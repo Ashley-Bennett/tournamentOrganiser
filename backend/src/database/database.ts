@@ -26,13 +26,15 @@ export class Database {
       if (err) {
         console.error("Error opening database:", err.message);
       } else {
-        console.log("✅ Connected to SQLite database");
+        console.log("✅ Connected to SQLite database at:", this.dbPath);
         this.initializeTables();
       }
     });
   }
 
   private initializeTables(): void {
+    console.log("🔧 Initializing database tables...");
+
     // Create users table (TOs only)
     const createUsersTable = `
       CREATE TABLE IF NOT EXISTS users (
@@ -256,23 +258,34 @@ export class Database {
   }): Promise<number> {
     return new Promise(async (resolve, reject) => {
       try {
+        console.log("🔐 Creating user in database:", {
+          name: user.name,
+          email: user.email,
+        });
         const hashedPassword = await bcrypt.hash(user.password, 10);
+        console.log("🔒 Password hashed successfully");
+
         const sql = `
           INSERT INTO users (name, email, password)
           VALUES (?, ?, ?)
         `;
+        console.log("📝 Executing SQL:", sql);
+
         this.db.run(
           sql,
           [user.name, user.email, hashedPassword],
           function (err) {
             if (err) {
+              console.error("❌ Database error:", err);
               reject(err);
             } else {
+              console.log("✅ User inserted with ID:", this.lastID);
               resolve(this.lastID);
             }
           }
         );
       } catch (err) {
+        console.error("❌ Error in createUser:", err);
         reject(err);
       }
     });

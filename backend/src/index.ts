@@ -73,21 +73,35 @@ app.get("/api", (req, res) => {
 // User routes
 app.post("/api/users", async (req, res) => {
   try {
+    console.log("📝 Registration attempt:", {
+      name: req.body.name,
+      email: req.body.email,
+    });
+
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
+      console.log("❌ Missing required fields");
       return res
         .status(400)
         .json({ error: "Name, email, and password are required" });
     }
 
+    console.log("🔐 Creating user in database...");
     const userId = await db.createUser({ name, email, password });
-    res.status(201).json({ id: userId, message: "User created successfully" });
+    console.log("✅ User created successfully with ID:", userId);
+
+    const response = { id: userId, message: "User created successfully" };
+    console.log("📤 Sending response:", response);
+    res.status(201).json(response);
   } catch (error: any) {
+    console.error("❌ Error creating user:", error);
     if (error.message.includes("UNIQUE constraint failed")) {
       res.status(409).json({ error: "Email already exists" });
     } else {
-      res.status(500).json({ error: "Failed to create user" });
+      res
+        .status(500)
+        .json({ error: "Failed to create user", details: error.message });
     }
   }
 });
