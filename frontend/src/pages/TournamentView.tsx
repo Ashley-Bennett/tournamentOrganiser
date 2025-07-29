@@ -108,6 +108,9 @@ const TournamentView: React.FC = () => {
     selectedPlayers: [] as Player[],
     started_round: 1,
   });
+  const [addPlayerFormError, setAddPlayerFormError] = useState<string | null>(
+    null
+  );
   const [createPlayerForm, setCreatePlayerForm] = useState({
     name: "",
     static_seating: false,
@@ -459,9 +462,11 @@ const TournamentView: React.FC = () => {
 
     // Validate that at least one player is selected
     if (addPlayerForm.selectedPlayers.length === 0) {
-      return; // Don't set error, just return - the field will show its own error state
+      setAddPlayerFormError("Please select at least one player");
+      return;
     }
 
+    setAddPlayerFormError(null);
     setAddingPlayer(true);
 
     try {
@@ -490,6 +495,7 @@ const TournamentView: React.FC = () => {
           selectedPlayers: [],
           started_round: 1,
         });
+        setAddPlayerFormError(null);
         fetchTournamentPlayers(); // Refresh the tournament players
       } else {
         const errorData = await response.json();
@@ -760,6 +766,7 @@ const TournamentView: React.FC = () => {
               onClick={() => {
                 setError(null); // Clear any previous errors
                 setSuccess(null); // Clear any previous success messages
+                setAddPlayerFormError(null); // Clear form errors
                 setOpenAddPlayerDialog(true);
               }}
               disabled={tournament?.is_completed}
@@ -1092,7 +1099,10 @@ const TournamentView: React.FC = () => {
         {/* Add Player Dialog */}
         <Dialog
           open={openAddPlayerDialog && !tournament?.is_completed}
-          onClose={() => setOpenAddPlayerDialog(false)}
+          onClose={() => {
+            setOpenAddPlayerDialog(false);
+            setAddPlayerFormError(null);
+          }}
           maxWidth="md"
           fullWidth
         >
@@ -1109,18 +1119,23 @@ const TournamentView: React.FC = () => {
                     )}
                     getOptionLabel={(option) => option.name}
                     value={addPlayerForm.selectedPlayers}
-                    onChange={(_, newValue) =>
+                    onChange={(_, newValue) => {
                       setAddPlayerForm({
                         ...addPlayerForm,
                         selectedPlayers: newValue,
-                      })
-                    }
+                      });
+                      // Clear error when user selects players
+                      if (newValue.length > 0) {
+                        setAddPlayerFormError(null);
+                      }
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
                         label="Select Players"
                         placeholder="Choose players to add"
-                        required
+                        error={Boolean(addPlayerFormError)}
+                        helperText={addPlayerFormError}
                       />
                     )}
                     renderOption={(props, option) => (
@@ -1155,7 +1170,10 @@ const TournamentView: React.FC = () => {
             </DialogContent>
             <DialogActions>
               <Button
-                onClick={() => setOpenAddPlayerDialog(false)}
+                onClick={() => {
+                  setOpenAddPlayerDialog(false);
+                  setAddPlayerFormError(null);
+                }}
                 disabled={addingPlayer}
               >
                 Cancel
