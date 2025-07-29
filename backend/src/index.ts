@@ -27,8 +27,9 @@ const corsOptions = {
     "https://localhost:3000",
   ],
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  exposedHeaders: ["Content-Type", "Authorization"],
   optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
 };
 
@@ -195,6 +196,10 @@ app.post("/api/login", async (req, res) => {
 
 // Protect all API routes except login and user registration
 app.use("/api", (req, res, next) => {
+  // Skip authentication for OPTIONS requests (CORS preflight)
+  if (req.method === "OPTIONS") {
+    return next();
+  }
   // Skip authentication for login and user registration
   if (req.path === "/login" || req.path === "/users") {
     return next();
