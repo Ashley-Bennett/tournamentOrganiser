@@ -39,6 +39,7 @@ import {
   People as PeopleIcon,
   EmojiEvents as TrophyIcon,
   Add as AddIcon,
+  Leaderboard as LeaderboardIcon,
 } from "@mui/icons-material";
 
 interface Tournament {
@@ -81,6 +82,18 @@ interface TournamentPlayer {
   created_at: string;
 }
 
+interface LeaderboardEntry {
+  id: number;
+  name: string;
+  points: number;
+  matches_played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  opponent_resistance: number;
+  opponent_opponent_resistance: number;
+}
+
 const TournamentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -89,6 +102,7 @@ const TournamentView: React.FC = () => {
   const [tournamentPlayers, setTournamentPlayers] = useState<
     TournamentPlayer[]
   >([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -132,6 +146,7 @@ const TournamentView: React.FC = () => {
       fetchTournamentData();
       fetchPlayers();
       fetchTournamentPlayers();
+      fetchLeaderboard();
     }
   }, [id]);
 
@@ -188,6 +203,20 @@ const TournamentView: React.FC = () => {
       }
     } catch (error) {
       console.error("Error fetching tournament players:", error);
+    }
+  };
+
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/tournaments/${id}/leaderboard`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setLeaderboard(data);
+      }
+    } catch (error) {
+      console.error("Error fetching leaderboard:", error);
     }
   };
 
@@ -444,6 +473,9 @@ const TournamentView: React.FC = () => {
         // Show subtle visual feedback
         setRecentlyUpdatedMatch(matchId);
         setTimeout(() => setRecentlyUpdatedMatch(null), 2000);
+
+        // Refresh leaderboard data
+        fetchLeaderboard();
 
         // Clear any previous errors
         setError(null);
@@ -775,6 +807,14 @@ const TournamentView: React.FC = () => {
                       />
                     )}
                   </Typography>
+                </Box>
+              }
+            />
+            <Tab
+              label={
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <LeaderboardIcon />
+                  <Typography>Leaderboard</Typography>
                 </Box>
               }
             />
@@ -1188,6 +1228,145 @@ const TournamentView: React.FC = () => {
                   </Box>
                 )}
               </Box>
+            )}
+          </Box>
+        )}
+
+        {/* Leaderboard Tab Content */}
+        {mainTabValue === 2 && (
+          <Box>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              mb={2}
+            >
+              <Typography variant="h5" gutterBottom>
+                Tournament Leaderboard
+              </Typography>
+              <Button
+                variant="outlined"
+                onClick={fetchLeaderboard}
+                disabled={loading}
+              >
+                Refresh Leaderboard
+              </Button>
+            </Box>
+
+            {leaderboard.length === 0 ? (
+              <Alert severity="info">
+                No leaderboard data available. Complete some matches to see
+                standings.
+              </Alert>
+            ) : (
+              <>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    <strong>Tiebreakers:</strong> Opponent's Resistance and
+                    Opponent's Opponent's Resistance are calculated based on
+                    your opponents' performance. Higher resistance values
+                    indicate stronger opponents, which can help break ties in
+                    standings.
+                  </Typography>
+                </Alert>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Rank</TableCell>
+                        <TableCell>Player</TableCell>
+                        <TableCell align="center">Points</TableCell>
+                        <TableCell align="center">W-L-D</TableCell>
+                        <TableCell align="center">Matches</TableCell>
+                        <TableCell align="center">
+                          Opponent's Resistance
+                        </TableCell>
+                        <TableCell align="center">
+                          Opponent's Opponent's Resistance
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {leaderboard.map((entry, index) => (
+                        <TableRow key={entry.id}>
+                          <TableCell>
+                            <Box display="flex" alignItems="center">
+                              <Typography
+                                variant="h6"
+                                color="primary"
+                                fontWeight="bold"
+                              >
+                                {index + 1}
+                              </Typography>
+                              {index === 0 && (
+                                <Chip
+                                  label="🥇"
+                                  size="small"
+                                  sx={{ ml: 1 }}
+                                  color="warning"
+                                />
+                              )}
+                              {index === 1 && (
+                                <Chip
+                                  label="🥈"
+                                  size="small"
+                                  sx={{ ml: 1 }}
+                                  color="default"
+                                />
+                              )}
+                              {index === 2 && (
+                                <Chip
+                                  label="🥉"
+                                  size="small"
+                                  sx={{ ml: 1 }}
+                                  color="default"
+                                />
+                              )}
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body1" fontWeight="medium">
+                              {entry.name}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography
+                              variant="h6"
+                              color="primary"
+                              fontWeight="bold"
+                            >
+                              {entry.points}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">
+                              {entry.wins}-{entry.losses}-{entry.draws}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">
+                              {entry.matches_played}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">
+                              {(entry.opponent_resistance * 100).toFixed(1)}%
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2">
+                              {(
+                                entry.opponent_opponent_resistance * 100
+                              ).toFixed(1)}
+                              %
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
             )}
           </Box>
         )}

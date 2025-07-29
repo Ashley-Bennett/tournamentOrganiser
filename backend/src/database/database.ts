@@ -803,6 +803,309 @@ export class Database {
     });
   }
 
+  async getLeaderboardWithTiebreakers(tournamentId: number): Promise<any[]> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // First, get basic player stats
+        const basicStats = await new Promise<any[]>(
+          (resolveStats, rejectStats) => {
+            const sql = `
+            SELECT 
+              p.id,
+              p.name,
+              p.static_seating,
+              tp.dropped,
+              tp.started_round,
+              COALESCE(SUM(
+                CASE 
+                  WHEN m.player1_id = p.id AND m.result = 'WIN_P1' THEN 1
+                  WHEN m.player2_id = p.id AND m.result = 'WIN_P2' THEN 1
+                  WHEN m.player1_id = p.id AND m.result = 'DRAW' THEN 0.5
+                  WHEN m.player2_id = p.id AND m.result = 'DRAW' THEN 0.5
+                  WHEN m.player1_id = p.id AND m.result = 'BYE' THEN 1
+                  WHEN m.player2_id = p.id AND m.result = 'BYE' THEN 1
+                  ELSE 0
+                END
+              ), 0) as points,
+              COUNT(m.id) as matches_played,
+                          SUM(CASE WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 1
+                     WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 1
+                     WHEN m.result = 'BYE' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
+                     ELSE 0 END) as wins,
+            SUM(CASE WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
+                     ELSE 0 END) as draws,
+            SUM(CASE WHEN m.result = 'WIN_P1' AND m.player2_id = p.id THEN 1
+                     WHEN m.result = 'WIN_P2' AND m.player1_id = p.id THEN 1
+                     ELSE 0 END) as losses
+            FROM players p
+            INNER JOIN tournament_players tp ON p.id = tp.player_id
+            LEFT JOIN matches m ON (m.player1_id = p.id OR m.player2_id = p.id) 
+              AND m.tournament_id = tp.tournament_id
+            WHERE tp.tournament_id = ? AND tp.dropped = FALSE
+            GROUP BY p.id, p.name, p.static_seating, tp.dropped, tp.started_round
+          `;
+
+            this.db.all(sql, [tournamentId], (err, rows) => {
+              if (err) {
+                rejectStats(err);
+              } else {
+                resolveStats(rows);
+              }
+            });
+          }
+        );
+
+        // Calculate opponent resistance for each player
+        const playersWithResistance = await Promise.all(
+          basicStats.map(async (player) => {
+            const opponents = await new Promise<any[]>(
+              (resolveOpponents, rejectOpponents) => {
+                const sql = `
+                SELECT DISTINCT 
+                  CASE 
+                    WHEN m.player1_id = ? THEN m.player2_id
+                    WHEN m.player2_id = ? THEN m.player1_id
+                  END as opponent_id
+                FROM matches m
+                WHERE m.tournament_id = ? 
+                  AND (m.player1_id = ? OR m.player2_id = ?)
+                  AND m.result IS NOT NULL
+                  AND m.result != 'BYE'
+              `;
+
+                this.db.all(
+                  sql,
+                  [player.id, player.id, tournamentId, player.id, player.id],
+                  (err, rows) => {
+                    if (err) {
+                      rejectOpponents(err);
+                    } else {
+                      resolveOpponents(rows);
+                    }
+                  }
+                );
+              }
+            );
+
+            // Calculate opponent resistance
+            let opponentResistance = 0;
+            if (opponents.length > 0) {
+              const opponentStats = await Promise.all(
+                opponents.map(async (opponent) => {
+                  const stats = await new Promise<any>(
+                    (resolveStats, rejectStats) => {
+                      const sql = `
+                      SELECT 
+                        COALESCE(SUM(
+                          CASE 
+                            WHEN m.player1_id = ? AND m.result = 'WIN_P1' THEN 1
+                            WHEN m.player2_id = ? AND m.result = 'WIN_P2' THEN 1
+                            WHEN m.player1_id = ? AND m.result = 'DRAW' THEN 0.5
+                            WHEN m.player2_id = ? AND m.result = 'DRAW' THEN 0.5
+                            WHEN m.player1_id = ? AND m.result = 'BYE' THEN 1
+                            WHEN m.player2_id = ? AND m.result = 'BYE' THEN 1
+                            ELSE 0
+                          END
+                        ), 0) as points,
+                        COUNT(m.id) as matches_played
+                      FROM matches m
+                      WHERE m.tournament_id = ? 
+                        AND (m.player1_id = ? OR m.player2_id = ?)
+                        AND m.result IS NOT NULL
+                        AND m.result != 'BYE'
+                    `;
+
+                      this.db.get(
+                        sql,
+                        [
+                          opponent.opponent_id,
+                          opponent.opponent_id,
+                          opponent.opponent_id,
+                          opponent.opponent_id,
+                          opponent.opponent_id,
+                          opponent.opponent_id,
+                          tournamentId,
+                          opponent.opponent_id,
+                          opponent.opponent_id,
+                        ],
+                        (err, row) => {
+                          if (err) {
+                            rejectStats(err);
+                          } else {
+                            resolveStats(row);
+                          }
+                        }
+                      );
+                    }
+                  );
+
+                  const resistance =
+                    stats.matches_played > 0
+                      ? Math.max(0.25, stats.points / stats.matches_played)
+                      : 0.25;
+
+                  return resistance;
+                })
+              );
+
+              opponentResistance =
+                opponentStats.reduce((sum, resistance) => sum + resistance, 0) /
+                opponentStats.length;
+            }
+
+            // Calculate opponent's opponent's resistance
+            let opponentOpponentResistance = 0;
+            if (opponents.length > 0) {
+              const opponentOpponentResistances = await Promise.all(
+                opponents.map(async (opponent) => {
+                  // Get the opponents of this opponent
+                  const opponentOpponents = await new Promise<any[]>(
+                    (resolveOpponentOpponents, rejectOpponentOpponents) => {
+                      const sql = `
+                      SELECT DISTINCT 
+                        CASE 
+                          WHEN m.player1_id = ? THEN m.player2_id
+                          WHEN m.player2_id = ? THEN m.player1_id
+                        END as opponent_opponent_id
+                      FROM matches m
+                      WHERE m.tournament_id = ? 
+                        AND (m.player1_id = ? OR m.player2_id = ?)
+                        AND m.result IS NOT NULL
+                        AND m.result != 'BYE'
+                        AND (m.player1_id != ? AND m.player2_id != ?)
+                    `;
+
+                      this.db.all(
+                        sql,
+                        [
+                          opponent.opponent_id,
+                          opponent.opponent_id,
+                          tournamentId,
+                          opponent.opponent_id,
+                          opponent.opponent_id,
+                          player.id,
+                          player.id,
+                        ],
+                        (err, rows) => {
+                          if (err) {
+                            rejectOpponentOpponents(err);
+                          } else {
+                            resolveOpponentOpponents(rows);
+                          }
+                        }
+                      );
+                    }
+                  );
+
+                  // Calculate resistance for each opponent's opponent
+                  if (opponentOpponents.length > 0) {
+                    const opponentOpponentStats = await Promise.all(
+                      opponentOpponents.map(async (opponentOpponent) => {
+                        const stats = await new Promise<any>(
+                          (resolveStats, rejectStats) => {
+                            const sql = `
+                            SELECT 
+                              COALESCE(SUM(
+                                CASE 
+                                  WHEN m.player1_id = ? AND m.result = 'WIN_P1' THEN 1
+                                  WHEN m.player2_id = ? AND m.result = 'WIN_P2' THEN 1
+                                  WHEN m.player1_id = ? AND m.result = 'DRAW' THEN 0.5
+                                  WHEN m.player2_id = ? AND m.result = 'DRAW' THEN 0.5
+                                  WHEN m.player1_id = ? AND m.result = 'BYE' THEN 1
+                                  WHEN m.player2_id = ? AND m.result = 'BYE' THEN 1
+                                  ELSE 0
+                                END
+                              ), 0) as points,
+                              COUNT(m.id) as matches_played
+                            FROM matches m
+                            WHERE m.tournament_id = ? 
+                              AND (m.player1_id = ? OR m.player2_id = ?)
+                              AND m.result IS NOT NULL
+                              AND m.result != 'BYE'
+                          `;
+
+                            this.db.get(
+                              sql,
+                              [
+                                opponentOpponent.opponent_opponent_id,
+                                opponentOpponent.opponent_opponent_id,
+                                opponentOpponent.opponent_opponent_id,
+                                opponentOpponent.opponent_opponent_id,
+                                opponentOpponent.opponent_opponent_id,
+                                opponentOpponent.opponent_opponent_id,
+                                tournamentId,
+                                opponentOpponent.opponent_opponent_id,
+                                opponentOpponent.opponent_opponent_id,
+                              ],
+                              (err, row) => {
+                                if (err) {
+                                  rejectStats(err);
+                                } else {
+                                  resolveStats(row);
+                                }
+                              }
+                            );
+                          }
+                        );
+
+                        const resistance =
+                          stats.matches_played > 0
+                            ? Math.max(
+                                0.25,
+                                stats.points / stats.matches_played
+                              )
+                            : 0.25;
+
+                        return resistance;
+                      })
+                    );
+
+                    const avgResistance =
+                      opponentOpponentStats.reduce(
+                        (sum, resistance) => sum + resistance,
+                        0
+                      ) / opponentOpponentStats.length;
+                    return avgResistance;
+                  } else {
+                    return 0.25; // Default minimum resistance
+                  }
+                })
+              );
+
+              opponentOpponentResistance =
+                opponentOpponentResistances.reduce(
+                  (sum, resistance) => sum + resistance,
+                  0
+                ) / opponentOpponentResistances.length;
+            }
+
+            return {
+              ...player,
+              opponent_resistance: opponentResistance,
+              opponent_opponent_resistance: opponentOpponentResistance,
+            };
+          })
+        );
+
+        // Sort by points, then opponent resistance, then opponent's opponent's resistance, then name
+        playersWithResistance.sort((a, b) => {
+          if (a.points !== b.points) return b.points - a.points;
+          if (a.opponent_resistance !== b.opponent_resistance)
+            return b.opponent_resistance - a.opponent_resistance;
+          if (a.opponent_opponent_resistance !== b.opponent_opponent_resistance)
+            return (
+              b.opponent_opponent_resistance - a.opponent_opponent_resistance
+            );
+          return a.name.localeCompare(b.name);
+        });
+
+        resolve(playersWithResistance);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
   async updateMatchResult(
     matchId: number,
     result: string,

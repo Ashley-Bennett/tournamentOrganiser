@@ -389,6 +389,17 @@ app.get("/api/tournaments/:id/standings", async (req, res) => {
   }
 });
 
+// Get leaderboard with tiebreakers for a tournament
+app.get("/api/tournaments/:id/leaderboard", async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id);
+    const leaderboard = await db.getLeaderboardWithTiebreakers(tournamentId);
+    res.json(leaderboard);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get leaderboard" });
+  }
+});
+
 // Create automatic pairings for a round
 app.post("/api/tournaments/:id/pairings", async (req, res) => {
   try {
