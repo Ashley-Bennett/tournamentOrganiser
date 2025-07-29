@@ -274,12 +274,19 @@ const TournamentView: React.FC = () => {
       ? Math.max(...roundNumbers)
       : null;
 
-  // Set selected round to highest round on initial load (for both active and completed tournaments)
+  // Set selected round to highest round on initial load and when new matches are created
   useEffect(() => {
-    if (roundNumbers.length > 0 && selectedRound === null) {
-      setSelectedRound(Math.max(...roundNumbers));
+    if (roundNumbers.length > 0) {
+      const maxRound = Math.max(...roundNumbers);
+      // Set to max round if no round is selected, or if we're on the active round and new matches were created
+      if (
+        selectedRound === null ||
+        (selectedRound === activeRound && activeRound !== null)
+      ) {
+        setSelectedRound(maxRound);
+      }
     }
-  }, [roundNumbers, selectedRound]);
+  }, [roundNumbers, selectedRound, activeRound]);
 
   const handleCreateMatch = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -353,7 +360,12 @@ const TournamentView: React.FC = () => {
         setOpenPairingOptionsDialog(false);
         setSuccess("Automatic pairings created successfully!");
         setTimeout(() => setSuccess(null), 5000);
-        fetchTournamentData(); // Refresh the tournament data
+
+        // Refresh tournament data and then set the selected round to the latest
+        await fetchTournamentData();
+
+        // Set the selected round to the round we just created
+        setSelectedRound(roundNumber);
       } else {
         const errorData = await response.json();
         setError(errorData.error || "Failed to create automatic pairings");
