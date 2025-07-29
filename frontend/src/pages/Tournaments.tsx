@@ -183,6 +183,26 @@ const Tournaments: React.FC = () => {
 
   return (
     <Box>
+      <Box
+        display="flex"
+        flexWrap="wrap"
+        gap={2}
+        mb={2}
+        justifyContent="space-between"
+        alignItems="center"
+      >
+        <Typography variant="h4" component="h1">
+          Tournaments
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          component={RouterLink}
+          to="/tournaments/create"
+        >
+          Create Tournament
+        </Button>
+      </Box>
       <Box display="flex" flexWrap="wrap" gap={2} mb={2}>
         <TextField
           label="Search Name"
@@ -221,24 +241,6 @@ const Tournaments: React.FC = () => {
             <MenuItem value="completed">Completed</MenuItem>
           </Select>
         </FormControl>
-      </Box>
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={3}
-      >
-        <Typography variant="h4" component="h1">
-          Tournaments
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          component={RouterLink}
-          to="/tournaments/create"
-        >
-          Create Tournament
-        </Button>
       </Box>
 
       {error && (
