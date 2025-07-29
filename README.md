@@ -1,11 +1,11 @@
-# Tournament Organiser
+# Matchamp
 
 A full-stack tournament management application built with React, TypeScript, Material-UI, Node.js, Express, and SQLite.
 
 ## 🏗️ Project Structure
 
 ```
-tournamentOrganiser/
+matchamp/
 ├── backend/                 # Node.js/Express backend
 │   ├── src/
 │   │   ├── database/       # SQLite database setup
@@ -36,7 +36,7 @@ tournamentOrganiser/
 
    ```bash
    git clone <repository-url>
-   cd tournamentOrganiser
+   cd matchamp
    ```
 
 2. **Install dependencies**

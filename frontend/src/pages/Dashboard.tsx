@@ -183,7 +183,7 @@ const Dashboard: React.FC = () => {
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>
-              Welcome to Tournament Organiser
+              Welcome to Matchamp
             </Typography>
             <Typography variant="body1" paragraph>
               This is your tournament management dashboard. Here you can:

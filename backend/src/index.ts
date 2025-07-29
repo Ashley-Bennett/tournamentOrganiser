@@ -32,7 +32,7 @@ app.get("/api/health", (req, res) => {
   res.json({
     status: "OK",
     timestamp: new Date().toISOString(),
-    message: "Tournament Organiser Backend is running",
+    message: "Matchamp Backend is running",
   });
 });
 
@@ -51,7 +51,7 @@ if (process.env.NODE_ENV === "development") {
 // API routes
 app.get("/api", (req, res) => {
   res.json({
-    message: "Tournament Organiser API",
+    message: "Matchamp API",
     version: "1.0.0",
   });
 });

@@ -1,7 +1,7 @@
 {
-  "name": "tournament-organiser",
+  "name": "matchamp",
   "version": "1.0.0",
-  "description": "Tournament Organiser - Full Stack Application",
+  "description": "Matchamp - Full Stack Application",
   "private": true,
   "workspaces": [
     "frontend",

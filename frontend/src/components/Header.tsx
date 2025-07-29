@@ -24,7 +24,7 @@ const Header: React.FC = () => {
         </IconButton>
 
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          Tournament Organiser
+          Matchamp
         </Typography>
 
         <Box sx={{ display: "flex", gap: 2 }}>

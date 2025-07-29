@@ -1,7 +1,7 @@
 {
-  "name": "tournament-organiser-backend",
+  "name": "matchamp-backend",
   "version": "1.0.0",
-  "description": "Backend for Tournament Organiser",
+  "description": "Backend for Matchamp",
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon src/index.ts",

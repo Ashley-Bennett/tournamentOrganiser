@@ -1,4 +1,4 @@
-Write-Host "Starting Tournament Organiser Development Servers..." -ForegroundColor Green
+Write-Host "Starting Matchamp Development Servers..." -ForegroundColor Green
 Write-Host ""
 
 Write-Host "Starting Backend Server (Port 3002)..." -ForegroundColor Yellow
