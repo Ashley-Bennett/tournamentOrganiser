@@ -19,12 +19,23 @@ import {
   CardContent,
   Tabs,
   Tab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
 } from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
   SportsEsports as TournamentIcon,
   People as PeopleIcon,
   EmojiEvents as TrophyIcon,
+  Add as AddIcon,
 } from "@mui/icons-material";
 
 interface Tournament {
@@ -50,18 +61,53 @@ interface Match {
   created_at: string;
 }
 
+interface Player {
+  id: number;
+  name: string;
+  static_seating: boolean;
+  created_at: string;
+}
+
+interface TournamentPlayer {
+  id: number;
+  name: string;
+  static_seating: boolean;
+  dropped: boolean;
+  started_round: number;
+  created_at: string;
+}
+
 const TournamentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [tournamentPlayers, setTournamentPlayers] = useState<
+    TournamentPlayer[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
+  const [openCreateMatchDialog, setOpenCreateMatchDialog] = useState(false);
+  const [openAddPlayerDialog, setOpenAddPlayerDialog] = useState(false);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [createMatchForm, setCreateMatchForm] = useState({
+    round_number: 1,
+    player1_id: "",
+    player2_id: "",
+  });
+  const [addPlayerForm, setAddPlayerForm] = useState({
+    player_id: "",
+    started_round: 1,
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [addingPlayer, setAddingPlayer] = useState(false);
 
   useEffect(() => {
     if (id) {
       fetchTournamentData();
+      fetchPlayers();
+      fetchTournamentPlayers();
     }
   }, [id]);
 
@@ -92,6 +138,32 @@ const TournamentView: React.FC = () => {
       setError("Failed to load tournament data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPlayers = async () => {
+    try {
+      const response = await fetch("http://localhost:3002/api/players");
+      if (response.ok) {
+        const data = await response.json();
+        setPlayers(data);
+      }
+    } catch (error) {
+      console.error("Error fetching players:", error);
+    }
+  };
+
+  const fetchTournamentPlayers = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/tournaments/${id}/players`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setTournamentPlayers(data);
+      }
+    } catch (error) {
+      console.error("Error fetching tournament players:", error);
     }
   };
 
@@ -160,6 +232,122 @@ const TournamentView: React.FC = () => {
       setSelectedRound(Math.max(...roundNumbers));
     }
   }, [roundNumbers, selectedRound]);
+
+  const handleCreateMatch = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmitting(true);
+
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/tournaments/${id}/matches`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            round_number: createMatchForm.round_number,
+            player1_id: createMatchForm.player1_id
+              ? parseInt(createMatchForm.player1_id)
+              : null,
+            player2_id: createMatchForm.player2_id
+              ? parseInt(createMatchForm.player2_id)
+              : null,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Match created:", result);
+        setOpenCreateMatchDialog(false);
+        setCreateMatchForm({
+          round_number: 1,
+          player1_id: "",
+          player2_id: "",
+        });
+        fetchTournamentData(); // Refresh the tournament data
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to create match");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAddPlayer = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAddingPlayer(true);
+
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/tournaments/${id}/players`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            player_id: parseInt(addPlayerForm.player_id),
+            started_round: addPlayerForm.started_round,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Player added to tournament:", result);
+        setOpenAddPlayerDialog(false);
+        setAddPlayerForm({
+          player_id: "",
+          started_round: 1,
+        });
+        fetchTournamentPlayers(); // Refresh the tournament players
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to add player to tournament");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setAddingPlayer(false);
+    }
+  };
+
+  const handleTextFieldChange =
+    (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+      setCreateMatchForm({
+        ...createMatchForm,
+        [field]: event.target.value,
+      });
+    };
+
+  const handleSelectChange =
+    (field: string) => (event: SelectChangeEvent<string>) => {
+      setCreateMatchForm({
+        ...createMatchForm,
+        [field]: event.target.value,
+      });
+    };
+
+  const handleAddPlayerTextFieldChange =
+    (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+      setAddPlayerForm({
+        ...addPlayerForm,
+        [field]: event.target.value,
+      });
+    };
+
+  const handleAddPlayerSelectChange =
+    (field: string) => (event: SelectChangeEvent<string>) => {
+      setAddPlayerForm({
+        ...addPlayerForm,
+        [field]: event.target.value,
+      });
+    };
 
   if (loading) {
     return (
@@ -259,6 +447,79 @@ const TournamentView: React.FC = () => {
         </Grid>
       </Paper>
 
+      {/* Tournament Players Section */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          mb={2}
+        >
+          <Typography variant="h5" gutterBottom>
+            Players ({tournamentPlayers.length})
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenAddPlayerDialog(true)}
+            disabled={tournament?.is_completed}
+          >
+            Add Player
+          </Button>
+        </Box>
+
+        {tournament?.is_completed && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            This tournament is completed. No new players can be added.
+          </Alert>
+        )}
+
+        {tournamentPlayers.length === 0 ? (
+          <Alert severity="info">
+            {tournament?.is_completed
+              ? "No players were added to this completed tournament."
+              : "No players have been added to this tournament yet. Add players to get started!"}
+          </Alert>
+        ) : (
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Seating Type</TableCell>
+                  <TableCell>Started Round</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Added</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {tournamentPlayers.map((player) => (
+                  <TableRow key={player.id}>
+                    <TableCell>{player.name}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={player.static_seating ? "Static" : "Dynamic"}
+                        color={player.static_seating ? "primary" : "default"}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>Round {player.started_round}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={player.dropped ? "Dropped" : "Active"}
+                        color={player.dropped ? "error" : "success"}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>{formatDate(player.created_at)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
+
       {/* Matches Section */}
       <Paper sx={{ p: 3 }}>
         <Typography variant="h5" gutterBottom>
@@ -325,11 +586,59 @@ const TournamentView: React.FC = () => {
         )}
 
         {matches.length === 0 ? (
-          <Alert severity="info">
-            No matches have been created for this tournament yet.
-          </Alert>
+          <Box>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              No matches have been created for this tournament yet.
+            </Alert>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenCreateMatchDialog(true)}
+              sx={{ mb: 2 }}
+              disabled={
+                tournamentPlayers.length === 0 || tournament?.is_completed
+              }
+            >
+              Create First Match
+            </Button>
+            {tournamentPlayers.length === 0 && (
+              <Alert severity="warning">
+                Add players to the tournament before creating matches.
+              </Alert>
+            )}
+            {tournament?.is_completed && (
+              <Alert severity="warning">
+                This tournament is completed. No new matches can be created.
+              </Alert>
+            )}
+          </Box>
         ) : (
           <Box>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 2,
+              }}
+            >
+              <Typography variant="h6" gutterBottom>
+                Round {selectedRound} -{" "}
+                {selectedRound && matchesByRound[selectedRound]
+                  ? matchesByRound[selectedRound].length
+                  : 0}{" "}
+                matches
+              </Typography>
+              <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={() => setOpenCreateMatchDialog(true)}
+                disabled={tournament?.is_completed}
+              >
+                Create Match
+              </Button>
+            </Box>
+
             {/* Round Navigation Tabs */}
             <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
               <Tabs
@@ -365,11 +674,6 @@ const TournamentView: React.FC = () => {
             {/* Matches for Selected Round */}
             {selectedRound && matchesByRound[selectedRound] && (
               <Box>
-                <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                  Round {selectedRound} - {matchesByRound[selectedRound].length}{" "}
-                  matches
-                </Typography>
-
                 <TableContainer>
                   <Table>
                     <TableHead>
@@ -404,6 +708,146 @@ const TournamentView: React.FC = () => {
             )}
           </Box>
         )}
+
+        {/* Add Player Dialog */}
+        <Dialog
+          open={openAddPlayerDialog && !tournament?.is_completed}
+          onClose={() => setOpenAddPlayerDialog(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Add Player to Tournament</DialogTitle>
+          <form onSubmit={handleAddPlayer}>
+            <DialogContent>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>Select Player</InputLabel>
+                    <Select
+                      value={addPlayerForm.player_id}
+                      label="Select Player"
+                      onChange={handleAddPlayerSelectChange("player_id")}
+                      required
+                    >
+                      {players
+                        .filter(
+                          (player) =>
+                            !tournamentPlayers.some((tp) => tp.id === player.id)
+                        )
+                        .map((player) => (
+                          <MenuItem key={player.id} value={player.id}>
+                            {player.name}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Started Round"
+                    type="number"
+                    value={addPlayerForm.started_round}
+                    onChange={handleAddPlayerTextFieldChange("started_round")}
+                    inputProps={{ min: 1 }}
+                    required
+                  />
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => setOpenAddPlayerDialog(false)}
+                disabled={addingPlayer}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="contained" disabled={addingPlayer}>
+                {addingPlayer ? "Adding..." : "Add Player"}
+              </Button>
+            </DialogActions>
+          </form>
+        </Dialog>
+
+        {/* Create Match Dialog */}
+        <Dialog
+          open={openCreateMatchDialog && !tournament?.is_completed}
+          onClose={() => setOpenCreateMatchDialog(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Create New Match</DialogTitle>
+          <form onSubmit={handleCreateMatch}>
+            <DialogContent>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Round Number"
+                    type="number"
+                    value={createMatchForm.round_number}
+                    onChange={handleTextFieldChange("round_number")}
+                    inputProps={{ min: 1 }}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>Player 1 (Optional)</InputLabel>
+                    <Select
+                      value={createMatchForm.player1_id}
+                      label="Player 1 (Optional)"
+                      onChange={handleSelectChange("player1_id")}
+                    >
+                      <MenuItem value="">
+                        <em>Select Player 1</em>
+                      </MenuItem>
+                      {tournamentPlayers
+                        .filter((player) => !player.dropped)
+                        .map((player) => (
+                          <MenuItem key={player.id} value={player.id}>
+                            {player.name}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>Player 2 (Optional)</InputLabel>
+                    <Select
+                      value={createMatchForm.player2_id}
+                      label="Player 2 (Optional)"
+                      onChange={handleSelectChange("player2_id")}
+                    >
+                      <MenuItem value="">
+                        <em>Select Player 2</em>
+                      </MenuItem>
+                      {tournamentPlayers
+                        .filter((player) => !player.dropped)
+                        .map((player) => (
+                          <MenuItem key={player.id} value={player.id}>
+                            {player.name}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => setOpenCreateMatchDialog(false)}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="contained" disabled={submitting}>
+                {submitting ? "Creating..." : "Create Match"}
+              </Button>
+            </DialogActions>
+          </form>
+        </Dialog>
       </Paper>
     </Box>
   );
