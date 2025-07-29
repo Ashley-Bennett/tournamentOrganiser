@@ -1,5 +1,6 @@
 import sqlite3 from "sqlite3";
 import path from "path";
+import bcrypt from "bcrypt";
 
 const DEBUG = process.env.DEBUG === "true";
 
@@ -168,19 +169,27 @@ export class Database {
     email: string;
     password: string;
   }): Promise<number> {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        INSERT INTO users (name, email, password)
-        VALUES (?, ?, ?)
-      `;
-
-      this.db.run(sql, [user.name, user.email, user.password], function (err) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(this.lastID);
-        }
-      });
+    return new Promise(async (resolve, reject) => {
+      try {
+        const hashedPassword = await bcrypt.hash(user.password, 10);
+        const sql = `
+          INSERT INTO users (name, email, password)
+          VALUES (?, ?, ?)
+        `;
+        this.db.run(
+          sql,
+          [user.name, user.email, hashedPassword],
+          function (err) {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(this.lastID);
+            }
+          }
+        );
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 

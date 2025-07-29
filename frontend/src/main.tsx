@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import App from "./App.tsx";
+import { AuthProvider } from "./AuthContext";
 
 const theme = createTheme({
   palette: {
@@ -25,7 +26,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
   </React.StrictMode>

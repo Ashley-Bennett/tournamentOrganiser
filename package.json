@@ -17,6 +17,8 @@
     "install:all": "npm install && npm install --workspace=frontend && npm install --workspace=backend"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "concurrently": "^8.2.2"
   },
   "keywords": [
@@ -29,6 +31,10 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "node-fetch": "^3.3.2"
+    "bcrypt": "^6.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^3.3.2",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0"
   }
 }
