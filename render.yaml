@@ -19,9 +19,8 @@ services:
         value: /opt/render/project/src/backend/data/tournament.db
 
   # Frontend service
-  - type: web
+  - type: static
     name: tournament-organizer-frontend
-    env: static
     plan: free
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
