@@ -95,7 +95,7 @@ app.post("/api/users", async (req, res) => {
       email: req.body.email,
       hasPassword: !!req.body.password,
     },
-    databasePath: process.env.DB_PATH || "default path",
+    databaseUrl: process.env.DATABASE_URL || "no database url",
     nodeEnv: process.env.NODE_ENV,
   };
 
@@ -249,7 +249,7 @@ app.delete("/api/leagues/:id", async (req, res) => {
     if (access !== "owner") {
       return res.status(403).json({ error: "Forbidden" });
     }
-    await db.runRawQuery("DELETE FROM leagues WHERE id = ?", [leagueId]);
+    await db.runRawQuery("DELETE FROM leagues WHERE id = $1", [leagueId]);
     res.json({ message: "League deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete league" });
@@ -364,14 +364,14 @@ app.delete("/api/tournaments/:id", async (req, res) => {
     if (access !== "owner") {
       return res.status(403).json({ error: "Forbidden" });
     }
-    await db.runRawQuery("DELETE FROM matches WHERE tournament_id = ?", [
+    await db.runRawQuery("DELETE FROM matches WHERE tournament_id = $1", [
       tournamentId,
     ]);
     await db.runRawQuery(
-      "DELETE FROM tournament_players WHERE tournament_id = ?",
+      "DELETE FROM tournament_players WHERE tournament_id = $1",
       [tournamentId]
     );
-    await db.runRawQuery("DELETE FROM tournaments WHERE id = ?", [
+    await db.runRawQuery("DELETE FROM tournaments WHERE id = $1", [
       tournamentId,
     ]);
     res.json({ message: "Tournament deleted successfully" });
@@ -449,7 +449,7 @@ app.delete("/api/players/:id", async (req, res) => {
     if (access !== "owner") {
       return res.status(403).json({ error: "Forbidden" });
     }
-    await db.runRawQuery("DELETE FROM players WHERE id = ?", [playerId]);
+    await db.runRawQuery("DELETE FROM players WHERE id = $1", [playerId]);
     res.json({ message: "Player deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete player" });
@@ -807,7 +807,7 @@ app.patch("/api/matches/:id", async (req, res) => {
 
     // Get the match to find tournament and round
     const dbMatch = await db.getRawQuery(
-      "SELECT tournament_id, round_number FROM matches WHERE id = ?",
+      "SELECT tournament_id, round_number FROM matches WHERE id = $1",
       [matchId]
     );
     if (!dbMatch) {
@@ -817,7 +817,7 @@ app.patch("/api/matches/:id", async (req, res) => {
 
     // Get all matches for this tournament and round
     const matches = await db.getRawQuery(
-      `SELECT * FROM matches WHERE tournament_id = ? AND round_number = ? AND id != ?`,
+      `SELECT * FROM matches WHERE tournament_id = $1 AND round_number = $2 AND id != $3`,
       [tournament_id, round_number, matchId]
     );
 
@@ -846,6 +846,7 @@ app.patch("/api/matches/:id", async (req, res) => {
     await db.updateMatch(matchId, player1_id, player2_id);
     res.json({ message: "Match updated successfully" });
   } catch (error) {
+    console.error("Error updating match:", error);
     res.status(500).json({ error: "Failed to update match" });
   }
 });
