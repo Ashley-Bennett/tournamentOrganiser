@@ -30,6 +30,8 @@ import {
   MenuItem,
   SelectChangeEvent,
   Autocomplete,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
@@ -88,9 +90,11 @@ const TournamentView: React.FC = () => {
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
   const [openCreateMatchDialog, setOpenCreateMatchDialog] = useState(false);
   const [openAddPlayerDialog, setOpenAddPlayerDialog] = useState(false);
+  const [openCreatePlayerDialog, setOpenCreatePlayerDialog] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
   const [createMatchForm, setCreateMatchForm] = useState({
     round_number: 1,
@@ -101,8 +105,13 @@ const TournamentView: React.FC = () => {
     selectedPlayers: [] as Player[],
     started_round: 1,
   });
+  const [createPlayerForm, setCreatePlayerForm] = useState({
+    name: "",
+    static_seating: false,
+  });
   const [submitting, setSubmitting] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
+  const [creatingPlayer, setCreatingPlayer] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -327,6 +336,70 @@ const TournamentView: React.FC = () => {
     }
   };
 
+  const handleCreatePlayer = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setCreatingPlayer(true);
+
+    try {
+      const response = await fetch("http://localhost:3002/api/players", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(createPlayerForm),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Player created:", result);
+
+        // Add the newly created player to the tournament
+        const addToTournamentResponse = await fetch(
+          `http://localhost:3002/api/tournaments/${id}/players`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              player_id: result.id,
+              started_round: 1,
+            }),
+          }
+        );
+
+        if (addToTournamentResponse.ok) {
+          console.log("Player automatically added to tournament");
+          setSuccess("Player created and added to tournament successfully!");
+          setError(null);
+          // Clear success message after 5 seconds
+          setTimeout(() => setSuccess(null), 5000);
+        } else {
+          console.warn("Player created but could not be added to tournament");
+          setSuccess(
+            "Player created successfully! You can add them to the tournament manually."
+          );
+          setError(null);
+          // Clear success message after 5 seconds
+          setTimeout(() => setSuccess(null), 5000);
+        }
+
+        setOpenCreatePlayerDialog(false);
+        setCreatePlayerForm({ name: "", static_seating: false });
+        fetchPlayers(); // Refresh the players list
+        fetchTournamentPlayers(); // Refresh the tournament players
+        setError(null); // Clear any previous errors
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to create player");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setCreatingPlayer(false);
+    }
+  };
+
   const handleTextFieldChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
       setCreateMatchForm({
@@ -348,6 +421,19 @@ const TournamentView: React.FC = () => {
       setAddPlayerForm({
         ...addPlayerForm,
         [field]: event.target.value,
+      });
+    };
+
+  const handleCreatePlayerChange =
+    (field: string) =>
+    (event: React.ChangeEvent<HTMLInputElement | { value: unknown }>) => {
+      const value =
+        field === "static_seating"
+          ? (event.target as HTMLInputElement).checked
+          : event.target.value;
+      setCreatePlayerForm({
+        ...createPlayerForm,
+        [field]: value,
       });
     };
 
@@ -375,6 +461,11 @@ const TournamentView: React.FC = () => {
           Back to Tournaments
         </Button>
         <Alert severity="error">{error || "Tournament not found"}</Alert>
+        {success && (
+          <Alert severity="success" sx={{ mt: 2 }}>
+            {success}
+          </Alert>
+        )}
       </Box>
     );
   }
@@ -388,6 +479,18 @@ const TournamentView: React.FC = () => {
       >
         Back to Tournaments
       </Button>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {success && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          {success}
+        </Alert>
+      )}
 
       {/* Tournament Header */}
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -460,17 +563,31 @@ const TournamentView: React.FC = () => {
           <Typography variant="h5" gutterBottom>
             Players ({tournamentPlayers.length})
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => {
-              setError(null); // Clear any previous errors
-              setOpenAddPlayerDialog(true);
-            }}
-            disabled={tournament?.is_completed}
-          >
-            Add Players
-          </Button>
+          <Box display="flex" gap={2}>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setError(null); // Clear any previous errors
+                setSuccess(null); // Clear any previous success messages
+                setOpenCreatePlayerDialog(true);
+              }}
+              disabled={tournament?.is_completed}
+            >
+              Create New Player
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setError(null); // Clear any previous errors
+                setSuccess(null); // Clear any previous success messages
+                setOpenAddPlayerDialog(true);
+              }}
+              disabled={tournament?.is_completed}
+            >
+              Add Players
+            </Button>
+          </Box>
         </Box>
 
         {Boolean(tournament?.is_completed) && (
@@ -838,6 +955,53 @@ const TournamentView: React.FC = () => {
                   : `Add ${addPlayerForm.selectedPlayers.length} Player${
                       addPlayerForm.selectedPlayers.length !== 1 ? "s" : ""
                     }`}
+              </Button>
+            </DialogActions>
+          </form>
+        </Dialog>
+
+        {/* Create Player Dialog */}
+        <Dialog
+          open={openCreatePlayerDialog}
+          onClose={() => setOpenCreatePlayerDialog(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Create New Player</DialogTitle>
+          <form onSubmit={handleCreatePlayer}>
+            <DialogContent>
+              <TextField
+                fullWidth
+                label="Player Name"
+                value={createPlayerForm.name}
+                onChange={handleCreatePlayerChange("name")}
+                required
+                variant="outlined"
+                sx={{ mb: 2 }}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={createPlayerForm.static_seating}
+                    onChange={handleCreatePlayerChange("static_seating")}
+                  />
+                }
+                label="Static Seating (Player prefers fixed seating position)"
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => setOpenCreatePlayerDialog(false)}
+                disabled={creatingPlayer}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={creatingPlayer || !createPlayerForm.name.trim()}
+              >
+                {creatingPlayer ? "Creating..." : "Create Player"}
               </Button>
             </DialogActions>
           </form>
