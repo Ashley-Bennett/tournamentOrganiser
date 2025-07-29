@@ -89,6 +89,48 @@ const migrateDatabase = async () => {
 
     console.log("✅ Existing tournaments updated to SWISS bracket type");
 
+    // Add trainer_id column to players table if it doesn't exist
+    console.log("Checking for trainer_id column in players table...");
+    const checkTrainerIdColumnSql = `
+      SELECT COUNT(*) as count 
+      FROM pragma_table_info('players') 
+      WHERE name = 'trainer_id'
+    `;
+    const trainerIdColumnExists = await db
+      .getRawQuery(checkTrainerIdColumnSql, [])
+      .then((row: any) => row.count > 0);
+    if (!trainerIdColumnExists) {
+      console.log("Adding trainer_id column...");
+      await db.runRawQuery(
+        `ALTER TABLE players ADD COLUMN trainer_id TEXT`,
+        []
+      );
+      console.log("✅ trainer_id column added successfully");
+    } else {
+      console.log("✅ trainer_id column already exists");
+    }
+
+    // Add birth_year column to players table if it doesn't exist
+    console.log("Checking for birth_year column in players table...");
+    const checkBirthYearColumnSql = `
+      SELECT COUNT(*) as count 
+      FROM pragma_table_info('players') 
+      WHERE name = 'birth_year'
+    `;
+    const birthYearColumnExists = await db
+      .getRawQuery(checkBirthYearColumnSql, [])
+      .then((row: any) => row.count > 0);
+    if (!birthYearColumnExists) {
+      console.log("Adding birth_year column...");
+      await db.runRawQuery(
+        `ALTER TABLE players ADD COLUMN birth_year INTEGER`,
+        []
+      );
+      console.log("✅ birth_year column added successfully");
+    } else {
+      console.log("✅ birth_year column already exists");
+    }
+
     console.log("🎉 Database migration completed successfully!");
   } catch (error) {
     console.error("❌ Migration failed:", error);

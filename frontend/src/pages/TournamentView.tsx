@@ -131,6 +131,8 @@ const TournamentView: React.FC = () => {
   const [createPlayerForm, setCreatePlayerForm] = useState({
     name: "",
     static_seating: false,
+    trainer_id: "",
+    birth_year: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
@@ -587,14 +589,21 @@ const TournamentView: React.FC = () => {
   const handleCreatePlayer = async (event: React.FormEvent) => {
     event.preventDefault();
     setCreatingPlayer(true);
-
+    setError(null);
+    setSuccess(null);
     try {
+      const payload: any = {
+        name: createPlayerForm.name,
+        static_seating: createPlayerForm.static_seating,
+      };
+      if (createPlayerForm.trainer_id)
+        payload.trainer_id = createPlayerForm.trainer_id;
+      if (createPlayerForm.birth_year)
+        payload.birth_year = Number(createPlayerForm.birth_year);
       const response = await fetch("http://localhost:3002/api/players", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(createPlayerForm),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -633,7 +642,12 @@ const TournamentView: React.FC = () => {
         }
 
         setOpenCreatePlayerDialog(false);
-        setCreatePlayerForm({ name: "", static_seating: false });
+        setCreatePlayerForm({
+          name: "",
+          static_seating: false,
+          trainer_id: "",
+          birth_year: "",
+        });
         fetchPlayers(); // Refresh the players list
         fetchTournamentPlayers(); // Refresh the tournament players
         setError(null); // Clear any previous errors
@@ -1753,6 +1767,23 @@ const TournamentView: React.FC = () => {
                     />
                   }
                   label="Static Seating (cannot be paired with other static seating players)"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Trainer ID (optional)"
+                  value={createPlayerForm.trainer_id}
+                  onChange={handleCreatePlayerChange("trainer_id")}
+                  fullWidth
+                  margin="normal"
+                />
+                <TextField
+                  label="Birth Year (optional)"
+                  value={createPlayerForm.birth_year}
+                  onChange={handleCreatePlayerChange("birth_year")}
+                  type="number"
+                  fullWidth
+                  margin="normal"
                 />
               </Grid>
             </Grid>

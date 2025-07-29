@@ -22,24 +22,39 @@ import {
   Chip,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
+import EditIcon from "@mui/icons-material/Edit";
 
 interface Player {
   id: number;
   name: string;
   static_seating: boolean;
+  trainer_id?: string;
+  birth_year?: number;
   created_at: string;
+  updated_at?: string;
 }
 
 const Players: React.FC = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     static_seating: false,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editPlayer, setEditPlayer] = useState<Player | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    static_seating: false,
+    trainer_id: "",
+    birth_year: "",
+  });
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPlayers();
@@ -105,6 +120,68 @@ const Players: React.FC = () => {
       });
     };
 
+  const openEditDialog = (player: Player) => {
+    setEditPlayer(player);
+    setEditForm({
+      name: player.name,
+      static_seating: player.static_seating,
+      trainer_id: player.trainer_id || "",
+      birth_year: player.birth_year ? String(player.birth_year) : "",
+    });
+    setEditDialogOpen(true);
+  };
+  const handleEditChange =
+    (field: string) =>
+    (event: React.ChangeEvent<HTMLInputElement | { value: unknown }>) => {
+      const value =
+        field === "static_seating"
+          ? (event.target as HTMLInputElement).checked
+          : event.target.value;
+      setEditForm({ ...editForm, [field]: value });
+    };
+  const handleEditSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editPlayer) return;
+    setEditSubmitting(true);
+    setEditError(null);
+    setSuccess(null);
+    try {
+      const payload: any = {
+        name: editForm.name,
+        static_seating: !!editForm.static_seating,
+        trainer_id: editForm.trainer_id || null,
+        birth_year: editForm.birth_year ? Number(editForm.birth_year) : null,
+      };
+      const response = await fetch(
+        `http://localhost:3002/api/players/${editPlayer.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (response.ok) {
+        setEditDialogOpen(false);
+        setEditPlayer(null);
+        setEditForm({
+          name: "",
+          static_seating: false,
+          trainer_id: "",
+          birth_year: "",
+        });
+        fetchPlayers();
+        setSuccess("Player updated successfully.");
+      } else {
+        const data = await response.json();
+        setEditError(data.error || "Failed to update player.");
+      }
+    } catch (err) {
+      setEditError("Network error. Please try again.");
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
   };
@@ -147,6 +224,11 @@ const Players: React.FC = () => {
           {error}
         </Alert>
       )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          {success}
+        </Alert>
+      )}
 
       <Paper>
         <TableContainer>
@@ -156,6 +238,9 @@ const Players: React.FC = () => {
                 <TableCell>Name</TableCell>
                 <TableCell>Seating Type</TableCell>
                 <TableCell>Created</TableCell>
+                <TableCell>Trainer ID</TableCell>
+                <TableCell>Birth Year</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -183,6 +268,17 @@ const Players: React.FC = () => {
                       />
                     </TableCell>
                     <TableCell>{formatDate(player.created_at)}</TableCell>
+                    <TableCell>{player.trainer_id || "N/A"}</TableCell>
+                    <TableCell>{player.birth_year || "N/A"}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={() => openEditDialog(player)}
+                      >
+                        Edit
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -226,6 +322,67 @@ const Players: React.FC = () => {
             </Button>
             <Button type="submit" variant="contained" disabled={submitting}>
               {submitting ? "Adding..." : "Add Player"}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit Player</DialogTitle>
+        <form onSubmit={handleEditSubmit}>
+          <DialogContent>
+            <TextField
+              fullWidth
+              label="Player Name"
+              value={editForm.name}
+              onChange={handleEditChange("name")}
+              required
+              variant="outlined"
+              sx={{ mb: 2 }}
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={editForm.static_seating}
+                  onChange={handleEditChange("static_seating")}
+                />
+              }
+              label="Static Seating (Player prefers fixed seating position)"
+            />
+            <TextField
+              label="Trainer ID (optional)"
+              value={editForm.trainer_id}
+              onChange={handleEditChange("trainer_id")}
+              fullWidth
+              margin="normal"
+            />
+            <TextField
+              label="Birth Year (optional)"
+              value={editForm.birth_year}
+              onChange={handleEditChange("birth_year")}
+              type="number"
+              fullWidth
+              margin="normal"
+            />
+            {editError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {editError}
+              </Alert>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setEditDialogOpen(false)}
+              disabled={editSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" disabled={editSubmitting}>
+              Save
             </Button>
           </DialogActions>
         </form>

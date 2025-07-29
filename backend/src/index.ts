@@ -238,13 +238,18 @@ app.delete("/api/tournaments/:id", async (req, res) => {
 // Player routes
 app.post("/api/players", async (req, res) => {
   try {
-    const { name, static_seating } = req.body;
+    const { name, static_seating, trainer_id, birth_year } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: "Player name is required" });
     }
 
-    const playerId = await db.createPlayer({ name, static_seating });
+    const playerId = await db.createPlayer({
+      name,
+      static_seating,
+      trainer_id,
+      birth_year,
+    });
     res
       .status(201)
       .json({ id: playerId, message: "Player created successfully" });
@@ -259,6 +264,23 @@ app.get("/api/players", async (req, res) => {
     res.json(players);
   } catch (error) {
     res.status(500).json({ error: "Failed to get players" });
+  }
+});
+
+app.patch("/api/players/:id", async (req, res) => {
+  try {
+    const playerId = parseInt(req.params.id);
+    const { name, static_seating, trainer_id, birth_year } = req.body;
+    await db.updatePlayer({
+      id: playerId,
+      name,
+      static_seating,
+      trainer_id,
+      birth_year,
+    });
+    res.json({ message: "Player updated successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update player" });
   }
 });
 

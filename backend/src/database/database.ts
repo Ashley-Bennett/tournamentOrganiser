@@ -63,6 +63,8 @@ export class Database {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         static_seating BOOLEAN DEFAULT FALSE,
+        trainer_id TEXT,
+        birth_year INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
@@ -341,16 +343,22 @@ export class Database {
   async createPlayer(player: {
     name: string;
     static_seating?: boolean;
+    trainer_id?: string;
+    birth_year?: number;
   }): Promise<number> {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT INTO players (name, static_seating)
-        VALUES (?, ?)
+        INSERT INTO players (name, static_seating, trainer_id, birth_year)
+        VALUES (?, ?, ?, ?)
       `;
-
       this.db.run(
         sql,
-        [player.name, player.static_seating || false],
+        [
+          player.name,
+          player.static_seating || false,
+          player.trainer_id || null,
+          player.birth_year || null,
+        ],
         function (err) {
           if (err) {
             reject(err);
@@ -364,13 +372,52 @@ export class Database {
 
   async getPlayers(): Promise<any[]> {
     return new Promise((resolve, reject) => {
-      const sql = "SELECT * FROM players ORDER BY name";
-
+      const sql = `
+        SELECT * FROM players
+      `;
       this.db.all(sql, [], (err, rows) => {
         if (err) {
           reject(err);
         } else {
           resolve(rows);
+        }
+      });
+    });
+  }
+
+  async updatePlayer(player: {
+    id: number;
+    name?: string;
+    static_seating?: boolean;
+    trainer_id?: string;
+    birth_year?: number;
+  }): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        UPDATE players
+        SET
+          name = COALESCE(?, name),
+          static_seating = COALESCE(?, static_seating),
+          trainer_id = COALESCE(?, trainer_id),
+          birth_year = COALESCE(?, birth_year),
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `;
+      const params = [
+        player.name ?? null,
+        player.static_seating ?? null,
+        player.trainer_id ?? null,
+        player.birth_year ?? null,
+        player.id,
+      ];
+      console.log("updatePlayer SQL:", sql);
+      console.log("updatePlayer params:", params);
+      this.db.run(sql, params, function (err) {
+        if (err) {
+          console.error("updatePlayer error:", err);
+          reject(err);
+        } else {
+          resolve();
         }
       });
     });
