@@ -188,6 +188,15 @@ const TournamentView: React.FC = () => {
   const [editingMatchLoading, setEditingMatchLoading] = useState(false);
   const [deletingMatchId, setDeletingMatchId] = useState<number | null>(null);
   const theme = useTheme();
+  // Add state for unpaired players in the edit match dialog
+  const [unpairedPlayers, setUnpairedPlayers] = useState<Player[]>([]);
+  const [unpairedPlayersLoading, setUnpairedPlayersLoading] = useState(false);
+  const [unpairedWarning, setUnpairedWarning] = useState<string | null>(null);
+  // Add state for unpaired players in the selected round
+  const [unpairedPlayersForRound, setUnpairedPlayersForRound] = useState<
+    Player[]
+  >([]);
+  const [loadingUnpairedForRound, setLoadingUnpairedForRound] = useState(false);
 
   const fetchTournamentData = useCallback(async () => {
     try {
@@ -275,28 +284,45 @@ const TournamentView: React.FC = () => {
   ]);
 
   const handleStartRound = async (roundNumber: number) => {
-    setStartingRound(roundNumber);
-    setError(null);
+    setUnpairedWarning(null);
     try {
       const response = await fetch(
-        `http://localhost:3002/api/tournaments/${id}/rounds/${roundNumber}/start`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        }
+        `http://localhost:3002/api/tournaments/${id}/rounds/${roundNumber}/unpaired-players`
       );
-      if (response.ok) {
-        setSuccess("Round started successfully!");
-        setTimeout(() => setSuccess(null), 3000);
-        await fetchTournamentData();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to start round");
+      const unpaired = await response.json();
+      if (Array.isArray(unpaired) && unpaired.length > 0) {
+        setUnpairedWarning(
+          `Warning: The following players are not paired in this round: ${unpaired
+            .map((p) => p.name)
+            .join(", ")}`
+        );
+        return; // Don't start the round yet
+      }
+      setStartingRound(roundNumber);
+      setError(null);
+      try {
+        const response = await fetch(
+          `http://localhost:3002/api/tournaments/${id}/rounds/${roundNumber}/start`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+        if (response.ok) {
+          setSuccess("Round started successfully!");
+          setTimeout(() => setSuccess(null), 3000);
+          await fetchTournamentData();
+        } else {
+          const errorData = await response.json();
+          setError(errorData.error || "Failed to start round");
+        }
+      } catch (error) {
+        setError("Network error. Please try again.");
+      } finally {
+        setStartingRound(null);
       }
     } catch (error) {
-      setError("Network error. Please try again.");
-    } finally {
-      setStartingRound(null);
+      setUnpairedWarning("Failed to check unpaired players.");
     }
   };
 
@@ -994,6 +1020,24 @@ const TournamentView: React.FC = () => {
     }
   };
 
+  // Fetch unpaired players for the selected round whenever selectedRound or matches change
+  useEffect(() => {
+    if (!selectedRound || !id) {
+      setUnpairedPlayersForRound([]);
+      return;
+    }
+    setLoadingUnpairedForRound(true);
+    fetch(
+      `http://localhost:3002/api/tournaments/${id}/rounds/${selectedRound}/unpaired-players`
+    )
+      .then((res) => res.json())
+      .then((data) =>
+        setUnpairedPlayersForRound(Array.isArray(data) ? data : [])
+      )
+      .catch(() => setUnpairedPlayersForRound([]))
+      .finally(() => setLoadingUnpairedForRound(false));
+  }, [selectedRound, matches, id]);
+
   if (loading) {
     return (
       <Box
@@ -1554,18 +1598,20 @@ const TournamentView: React.FC = () => {
                         Round {selectedRound} Status
                       </Typography>
                       <Box sx={{ display: "flex", gap: 1 }}>
-                        {roundStatuses[selectedRound] === "pending" && (
-                          <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => handleStartRound(selectedRound)}
-                            disabled={startingRound === selectedRound}
-                          >
-                            {startingRound === selectedRound
-                              ? "Starting..."
-                              : "Start Round"}
-                          </Button>
-                        )}
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          onClick={() => handleStartRound(selectedRound)}
+                          disabled={
+                            loadingUnpairedForRound ||
+                            unpairedPlayersForRound.length > 0 ||
+                            tournament?.status === "completed" ||
+                            roundStatuses[selectedRound] !== "pending"
+                          }
+                          sx={{ ml: 2 }}
+                        >
+                          Start Round
+                        </Button>
                         {roundStatuses[selectedRound] === "started" && (
                           <Button
                             variant="contained"
@@ -1719,6 +1765,46 @@ const TournamentView: React.FC = () => {
                                               ? String(match.player2_id)
                                               : "",
                                           });
+                                          setUnpairedPlayersLoading(true);
+                                          fetch(
+                                            `http://localhost:3002/api/tournaments/${id}/rounds/${match.round_number}/unpaired-players`
+                                          )
+                                            .then((res) => res.json())
+                                            .then((data) => {
+                                              // Always include the currently assigned players in the dropdown
+                                              let currentPlayers: Player[] = [];
+                                              if (match.player1_id) {
+                                                const p1 =
+                                                  tournamentPlayers.find(
+                                                    (p) =>
+                                                      p.id === match.player1_id
+                                                  );
+                                                if (p1) currentPlayers.push(p1);
+                                              }
+                                              if (match.player2_id) {
+                                                const p2 =
+                                                  tournamentPlayers.find(
+                                                    (p) =>
+                                                      p.id === match.player2_id
+                                                  );
+                                                if (p2) currentPlayers.push(p2);
+                                              }
+                                              // Remove duplicates
+                                              const allPlayers = [
+                                                ...data,
+                                                ...currentPlayers,
+                                              ].filter(
+                                                (p, i, arr) =>
+                                                  arr.findIndex(
+                                                    (x) => x.id === p.id
+                                                  ) === i
+                                              );
+                                              setUnpairedPlayers(allPlayers);
+                                            })
+                                            .catch(() => setUnpairedPlayers([]))
+                                            .finally(() =>
+                                              setUnpairedPlayersLoading(false)
+                                            );
                                           setOpenEditMatchDialog(true);
                                         }}
                                       >
@@ -2538,17 +2624,16 @@ const TournamentView: React.FC = () => {
                         player1_id: e.target.value,
                       })
                     }
+                    disabled={unpairedPlayersLoading}
                   >
                     <MenuItem value="">
-                      <em>Select Player 1</em>
+                      <em>Remove Player 1</em>
                     </MenuItem>
-                    {tournamentPlayers
-                      .filter((player) => !Boolean(player.dropped))
-                      .map((player) => (
-                        <MenuItem key={player.id} value={player.id}>
-                          {player.name}
-                        </MenuItem>
-                      ))}
+                    {unpairedPlayers.map((player) => (
+                      <MenuItem key={player.id} value={player.id}>
+                        {player.name}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>
@@ -2564,17 +2649,16 @@ const TournamentView: React.FC = () => {
                         player2_id: e.target.value,
                       })
                     }
+                    disabled={unpairedPlayersLoading}
                   >
                     <MenuItem value="">
-                      <em>Select Player 2</em>
+                      <em>Remove Player 2</em>
                     </MenuItem>
-                    {tournamentPlayers
-                      .filter((player) => !Boolean(player.dropped))
-                      .map((player) => (
-                        <MenuItem key={player.id} value={player.id}>
-                          {player.name}
-                        </MenuItem>
-                      ))}
+                    {unpairedPlayers.map((player) => (
+                      <MenuItem key={player.id} value={player.id}>
+                        {player.name}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>
@@ -2597,6 +2681,17 @@ const TournamentView: React.FC = () => {
           </DialogActions>
         </form>
       </Dialog>
+      {unpairedWarning && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {unpairedWarning}
+        </Alert>
+      )}
+      {mainTabValue === 1 && unpairedPlayersForRound.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          The following players are not paired in this round:{" "}
+          {unpairedPlayersForRound.map((p) => p.name).join(", ")}
+        </Alert>
+      )}
     </Box>
   );
 };

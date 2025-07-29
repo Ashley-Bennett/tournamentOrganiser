@@ -1475,6 +1475,38 @@ export class Database {
     });
   }
 
+  // Get all players in a tournament who are not paired in any match for a given round
+  async getUnpairedPlayersForRound(
+    tournamentId: number,
+    roundNumber: number
+  ): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT p.*
+        FROM players p
+        INNER JOIN tournament_players tp ON p.id = tp.player_id
+        WHERE tp.tournament_id = ? AND tp.dropped = FALSE
+          AND p.id NOT IN (
+            SELECT COALESCE(player1_id, -1) FROM matches WHERE tournament_id = ? AND round_number = ?
+            UNION
+            SELECT COALESCE(player2_id, -1) FROM matches WHERE tournament_id = ? AND round_number = ?
+          )
+        ORDER BY p.name
+      `;
+      this.db.all(
+        sql,
+        [tournamentId, tournamentId, roundNumber, tournamentId, roundNumber],
+        (err, rows) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(rows);
+          }
+        }
+      );
+    });
+  }
+
   // Close database connection
   close(): void {
     this.db.close((err) => {

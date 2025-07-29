@@ -633,12 +633,68 @@ app.patch("/api/matches/:id", async (req, res) => {
     const matchId = parseInt(req.params.id);
     const { player1_id, player2_id } = req.body;
 
+    // Get the match to find tournament and round
+    const dbMatch = await db.getRawQuery(
+      "SELECT tournament_id, round_number FROM matches WHERE id = ?",
+      [matchId]
+    );
+    if (!dbMatch) {
+      return res.status(404).json({ error: "Match not found" });
+    }
+    const { tournament_id, round_number } = dbMatch;
+
+    // Get all matches for this tournament and round
+    const matches = await db.getRawQuery(
+      `SELECT * FROM matches WHERE tournament_id = ? AND round_number = ? AND id != ?`,
+      [tournament_id, round_number, matchId]
+    );
+
+    // Helper to check if a player is already paired in this round
+    function isPlayerPaired(playerId: number | null | undefined): boolean {
+      if (!playerId) return false;
+      return (
+        Array.isArray(matches) &&
+        matches.some(
+          (m: any) => m.player1_id === playerId || m.player2_id === playerId
+        )
+      );
+    }
+
+    if (isPlayerPaired(player1_id)) {
+      return res
+        .status(400)
+        .json({ error: "Player 1 is already paired in this round" });
+    }
+    if (isPlayerPaired(player2_id)) {
+      return res
+        .status(400)
+        .json({ error: "Player 2 is already paired in this round" });
+    }
+
     await db.updateMatch(matchId, player1_id, player2_id);
     res.json({ message: "Match updated successfully" });
   } catch (error) {
     res.status(500).json({ error: "Failed to update match" });
   }
 });
+
+// Get unpaired players for a round
+app.get(
+  "/api/tournaments/:id/rounds/:roundNumber/unpaired-players",
+  async (req, res) => {
+    try {
+      const tournamentId = parseInt(req.params.id);
+      const roundNumber = parseInt(req.params.roundNumber);
+      const players = await db.getUnpairedPlayersForRound(
+        tournamentId,
+        roundNumber
+      );
+      res.json(players);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get unpaired players" });
+    }
+  }
+);
 
 // Error handling middleware
 app.use(
