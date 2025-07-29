@@ -41,6 +41,7 @@ import {
   Add as AddIcon,
   Leaderboard as LeaderboardIcon,
   Delete as DeleteIcon,
+  Edit as EditIcon,
 } from "@mui/icons-material";
 
 interface Tournament {
@@ -82,6 +83,8 @@ interface TournamentPlayer {
   dropped: boolean;
   started_round: number;
   created_at: string;
+  trainer_id?: string;
+  birth_year?: number;
 }
 
 interface LeaderboardEntry {
@@ -147,6 +150,27 @@ const TournamentView: React.FC = () => {
   const [endingTournament, setEndingTournament] = useState(false);
   const [removingPlayerId, setRemovingPlayerId] = useState<number | null>(null);
   const [removingAllPlayers, setRemovingAllPlayers] = useState(false);
+  // Add state for edit dialog and player being edited
+  const [openEditPlayerDialog, setOpenEditPlayerDialog] = useState(false);
+  const [editPlayerForm, setEditPlayerForm] = useState({
+    id: null as number | null,
+    name: "",
+    static_seating: false,
+    trainer_id: "",
+    birth_year: "",
+    dropped: false,
+    started_round: 1,
+  });
+  const [editingPlayer, setEditingPlayer] = useState<TournamentPlayer | null>(
+    null
+  );
+  const [editing, setEditing] = useState(false);
+  // Add state for dropped confirmation dialog
+  const [droppedConfirm, setDroppedConfirm] = useState<{
+    player: TournamentPlayer | null;
+    newDropped: boolean;
+  }>({ player: null, newDropped: false });
+  const [droppedLoading, setDroppedLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -1084,7 +1108,9 @@ const TournamentView: React.FC = () => {
                         <TableCell>
                           <Chip
                             label={
-                              Boolean(player.dropped) ? "Dropped" : "Active"
+                              Boolean(player.dropped)
+                                ? `Dropped (Round ${player.started_round})`
+                                : "Active"
                             }
                             color={
                               Boolean(player.dropped) ? "error" : "success"
@@ -1095,17 +1121,58 @@ const TournamentView: React.FC = () => {
                         <TableCell>{formatDate(player.created_at)}</TableCell>
                         <TableCell>
                           {tournament.status !== "completed" && (
-                            <Button
-                              size="small"
-                              color="error"
-                              startIcon={<DeleteIcon />}
-                              onClick={() => handleRemovePlayer(player.id)}
-                              disabled={removingPlayerId === player.id}
-                            >
-                              {removingPlayerId === player.id
-                                ? "Removing..."
-                                : "Remove"}
-                            </Button>
+                            <>
+                              <Button
+                                size="small"
+                                color="primary"
+                                startIcon={<EditIcon />}
+                                onClick={() => {
+                                  setEditingPlayer(player);
+                                  setEditPlayerForm({
+                                    id: player.id,
+                                    name: player.name,
+                                    static_seating: player.static_seating,
+                                    trainer_id: player.trainer_id || "",
+                                    birth_year: player.birth_year
+                                      ? String(player.birth_year)
+                                      : "",
+                                    dropped: Boolean(player.dropped),
+                                    started_round: player.started_round || 1,
+                                  });
+                                  setOpenEditPlayerDialog(true);
+                                }}
+                                sx={{ mr: 1 }}
+                              >
+                                Edit
+                              </Button>
+                              <FormControlLabel
+                                control={
+                                  <Checkbox
+                                    checked={Boolean(player.dropped)}
+                                    onChange={(e) =>
+                                      setDroppedConfirm({
+                                        player,
+                                        newDropped: e.target.checked,
+                                      })
+                                    }
+                                    color="error"
+                                  />
+                                }
+                                label="Dropped"
+                                sx={{ mr: 1 }}
+                              />
+                              <Button
+                                size="small"
+                                color="error"
+                                startIcon={<DeleteIcon />}
+                                onClick={() => handleRemovePlayer(player.id)}
+                                disabled={removingPlayerId === player.id}
+                              >
+                                {removingPlayerId === player.id
+                                  ? "Removing..."
+                                  : "Remove"}
+                              </Button>
+                            </>
                           )}
                         </TableCell>
                       </TableRow>
@@ -1582,6 +1649,7 @@ const TournamentView: React.FC = () => {
               <Grid item xs={12}>
                 <Autocomplete
                   multiple
+                  disableCloseOnSelect
                   options={players.filter(
                     (player) =>
                       !tournamentPlayers.some((tp) => tp.id === player.id)
@@ -1884,6 +1952,229 @@ const TournamentView: React.FC = () => {
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      {/* Edit Player Dialog */}
+      <Dialog
+        open={openEditPlayerDialog}
+        onClose={() => setOpenEditPlayerDialog(false)}
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!editPlayerForm.id) return;
+            setEditing(true);
+            setError(null);
+            setSuccess(null);
+            try {
+              // Update global player info
+              const payload: any = {
+                name: editPlayerForm.name,
+                static_seating: editPlayerForm.static_seating,
+                trainer_id: editPlayerForm.trainer_id,
+                birth_year: editPlayerForm.birth_year
+                  ? Number(editPlayerForm.birth_year)
+                  : null,
+              };
+              const playerRes = await fetch(
+                `http://localhost:3002/api/players/${editPlayerForm.id}`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload),
+                }
+              );
+              if (!playerRes.ok) {
+                const errorData = await playerRes.json();
+                setError(errorData.error || "Failed to update player");
+                setEditing(false);
+                return;
+              }
+              // Update dropped status
+              const dropRes = await fetch(
+                `http://localhost:3002/api/tournaments/${tournament.id}/players/${editPlayerForm.id}/drop`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ dropped: editPlayerForm.dropped }),
+                }
+              );
+              if (!dropRes.ok) {
+                const errorData = await dropRes.json();
+                setError(errorData.error || "Failed to update dropped status");
+                setEditing(false);
+                return;
+              }
+              // Update started_round
+              const roundRes = await fetch(
+                `http://localhost:3002/api/tournaments/${tournament.id}/players/${editPlayerForm.id}/started_round`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    started_round: editPlayerForm.started_round,
+                  }),
+                }
+              );
+              if (!roundRes.ok) {
+                const errorData = await roundRes.json();
+                setError(errorData.error || "Failed to update started round");
+                setEditing(false);
+                return;
+              }
+              setSuccess("Player updated successfully!");
+              setOpenEditPlayerDialog(false);
+              setEditingPlayer(null);
+              setEditPlayerForm({
+                id: null,
+                name: "",
+                static_seating: false,
+                trainer_id: "",
+                birth_year: "",
+                dropped: false,
+                started_round: 1,
+              });
+              fetchPlayers();
+              fetchTournamentPlayers();
+            } catch (err) {
+              setError("Network error. Please try again.");
+            } finally {
+              setEditing(false);
+            }
+          }}
+        >
+          <DialogTitle>Edit Player</DialogTitle>
+          <DialogContent>
+            <TextField
+              label="Name"
+              value={editPlayerForm.name}
+              onChange={(e) =>
+                setEditPlayerForm((f) => ({ ...f, name: e.target.value }))
+              }
+              fullWidth
+              margin="normal"
+              required
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={editPlayerForm.static_seating}
+                  onChange={(e) =>
+                    setEditPlayerForm((f) => ({
+                      ...f,
+                      static_seating: e.target.checked,
+                    }))
+                  }
+                />
+              }
+              label="Static Seating"
+            />
+            <TextField
+              label="Trainer ID"
+              value={editPlayerForm.trainer_id}
+              onChange={(e) =>
+                setEditPlayerForm((f) => ({ ...f, trainer_id: e.target.value }))
+              }
+              fullWidth
+              margin="normal"
+            />
+            <TextField
+              label="Birth Year"
+              type="number"
+              value={editPlayerForm.birth_year}
+              onChange={(e) =>
+                setEditPlayerForm((f) => ({ ...f, birth_year: e.target.value }))
+              }
+              fullWidth
+              margin="normal"
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setOpenEditPlayerDialog(false)}
+              disabled={editing}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={editing}
+            >
+              {editing ? "Saving..." : "Save"}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Dropped Confirmation Dialog */}
+      <Dialog
+        open={!!droppedConfirm.player}
+        onClose={() => setDroppedConfirm({ player: null, newDropped: false })}
+      >
+        <DialogTitle>
+          Confirm {droppedConfirm.newDropped ? "Drop" : "Reinstate"} Player
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to{" "}
+            {droppedConfirm.newDropped ? "mark" : "unmark"}{" "}
+            <b>{droppedConfirm.player?.name}</b> as{" "}
+            {droppedConfirm.newDropped ? "dropped" : "active"} for this
+            tournament?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() =>
+              setDroppedConfirm({ player: null, newDropped: false })
+            }
+            disabled={droppedLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              if (!droppedConfirm.player) return;
+              setDroppedLoading(true);
+              setError(null);
+              setSuccess(null);
+              try {
+                const dropRes = await fetch(
+                  `http://localhost:3002/api/tournaments/${tournament.id}/players/${droppedConfirm.player.id}/drop`,
+                  {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      dropped: droppedConfirm.newDropped,
+                    }),
+                  }
+                );
+                if (!dropRes.ok) {
+                  const errorData = await dropRes.json();
+                  setError(
+                    errorData.error || "Failed to update dropped status"
+                  );
+                  setDroppedLoading(false);
+                  return;
+                }
+                setSuccess("Player drop status updated");
+                fetchTournamentPlayers();
+              } catch (err) {
+                setError("Network error. Please try again.");
+              } finally {
+                setDroppedLoading(false);
+                setDroppedConfirm({ player: null, newDropped: false });
+              }
+            }}
+            color={droppedConfirm.newDropped ? "error" : "primary"}
+            variant="contained"
+            disabled={droppedLoading}
+          >
+            Confirm
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

@@ -363,12 +363,79 @@ app.patch("/api/tournaments/:id/players/:playerId/drop", async (req, res) => {
       return res.status(400).json({ error: "dropped must be a boolean" });
     }
 
-    await db.updatePlayerDropStatus(tournamentId, playerId, dropped);
-    res.json({ message: "Player drop status updated" });
+    // If dropping, determine round logic
+    if (dropped) {
+      // Get all matches for the tournament
+      const matches = await db.getMatchesByTournament(tournamentId);
+      if (!matches.length) {
+        // No matches, just drop for round 1
+        await db.updatePlayerDropStatus(tournamentId, playerId, true);
+        await db.updatePlayerStartedRound(tournamentId, playerId, 1);
+        return res.json({ message: "Player drop status updated (no matches)" });
+      }
+      // Find the current round (max round_number)
+      const currentRound = Math.max(...matches.map((m) => m.round_number));
+      // Find the player's match for the current round
+      const playerMatch = matches.find(
+        (m) =>
+          m.round_number === currentRound &&
+          (m.player1_id === playerId || m.player2_id === playerId)
+      );
+      let dropRound = currentRound + 1;
+      if (playerMatch) {
+        if (!playerMatch.result) {
+          // Unresolved match: award win to opponent
+          let winnerId = null;
+          let result = null;
+          if (playerMatch.player1_id === playerId && playerMatch.player2_id) {
+            winnerId = playerMatch.player2_id;
+            result = "WIN_P2";
+          } else if (
+            playerMatch.player2_id === playerId &&
+            playerMatch.player1_id
+          ) {
+            winnerId = playerMatch.player1_id;
+            result = "WIN_P1";
+          }
+          if (result && winnerId) {
+            await db.updateMatchResult(playerMatch.id, result, winnerId, true);
+          }
+          dropRound = currentRound; // Drop for current round
+        }
+      }
+      // Set dropped and started_round
+      await db.updatePlayerDropStatus(tournamentId, playerId, true);
+      await db.updatePlayerStartedRound(tournamentId, playerId, dropRound);
+      return res.json({ message: `Player dropped for round ${dropRound}` });
+    } else {
+      // If reinstating, just set dropped to false (do not change started_round)
+      await db.updatePlayerDropStatus(tournamentId, playerId, false);
+      return res.json({ message: "Player reinstated" });
+    }
   } catch (error) {
     res.status(500).json({ error: "Failed to update player drop status" });
   }
 });
+
+app.patch(
+  "/api/tournaments/:id/players/:playerId/started_round",
+  async (req, res) => {
+    try {
+      const tournamentId = parseInt(req.params.id);
+      const playerId = parseInt(req.params.playerId);
+      const { started_round } = req.body;
+      if (typeof started_round !== "number" || started_round < 1) {
+        return res
+          .status(400)
+          .json({ error: "started_round must be a positive integer" });
+      }
+      await db.updatePlayerStartedRound(tournamentId, playerId, started_round);
+      res.json({ message: "Player started_round updated" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update player started_round" });
+    }
+  }
+);
 
 app.delete("/api/tournaments/:id/players/:playerId", async (req, res) => {
   try {
@@ -416,6 +483,9 @@ app.post("/api/tournaments/:id/matches", async (req, res) => {
       player2_id,
       result,
     });
+
+    // Update tournament status to 'active' if it was 'new'
+    await db.updateTournamentStatusToActive(tournamentId);
 
     res
       .status(201)
@@ -489,6 +559,10 @@ app.post("/api/tournaments/:id/pairings", async (req, res) => {
       tournamentId,
       round_number
     );
+
+    // Update tournament status to 'active' if it was 'new'
+    await db.updateTournamentStatusToActive(tournamentId);
+
     res.status(201).json({
       message: "Automatic pairings created successfully",
       pairings,

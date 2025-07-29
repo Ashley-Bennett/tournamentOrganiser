@@ -339,6 +339,19 @@ export class Database {
     });
   }
 
+  async updateTournamentStatusToActive(tournamentId: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const sql = `UPDATE tournaments SET status = 'active' WHERE id = ? AND status = 'new'`;
+      this.db.run(sql, [tournamentId], function (err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
   // Player methods
   async createPlayer(player: {
     name: string;
@@ -530,6 +543,27 @@ export class Database {
     });
   }
 
+  async updatePlayerStartedRound(
+    tournamentId: number,
+    playerId: number,
+    started_round: number
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        UPDATE tournament_players
+        SET started_round = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE tournament_id = ? AND player_id = ?
+      `;
+      this.db.run(sql, [started_round, tournamentId, playerId], function (err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
   // Match methods
   async createMatch(match: {
     tournament_id: number;
@@ -540,9 +574,11 @@ export class Database {
   }): Promise<number> {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT INTO matches (tournament_id, round_number, player1_id, player2_id, result)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO matches (
+          tournament_id, round_number, player1_id, player2_id, result, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `;
+
       this.db.run(
         sql,
         [
@@ -552,24 +588,10 @@ export class Database {
           match.player2_id || null,
           match.result || null,
         ],
-        async function (err) {
+        function (err) {
           if (err) {
             reject(err);
           } else {
-            // Set tournament status to 'active' if it was 'new'
-            const db = this;
-            db.run(
-              `UPDATE tournaments SET status = 'active' WHERE id = ? AND status = 'new'`,
-              [match.tournament_id],
-              (err2: Error | null) => {
-                if (err2) {
-                  console.error(
-                    "Failed to update tournament status to active:",
-                    err2
-                  );
-                }
-              }
-            );
             resolve(this.lastID);
           }
         }
