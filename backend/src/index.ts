@@ -18,14 +18,16 @@ const PORT = process.env.PORT || 3002;
 app.use(helmet());
 app.use(
   cors({
-    origin:
-      process.env.NODE_ENV === "production"
-        ? [
-            process.env.FRONTEND_URL ||
-              "https://tournament-organizer-frontend.onrender.com",
-          ]
-        : process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: [
+      process.env.FRONTEND_URL || "https://matchamp.win/",
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "https://localhost:5173",
+      "https://localhost:3000",
+    ],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 app.use(morgan("combined"));

@@ -12,7 +12,7 @@ services:
       - key: PORT
         value: 10000
       - key: FRONTEND_URL
-        value: https://your-frontend-url.pages.dev
+        value: https://tournament-organizer-frontend.onrender.com
       - key: JWT_SECRET
         generateValue: true
       - key: DB_PATH
