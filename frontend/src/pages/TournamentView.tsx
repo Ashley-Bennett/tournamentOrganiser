@@ -383,6 +383,14 @@ const TournamentView: React.FC = () => {
     event.preventDefault();
     if (!editingMatch) return;
 
+    // If Player 1 is removed and Player 2 is set, move Player 2 to Player 1 and clear Player 2
+    let player1_id = editMatchForm.player1_id;
+    let player2_id = editMatchForm.player2_id;
+    if (!player1_id && player2_id) {
+      player1_id = player2_id;
+      player2_id = "";
+    }
+
     setEditingMatchLoading(true);
     setError(null);
     try {
@@ -392,22 +400,18 @@ const TournamentView: React.FC = () => {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            player1_id: editMatchForm.player1_id
-              ? parseInt(editMatchForm.player1_id)
-              : null,
-            player2_id: editMatchForm.player2_id
-              ? parseInt(editMatchForm.player2_id)
-              : null,
+            player1_id: player1_id ? parseInt(player1_id) : null,
+            player2_id: player2_id ? parseInt(player2_id) : null,
           }),
         }
       );
       if (response.ok) {
         setSuccess("Match updated successfully!");
         setTimeout(() => setSuccess(null), 3000);
+        await fetchTournamentData();
         setOpenEditMatchDialog(false);
         setEditingMatch(null);
         setEditMatchForm({ player1_id: "", player2_id: "" });
-        await fetchTournamentData();
       } else {
         const errorData = await response.json();
         setError(errorData.error || "Failed to update match");
@@ -2626,14 +2630,24 @@ const TournamentView: React.FC = () => {
                     }
                     disabled={unpairedPlayersLoading}
                   >
-                    <MenuItem value="">
-                      <em>Remove Player 1</em>
-                    </MenuItem>
-                    {unpairedPlayers.map((player) => (
-                      <MenuItem key={player.id} value={player.id}>
-                        {player.name}
+                    {editMatchForm.player1_id && (
+                      <MenuItem value="">
+                        <em>Remove Player 1</em>
                       </MenuItem>
-                    ))}
+                    )}
+                    {unpairedPlayers
+                      .filter(
+                        (player) =>
+                          player.id === Number(editMatchForm.player1_id) ||
+                          ![editMatchForm.player2_id].includes(
+                            String(player.id)
+                          )
+                      )
+                      .map((player) => (
+                        <MenuItem key={player.id} value={player.id}>
+                          {player.name}
+                        </MenuItem>
+                      ))}
                   </Select>
                 </FormControl>
               </Grid>
@@ -2649,16 +2663,28 @@ const TournamentView: React.FC = () => {
                         player2_id: e.target.value,
                       })
                     }
-                    disabled={unpairedPlayersLoading}
+                    disabled={
+                      unpairedPlayersLoading || !editMatchForm.player1_id
+                    }
                   >
-                    <MenuItem value="">
-                      <em>Remove Player 2</em>
-                    </MenuItem>
-                    {unpairedPlayers.map((player) => (
-                      <MenuItem key={player.id} value={player.id}>
-                        {player.name}
+                    {editMatchForm.player2_id && (
+                      <MenuItem value="">
+                        <em>Remove Player 2</em>
                       </MenuItem>
-                    ))}
+                    )}
+                    {unpairedPlayers
+                      .filter(
+                        (player) =>
+                          player.id === Number(editMatchForm.player2_id) ||
+                          ![editMatchForm.player1_id].includes(
+                            String(player.id)
+                          )
+                      )
+                      .map((player) => (
+                        <MenuItem key={player.id} value={player.id}>
+                          {player.name}
+                        </MenuItem>
+                      ))}
                   </Select>
                 </FormControl>
               </Grid>
