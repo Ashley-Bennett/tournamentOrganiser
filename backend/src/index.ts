@@ -16,20 +16,27 @@ const PORT = process.env.PORT || 3002;
 
 // Middleware
 app.use(helmet());
-app.use(
-  cors({
-    origin: [
-      process.env.FRONTEND_URL || "https://matchamp.win/",
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://localhost:5173",
-      "https://localhost:3000",
-    ],
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+
+// CORS configuration
+const corsOptions = {
+  origin: [
+    process.env.FRONTEND_URL || "https://matchamp.win/",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://localhost:5173",
+    "https://localhost:3000",
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
+};
+
+app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options("*", cors(corsOptions));
+
 app.use(morgan("combined"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -39,8 +46,12 @@ const db = new Database();
 
 // JWT authentication middleware
 function authenticateJWT(req: Request, res: Response, next: NextFunction) {
+  console.log("🔐 JWT Authentication check for:", req.path);
+  console.log("🔐 Headers:", req.headers);
+
   const authHeader = req.headers["authorization"];
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.log("❌ Missing or invalid Authorization header");
     return res
       .status(401)
       .json({ error: "Missing or invalid Authorization header" });
@@ -48,9 +59,11 @@ function authenticateJWT(req: Request, res: Response, next: NextFunction) {
   const token = authHeader.split(" ")[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "devsecret");
+    console.log("✅ JWT verified successfully for user:", decoded);
     req.user = decoded;
     next();
   } catch (err) {
+    console.log("❌ JWT verification failed:", err);
     return res.status(401).json({ error: "Invalid or expired token" });
   }
 }
@@ -116,7 +129,11 @@ app.post("/api/users", async (req, res) => {
     console.error("❌ Error creating user:", error);
 
     // Handle the new error structure from database
-    const errorDetails = error.details || error.message;
+    const errorDetails =
+      error.details ||
+      error.message ||
+      (error.error && error.error.message) ||
+      "Unknown error";
     const errorDebug = error.debug || debugInfo;
 
     if (errorDetails.includes("UNIQUE constraint failed")) {
