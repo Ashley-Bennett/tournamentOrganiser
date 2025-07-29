@@ -59,9 +59,9 @@ interface Match {
   player2_id: number;
   player1_name: string;
   player2_name: string;
-  winner_id: number;
-  winner_name: string;
-  result: string;
+  winner_id: number | null;
+  winner_name: string | null;
+  result: string | null;
   created_at: string;
 }
 
@@ -116,6 +116,12 @@ const TournamentView: React.FC = () => {
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [creatingPlayer, setCreatingPlayer] = useState(false);
   const [creatingPairings, setCreatingPairings] = useState(false);
+  const [updatingMatchResult, setUpdatingMatchResult] = useState<number | null>(
+    null
+  );
+  const [recentlyUpdatedMatch, setRecentlyUpdatedMatch] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     if (id) {
@@ -230,6 +236,21 @@ const TournamentView: React.FC = () => {
       default:
         return bracketType;
     }
+  };
+
+  // Check if all matches in a round have results
+  const hasAllResultsForRound = (roundNumber: number) => {
+    const roundMatches = matchesByRound[roundNumber] || [];
+    return (
+      roundMatches.length > 0 &&
+      roundMatches.every((match) => match.result && match.result !== "")
+    );
+  };
+
+  // Check if the current round is the active round and all results are in
+  const canCreateNextRound = () => {
+    if (!activeRound) return false;
+    return hasAllResultsForRound(activeRound);
   };
 
   // Group matches by round
@@ -350,6 +371,74 @@ const TournamentView: React.FC = () => {
       handleCreateAutomaticPairings();
     } else {
       setOpenCreateMatchDialog(true);
+    }
+  };
+
+  const handleUpdateMatchResult = async (matchId: number, result: string) => {
+    setUpdatingMatchResult(matchId);
+    setError(null);
+
+    try {
+      let winnerId = null;
+      if (result === "WIN_P1") {
+        const match = matches.find((m) => m.id === matchId);
+        winnerId = match?.player1_id || null;
+      } else if (result === "WIN_P2") {
+        const match = matches.find((m) => m.id === matchId);
+        winnerId = match?.player2_id || null;
+      }
+
+      const response = await fetch(
+        `http://localhost:3002/api/matches/${matchId}/result`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            result,
+            winner_id: winnerId,
+            modified_by_to: true,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        console.log("Match result updated successfully");
+
+        // Update local state instead of refetching all data
+        setMatches((prevMatches) =>
+          prevMatches.map((match) =>
+            match.id === matchId
+              ? {
+                  ...match,
+                  result,
+                  winner_id: winnerId,
+                  winner_name:
+                    result === "WIN_P1"
+                      ? match.player1_name
+                      : result === "WIN_P2"
+                      ? match.player2_name
+                      : null,
+                }
+              : match
+          )
+        );
+
+        // Show subtle visual feedback
+        setRecentlyUpdatedMatch(matchId);
+        setTimeout(() => setRecentlyUpdatedMatch(null), 2000);
+
+        // Clear any previous errors
+        setError(null);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to update match result");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setUpdatingMatchResult(null);
     }
   };
 
@@ -833,14 +922,28 @@ const TournamentView: React.FC = () => {
                   : 0}{" "}
                 matches
               </Typography>
-              <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={() => setOpenPairingOptionsDialog(true)}
-                disabled={tournament?.is_completed}
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-end",
+                  gap: 1,
+                }}
               >
-                Create Match
-              </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={() => setOpenPairingOptionsDialog(true)}
+                  disabled={tournament?.is_completed || !canCreateNextRound()}
+                >
+                  Create Match
+                </Button>
+                {activeRound && !hasAllResultsForRound(activeRound) && (
+                  <Typography variant="caption" color="text.secondary">
+                    Complete all match results to create next round
+                  </Typography>
+                )}
+              </Box>
             </Box>
 
             {/* Round Navigation Tabs */}
@@ -886,23 +989,84 @@ const TournamentView: React.FC = () => {
                         <TableCell>Player 2</TableCell>
                         <TableCell>Result</TableCell>
                         <TableCell>Winner</TableCell>
-                        <TableCell>Date</TableCell>
+                        <TableCell>Select Winner</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {matchesByRound[selectedRound].map((match) => (
-                        <TableRow key={match.id}>
+                        <TableRow
+                          key={match.id}
+                          sx={{
+                            backgroundColor:
+                              recentlyUpdatedMatch === match.id
+                                ? "action.hover"
+                                : "inherit",
+                          }}
+                        >
                           <TableCell>{match.player1_name || "TBD"}</TableCell>
                           <TableCell>{match.player2_name || "TBD"}</TableCell>
                           <TableCell>
                             <Chip
-                              label={getResultLabel(match.result)}
-                              color={getResultColor(match.result) as any}
+                              label={getResultLabel(match.result || "")}
+                              color={getResultColor(match.result || "") as any}
                               size="small"
                             />
                           </TableCell>
                           <TableCell>{match.winner_name || "N/A"}</TableCell>
-                          <TableCell>{formatDate(match.created_at)}</TableCell>
+                          <TableCell>
+                            {match.result && match.result !== "" ? (
+                              <Chip
+                                label="Result Set"
+                                color="success"
+                                size="small"
+                              />
+                            ) : (
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  gap: 1,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  color="primary"
+                                  disabled={updatingMatchResult === match.id}
+                                  onClick={() =>
+                                    handleUpdateMatchResult(match.id, "WIN_P1")
+                                  }
+                                  sx={{ minWidth: "auto", px: 1 }}
+                                >
+                                  {match.player1_name || "Player 1"} Wins
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  color="warning"
+                                  disabled={updatingMatchResult === match.id}
+                                  onClick={() =>
+                                    handleUpdateMatchResult(match.id, "DRAW")
+                                  }
+                                  sx={{ minWidth: "auto", px: 1 }}
+                                >
+                                  Tie
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  color="secondary"
+                                  disabled={updatingMatchResult === match.id}
+                                  onClick={() =>
+                                    handleUpdateMatchResult(match.id, "WIN_P2")
+                                  }
+                                  sx={{ minWidth: "auto", px: 1 }}
+                                >
+                                  {match.player2_name || "Player 2"} Wins
+                                </Button>
+                              </Box>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

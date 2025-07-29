@@ -140,6 +140,8 @@ tournamentOrganiser/
 - ✅ TypeScript for type safety
 - ✅ **Automatic Swiss pairing system**
 - ✅ **Static seating constraint enforcement**
+- ✅ **Dynamic match result entry**
+- ✅ **Real-time standings updates**
 
 ### Planned Features
 
@@ -177,6 +179,31 @@ When creating matches, users can choose between:
 1. **🎯 Automatic Pairing**: System automatically creates optimal pairings based on points and constraints
 2. **✏️ Custom Pairing**: Manual selection of players for each match
 
+## 🏆 Match Result System
+
+### Dynamic Result Entry
+
+The tournament organizer now features dynamic match result entry with the following capabilities:
+
+#### Result Buttons
+
+- **Player-Specific Buttons**: Each match shows three buttons with actual player names
+- **Win Options**: "[Player Name] Wins" buttons for each player
+- **Tie Option**: "Tie" button for draws
+- **Real-time Updates**: Results update immediately and refresh standings
+
+#### Result Validation
+
+- **Complete Round Requirement**: Subsequent rounds cannot be created until all current round results are in
+- **Visual Feedback**: Buttons are disabled during updates with loading states
+- **Success Indicators**: "Result Set" chip appears when match has a result
+
+#### Standings Updates
+
+- **Automatic Point Calculation**: Win = 1 point, Draw = 0.5 points, Loss = 0 points
+- **Real-time Refresh**: Standings update immediately after result entry
+- **Tournament Progress**: System tracks completion status for each round
+
 ### API Endpoints
 
 #### Get Player Standings
@@ -196,6 +223,15 @@ Body: { "round_number": number }
 
 Creates automatic pairings for the specified round and returns the created matches.
 
+#### Update Match Result
+
+```
+PATCH /api/matches/:id/result
+Body: { "result": string, "winner_id": number, "modified_by_to": boolean }
+```
+
+Updates match result and automatically recalculates player standings.
+
 ### Database Schema Updates
 
 The system now tracks:
@@ -203,6 +239,8 @@ The system now tracks:
 - **Player Points**: Calculated from match results (Win = 1, Draw = 0.5, Loss = 0)
 - **Static Seating**: Boolean flag indicating if a player requires fixed seating
 - **Match History**: Prevents repeat pairings in Swiss tournaments
+- **Result Tracking**: Complete match result history with timestamps
+- **Tournament Progress**: Round completion status and validation
 
 ## 🧪 API Endpoints
 
