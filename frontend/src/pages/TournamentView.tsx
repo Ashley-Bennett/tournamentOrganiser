@@ -1004,7 +1004,9 @@ const TournamentView: React.FC = () => {
         }
       );
       if (response.ok) {
-        setTournamentPlayers((prev) => prev.filter((p) => p.id !== playerId));
+        setTournamentPlayers((prev) =>
+          prev.filter((p) => p.player_id !== playerId)
+        );
         setSuccess("Player removed from tournament.");
       } else {
         const data = await response.json();
@@ -1728,7 +1730,7 @@ const TournamentView: React.FC = () => {
                               <TableCell>
                                 {(() => {
                                   const p = tournamentPlayers.find(
-                                    (tp) => tp.id === match.player1_id
+                                    (tp) => tp.player_id === match.player1_id
                                   );
                                   if (p && p.static_seating) {
                                     return (
@@ -1753,7 +1755,7 @@ const TournamentView: React.FC = () => {
                               <TableCell>
                                 {(() => {
                                   const p = tournamentPlayers.find(
-                                    (tp) => tp.id === match.player2_id
+                                    (tp) => tp.player_id === match.player2_id
                                   );
                                   if (p && p.static_seating) {
                                     return (
@@ -1821,16 +1823,18 @@ const TournamentView: React.FC = () => {
                                             .then((data) => {
                                               // Always include the currently assigned players in the dropdown
                                               let currentPlayers: Player[] = [];
+
                                               if (match.player1_id) {
                                                 const p1 =
                                                   tournamentPlayers.find(
                                                     (p) =>
-                                                      p.id === match.player1_id
+                                                      p.player_id ===
+                                                      match.player1_id
                                                   );
-                                                if (p1) {
+                                                if (p1 && p1.player_id) {
                                                   // Convert TournamentPlayer to Player format
                                                   currentPlayers.push({
-                                                    id: p1.id,
+                                                    id: p1.player_id,
                                                     name:
                                                       p1.player_name || p1.name,
                                                     static_seating:
@@ -1843,12 +1847,13 @@ const TournamentView: React.FC = () => {
                                                 const p2 =
                                                   tournamentPlayers.find(
                                                     (p) =>
-                                                      p.id === match.player2_id
+                                                      p.player_id ===
+                                                      match.player2_id
                                                   );
-                                                if (p2) {
+                                                if (p2 && p2.player_id) {
                                                   // Convert TournamentPlayer to Player format
                                                   currentPlayers.push({
-                                                    id: p2.id,
+                                                    id: p2.player_id,
                                                     name:
                                                       p2.player_name || p2.name,
                                                     static_seating:
@@ -2164,7 +2169,9 @@ const TournamentView: React.FC = () => {
                   disableCloseOnSelect
                   options={players.filter(
                     (player) =>
-                      !tournamentPlayers.some((tp) => tp.id === player.id)
+                      !tournamentPlayers.some(
+                        (tp) => tp.player_id === player.id
+                      )
                   )}
                   getOptionLabel={(option) => option.name}
                   value={addPlayerForm.selectedPlayers}
@@ -2725,12 +2732,10 @@ const TournamentView: React.FC = () => {
                       .filter(
                         (player) =>
                           player.id === Number(editMatchForm.player1_id) ||
-                          ![editMatchForm.player2_id].includes(
-                            String(player.id)
-                          )
+                          String(player.id) !== editMatchForm.player2_id
                       )
                       .map((player) => (
-                        <MenuItem key={player.id} value={player.id}>
+                        <MenuItem key={player.id} value={String(player.id)}>
                           {player.name}
                         </MenuItem>
                       ))}
@@ -2762,12 +2767,10 @@ const TournamentView: React.FC = () => {
                       .filter(
                         (player) =>
                           player.id === Number(editMatchForm.player2_id) ||
-                          ![editMatchForm.player1_id].includes(
-                            String(player.id)
-                          )
+                          String(player.id) !== editMatchForm.player1_id
                       )
                       .map((player) => (
-                        <MenuItem key={player.id} value={player.id}>
+                        <MenuItem key={player.id} value={String(player.id)}>
                           {player.name}
                         </MenuItem>
                       ))}
