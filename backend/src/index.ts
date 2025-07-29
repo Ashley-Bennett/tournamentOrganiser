@@ -348,6 +348,35 @@ app.patch("/api/tournaments/:id/players/:playerId/drop", async (req, res) => {
   }
 });
 
+app.delete("/api/tournaments/:id/players/:playerId", async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id);
+    const playerId = parseInt(req.params.playerId);
+    await db.runRawQuery(
+      "DELETE FROM tournament_players WHERE tournament_id = ? AND player_id = ?",
+      [tournamentId, playerId]
+    );
+    res.json({ message: "Player removed from tournament successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to remove player from tournament" });
+  }
+});
+
+app.delete("/api/tournaments/:id/players", async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id);
+    await db.runRawQuery(
+      "DELETE FROM tournament_players WHERE tournament_id = ?",
+      [tournamentId]
+    );
+    res.json({ message: "All players removed from tournament successfully" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: "Failed to remove all players from tournament" });
+  }
+});
+
 // Match routes
 app.post("/api/tournaments/:id/matches", async (req, res) => {
   try {

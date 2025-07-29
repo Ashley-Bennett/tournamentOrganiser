@@ -40,6 +40,7 @@ import {
   EmojiEvents as TrophyIcon,
   Add as AddIcon,
   Leaderboard as LeaderboardIcon,
+  Delete as DeleteIcon,
 } from "@mui/icons-material";
 
 interface Tournament {
@@ -142,6 +143,8 @@ const TournamentView: React.FC = () => {
     number | null
   >(null);
   const [endingTournament, setEndingTournament] = useState(false);
+  const [removingPlayerId, setRemovingPlayerId] = useState<number | null>(null);
+  const [removingAllPlayers, setRemovingAllPlayers] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -718,6 +721,70 @@ const TournamentView: React.FC = () => {
     }
   };
 
+  const handleRemovePlayer = async (playerId: number) => {
+    if (!tournament) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to remove this player from the tournament?"
+      )
+    )
+      return;
+    setRemovingPlayerId(playerId);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/tournaments/${tournament.id}/players/${playerId}`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (response.ok) {
+        setTournamentPlayers((prev) => prev.filter((p) => p.id !== playerId));
+        setSuccess("Player removed from tournament.");
+      } else {
+        const data = await response.json();
+        setError(data.error || "Failed to remove player.");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setRemovingPlayerId(null);
+    }
+  };
+
+  const handleRemoveAllPlayers = async () => {
+    if (!tournament) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to remove ALL players from this tournament? This cannot be undone."
+      )
+    )
+      return;
+    setRemovingAllPlayers(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/tournaments/${tournament.id}/players`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (response.ok) {
+        setTournamentPlayers([]);
+        setSuccess("All players removed from tournament.");
+      } else {
+        const data = await response.json();
+        setError(data.error || "Failed to remove all players.");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setRemovingAllPlayers(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box
@@ -929,16 +996,28 @@ const TournamentView: React.FC = () => {
                 </Button>
                 <Button
                   variant="contained"
-                  startIcon={<AddIcon />}
                   onClick={() => {
-                    setError(null); // Clear any previous errors
-                    setSuccess(null); // Clear any previous success messages
-                    setAddPlayerFormError(null); // Clear form errors
+                    setError(null);
+                    setSuccess(null);
                     setOpenAddPlayerDialog(true);
                   }}
                   disabled={tournament?.status === "completed"}
                 >
                   Add Players
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={handleRemoveAllPlayers}
+                  disabled={
+                    tournament?.status === "completed" ||
+                    tournamentPlayers.length === 0 ||
+                    removingAllPlayers
+                  }
+                >
+                  {removingAllPlayers
+                    ? "Removing All..."
+                    : "Remove All Players"}
                 </Button>
               </Box>
             </Box>
@@ -965,6 +1044,7 @@ const TournamentView: React.FC = () => {
                       <TableCell>Started Round</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell>Added</TableCell>
+                      <TableCell>Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -999,6 +1079,21 @@ const TournamentView: React.FC = () => {
                           />
                         </TableCell>
                         <TableCell>{formatDate(player.created_at)}</TableCell>
+                        <TableCell>
+                          {tournament.status !== "completed" && (
+                            <Button
+                              size="small"
+                              color="error"
+                              startIcon={<DeleteIcon />}
+                              onClick={() => handleRemovePlayer(player.id)}
+                              disabled={removingPlayerId === player.id}
+                            >
+                              {removingPlayerId === player.id
+                                ? "Removing..."
+                                : "Remove"}
+                            </Button>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

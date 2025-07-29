@@ -215,6 +215,7 @@ const Tournaments: React.FC = () => {
                     <TableCell>
                       <Button
                         size="small"
+                        variant="contained"
                         color="primary"
                         onClick={() =>
                           navigate(`/tournaments/${tournament.id}`)
