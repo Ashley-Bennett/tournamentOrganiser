@@ -92,7 +92,6 @@ const Players: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
-        console.log("Player created:", result);
         setOpenDialog(false);
         setFormData({ name: "", static_seating: false });
         fetchPlayers(); // Refresh the list

@@ -90,8 +90,6 @@ const CreateTournament: React.FC = () => {
         status: "new",
       };
 
-      console.log("Sending tournament creation request:", requestBody);
-
       const response = await fetch("http://localhost:3002/api/tournaments", {
         method: "POST",
         headers: {
@@ -102,7 +100,6 @@ const CreateTournament: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
-        console.log("Tournament created:", result);
         navigate("/tournaments");
       } else {
         const errorData = await response.json();

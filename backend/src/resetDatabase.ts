@@ -16,29 +16,28 @@ const resetDatabase = () => {
     try {
       if (fs.existsSync(dbPath)) {
         fs.unlinkSync(dbPath);
-        console.log(`🗑️  Deleted existing database file: ${dbPath}`);
         deletedFile = true;
       }
     } catch (error) {
-      console.log(`ℹ️  Could not access: ${dbPath}`);
+      // console.log(`ℹ️  Could not access: ${dbPath}`);
     }
   }
 
   if (!deletedFile) {
-    console.log("ℹ️  No existing database file found in common locations");
+    // console.log("ℹ️  No existing database file found in common locations");
   }
 
   // Ensure data directory exists
   const dataDir = path.join(process.cwd(), "data");
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
-    console.log("📁 Created data directory");
+    // console.log("📁 Created data directory");
   }
 
-  console.log("✅ Database reset completed successfully!");
-  console.log(
-    "💡 You can now run the seed script to populate with sample data"
-  );
+  // console.log("✅ Database reset completed successfully!");
+  // console.log(
+  //   "💡 You can now run the seed script to populate with sample data"
+  // );
 };
 
 // Run the reset function if this file is executed directly

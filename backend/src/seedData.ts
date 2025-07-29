@@ -4,10 +4,7 @@ const seedData = async () => {
   const db = new Database();
 
   try {
-    console.log("🌱 Starting to seed database...");
-
     // Create sample users (TOs)
-    console.log("Creating sample users...");
     const user1Id = await db.createUser({
       name: "John Smith",
       email: "john.smith@tournament.com",
@@ -20,7 +17,6 @@ const seedData = async () => {
     });
 
     // Create sample leagues
-    console.log("Creating sample leagues...");
     const league1Id = await db.createLeague({
       name: "Spring Championship Series",
       description: "Annual spring tournament series for competitive players",
@@ -35,7 +31,6 @@ const seedData = async () => {
     });
 
     // Create sample players
-    console.log("Creating sample players...");
     const player1Id = await db.createPlayer({
       name: "Mike Chen",
       static_seating: true,
@@ -70,7 +65,6 @@ const seedData = async () => {
     });
 
     // Create sample tournaments
-    console.log("Creating sample tournaments...");
     const tournament1Id = await db.createTournament({
       name: "Spring Championship 2024",
       date: "2024-03-15",
@@ -101,7 +95,6 @@ const seedData = async () => {
     });
 
     // Add players to tournaments
-    console.log("Adding players to tournaments...");
 
     // Tournament 1 - 8 players
     await db.addPlayerToTournament({
@@ -225,7 +218,6 @@ const seedData = async () => {
     await db.updatePlayerDropStatus(tournament2Id, player6Id, true);
 
     // Create sample matches for tournament 1 (completed tournament)
-    console.log("Creating sample matches...");
 
     // Round 1 matches
     await db.createMatch({
@@ -307,16 +299,6 @@ const seedData = async () => {
 
     // Mark tournament 1 as completed
     await db.updateTournamentCompletion(tournament1Id, true);
-
-    console.log("✅ Database seeded successfully!");
-    console.log("\n📊 Sample Data Summary:");
-    console.log(`- Users (TOs): 2`);
-    console.log(`- Leagues: 3`);
-    console.log(`- Players: 8`);
-    console.log(`- Tournaments: 4`);
-    console.log(`- Tournament Players: 22 entries`);
-    console.log(`- Matches: 9`);
-    console.log(`- Completed Tournaments: 1`);
   } catch (error) {
     console.error("❌ Error seeding database:", error);
   } finally {

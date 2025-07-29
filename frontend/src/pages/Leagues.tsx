@@ -74,7 +74,6 @@ const Leagues: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
-        console.log("League created:", result);
         setOpenDialog(false);
         setFormData({ name: "", description: "" });
         fetchLeagues(); // Refresh the list
