@@ -53,6 +53,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const requestBody = { name, email, password };
     console.log("📝 Request body:", { name, email, hasPassword: !!password });
 
+    // First, let's test if we can reach the backend at all
+    console.log("🧪 Testing backend connectivity...");
+    try {
+      const healthRes = await apiCall("/api/health", { method: "GET" });
+      console.log("🏥 Health check status:", healthRes.status);
+      const healthText = await healthRes.text();
+      console.log("🏥 Health check response:", healthText);
+    } catch (healthError) {
+      console.error("❌ Health check failed:", healthError);
+    }
+
+    console.log("🔗 About to call apiCall function...");
     const res = await apiCall("/api/users", {
       method: "POST",
       body: JSON.stringify(requestBody),

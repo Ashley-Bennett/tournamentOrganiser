@@ -1,4 +1,9 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
+console.log("🔧 Environment check:", {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
+  API_BASE_URL,
+  isProduction: import.meta.env.PROD,
+});
 
 export const apiCall = async (
   endpoint: string,
