@@ -22,7 +22,6 @@ services:
   - type: web
     name: tournament-organizer-frontend
     runtime: static
-    plan: starter
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     envVars:
