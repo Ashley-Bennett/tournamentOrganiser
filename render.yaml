@@ -17,3 +17,14 @@ services:
         generateValue: true
       - key: DB_PATH
         value: /opt/render/project/src/backend/data/tournament.db
+
+  # Frontend service
+  - type: web
+    name: tournament-organizer-frontend
+    runtime: static
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://tournament-organizer-backend.onrender.com
