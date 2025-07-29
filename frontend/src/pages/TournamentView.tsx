@@ -29,6 +29,7 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
+  Autocomplete,
 } from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
@@ -97,7 +98,7 @@ const TournamentView: React.FC = () => {
     player2_id: "",
   });
   const [addPlayerForm, setAddPlayerForm] = useState({
-    player_id: "",
+    selectedPlayers: [] as Player[],
     started_round: 1,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -280,18 +281,24 @@ const TournamentView: React.FC = () => {
 
   const handleAddPlayer = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    // Validate that at least one player is selected
+    if (addPlayerForm.selectedPlayers.length === 0) {
+      return; // Don't set error, just return - the field will show its own error state
+    }
+
     setAddingPlayer(true);
 
     try {
       const response = await fetch(
-        `http://localhost:3002/api/tournaments/${id}/players`,
+        `http://localhost:3002/api/tournaments/${id}/players/bulk`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            player_id: parseInt(addPlayerForm.player_id),
+            players: addPlayerForm.selectedPlayers.map((player) => player.id),
             started_round: addPlayerForm.started_round,
           }),
         }
@@ -299,16 +306,19 @@ const TournamentView: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
-        console.log("Player added to tournament:", result);
+        console.log(
+          "Players added to tournament successfully:",
+          result.message
+        );
         setOpenAddPlayerDialog(false);
         setAddPlayerForm({
-          player_id: "",
+          selectedPlayers: [],
           started_round: 1,
         });
         fetchTournamentPlayers(); // Refresh the tournament players
       } else {
         const errorData = await response.json();
-        setError(errorData.error || "Failed to add player to tournament");
+        setError(errorData.error || "Failed to add players to tournament");
       }
     } catch (error) {
       setError("Network error. Please try again.");
@@ -335,14 +345,6 @@ const TournamentView: React.FC = () => {
 
   const handleAddPlayerTextFieldChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-      setAddPlayerForm({
-        ...addPlayerForm,
-        [field]: event.target.value,
-      });
-    };
-
-  const handleAddPlayerSelectChange =
-    (field: string) => (event: SelectChangeEvent<string>) => {
       setAddPlayerForm({
         ...addPlayerForm,
         [field]: event.target.value,
@@ -461,14 +463,17 @@ const TournamentView: React.FC = () => {
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => setOpenAddPlayerDialog(true)}
+            onClick={() => {
+              setError(null); // Clear any previous errors
+              setOpenAddPlayerDialog(true);
+            }}
             disabled={tournament?.is_completed}
           >
-            Add Player
+            Add Players
           </Button>
         </Box>
 
-        {tournament?.is_completed && (
+        {Boolean(tournament?.is_completed) && (
           <Alert severity="warning" sx={{ mb: 2 }}>
             This tournament is completed. No new players can be added.
           </Alert>
@@ -606,7 +611,7 @@ const TournamentView: React.FC = () => {
                 Add players to the tournament before creating matches.
               </Alert>
             )}
-            {tournament?.is_completed && (
+            {Boolean(tournament?.is_completed) && (
               <Alert severity="warning">
                 This tournament is completed. No new matches can be created.
               </Alert>
@@ -716,31 +721,86 @@ const TournamentView: React.FC = () => {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle>Add Player to Tournament</DialogTitle>
+          <DialogTitle>Add Players to Tournament</DialogTitle>
           <form onSubmit={handleAddPlayer}>
             <DialogContent>
               <Grid container spacing={2}>
                 <Grid item xs={12}>
-                  <FormControl fullWidth>
-                    <InputLabel>Select Player</InputLabel>
-                    <Select
-                      value={addPlayerForm.player_id}
-                      label="Select Player"
-                      onChange={handleAddPlayerSelectChange("player_id")}
-                      required
-                    >
-                      {players
-                        .filter(
-                          (player) =>
-                            !tournamentPlayers.some((tp) => tp.id === player.id)
-                        )
-                        .map((player) => (
-                          <MenuItem key={player.id} value={player.id}>
-                            {player.name}
-                          </MenuItem>
-                        ))}
-                    </Select>
-                  </FormControl>
+                  <Autocomplete
+                    multiple
+                    options={players.filter(
+                      (player) =>
+                        !tournamentPlayers.some((tp) => tp.id === player.id)
+                    )}
+                    getOptionLabel={(option) => option.name}
+                    value={addPlayerForm.selectedPlayers}
+                    onChange={(_, newValue) => {
+                      setAddPlayerForm({
+                        ...addPlayerForm,
+                        selectedPlayers: newValue,
+                      });
+                      // Clear any previous errors when user makes a selection
+                      if (newValue.length > 0) {
+                        setError(null);
+                      }
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Select Players"
+                        placeholder="Search and select players..."
+                        error={addPlayerForm.selectedPlayers.length === 0}
+                        helperText={
+                          addPlayerForm.selectedPlayers.length === 0
+                            ? "Please select at least one player"
+                            : `${
+                                addPlayerForm.selectedPlayers.length
+                              } selected, ${
+                                players.filter(
+                                  (player) =>
+                                    !tournamentPlayers.some(
+                                      (tp) => tp.id === player.id
+                                    )
+                                ).length
+                              } available`
+                        }
+                      />
+                    )}
+                    renderTags={(value, getTagProps) =>
+                      value.map((option, index) => (
+                        <Chip
+                          label={option.name}
+                          {...getTagProps({ index })}
+                          size="small"
+                          color="primary"
+                        />
+                      ))
+                    }
+                    noOptionsText="No players available"
+                    filterOptions={(options, { inputValue }) => {
+                      const filtered = options.filter((option) =>
+                        option.name
+                          .toLowerCase()
+                          .includes(inputValue.toLowerCase())
+                      );
+                      return filtered;
+                    }}
+                    renderOption={(props, option) => (
+                      <li {...props}>
+                        <Box display="flex" alignItems="center" width="100%">
+                          <Typography variant="body1">{option.name}</Typography>
+                          {option.static_seating && (
+                            <Chip
+                              label="Static"
+                              size="small"
+                              color="secondary"
+                              sx={{ ml: 1 }}
+                            />
+                          )}
+                        </Box>
+                      </li>
+                    )}
+                  />
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
@@ -762,8 +822,18 @@ const TournamentView: React.FC = () => {
               >
                 Cancel
               </Button>
-              <Button type="submit" variant="contained" disabled={addingPlayer}>
-                {addingPlayer ? "Adding..." : "Add Player"}
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={
+                  addingPlayer || addPlayerForm.selectedPlayers.length === 0
+                }
+              >
+                {addingPlayer
+                  ? "Adding..."
+                  : `Add ${addPlayerForm.selectedPlayers.length} Player${
+                      addPlayerForm.selectedPlayers.length !== 1 ? "s" : ""
+                    }`}
               </Button>
             </DialogActions>
           </form>

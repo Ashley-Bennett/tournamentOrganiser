@@ -1,17 +1,109 @@
-import React from "react";
-import { Grid, Card, CardContent, Typography, Box, Paper } from "@mui/material";
+import React, { useState, useEffect } from "react";
+import {
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  Paper,
+  CircularProgress,
+} from "@mui/material";
 import {
   SportsEsports as TournamentIcon,
   People as PeopleIcon,
   EmojiEvents as TrophyIcon,
 } from "@mui/icons-material";
 
+interface DashboardStats {
+  activeTournaments: number;
+  totalParticipants: number;
+  completedTournaments: number;
+}
+
 const Dashboard: React.FC = () => {
+  const [stats, setStats] = useState<DashboardStats>({
+    activeTournaments: 0,
+    totalParticipants: 0,
+    completedTournaments: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch tournaments
+      const tournamentsResponse = await fetch(
+        "http://localhost:3002/api/tournaments"
+      );
+      if (!tournamentsResponse.ok) {
+        throw new Error("Failed to fetch tournaments");
+      }
+      const tournaments = await tournamentsResponse.json();
+
+      // Calculate statistics
+      const activeTournaments = tournaments.filter(
+        (t: any) => !t.is_completed
+      ).length;
+      const completedTournaments = tournaments.filter(
+        (t: any) => t.is_completed
+      ).length;
+
+      // Fetch total participants (players across all tournaments)
+      let totalParticipants = 0;
+      for (const tournament of tournaments) {
+        const playersResponse = await fetch(
+          `http://localhost:3002/api/tournaments/${tournament.id}/players`
+        );
+        if (playersResponse.ok) {
+          const players = await playersResponse.json();
+          totalParticipants += players.length;
+        }
+      }
+
+      setStats({
+        activeTournaments,
+        totalParticipants,
+        completedTournaments,
+      });
+    } catch (error) {
+      setError("Failed to load dashboard statistics");
+      console.error("Error fetching dashboard stats:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <Box>
       <Typography variant="h4" component="h1" gutterBottom>
         Dashboard
       </Typography>
+
+      {error && (
+        <Box sx={{ mb: 3 }}>
+          <Typography color="error">{error}</Typography>
+        </Box>
+      )}
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
@@ -22,10 +114,14 @@ const Dashboard: React.FC = () => {
                 <Typography variant="h6">Active Tournaments</Typography>
               </Box>
               <Typography variant="h3" color="primary">
-                0
+                {stats.activeTournaments}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                No tournaments currently active
+                {stats.activeTournaments === 0
+                  ? "No tournaments currently active"
+                  : `${stats.activeTournaments} tournament${
+                      stats.activeTournaments === 1 ? "" : "s"
+                    } in progress`}
               </Typography>
             </CardContent>
           </Card>
@@ -39,10 +135,14 @@ const Dashboard: React.FC = () => {
                 <Typography variant="h6">Total Participants</Typography>
               </Box>
               <Typography variant="h3" color="secondary">
-                0
+                {stats.totalParticipants}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                No participants registered
+                {stats.totalParticipants === 0
+                  ? "No participants registered"
+                  : `${stats.totalParticipants} participant${
+                      stats.totalParticipants === 1 ? "" : "s"
+                    } across all tournaments`}
               </Typography>
             </CardContent>
           </Card>
@@ -56,10 +156,14 @@ const Dashboard: React.FC = () => {
                 <Typography variant="h6">Completed Tournaments</Typography>
               </Box>
               <Typography variant="h3" color="warning.main">
-                0
+                {stats.completedTournaments}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                No tournaments completed yet
+                {stats.completedTournaments === 0
+                  ? "No tournaments completed yet"
+                  : `${stats.completedTournaments} tournament${
+                      stats.completedTournaments === 1 ? "" : "s"
+                    } completed`}
               </Typography>
             </CardContent>
           </Card>

@@ -234,6 +234,40 @@ app.post("/api/tournaments/:id/players", async (req, res) => {
   }
 });
 
+app.post("/api/tournaments/:id/players/bulk", async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id);
+    const { players, started_round } = req.body;
+
+    if (!players || !Array.isArray(players) || players.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "Players array is required and must not be empty" });
+    }
+
+    const playersToAdd = players.map((playerId: number) => ({
+      player_id: playerId,
+      tournament_id: tournamentId,
+      started_round,
+    }));
+
+    await db.addMultiplePlayersToTournament(playersToAdd);
+    res
+      .status(201)
+      .json({
+        message: `${players.length} player(s) added to tournament successfully`,
+      });
+  } catch (error: any) {
+    if (error.message.includes("UNIQUE constraint failed")) {
+      res
+        .status(409)
+        .json({ error: "One or more players are already in this tournament" });
+    } else {
+      res.status(500).json({ error: "Failed to add players to tournament" });
+    }
+  }
+});
+
 app.get("/api/tournaments/:id/players", async (req, res) => {
   try {
     const tournamentId = parseInt(req.params.id);

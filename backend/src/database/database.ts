@@ -398,6 +398,41 @@ export class Database {
     });
   }
 
+  async addMultiplePlayersToTournament(
+    players: {
+      player_id: number;
+      tournament_id: number;
+      started_round?: number;
+    }[]
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (players.length === 0) {
+        resolve();
+        return;
+      }
+
+      const placeholders = players.map(() => "(?, ?, ?)").join(", ");
+      const sql = `
+        INSERT INTO tournament_players (player_id, tournament_id, started_round)
+        VALUES ${placeholders}
+      `;
+
+      const values = players.flatMap((player) => [
+        player.player_id,
+        player.tournament_id,
+        player.started_round || 1,
+      ]);
+
+      this.db.run(sql, values, function (err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
   async getTournamentPlayers(tournamentId: number): Promise<any[]> {
     return new Promise((resolve, reject) => {
       const sql = `
