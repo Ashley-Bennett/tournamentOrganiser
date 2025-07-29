@@ -48,8 +48,9 @@ interface Tournament {
   date: string;
   league_name?: string;
   bracket_type: string;
-  is_completed: boolean;
+  status: "new" | "active" | "completed";
   created_at: string;
+  updated_at?: string;
 }
 
 interface Match {
@@ -140,6 +141,7 @@ const TournamentView: React.FC = () => {
   const [recentlyUpdatedMatch, setRecentlyUpdatedMatch] = useState<
     number | null
   >(null);
+  const [endingTournament, setEndingTournament] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -303,7 +305,7 @@ const TournamentView: React.FC = () => {
 
   // Determine the active round (highest round number, but only if tournament is not completed)
   const activeRound =
-    roundNumbers.length > 0 && !tournament?.is_completed
+    roundNumbers.length > 0 && tournament?.status !== "completed"
       ? Math.max(...roundNumbers)
       : null;
 
@@ -320,6 +322,44 @@ const TournamentView: React.FC = () => {
       }
     }
   }, [roundNumbers, selectedRound, activeRound]);
+
+  // Use tournament.status for tab logic
+  useEffect(() => {
+    if (!tournament) return;
+    if (tournament.status === "completed") {
+      setMainTabValue(2); // Leaderboard
+    } else if (tournament.status === "active") {
+      setMainTabValue(1); // Matches
+    } else {
+      setMainTabValue(0); // Players
+    }
+  }, [tournament]);
+
+  // Use tournament.status for status chip
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "Completed";
+      case "active":
+        return "Active";
+      case "new":
+        return "New";
+      default:
+        return status;
+    }
+  };
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "success";
+      case "active":
+        return "warning";
+      case "new":
+        return "info";
+      default:
+        return "default";
+    }
+  };
 
   const handleCreateMatch = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -648,6 +688,36 @@ const TournamentView: React.FC = () => {
       .length;
   };
 
+  // Add handler for ending the tournament
+  const handleEndTournament = async () => {
+    if (!tournament) return;
+    setEndingTournament(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/tournaments/${tournament.id}/completion`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ is_completed: true }),
+        }
+      );
+      if (response.ok) {
+        setSuccess("Tournament marked as completed.");
+        // Refetch tournament data to update UI
+        await fetchTournamentData();
+      } else {
+        const data = await response.json();
+        setError(data.error || "Failed to end tournament");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setEndingTournament(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box
@@ -715,6 +785,18 @@ const TournamentView: React.FC = () => {
               {formatDate(tournament.date)}
             </Typography>
           </Box>
+          {/* End Tournament Button - only show if not completed */}
+          {tournament.status !== "completed" && (
+            <Button
+              variant="contained"
+              color="error"
+              sx={{ ml: "auto" }}
+              onClick={handleEndTournament}
+              disabled={endingTournament}
+            >
+              {endingTournament ? "Ending..." : "End Tournament"}
+            </Button>
+          )}
         </Box>
 
         <Grid container spacing={3}>
@@ -726,8 +808,8 @@ const TournamentView: React.FC = () => {
                   <Typography variant="h6">Status</Typography>
                 </Box>
                 <Chip
-                  label={tournament.is_completed ? "Completed" : "Active"}
-                  color={getCompletionColor(tournament.is_completed) as any}
+                  label={getStatusLabel(tournament.status)}
+                  color={getStatusColor(tournament.status) as any}
                   size="medium"
                 />
               </CardContent>
@@ -841,7 +923,7 @@ const TournamentView: React.FC = () => {
                     setSuccess(null); // Clear any previous success messages
                     setOpenCreatePlayerDialog(true);
                   }}
-                  disabled={tournament?.is_completed}
+                  disabled={tournament?.status === "completed"}
                 >
                   Create New Player
                 </Button>
@@ -854,14 +936,14 @@ const TournamentView: React.FC = () => {
                     setAddPlayerFormError(null); // Clear form errors
                     setOpenAddPlayerDialog(true);
                   }}
-                  disabled={tournament?.is_completed}
+                  disabled={tournament?.status === "completed"}
                 >
                   Add Players
                 </Button>
               </Box>
             </Box>
 
-            {Boolean(tournament?.is_completed) && (
+            {Boolean(tournament?.status === "completed") && (
               <Alert severity="warning" sx={{ mb: 2 }}>
                 This tournament is completed. No new players can be added.
               </Alert>
@@ -869,7 +951,7 @@ const TournamentView: React.FC = () => {
 
             {tournamentPlayers.length === 0 ? (
               <Alert severity="info">
-                {tournament?.is_completed
+                {tournament?.status === "completed"
                   ? "No players were added to this completed tournament."
                   : "No players have been added to this tournament yet. Add players to get started!"}
               </Alert>
@@ -949,17 +1031,17 @@ const TournamentView: React.FC = () => {
                     <Card variant="outlined">
                       <CardContent>
                         <Typography variant="h6" color="primary">
-                          {tournament?.is_completed
+                          {tournament?.status === "completed"
                             ? "Final Round"
                             : "Current Round"}
                         </Typography>
                         <Typography variant="h4" color="primary">
-                          {tournament?.is_completed
+                          {tournament?.status === "completed"
                             ? Math.max(...roundNumbers)
                             : activeRound}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {tournament?.is_completed
+                          {tournament?.status === "completed"
                             ? "Tournament Completed"
                             : "Active Round"}
                         </Typography>
@@ -1011,7 +1093,8 @@ const TournamentView: React.FC = () => {
                   onClick={() => setOpenPairingOptionsDialog(true)}
                   sx={{ mb: 2 }}
                   disabled={
-                    tournamentPlayers.length === 0 || tournament?.is_completed
+                    tournamentPlayers.length === 0 ||
+                    tournament?.status === "completed"
                   }
                 >
                   Create First Match
@@ -1021,7 +1104,7 @@ const TournamentView: React.FC = () => {
                     Add players to the tournament before creating matches.
                   </Alert>
                 )}
-                {Boolean(tournament?.is_completed) && (
+                {Boolean(tournament?.status === "completed") && (
                   <Alert severity="warning">
                     This tournament is completed. No new matches can be created.
                   </Alert>
@@ -1057,7 +1140,8 @@ const TournamentView: React.FC = () => {
                       startIcon={<AddIcon />}
                       onClick={() => setOpenPairingOptionsDialog(true)}
                       disabled={
-                        tournament?.is_completed || !canCreateNextRound()
+                        tournament?.status === "completed" ||
+                        !canCreateNextRound()
                       }
                     >
                       Create Match
@@ -1374,7 +1458,7 @@ const TournamentView: React.FC = () => {
 
       {/* Add Player Dialog */}
       <Dialog
-        open={openAddPlayerDialog && !tournament?.is_completed}
+        open={openAddPlayerDialog && tournament?.status !== "completed"}
         onClose={() => {
           setOpenAddPlayerDialog(false);
           setAddPlayerFormError(null);
@@ -1598,7 +1682,7 @@ const TournamentView: React.FC = () => {
 
       {/* Create Match Dialog */}
       <Dialog
-        open={openCreateMatchDialog && !tournament?.is_completed}
+        open={openCreateMatchDialog && tournament?.status !== "completed"}
         onClose={() => setOpenCreateMatchDialog(false)}
         maxWidth="sm"
         fullWidth

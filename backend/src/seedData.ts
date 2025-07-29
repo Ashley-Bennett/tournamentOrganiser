@@ -76,23 +76,27 @@ const seedData = async () => {
       date: "2024-03-15",
       league_id: league1Id,
       bracket_type: "SWISS",
+      status: "completed",
     });
     const tournament2Id = await db.createTournament({
       name: "Weekend Warriors March Madness",
       date: "2024-03-23",
       league_id: league2Id,
       bracket_type: "SWISS",
+      status: "active",
     });
     const tournament3Id = await db.createTournament({
       name: "Pro Circuit Qualifier",
       date: "2024-04-10",
       league_id: league3Id,
       bracket_type: "SWISS",
+      status: "new",
     });
     const tournament4Id = await db.createTournament({
       name: "Casual Friday Night",
       date: "2024-03-29",
       bracket_type: "SWISS",
+      status: "new",
       // No league association
     });
 

@@ -23,8 +23,9 @@ interface Tournament {
   date: string;
   league_name?: string;
   bracket_type: string;
-  is_completed: boolean;
+  status: "new" | "active" | "completed";
   created_at: string;
+  updated_at?: string;
 }
 
 const Tournaments: React.FC = () => {
@@ -58,8 +59,17 @@ const Tournaments: React.FC = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const getCompletionColor = (isCompleted: boolean) => {
-    return isCompleted ? "success" : "warning";
+  const getCompletionColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "success";
+      case "active":
+        return "warning";
+      case "new":
+        return "info";
+      default:
+        return "default";
+    }
   };
 
   const getBracketTypeLabel = (bracketType: string) => {
@@ -73,6 +83,12 @@ const Tournaments: React.FC = () => {
       default:
         return bracketType;
     }
+  };
+
+  // Add a function to capitalize the status label
+  const getStatusLabel = (status: string) => {
+    if (!status) return "";
+    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   if (loading) {
@@ -151,10 +167,8 @@ const Tournaments: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={tournament.is_completed ? "Completed" : "Active"}
-                        color={
-                          getCompletionColor(tournament.is_completed) as any
-                        }
+                        label={getStatusLabel(tournament.status)}
+                        color={getCompletionColor(tournament.status) as any}
                         size="small"
                       />
                     </TableCell>

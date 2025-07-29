@@ -24,6 +24,17 @@ interface League {
   description?: string;
 }
 
+interface Tournament {
+  id: number;
+  name: string;
+  date: string;
+  league_name?: string;
+  bracket_type: string;
+  status: "new" | "active" | "completed";
+  created_at: string;
+  updated_at?: string;
+}
+
 const CreateTournament: React.FC = () => {
   const navigate = useNavigate();
   const [leagues, setLeagues] = useState<League[]>([]);
@@ -76,6 +87,7 @@ const CreateTournament: React.FC = () => {
           ? parseInt(formData.league_id)
           : undefined,
         bracket_type: formData.bracket_type,
+        status: "new",
       };
 
       console.log("Sending tournament creation request:", requestBody);

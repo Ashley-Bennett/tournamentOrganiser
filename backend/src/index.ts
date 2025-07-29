@@ -123,12 +123,13 @@ app.get("/api/leagues", async (req, res) => {
 // Tournament routes
 app.post("/api/tournaments", async (req, res) => {
   try {
-    const { name, date, league_id, bracket_type } = req.body;
+    const { name, date, league_id, bracket_type, status } = req.body;
     console.log("Creating tournament with data:", {
       name,
       date,
       league_id,
       bracket_type,
+      status,
     });
 
     if (!name || !date) {
@@ -161,6 +162,7 @@ app.post("/api/tournaments", async (req, res) => {
       date,
       league_id,
       bracket_type,
+      status: status || "new",
     });
     res
       .status(201)

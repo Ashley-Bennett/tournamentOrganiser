@@ -50,6 +50,7 @@ export class Database {
         league_id INTEGER,
         bracket_type TEXT NOT NULL DEFAULT 'SWISS' CHECK(bracket_type IN ('SWISS', 'SINGLE_ELIMINATION', 'DOUBLE_ELIMINATION')),
         is_completed BOOLEAN DEFAULT FALSE,
+        status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'active', 'completed')),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (league_id) REFERENCES leagues (id)
@@ -251,13 +252,13 @@ export class Database {
     date: string;
     league_id?: number;
     bracket_type?: string;
+    status?: string;
   }): Promise<number> {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT INTO tournaments (name, date, league_id, bracket_type)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO tournaments (name, date, league_id, bracket_type, status)
+        VALUES (?, ?, ?, ?, ?)
       `;
-
       this.db.run(
         sql,
         [
@@ -265,6 +266,7 @@ export class Database {
           tournament.date,
           tournament.league_id || null,
           tournament.bracket_type || "SWISS",
+          tournament.status || "new",
         ],
         function (err) {
           if (err) {
@@ -322,11 +324,10 @@ export class Database {
     return new Promise((resolve, reject) => {
       const sql = `
         UPDATE tournaments 
-        SET is_completed = ?, updated_at = CURRENT_TIMESTAMP 
+        SET is_completed = ?, status = CASE WHEN ? THEN 'completed' ELSE status END, updated_at = CURRENT_TIMESTAMP 
         WHERE id = ?
       `;
-
-      this.db.run(sql, [isCompleted, id], function (err) {
+      this.db.run(sql, [isCompleted, isCompleted, id], function (err) {
         if (err) {
           reject(err);
         } else {
@@ -495,7 +496,6 @@ export class Database {
         INSERT INTO matches (tournament_id, round_number, player1_id, player2_id, result)
         VALUES (?, ?, ?, ?, ?)
       `;
-
       this.db.run(
         sql,
         [
@@ -505,10 +505,24 @@ export class Database {
           match.player2_id || null,
           match.result || null,
         ],
-        function (err) {
+        async function (err) {
           if (err) {
             reject(err);
           } else {
+            // Set tournament status to 'active' if it was 'new'
+            const db = this;
+            db.run(
+              `UPDATE tournaments SET status = 'active' WHERE id = ? AND status = 'new'`,
+              [match.tournament_id],
+              (err2: Error | null) => {
+                if (err2) {
+                  console.error(
+                    "Failed to update tournament status to active:",
+                    err2
+                  );
+                }
+              }
+            );
             resolve(this.lastID);
           }
         }
@@ -827,16 +841,16 @@ export class Database {
                   ELSE 0
                 END
               ), 0) as points,
-              COUNT(m.id) as matches_played,
-                          SUM(CASE WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 1
+              SUM(CASE WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 1
                      WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 1
                      WHEN m.result = 'BYE' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
                      ELSE 0 END) as wins,
-            SUM(CASE WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
-                     ELSE 0 END) as draws,
-            SUM(CASE WHEN m.result = 'WIN_P1' AND m.player2_id = p.id THEN 1
-                     WHEN m.result = 'WIN_P2' AND m.player1_id = p.id THEN 1
-                     ELSE 0 END) as losses
+              SUM(CASE WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
+                       ELSE 0 END) as draws,
+              SUM(CASE WHEN m.result = 'WIN_P1' AND m.player2_id = p.id THEN 1
+                       WHEN m.result = 'WIN_P2' AND m.player1_id = p.id THEN 1
+                       ELSE 0 END) as losses,
+              COUNT(CASE WHEN m.result IS NOT NULL THEN m.id END) as matches_played
             FROM players p
             INNER JOIN tournament_players tp ON p.id = tp.player_id
             LEFT JOIN matches m ON (m.player1_id = p.id OR m.player2_id = p.id) 

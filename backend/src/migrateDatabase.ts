@@ -35,6 +35,48 @@ const migrateDatabase = async () => {
       console.log("✅ bracket_type column already exists");
     }
 
+    // Add status column to tournaments table if it doesn't exist
+    console.log("Adding status column to tournaments table...");
+    const checkStatusColumnSql = `
+      SELECT COUNT(*) as count 
+      FROM pragma_table_info('tournaments') 
+      WHERE name = 'status'
+    `;
+    const statusColumnExists = await db
+      .getRawQuery(checkStatusColumnSql, [])
+      .then((row: any) => row.count > 0);
+    if (!statusColumnExists) {
+      console.log("Adding status column...");
+      const addStatusColumnSql = `
+        ALTER TABLE tournaments 
+        ADD COLUMN status TEXT NOT NULL DEFAULT 'new' 
+        CHECK(status IN ('new', 'active', 'completed'))
+      `;
+      await db.runRawQuery(addStatusColumnSql, []);
+      console.log("✅ status column added successfully");
+    } else {
+      console.log("✅ status column already exists");
+    }
+
+    // Migrate existing tournaments to set status based on is_completed and matches
+    console.log("Migrating existing tournaments to set status...");
+    // Set completed tournaments
+    await db.runRawQuery(
+      `UPDATE tournaments SET status = 'completed' WHERE is_completed = 1`,
+      []
+    );
+    // Set active tournaments (has matches, not completed)
+    await db.runRawQuery(
+      `UPDATE tournaments SET status = 'active' WHERE id IN (SELECT DISTINCT tournament_id FROM matches) AND is_completed = 0`,
+      []
+    );
+    // Set new tournaments (no matches, not completed)
+    await db.runRawQuery(
+      `UPDATE tournaments SET status = 'new' WHERE status IS NULL OR status = ''`,
+      []
+    );
+    console.log("✅ Existing tournaments migrated to new status field");
+
     // Update existing tournaments to have SWISS bracket type
     console.log("Updating existing tournaments to SWISS bracket type...");
     const updateSql = `

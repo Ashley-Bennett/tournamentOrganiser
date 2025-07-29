@@ -14,6 +14,17 @@ import {
   EmojiEvents as TrophyIcon,
 } from "@mui/icons-material";
 
+interface Tournament {
+  id: number;
+  name: string;
+  date: string;
+  league_name?: string;
+  bracket_type: string;
+  status: "new" | "active" | "completed";
+  created_at: string;
+  updated_at?: string;
+}
+
 interface DashboardStats {
   activeTournaments: number;
   totalParticipants: number;
@@ -45,14 +56,14 @@ const Dashboard: React.FC = () => {
       if (!tournamentsResponse.ok) {
         throw new Error("Failed to fetch tournaments");
       }
-      const tournaments = await tournamentsResponse.json();
+      const tournaments: Tournament[] = await tournamentsResponse.json();
 
       // Calculate statistics
       const activeTournaments = tournaments.filter(
-        (t: any) => !t.is_completed
+        (t) => t.status === "active"
       ).length;
       const completedTournaments = tournaments.filter(
-        (t: any) => t.is_completed
+        (t) => t.status === "completed"
       ).length;
 
       // Fetch total participants (players across all tournaments)
