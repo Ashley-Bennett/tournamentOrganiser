@@ -16,9 +16,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: tournament-postgres
-          property: connectionString
+        value: postgresql://tournament_user:YbhNTYGvA3O28TO3uKZdjSLxRA7eCPQs@dpg-d24kv8pr0fns73d71ddg-a.oregon-postgres.render.com/tournament_db_tcj9
 
   # Frontend service
   - type: web
