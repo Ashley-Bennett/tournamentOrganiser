@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Typography,
   Button,
@@ -19,6 +20,8 @@ import {
   Alert,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
+import { apiCall, handleApiError } from "../utils/api";
+import { useAuth } from "../AuthContext";
 
 interface League {
   id: number;
@@ -28,6 +31,8 @@ interface League {
 }
 
 const Leagues: React.FC = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,15 +50,20 @@ const Leagues: React.FC = () => {
   const fetchLeagues = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:3002/api/leagues");
+      const response = await apiCall("/api/leagues");
       if (response.ok) {
         const data = await response.json();
         setLeagues(data);
       } else {
-        setError("Failed to fetch leagues");
+        if (response.status === 401) {
+          logout();
+          navigate("/login");
+          return;
+        }
+        await handleApiError(response);
       }
-    } catch (error) {
-      setError("Network error. Please try again.");
+    } catch (error: any) {
+      setError(error.message || "Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -64,25 +74,26 @@ const Leagues: React.FC = () => {
     setSubmitting(true);
 
     try {
-      const response = await fetch("http://localhost:3002/api/leagues", {
+      const response = await apiCall("/api/leagues", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(formData),
       });
 
       if (response.ok) {
-        const result = await response.json();
+        await response.json();
         setOpenDialog(false);
         setFormData({ name: "", description: "" });
         fetchLeagues(); // Refresh the list
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to create league");
+        if (response.status === 401) {
+          logout();
+          navigate("/login");
+          return;
+        }
+        await handleApiError(response);
       }
-    } catch (error) {
-      setError("Network error. Please try again.");
+    } catch (error: any) {
+      setError(error.message || "Network error. Please try again.");
     } finally {
       setSubmitting(false);
     }

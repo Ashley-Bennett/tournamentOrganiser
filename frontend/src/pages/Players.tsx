@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Typography,
   Button,
@@ -23,6 +24,8 @@ import {
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import EditIcon from "@mui/icons-material/Edit";
+import { apiCall, handleApiError } from "../utils/api";
+import { useAuth } from "../AuthContext";
 
 interface Player {
   id: number;
@@ -35,6 +38,8 @@ interface Player {
 }
 
 const Players: React.FC = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,15 +68,20 @@ const Players: React.FC = () => {
   const fetchPlayers = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:3002/api/players");
+      const response = await apiCall("/api/players");
       if (response.ok) {
         const data = await response.json();
         setPlayers(data);
       } else {
-        setError("Failed to fetch players");
+        if (response.status === 401) {
+          logout();
+          navigate("/login");
+          return;
+        }
+        await handleApiError(response);
       }
-    } catch (error) {
-      setError("Network error. Please try again.");
+    } catch (error: any) {
+      setError(error.message || "Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -82,25 +92,26 @@ const Players: React.FC = () => {
     setSubmitting(true);
 
     try {
-      const response = await fetch("http://localhost:3002/api/players", {
+      const response = await apiCall("/api/players", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(formData),
       });
 
       if (response.ok) {
-        const result = await response.json();
+        await response.json();
         setOpenDialog(false);
         setFormData({ name: "", static_seating: false });
         fetchPlayers(); // Refresh the list
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to create player");
+        if (response.status === 401) {
+          logout();
+          navigate("/login");
+          return;
+        }
+        await handleApiError(response);
       }
-    } catch (error) {
-      setError("Network error. Please try again.");
+    } catch (error: any) {
+      setError(error.message || "Network error. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -151,14 +162,10 @@ const Players: React.FC = () => {
         trainer_id: editForm.trainer_id || null,
         birth_year: editForm.birth_year ? Number(editForm.birth_year) : null,
       };
-      const response = await fetch(
-        `http://localhost:3002/api/players/${editPlayer.id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+      const response = await apiCall(`/api/players/${editPlayer.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
       if (response.ok) {
         setEditDialogOpen(false);
         setEditPlayer(null);
@@ -171,11 +178,15 @@ const Players: React.FC = () => {
         fetchPlayers();
         setSuccess("Player updated successfully.");
       } else {
-        const data = await response.json();
-        setEditError(data.error || "Failed to update player.");
+        if (response.status === 401) {
+          logout();
+          navigate("/login");
+          return;
+        }
+        await handleApiError(response);
       }
-    } catch (err) {
-      setEditError("Network error. Please try again.");
+    } catch (error: any) {
+      setEditError(error.message || "Network error. Please try again.");
     } finally {
       setEditSubmitting(false);
     }

@@ -22,6 +22,8 @@ import {
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { apiCall, handleApiError } from "../utils/api";
+import { useAuth } from "../AuthContext";
 
 interface Tournament {
   id: number;
@@ -36,6 +38,7 @@ interface Tournament {
 
 const Tournaments: React.FC = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,15 +57,20 @@ const Tournaments: React.FC = () => {
   const fetchTournaments = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:3002/api/tournaments");
+      const response = await apiCall("/api/tournaments");
       if (response.ok) {
         const data = await response.json();
         setTournaments(data);
       } else {
-        setError("Failed to fetch tournaments");
+        if (response.status === 401) {
+          logout();
+          navigate("/login");
+          return;
+        }
+        await handleApiError(response);
       }
-    } catch (error) {
-      setError("Network error. Please try again.");
+    } catch (error: any) {
+      setError(error.message || "Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -70,7 +78,7 @@ const Tournaments: React.FC = () => {
 
   const fetchLeagues = async () => {
     try {
-      const response = await fetch("http://localhost:3002/api/leagues");
+      const response = await apiCall("/api/leagues");
       if (response.ok) {
         const data = await response.json();
         setLeagues(data);
@@ -91,12 +99,9 @@ const Tournaments: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/tournaments/${id}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const response = await apiCall(`/api/tournaments/${id}`, {
+        method: "DELETE",
+      });
       if (response.ok) {
         setTournaments((prev) => prev.filter((t) => t.id !== id));
         setSuccess("Tournament deleted successfully.");

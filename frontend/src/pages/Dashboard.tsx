@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Grid,
   Card,
@@ -13,6 +14,8 @@ import {
   People as PeopleIcon,
   EmojiEvents as TrophyIcon,
 } from "@mui/icons-material";
+import { apiCall, handleApiError } from "../utils/api";
+import { useAuth } from "../AuthContext";
 
 interface Tournament {
   id: number;
@@ -32,6 +35,8 @@ interface DashboardStats {
 }
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     activeTournaments: 0,
     totalParticipants: 0,
@@ -50,11 +55,14 @@ const Dashboard: React.FC = () => {
       setError(null);
 
       // Fetch tournaments
-      const tournamentsResponse = await fetch(
-        "http://localhost:3002/api/tournaments"
-      );
+      const tournamentsResponse = await apiCall("/api/tournaments");
       if (!tournamentsResponse.ok) {
-        throw new Error("Failed to fetch tournaments");
+        if (tournamentsResponse.status === 401) {
+          logout();
+          navigate("/login");
+          return;
+        }
+        await handleApiError(tournamentsResponse);
       }
       const tournaments: Tournament[] = await tournamentsResponse.json();
 
@@ -69,8 +77,8 @@ const Dashboard: React.FC = () => {
       // Fetch total participants (players across all tournaments)
       let totalParticipants = 0;
       for (const tournament of tournaments) {
-        const playersResponse = await fetch(
-          `http://localhost:3002/api/tournaments/${tournament.id}/players`
+        const playersResponse = await apiCall(
+          `/api/tournaments/${tournament.id}/players`
         );
         if (playersResponse.ok) {
           const players = await playersResponse.json();
@@ -83,8 +91,8 @@ const Dashboard: React.FC = () => {
         totalParticipants,
         completedTournaments,
       });
-    } catch (error) {
-      setError("Failed to load dashboard statistics");
+    } catch (error: any) {
+      setError(error.message || "Failed to load dashboard statistics");
       console.error("Error fetching dashboard stats:", error);
     } finally {
       setLoading(false);

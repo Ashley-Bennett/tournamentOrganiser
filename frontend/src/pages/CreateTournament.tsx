@@ -17,6 +17,8 @@ import {
   Save as SaveIcon,
   ArrowBack as ArrowBackIcon,
 } from "@mui/icons-material";
+import { apiCall } from "../utils/api";
+import { useAuth } from "../AuthContext";
 
 interface League {
   id: number;
@@ -24,19 +26,9 @@ interface League {
   description?: string;
 }
 
-interface Tournament {
-  id: number;
-  name: string;
-  date: string;
-  league_name?: string;
-  bracket_type: string;
-  status: "new" | "active" | "completed";
-  created_at: string;
-  updated_at?: string;
-}
-
 const CreateTournament: React.FC = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,11 +45,16 @@ const CreateTournament: React.FC = () => {
 
   const fetchLeagues = async () => {
     try {
-      const response = await fetch("http://localhost:3002/api/leagues");
+      const response = await apiCall("/api/leagues");
       if (response.ok) {
         const data = await response.json();
         setLeagues(data);
       } else {
+        if (response.status === 401) {
+          logout();
+          navigate("/login");
+          return;
+        }
         console.error("Failed to fetch leagues");
       }
     } catch (error) {
@@ -90,16 +87,13 @@ const CreateTournament: React.FC = () => {
         status: "new",
       };
 
-      const response = await fetch("http://localhost:3002/api/tournaments", {
+      const response = await apiCall("/api/tournaments", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(requestBody),
       });
 
       if (response.ok) {
-        const result = await response.json();
+        await response.json();
         navigate("/tournaments");
       } else {
         const errorData = await response.json();

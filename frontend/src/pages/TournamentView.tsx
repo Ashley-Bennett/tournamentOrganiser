@@ -33,9 +33,7 @@ import {
   FormControlLabel,
   Checkbox,
   useTheme,
-  FormLabel,
   RadioGroup,
-  FormControlLabel as MuiFormControlLabel,
   Radio,
 } from "@mui/material";
 import {
@@ -47,8 +45,9 @@ import {
   Leaderboard as LeaderboardIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
-  Star as StarIcon, // <-- Add this line
 } from "@mui/icons-material";
+import { apiCall } from "../utils/api";
+import { useAuth } from "../AuthContext";
 
 interface Tournament {
   id: number;
@@ -109,6 +108,8 @@ interface LeaderboardEntry {
 const TournamentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { logout } = useAuth();
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [tournamentPlayers, setTournamentPlayers] = useState<
@@ -168,6 +169,8 @@ const TournamentView: React.FC = () => {
     dropped: false,
     started_round: 1,
   });
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [editingPlayer, setEditingPlayer] = useState<TournamentPlayer | null>(
     null
   );
@@ -181,6 +184,8 @@ const TournamentView: React.FC = () => {
   const [roundStatuses, setRoundStatuses] = useState<Record<number, string>>(
     {}
   );
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [startingRound, setStartingRound] = useState<number | null>(null);
   const [completingRound, setCompletingRound] = useState<number | null>(null);
   const [openEditMatchDialog, setOpenEditMatchDialog] = useState(false);
@@ -201,7 +206,9 @@ const TournamentView: React.FC = () => {
     Player[]
   >([]);
   const [loadingUnpairedForRound, setLoadingUnpairedForRound] = useState(false);
+
   // Add state for editing the result
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [editMatchResult, setEditMatchResult] = useState<string>("");
   // Add state for Edit Result dialog
   const [openEditResultDialog, setOpenEditResultDialog] = useState(false);
@@ -216,9 +223,7 @@ const TournamentView: React.FC = () => {
       setError(null);
 
       // Fetch tournament details
-      const tournamentResponse = await fetch(
-        `http://localhost:3002/api/tournaments/${id}`
-      );
+      const tournamentResponse = await apiCall(`/api/tournaments/${id}`);
       if (!tournamentResponse.ok) {
         throw new Error("Tournament not found");
       }
@@ -226,9 +231,7 @@ const TournamentView: React.FC = () => {
       setTournament(tournamentData);
 
       // Fetch tournament matches
-      const matchesResponse = await fetch(
-        `http://localhost:3002/api/tournaments/${id}/matches`
-      );
+      const matchesResponse = await apiCall(`/api/tournaments/${id}/matches`);
       if (matchesResponse.ok) {
         const matchesData = await matchesResponse.json();
         setMatches(matchesData);
@@ -242,7 +245,7 @@ const TournamentView: React.FC = () => {
 
   const fetchPlayers = useCallback(async () => {
     try {
-      const response = await fetch("http://localhost:3002/api/players");
+      const response = await apiCall("/api/players");
       if (response.ok) {
         const data = await response.json();
         setPlayers(data);
@@ -254,9 +257,7 @@ const TournamentView: React.FC = () => {
 
   const fetchTournamentPlayers = useCallback(async () => {
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/tournaments/${id}/players`
-      );
+      const response = await apiCall(`/api/tournaments/${id}/players`);
       if (response.ok) {
         const data = await response.json();
         setTournamentPlayers(data);
@@ -268,9 +269,7 @@ const TournamentView: React.FC = () => {
 
   const fetchLeaderboard = useCallback(async () => {
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/tournaments/${id}/leaderboard`
-      );
+      const response = await apiCall(`/api/tournaments/${id}/leaderboard`);
       if (response.ok) {
         const data = await response.json();
         setLeaderboard(data);
@@ -298,8 +297,8 @@ const TournamentView: React.FC = () => {
   const handleStartRound = async (roundNumber: number) => {
     setUnpairedWarning(null);
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/tournaments/${id}/rounds/${roundNumber}/unpaired-players`
+      const response = await apiCall(
+        `/api/tournaments/${id}/rounds/${roundNumber}/unpaired-players`
       );
       const unpaired = await response.json();
       if (Array.isArray(unpaired) && unpaired.length > 0) {
@@ -313,11 +312,10 @@ const TournamentView: React.FC = () => {
       setStartingRound(roundNumber);
       setError(null);
       try {
-        const response = await fetch(
-          `http://localhost:3002/api/tournaments/${id}/rounds/${roundNumber}/start`,
+        const response = await apiCall(
+          `/api/tournaments/${id}/rounds/${roundNumber}/start`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
           }
         );
         if (response.ok) {
@@ -342,11 +340,10 @@ const TournamentView: React.FC = () => {
     setCompletingRound(roundNumber);
     setError(null);
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/tournaments/${id}/rounds/${roundNumber}/complete`,
+      const response = await apiCall(
+        `/api/tournaments/${id}/rounds/${roundNumber}/complete`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
         }
       );
       if (response.ok) {
@@ -370,12 +367,9 @@ const TournamentView: React.FC = () => {
     setDeletingMatchId(matchId);
     setError(null);
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/matches/${matchId}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const response = await apiCall(`/api/matches/${matchId}`, {
+        method: "DELETE",
+      });
       if (response.ok) {
         setSuccess("Match deleted successfully!");
         setTimeout(() => setSuccess(null), 3000);
@@ -402,18 +396,14 @@ const TournamentView: React.FC = () => {
         let winner_id = null;
         if (editMatchResult === "WIN_P1") winner_id = editingMatch.player1_id;
         if (editMatchResult === "WIN_P2") winner_id = editingMatch.player2_id;
-        const response = await fetch(
-          `http://localhost:3002/api/matches/${editingMatch.id}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              result: editMatchResult,
-              winner_id,
-              modified_by_to: true,
-            }),
-          }
-        );
+        const response = await apiCall(`/api/matches/${editingMatch.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            result: editMatchResult,
+            winner_id,
+            modified_by_to: true,
+          }),
+        });
         if (response.ok) {
           setSuccess("Match result updated successfully!");
           setTimeout(() => setSuccess(null), 3000);
@@ -444,17 +434,13 @@ const TournamentView: React.FC = () => {
     setEditingMatchLoading(true);
     setError(null);
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/matches/${editingMatch.id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            player1_id: player1_id ? parseInt(player1_id) : null,
-            player2_id: player2_id ? parseInt(player2_id) : null,
-          }),
-        }
-      );
+      const response = await apiCall(`/api/matches/${editingMatch.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          player1_id: player1_id ? parseInt(player1_id) : null,
+          player2_id: player2_id ? parseInt(player2_id) : null,
+        }),
+      });
       if (response.ok) {
         setSuccess("Match updated successfully!");
         setTimeout(() => setSuccess(null), 3000);
@@ -596,8 +582,8 @@ const TournamentView: React.FC = () => {
       try {
         const statuses: Record<number, string> = {};
         for (const round of roundNumbers) {
-          const response = await fetch(
-            `http://localhost:3002/api/tournaments/${id}/rounds/${round}/status`
+          const response = await apiCall(
+            `/api/tournaments/${id}/rounds/${round}/status`
           );
           if (response.ok) {
             const data = await response.json();
@@ -646,24 +632,18 @@ const TournamentView: React.FC = () => {
     setSubmitting(true);
 
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/tournaments/${id}/matches`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            round_number: createMatchForm.round_number,
-            player1_id: createMatchForm.player1_id
-              ? parseInt(createMatchForm.player1_id)
-              : null,
-            player2_id: createMatchForm.player2_id
-              ? parseInt(createMatchForm.player2_id)
-              : null,
-          }),
-        }
-      );
+      const response = await apiCall(`/api/tournaments/${id}/matches`, {
+        method: "POST",
+        body: JSON.stringify({
+          round_number: createMatchForm.round_number,
+          player1_id: createMatchForm.player1_id
+            ? parseInt(createMatchForm.player1_id)
+            : null,
+          player2_id: createMatchForm.player2_id
+            ? parseInt(createMatchForm.player2_id)
+            : null,
+        }),
+      });
 
       if (response.ok) {
         const result = await response.json();
@@ -694,18 +674,12 @@ const TournamentView: React.FC = () => {
       const roundNumber =
         matches.length === 0 ? 1 : Math.max(...roundNumbers) + 1;
 
-      const response = await fetch(
-        `http://localhost:3002/api/tournaments/${id}/pairings`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            round_number: roundNumber,
-          }),
-        }
-      );
+      const response = await apiCall(`/api/tournaments/${id}/pairings`, {
+        method: "POST",
+        body: JSON.stringify({
+          round_number: roundNumber,
+        }),
+      });
 
       if (response.ok) {
         const result = await response.json();
@@ -762,20 +736,14 @@ const TournamentView: React.FC = () => {
         modified_by_to: true,
       });
 
-      const response = await fetch(
-        `http://localhost:3002/api/matches/${matchId}/result`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            result,
-            winner_id: winnerId,
-            modified_by_to: true,
-          }),
-        }
-      );
+      const response = await apiCall(`/api/matches/${matchId}/result`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          result,
+          winner_id: winnerId,
+          modified_by_to: true,
+        }),
+      });
 
       console.log("PATCH response status:", response.status);
 
@@ -838,19 +806,13 @@ const TournamentView: React.FC = () => {
     setAddingPlayer(true);
 
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/tournaments/${id}/players/bulk`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            players: addPlayerForm.selectedPlayers.map((player) => player.id),
-            started_round: addPlayerForm.started_round,
-          }),
-        }
-      );
+      const response = await apiCall(`/api/tournaments/${id}/players/bulk`, {
+        method: "POST",
+        body: JSON.stringify({
+          players: addPlayerForm.selectedPlayers.map((player) => player.id),
+          started_round: addPlayerForm.started_round,
+        }),
+      });
 
       if (response.ok) {
         const result = await response.json();
@@ -890,9 +852,8 @@ const TournamentView: React.FC = () => {
         payload.trainer_id = createPlayerForm.trainer_id;
       if (createPlayerForm.birth_year)
         payload.birth_year = Number(createPlayerForm.birth_year);
-      const response = await fetch("http://localhost:3002/api/players", {
+      const response = await apiCall("/api/players", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -901,13 +862,10 @@ const TournamentView: React.FC = () => {
         console.log("Player created:", result);
 
         // Add the newly created player to the tournament
-        const addToTournamentResponse = await fetch(
-          `http://localhost:3002/api/tournaments/${id}/players`,
+        const addToTournamentResponse = await apiCall(
+          `/api/tournaments/${id}/players`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
             body: JSON.stringify({
               player_id: result.id,
               started_round: 1,
@@ -1002,11 +960,10 @@ const TournamentView: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/tournaments/${tournament.id}/completion`,
+      const response = await apiCall(
+        `/api/tournaments/${tournament.id}/completion`,
         {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ is_completed: true }),
         }
       );
@@ -1037,8 +994,8 @@ const TournamentView: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/tournaments/${tournament.id}/players/${playerId}`,
+      const response = await apiCall(
+        `/api/tournaments/${tournament.id}/players/${playerId}`,
         {
           method: "DELETE",
         }
@@ -1069,8 +1026,8 @@ const TournamentView: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/tournaments/${tournament.id}/players`,
+      const response = await apiCall(
+        `/api/tournaments/${tournament.id}/players`,
         {
           method: "DELETE",
         }
@@ -1096,9 +1053,7 @@ const TournamentView: React.FC = () => {
       return;
     }
     setLoadingUnpairedForRound(true);
-    fetch(
-      `http://localhost:3002/api/tournaments/${id}/rounds/${selectedRound}/unpaired-players`
-    )
+    apiCall(`/api/tournaments/${id}/rounds/${selectedRound}/unpaired-players`)
       .then((res) => res.json())
       .then((data) =>
         setUnpairedPlayersForRound(Array.isArray(data) ? data : [])
@@ -1845,8 +1800,8 @@ const TournamentView: React.FC = () => {
                                               : "",
                                           });
                                           setUnpairedPlayersLoading(true);
-                                          fetch(
-                                            `http://localhost:3002/api/tournaments/${id}/rounds/${match.round_number}/unpaired-players`
+                                          apiCall(
+                                            `/api/tournaments/${id}/rounds/${match.round_number}/unpaired-players`
                                           )
                                             .then((res) => res.json())
                                             .then((data) => {
@@ -2499,11 +2454,10 @@ const TournamentView: React.FC = () => {
                   ? Number(editPlayerForm.birth_year)
                   : null,
               };
-              const playerRes = await fetch(
-                `http://localhost:3002/api/players/${editPlayerForm.id}`,
+              const playerRes = await apiCall(
+                `/api/players/${editPlayerForm.id}`,
                 {
                   method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify(payload),
                 }
               );
@@ -2514,11 +2468,10 @@ const TournamentView: React.FC = () => {
                 return;
               }
               // Update dropped status
-              const dropRes = await fetch(
-                `http://localhost:3002/api/tournaments/${tournament.id}/players/${editPlayerForm.id}/drop`,
+              const dropRes = await apiCall(
+                `/api/tournaments/${tournament.id}/players/${editPlayerForm.id}/drop`,
                 {
                   method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ dropped: editPlayerForm.dropped }),
                 }
               );
@@ -2529,11 +2482,10 @@ const TournamentView: React.FC = () => {
                 return;
               }
               // Update started_round
-              const roundRes = await fetch(
-                `http://localhost:3002/api/tournaments/${tournament.id}/players/${editPlayerForm.id}/started_round`,
+              const roundRes = await apiCall(
+                `/api/tournaments/${tournament.id}/players/${editPlayerForm.id}/started_round`,
                 {
                   method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     started_round: editPlayerForm.started_round,
                   }),
@@ -2664,11 +2616,10 @@ const TournamentView: React.FC = () => {
               setError(null);
               setSuccess(null);
               try {
-                const dropRes = await fetch(
-                  `http://localhost:3002/api/tournaments/${tournament.id}/players/${droppedConfirm.player.id}/drop`,
+                const dropRes = await apiCall(
+                  `/api/tournaments/${tournament.id}/players/${droppedConfirm.player.id}/drop`,
                   {
                     method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       dropped: droppedConfirm.newDropped,
                     }),

@@ -39,8 +39,10 @@ export class Database {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         description TEXT,
+        owner_id INTEGER NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (owner_id) REFERENCES users (id)
       )
     `;
 
@@ -51,12 +53,14 @@ export class Database {
         name TEXT NOT NULL,
         date TEXT NOT NULL,
         league_id INTEGER,
+        owner_id INTEGER NOT NULL,
         bracket_type TEXT NOT NULL DEFAULT 'SWISS' CHECK(bracket_type IN ('SWISS', 'SINGLE_ELIMINATION', 'DOUBLE_ELIMINATION')),
         is_completed BOOLEAN DEFAULT FALSE,
         status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'active', 'completed')),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (league_id) REFERENCES leagues (id)
+        FOREIGN KEY (league_id) REFERENCES leagues (id),
+        FOREIGN KEY (owner_id) REFERENCES users (id)
       )
     `;
 
@@ -68,8 +72,10 @@ export class Database {
         static_seating BOOLEAN DEFAULT FALSE,
         trainer_id TEXT,
         birth_year INTEGER,
+        owner_id INTEGER NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (owner_id) REFERENCES users (id)
       )
     `;
 
@@ -106,6 +112,42 @@ export class Database {
         FOREIGN KEY (player1_id) REFERENCES players (id),
         FOREIGN KEY (player2_id) REFERENCES players (id),
         FOREIGN KEY (winner_id) REFERENCES players (id)
+      )
+    `;
+
+    // Create tournament collaborators table
+    const createTournamentCollaboratorsTable = `
+      CREATE TABLE IF NOT EXISTS tournament_collaborators (
+        tournament_id INTEGER,
+        user_id INTEGER,
+        role TEXT DEFAULT 'editor' CHECK(role IN ('editor', 'viewer')),
+        PRIMARY KEY (tournament_id, user_id),
+        FOREIGN KEY (tournament_id) REFERENCES tournaments(id),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `;
+
+    // Create league collaborators table
+    const createLeagueCollaboratorsTable = `
+      CREATE TABLE IF NOT EXISTS league_collaborators (
+        league_id INTEGER,
+        user_id INTEGER,
+        role TEXT DEFAULT 'editor' CHECK(role IN ('editor', 'viewer')),
+        PRIMARY KEY (league_id, user_id),
+        FOREIGN KEY (league_id) REFERENCES leagues(id),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `;
+
+    // Create player collaborators table
+    const createPlayerCollaboratorsTable = `
+      CREATE TABLE IF NOT EXISTS player_collaborators (
+        player_id INTEGER,
+        user_id INTEGER,
+        role TEXT DEFAULT 'editor' CHECK(role IN ('editor', 'viewer')),
+        PRIMARY KEY (player_id, user_id),
+        FOREIGN KEY (player_id) REFERENCES players(id),
+        FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `;
 
@@ -158,6 +200,37 @@ export class Database {
           console.error("Error creating matches table:", err.message);
         } else {
           console.log("✅ Matches table created/verified");
+        }
+      });
+
+      this.db.run(createTournamentCollaboratorsTable, (err) => {
+        if (err) {
+          console.error(
+            "Error creating tournament_collaborators table:",
+            err.message
+          );
+        } else {
+          console.log("✅ Tournament_collaborators table created/verified");
+        }
+      });
+      this.db.run(createLeagueCollaboratorsTable, (err) => {
+        if (err) {
+          console.error(
+            "Error creating league_collaborators table:",
+            err.message
+          );
+        } else {
+          console.log("✅ League_collaborators table created/verified");
+        }
+      });
+      this.db.run(createPlayerCollaboratorsTable, (err) => {
+        if (err) {
+          console.error(
+            "Error creating player_collaborators table:",
+            err.message
+          );
+        } else {
+          console.log("✅ Player_collaborators table created/verified");
         }
       });
     });
@@ -225,16 +298,17 @@ export class Database {
   async createLeague(league: {
     name: string;
     description?: string;
+    owner_id: number;
   }): Promise<number> {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT INTO leagues (name, description)
-        VALUES (?, ?)
+        INSERT INTO leagues (name, description, owner_id)
+        VALUES (?, ?, ?)
       `;
 
       this.db.run(
         sql,
-        [league.name, league.description || null],
+        [league.name, league.description || null, league.owner_id],
         function (err) {
           if (err) {
             reject(err);
@@ -260,6 +334,21 @@ export class Database {
     });
   }
 
+  async getLeaguesByOwner(ownerId: number): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      const sql =
+        "SELECT * FROM leagues WHERE owner_id = ? ORDER BY created_at DESC";
+
+      this.db.all(sql, [ownerId], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
   // Tournament methods
   async createTournament(tournament: {
     name: string;
@@ -267,11 +356,12 @@ export class Database {
     league_id?: number;
     bracket_type?: string;
     status?: string;
+    owner_id: number;
   }): Promise<number> {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT INTO tournaments (name, date, league_id, bracket_type, status)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO tournaments (name, date, league_id, bracket_type, status, owner_id)
+        VALUES (?, ?, ?, ?, ?, ?)
       `;
       this.db.run(
         sql,
@@ -281,6 +371,7 @@ export class Database {
           tournament.league_id || null,
           tournament.bracket_type || "SWISS",
           tournament.status || "new",
+          tournament.owner_id,
         ],
         function (err) {
           if (err) {
@@ -303,6 +394,26 @@ export class Database {
       `;
 
       this.db.all(sql, [], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  async getTournamentsByOwner(ownerId: number): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT t.*, l.name as league_name 
+        FROM tournaments t 
+        LEFT JOIN leagues l ON t.league_id = l.id 
+        WHERE t.owner_id = ?
+        ORDER BY t.created_at DESC
+      `;
+
+      this.db.all(sql, [ownerId], (err, rows) => {
         if (err) {
           reject(err);
         } else {
@@ -370,11 +481,12 @@ export class Database {
     static_seating?: boolean;
     trainer_id?: string;
     birth_year?: number;
+    owner_id: number;
   }): Promise<number> {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT INTO players (name, static_seating, trainer_id, birth_year)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO players (name, static_seating, trainer_id, birth_year, owner_id)
+        VALUES (?, ?, ?, ?, ?)
       `;
       this.db.run(
         sql,
@@ -383,6 +495,7 @@ export class Database {
           player.static_seating || false,
           player.trainer_id || null,
           player.birth_year || null,
+          player.owner_id,
         ],
         function (err) {
           if (err) {
@@ -401,6 +514,20 @@ export class Database {
         SELECT * FROM players
       `;
       this.db.all(sql, [], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  async getPlayersByOwner(ownerId: number): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      const sql = "SELECT * FROM players WHERE owner_id = ? ORDER BY name";
+
+      this.db.all(sql, [ownerId], (err, rows) => {
         if (err) {
           reject(err);
         } else {
@@ -1586,5 +1713,179 @@ export class Database {
         }
       });
     });
+  }
+
+  // Collaborator management
+  async addTournamentCollaborator(
+    tournamentId: number,
+    userId: number,
+    role: "editor" | "viewer"
+  ) {
+    return this.runRawQuery(
+      "INSERT OR REPLACE INTO tournament_collaborators (tournament_id, user_id, role) VALUES (?, ?, ?)",
+      [tournamentId, userId, role]
+    );
+  }
+  async removeTournamentCollaborator(tournamentId: number, userId: number) {
+    return this.runRawQuery(
+      "DELETE FROM tournament_collaborators WHERE tournament_id = ? AND user_id = ?",
+      [tournamentId, userId]
+    );
+  }
+  async getTournamentCollaborators(tournamentId: number) {
+    return this.getRawQuery(
+      "SELECT u.id, u.name, u.email, c.role FROM tournament_collaborators c JOIN users u ON c.user_id = u.id WHERE c.tournament_id = ?",
+      [tournamentId]
+    );
+  }
+  async getAccessibleTournaments(userId: number) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT t.*, l.name as league_name, 'owner' as access_type
+        FROM tournaments t
+        LEFT JOIN leagues l ON t.league_id = l.id
+        WHERE t.owner_id = ?
+        UNION
+        SELECT t.*, l.name as league_name, c.role as access_type
+        FROM tournament_collaborators c
+        JOIN tournaments t ON c.tournament_id = t.id
+        LEFT JOIN leagues l ON t.league_id = l.id
+        WHERE c.user_id = ?
+      `;
+      this.db.all(sql, [userId, userId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  async addLeagueCollaborator(
+    leagueId: number,
+    userId: number,
+    role: "editor" | "viewer"
+  ) {
+    return this.runRawQuery(
+      "INSERT OR REPLACE INTO league_collaborators (league_id, user_id, role) VALUES (?, ?, ?)",
+      [leagueId, userId, role]
+    );
+  }
+  async removeLeagueCollaborator(leagueId: number, userId: number) {
+    return this.runRawQuery(
+      "DELETE FROM league_collaborators WHERE league_id = ? AND user_id = ?",
+      [leagueId, userId]
+    );
+  }
+  async getLeagueCollaborators(leagueId: number) {
+    return this.getRawQuery(
+      "SELECT u.id, u.name, u.email, c.role FROM league_collaborators c JOIN users u ON c.user_id = u.id WHERE c.league_id = ?",
+      [leagueId]
+    );
+  }
+  async getAccessibleLeagues(userId: number) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT l.*, 'owner' as access_type
+        FROM leagues l
+        WHERE l.owner_id = ?
+        UNION
+        SELECT l.*, c.role as access_type
+        FROM league_collaborators c
+        JOIN leagues l ON c.league_id = l.id
+        WHERE c.user_id = ?
+      `;
+      this.db.all(sql, [userId, userId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  async addPlayerCollaborator(
+    playerId: number,
+    userId: number,
+    role: "editor" | "viewer"
+  ) {
+    return this.runRawQuery(
+      "INSERT OR REPLACE INTO player_collaborators (player_id, user_id, role) VALUES (?, ?, ?)",
+      [playerId, userId, role]
+    );
+  }
+  async removePlayerCollaborator(playerId: number, userId: number) {
+    return this.runRawQuery(
+      "DELETE FROM player_collaborators WHERE player_id = ? AND user_id = ?",
+      [playerId, userId]
+    );
+  }
+  async getPlayerCollaborators(playerId: number) {
+    return this.getRawQuery(
+      "SELECT u.id, u.name, u.email, c.role FROM player_collaborators c JOIN users u ON c.user_id = u.id WHERE c.player_id = ?",
+      [playerId]
+    );
+  }
+  async getAccessiblePlayers(userId: number) {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT p.*, 'owner' as access_type
+        FROM players p
+        WHERE p.owner_id = ?
+        UNION
+        SELECT p.*, c.role as access_type
+        FROM player_collaborators c
+        JOIN players p ON c.player_id = p.id
+        WHERE c.user_id = ?
+      `;
+      this.db.all(sql, [userId, userId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  async getTournamentAccess(
+    userId: number,
+    tournamentId: number
+  ): Promise<"owner" | "editor" | "viewer" | null> {
+    const tournament = await this.getTournamentById(tournamentId);
+    if (tournament && tournament.owner_id === userId) return "owner";
+    const collab = await this.getRawQuery(
+      "SELECT role FROM tournament_collaborators WHERE tournament_id = ? AND user_id = ?",
+      [tournamentId, userId]
+    );
+    if (collab && collab.role) return collab.role;
+    return null;
+  }
+
+  async getLeagueAccess(
+    userId: number,
+    leagueId: number
+  ): Promise<"owner" | "editor" | "viewer" | null> {
+    const league = await this.getRawQuery(
+      "SELECT * FROM leagues WHERE id = ?",
+      [leagueId]
+    );
+    if (league && league.owner_id === userId) return "owner";
+    const collab = await this.getRawQuery(
+      "SELECT role FROM league_collaborators WHERE league_id = ? AND user_id = ?",
+      [leagueId, userId]
+    );
+    if (collab && collab.role) return collab.role;
+    return null;
+  }
+
+  async getPlayerAccess(
+    userId: number,
+    playerId: number
+  ): Promise<"owner" | "editor" | "viewer" | null> {
+    const player = await this.getRawQuery(
+      "SELECT * FROM players WHERE id = ?",
+      [playerId]
+    );
+    if (player && player.owner_id === userId) return "owner";
+    const collab = await this.getRawQuery(
+      "SELECT role FROM player_collaborators WHERE player_id = ? AND user_id = ?",
+      [playerId, userId]
+    );
+    if (collab && collab.role) return collab.role;
+    return null;
   }
 }

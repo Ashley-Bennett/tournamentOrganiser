@@ -4,7 +4,6 @@ import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
 import { Database } from "./database/database";
-import seedData from "./seedData";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
@@ -19,7 +18,13 @@ const PORT = process.env.PORT || 3002;
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin:
+      process.env.NODE_ENV === "production"
+        ? [
+            process.env.FRONTEND_URL ||
+              "https://tournament-organizer-frontend.onrender.com",
+          ]
+        : process.env.FRONTEND_URL || "http://localhost:5173",
     credentials: true,
   })
 );
@@ -56,18 +61,6 @@ app.get("/api/health", (req, res) => {
     message: "Matchamp Backend is running",
   });
 });
-
-// Seed data endpoint (for development only)
-if (process.env.NODE_ENV === "development") {
-  app.post("/api/seed", async (req, res) => {
-    try {
-      await seedData();
-      res.json({ message: "Database seeded successfully" });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to seed database" });
-    }
-  });
-}
 
 // API routes
 app.get("/api", (req, res) => {
@@ -141,16 +134,30 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
+// Protect all API routes except login and user registration
+app.use("/api", (req, res, next) => {
+  // Skip authentication for login and user registration
+  if (req.path === "/login" || req.path === "/users") {
+    return next();
+  }
+  return authenticateJWT(req, res, next);
+});
+
 // League routes
 app.post("/api/leagues", async (req, res) => {
   try {
     const { name, description } = req.body;
+    const userId = (req.user as any).id;
 
     if (!name) {
       return res.status(400).json({ error: "League name is required" });
     }
 
-    const leagueId = await db.createLeague({ name, description });
+    const leagueId = await db.createLeague({
+      name,
+      description,
+      owner_id: userId,
+    });
     res
       .status(201)
       .json({ id: leagueId, message: "League created successfully" });
@@ -161,10 +168,27 @@ app.post("/api/leagues", async (req, res) => {
 
 app.get("/api/leagues", async (req, res) => {
   try {
-    const leagues = await db.getLeagues();
+    const userId = (req.user as any).id;
+    const leagues = await db.getAccessibleLeagues(userId);
     res.json(leagues);
   } catch (error) {
     res.status(500).json({ error: "Failed to get leagues" });
+  }
+});
+
+// League delete
+app.delete("/api/leagues/:id", async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const userId = (req.user as any).id;
+    const access = await db.getLeagueAccess(userId, leagueId);
+    if (access !== "owner") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    await db.runRawQuery("DELETE FROM leagues WHERE id = ?", [leagueId]);
+    res.json({ message: "League deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete league" });
   }
 });
 
@@ -172,6 +196,7 @@ app.get("/api/leagues", async (req, res) => {
 app.post("/api/tournaments", async (req, res) => {
   try {
     const { name, date, league_id, bracket_type, status } = req.body;
+    const userId = (req.user as any).id;
     console.log("Creating tournament with data:", {
       name,
       date,
@@ -211,6 +236,7 @@ app.post("/api/tournaments", async (req, res) => {
       league_id,
       bracket_type,
       status: status || "new",
+      owner_id: userId,
     });
     res
       .status(201)
@@ -223,7 +249,8 @@ app.post("/api/tournaments", async (req, res) => {
 
 app.get("/api/tournaments", async (req, res) => {
   try {
-    const tournaments = await db.getTournaments();
+    const userId = (req.user as any).id;
+    const tournaments = await db.getAccessibleTournaments(userId);
     res.json(tournaments);
   } catch (error) {
     res.status(500).json({ error: "Failed to get tournaments" });
@@ -245,35 +272,41 @@ app.get("/api/tournaments/:id", async (req, res) => {
   }
 });
 
+// Tournament update (completion)
 app.patch("/api/tournaments/:id/completion", async (req, res) => {
   try {
     const tournamentId = parseInt(req.params.id);
+    const userId = (req.user as any).id;
+    const access = await db.getTournamentAccess(userId, tournamentId);
+    if (access !== "owner" && access !== "editor") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
     const { is_completed } = req.body;
-
     if (typeof is_completed !== "boolean") {
       return res.status(400).json({ error: "is_completed must be a boolean" });
     }
-
     await db.updateTournamentCompletion(tournamentId, is_completed);
     res.json({ message: "Tournament completion status updated" });
   } catch (error) {
     res.status(500).json({ error: "Failed to update tournament completion" });
   }
 });
-
+// Tournament delete
 app.delete("/api/tournaments/:id", async (req, res) => {
   try {
     const tournamentId = parseInt(req.params.id);
-    // Delete matches
+    const userId = (req.user as any).id;
+    const access = await db.getTournamentAccess(userId, tournamentId);
+    if (access !== "owner") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
     await db.runRawQuery("DELETE FROM matches WHERE tournament_id = ?", [
       tournamentId,
     ]);
-    // Delete tournament_players
     await db.runRawQuery(
       "DELETE FROM tournament_players WHERE tournament_id = ?",
       [tournamentId]
     );
-    // Delete tournament
     await db.runRawQuery("DELETE FROM tournaments WHERE id = ?", [
       tournamentId,
     ]);
@@ -287,6 +320,7 @@ app.delete("/api/tournaments/:id", async (req, res) => {
 app.post("/api/players", async (req, res) => {
   try {
     const { name, static_seating, trainer_id, birth_year } = req.body;
+    const userId = (req.user as any).id;
 
     if (!name) {
       return res.status(400).json({ error: "Player name is required" });
@@ -297,6 +331,7 @@ app.post("/api/players", async (req, res) => {
       static_seating,
       trainer_id,
       birth_year,
+      owner_id: userId,
     });
     res
       .status(201)
@@ -308,7 +343,8 @@ app.post("/api/players", async (req, res) => {
 
 app.get("/api/players", async (req, res) => {
   try {
-    const players = await db.getPlayers();
+    const userId = (req.user as any).id;
+    const players = await db.getAccessiblePlayers(userId);
     res.json(players);
   } catch (error) {
     res.status(500).json({ error: "Failed to get players" });
@@ -318,6 +354,11 @@ app.get("/api/players", async (req, res) => {
 app.patch("/api/players/:id", async (req, res) => {
   try {
     const playerId = parseInt(req.params.id);
+    const userId = (req.user as any).id;
+    const access = await db.getPlayerAccess(userId, playerId);
+    if (access !== "owner" && access !== "editor") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
     const { name, static_seating, trainer_id, birth_year } = req.body;
     await db.updatePlayer({
       id: playerId,
@@ -329,6 +370,22 @@ app.patch("/api/players/:id", async (req, res) => {
     res.json({ message: "Player updated successfully" });
   } catch (error) {
     res.status(500).json({ error: "Failed to update player" });
+  }
+});
+
+// Player delete
+app.delete("/api/players/:id", async (req, res) => {
+  try {
+    const playerId = parseInt(req.params.id);
+    const userId = (req.user as any).id;
+    const access = await db.getPlayerAccess(userId, playerId);
+    if (access !== "owner") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    await db.runRawQuery("DELETE FROM players WHERE id = ?", [playerId]);
+    res.json({ message: "Player deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete player" });
   }
 });
 
@@ -744,6 +801,106 @@ app.get(
   }
 );
 
+// --- Collaborator Management Endpoints ---
+// Tournament collaborators
+app.post("/api/tournaments/:id/collaborators", async (req, res) => {
+  try {
+    const { user_id, role } = req.body;
+    const tournamentId = parseInt(req.params.id);
+    if (!user_id || !role)
+      return res.status(400).json({ error: "user_id and role required" });
+    await db.addTournamentCollaborator(tournamentId, user_id, role);
+    res.json({ message: "Collaborator added" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to add collaborator" });
+  }
+});
+app.delete("/api/tournaments/:id/collaborators/:userId", async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id);
+    const userId = parseInt(req.params.userId);
+    await db.removeTournamentCollaborator(tournamentId, userId);
+    res.json({ message: "Collaborator removed" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to remove collaborator" });
+  }
+});
+app.get("/api/tournaments/:id/collaborators", async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id);
+    const collaborators = await db.getTournamentCollaborators(tournamentId);
+    res.json(collaborators);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get collaborators" });
+  }
+});
+
+// League collaborators
+app.post("/api/leagues/:id/collaborators", async (req, res) => {
+  try {
+    const { user_id, role } = req.body;
+    const leagueId = parseInt(req.params.id);
+    if (!user_id || !role)
+      return res.status(400).json({ error: "user_id and role required" });
+    await db.addLeagueCollaborator(leagueId, user_id, role);
+    res.json({ message: "Collaborator added" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to add collaborator" });
+  }
+});
+app.delete("/api/leagues/:id/collaborators/:userId", async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const userId = parseInt(req.params.userId);
+    await db.removeLeagueCollaborator(leagueId, userId);
+    res.json({ message: "Collaborator removed" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to remove collaborator" });
+  }
+});
+app.get("/api/leagues/:id/collaborators", async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const collaborators = await db.getLeagueCollaborators(leagueId);
+    res.json(collaborators);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get collaborators" });
+  }
+});
+
+// Player collaborators
+app.post("/api/players/:id/collaborators", async (req, res) => {
+  try {
+    const { user_id, role } = req.body;
+    const playerId = parseInt(req.params.id);
+    if (!user_id || !role)
+      return res.status(400).json({ error: "user_id and role required" });
+    await db.addPlayerCollaborator(playerId, user_id, role);
+    res.json({ message: "Collaborator added" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to add collaborator" });
+  }
+});
+app.delete("/api/players/:id/collaborators/:userId", async (req, res) => {
+  try {
+    const playerId = parseInt(req.params.id);
+    const userId = parseInt(req.params.userId);
+    await db.removePlayerCollaborator(playerId, userId);
+    res.json({ message: "Collaborator removed" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to remove collaborator" });
+  }
+});
+app.get("/api/players/:id/collaborators", async (req, res) => {
+  try {
+    const playerId = parseInt(req.params.id);
+    const collaborators = await db.getPlayerCollaborators(playerId);
+    res.json(collaborators);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get collaborators" });
+  }
+});
+
 // Error handling middleware
 app.use(
   (
@@ -767,9 +924,6 @@ app.use(
 app.use("*", (req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
-
-// Protect all other routes
-app.use("/api", authenticateJWT);
 
 // Start server
 app.listen(PORT, () => {
