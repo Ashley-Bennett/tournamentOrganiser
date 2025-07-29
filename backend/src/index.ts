@@ -378,6 +378,42 @@ app.patch("/api/matches/:id/result", async (req, res) => {
   }
 });
 
+// Get player standings for a tournament
+app.get("/api/tournaments/:id/standings", async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id);
+    const standings = await db.getPlayerStandings(tournamentId);
+    res.json(standings);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get player standings" });
+  }
+});
+
+// Create automatic pairings for a round
+app.post("/api/tournaments/:id/pairings", async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id);
+    const { round_number } = req.body;
+
+    if (!round_number) {
+      return res.status(400).json({ error: "Round number is required" });
+    }
+
+    const pairings = await db.createAutomaticPairings(
+      tournamentId,
+      round_number
+    );
+    res.status(201).json({
+      message: "Automatic pairings created successfully",
+      pairings,
+    });
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ error: error.message || "Failed to create automatic pairings" });
+  }
+});
+
 // Error handling middleware
 app.use(
   (

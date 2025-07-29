@@ -138,6 +138,8 @@ tournamentOrganiser/
 - ✅ Modern Material-UI interface
 - ✅ Responsive design
 - ✅ TypeScript for type safety
+- ✅ **Automatic Swiss pairing system**
+- ✅ **Static seating constraint enforcement**
 
 ### Planned Features
 
@@ -147,6 +149,60 @@ tournamentOrganiser/
 - 🔄 User authentication and authorization
 - 🔄 Tournament templates
 - 🔄 Export/import functionality
+
+## 🎯 Pairing System
+
+### Automatic Pairing
+
+The tournament organizer now supports automatic pairing for Swiss tournaments with the following features:
+
+#### First Round Pairing
+
+- **Static Seating Priority**: Static seating players are paired with dynamic seating players first
+- **Constraint Enforcement**: Two static seating players are never paired together
+- **Remaining Players**: Any remaining players are paired within their own groups
+- **Bye Handling**: Odd players receive a bye
+
+#### Subsequent Round Pairing (Swiss System)
+
+- **Point-Based Pairing**: Players are paired based on their current tournament points
+- **Previous Match Avoidance**: Players who have already played each other are not paired again
+- **Static Seating Constraint**: Static seating players are never paired together
+- **Optimal Matching**: Algorithm finds the best available opponent based on point difference
+
+### Pairing Options
+
+When creating matches, users can choose between:
+
+1. **🎯 Automatic Pairing**: System automatically creates optimal pairings based on points and constraints
+2. **✏️ Custom Pairing**: Manual selection of players for each match
+
+### API Endpoints
+
+#### Get Player Standings
+
+```
+GET /api/tournaments/:id/standings
+```
+
+Returns player standings with points, matches played, and seating type.
+
+#### Create Automatic Pairings
+
+```
+POST /api/tournaments/:id/pairings
+Body: { "round_number": number }
+```
+
+Creates automatic pairings for the specified round and returns the created matches.
+
+### Database Schema Updates
+
+The system now tracks:
+
+- **Player Points**: Calculated from match results (Win = 1, Draw = 0.5, Loss = 0)
+- **Static Seating**: Boolean flag indicating if a player requires fixed seating
+- **Match History**: Prevents repeat pairings in Swiss tournaments
 
 ## 🧪 API Endpoints
 

@@ -94,6 +94,8 @@ const TournamentView: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
   const [openCreateMatchDialog, setOpenCreateMatchDialog] = useState(false);
+  const [openPairingOptionsDialog, setOpenPairingOptionsDialog] =
+    useState(false);
   const [openAddPlayerDialog, setOpenAddPlayerDialog] = useState(false);
   const [openCreatePlayerDialog, setOpenCreatePlayerDialog] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -113,6 +115,7 @@ const TournamentView: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [creatingPlayer, setCreatingPlayer] = useState(false);
+  const [creatingPairings, setCreatingPairings] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -299,6 +302,54 @@ const TournamentView: React.FC = () => {
       setError("Network error. Please try again.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCreateAutomaticPairings = async () => {
+    setCreatingPairings(true);
+    setError(null);
+
+    try {
+      const roundNumber =
+        matches.length === 0 ? 1 : Math.max(...roundNumbers) + 1;
+
+      const response = await fetch(
+        `http://localhost:3002/api/tournaments/${id}/pairings`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            round_number: roundNumber,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Automatic pairings created:", result);
+        setOpenPairingOptionsDialog(false);
+        setSuccess("Automatic pairings created successfully!");
+        setTimeout(() => setSuccess(null), 5000);
+        fetchTournamentData(); // Refresh the tournament data
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to create automatic pairings");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setCreatingPairings(false);
+    }
+  };
+
+  const handlePairingOptionSelect = (option: "automatic" | "custom") => {
+    setOpenPairingOptionsDialog(false);
+    if (option === "automatic") {
+      handleCreateAutomaticPairings();
+    } else {
+      setOpenCreateMatchDialog(true);
     }
   };
 
@@ -746,7 +797,7 @@ const TournamentView: React.FC = () => {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => setOpenCreateMatchDialog(true)}
+              onClick={() => setOpenPairingOptionsDialog(true)}
               sx={{ mb: 2 }}
               disabled={
                 tournamentPlayers.length === 0 || tournament?.is_completed
@@ -785,7 +836,7 @@ const TournamentView: React.FC = () => {
               <Button
                 variant="outlined"
                 startIcon={<AddIcon />}
-                onClick={() => setOpenCreateMatchDialog(true)}
+                onClick={() => setOpenPairingOptionsDialog(true)}
                 disabled={tournament?.is_completed}
               >
                 Create Match
@@ -866,7 +917,7 @@ const TournamentView: React.FC = () => {
         <Dialog
           open={openAddPlayerDialog && !tournament?.is_completed}
           onClose={() => setOpenAddPlayerDialog(false)}
-          maxWidth="sm"
+          maxWidth="md"
           fullWidth
         >
           <DialogTitle>Add Players to Tournament</DialogTitle>
@@ -882,57 +933,20 @@ const TournamentView: React.FC = () => {
                     )}
                     getOptionLabel={(option) => option.name}
                     value={addPlayerForm.selectedPlayers}
-                    onChange={(_, newValue) => {
+                    onChange={(_, newValue) =>
                       setAddPlayerForm({
                         ...addPlayerForm,
                         selectedPlayers: newValue,
-                      });
-                      // Clear any previous errors when user makes a selection
-                      if (newValue.length > 0) {
-                        setError(null);
-                      }
-                    }}
+                      })
+                    }
                     renderInput={(params) => (
                       <TextField
                         {...params}
                         label="Select Players"
-                        placeholder="Search and select players..."
-                        error={addPlayerForm.selectedPlayers.length === 0}
-                        helperText={
-                          addPlayerForm.selectedPlayers.length === 0
-                            ? "Please select at least one player"
-                            : `${
-                                addPlayerForm.selectedPlayers.length
-                              } selected, ${
-                                players.filter(
-                                  (player) =>
-                                    !tournamentPlayers.some(
-                                      (tp) => tp.id === player.id
-                                    )
-                                ).length
-                              } available`
-                        }
+                        placeholder="Choose players to add"
+                        required
                       />
                     )}
-                    renderTags={(value, getTagProps) =>
-                      value.map((option, index) => (
-                        <Chip
-                          label={option.name}
-                          {...getTagProps({ index })}
-                          size="small"
-                          color="primary"
-                        />
-                      ))
-                    }
-                    noOptionsText="No players available"
-                    filterOptions={(options, { inputValue }) => {
-                      const filtered = options.filter((option) =>
-                        option.name
-                          .toLowerCase()
-                          .includes(inputValue.toLowerCase())
-                      );
-                      return filtered;
-                    }}
                     renderOption={(props, option) => (
                       <li {...props}>
                         <Box display="flex" alignItems="center" width="100%">
@@ -987,6 +1001,80 @@ const TournamentView: React.FC = () => {
           </form>
         </Dialog>
 
+        {/* Pairing Options Dialog */}
+        <Dialog
+          open={openPairingOptionsDialog}
+          onClose={() => setOpenPairingOptionsDialog(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Create Matches</DialogTitle>
+          <DialogContent>
+            <Typography variant="body1" sx={{ mb: 3 }}>
+              Choose how you would like to create matches for this round:
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  size="large"
+                  onClick={() => handlePairingOptionSelect("automatic")}
+                  disabled={creatingPairings}
+                  sx={{
+                    py: 2,
+                    textAlign: "left",
+                    justifyContent: "flex-start",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    🎯 Automatic Pairing
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Automatically pair players based on points and seating
+                    constraints. Static seating players will not be paired
+                    together.
+                  </Typography>
+                </Button>
+              </Grid>
+              <Grid item xs={12}>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  size="large"
+                  onClick={() => handlePairingOptionSelect("custom")}
+                  disabled={creatingPairings}
+                  sx={{
+                    py: 2,
+                    textAlign: "left",
+                    justifyContent: "flex-start",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    ✏️ Custom Pairing
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Manually select players for each match. You have full
+                    control over the pairings.
+                  </Typography>
+                </Button>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setOpenPairingOptionsDialog(false)}
+              disabled={creatingPairings}
+            >
+              Cancel
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         {/* Create Player Dialog */}
         <Dialog
           open={openCreatePlayerDialog}
@@ -997,24 +1085,28 @@ const TournamentView: React.FC = () => {
           <DialogTitle>Create New Player</DialogTitle>
           <form onSubmit={handleCreatePlayer}>
             <DialogContent>
-              <TextField
-                fullWidth
-                label="Player Name"
-                value={createPlayerForm.name}
-                onChange={handleCreatePlayerChange("name")}
-                required
-                variant="outlined"
-                sx={{ mb: 2 }}
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={createPlayerForm.static_seating}
-                    onChange={handleCreatePlayerChange("static_seating")}
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Player Name"
+                    value={createPlayerForm.name}
+                    onChange={handleCreatePlayerChange("name")}
+                    required
                   />
-                }
-                label="Static Seating (Player prefers fixed seating position)"
-              />
+                </Grid>
+                <Grid item xs={12}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={createPlayerForm.static_seating}
+                        onChange={handleCreatePlayerChange("static_seating")}
+                      />
+                    }
+                    label="Static Seating (cannot be paired with other static seating players)"
+                  />
+                </Grid>
+              </Grid>
             </DialogContent>
             <DialogActions>
               <Button
