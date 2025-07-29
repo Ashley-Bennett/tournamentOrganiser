@@ -93,6 +93,7 @@ const TournamentView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
+  const [mainTabValue, setMainTabValue] = useState(0);
   const [openCreateMatchDialog, setOpenCreateMatchDialog] = useState(false);
   const [openPairingOptionsDialog, setOpenPairingOptionsDialog] =
     useState(false);
@@ -609,6 +610,12 @@ const TournamentView: React.FC = () => {
       });
     };
 
+  // Count matches that are waiting for results to be resolved
+  const getUnresolvedMatchesCount = () => {
+    return matches.filter((match) => !match.result || match.result === "")
+      .length;
+  };
+
   if (loading) {
     return (
       <Box
@@ -737,669 +744,758 @@ const TournamentView: React.FC = () => {
         </Grid>
       </Paper>
 
-      {/* Tournament Players Section */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={2}
-        >
-          <Typography variant="h5" gutterBottom>
-            Players ({tournamentPlayers.length})
-          </Typography>
-          <Box display="flex" gap={2}>
-            <Button
-              variant="outlined"
-              onClick={() => {
-                setError(null); // Clear any previous errors
-                setSuccess(null); // Clear any previous success messages
-                setOpenCreatePlayerDialog(true);
-              }}
-              disabled={tournament?.is_completed}
-            >
-              Create New Player
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setError(null); // Clear any previous errors
-                setSuccess(null); // Clear any previous success messages
-                setAddPlayerFormError(null); // Clear form errors
-                setOpenAddPlayerDialog(true);
-              }}
-              disabled={tournament?.is_completed}
-            >
-              Add Players
-            </Button>
-          </Box>
+      {/* Main Content Tabs */}
+      <Paper sx={{ p: 3 }}>
+        <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+          <Tabs
+            value={mainTabValue}
+            onChange={(_, newValue) => setMainTabValue(newValue)}
+            variant="fullWidth"
+          >
+            <Tab
+              label={
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <PeopleIcon />
+                  <Typography>Players ({tournamentPlayers.length})</Typography>
+                </Box>
+              }
+            />
+            <Tab
+              label={
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <TournamentIcon />
+                  <Typography>
+                    Matches ({matches.length})
+                    {getUnresolvedMatchesCount() > 0 && (
+                      <Chip
+                        label={getUnresolvedMatchesCount()}
+                        color="warning"
+                        size="small"
+                        sx={{ ml: 1 }}
+                      />
+                    )}
+                  </Typography>
+                </Box>
+              }
+            />
+          </Tabs>
         </Box>
 
-        {Boolean(tournament?.is_completed) && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            This tournament is completed. No new players can be added.
-          </Alert>
+        {/* Players Tab Content */}
+        {mainTabValue === 0 && (
+          <Box>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              mb={2}
+            >
+              <Typography variant="h5" gutterBottom>
+                Tournament Players
+              </Typography>
+              <Box display="flex" gap={2}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setError(null); // Clear any previous errors
+                    setSuccess(null); // Clear any previous success messages
+                    setOpenCreatePlayerDialog(true);
+                  }}
+                  disabled={tournament?.is_completed}
+                >
+                  Create New Player
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    setError(null); // Clear any previous errors
+                    setSuccess(null); // Clear any previous success messages
+                    setAddPlayerFormError(null); // Clear form errors
+                    setOpenAddPlayerDialog(true);
+                  }}
+                  disabled={tournament?.is_completed}
+                >
+                  Add Players
+                </Button>
+              </Box>
+            </Box>
+
+            {Boolean(tournament?.is_completed) && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                This tournament is completed. No new players can be added.
+              </Alert>
+            )}
+
+            {tournamentPlayers.length === 0 ? (
+              <Alert severity="info">
+                {tournament?.is_completed
+                  ? "No players were added to this completed tournament."
+                  : "No players have been added to this tournament yet. Add players to get started!"}
+              </Alert>
+            ) : (
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Name</TableCell>
+                      <TableCell>Seating Type</TableCell>
+                      <TableCell>Started Round</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Added</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {tournamentPlayers.map((player) => (
+                      <TableRow key={player.id}>
+                        <TableCell>{player.name}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={
+                              Boolean(player.static_seating)
+                                ? "Static"
+                                : "Dynamic"
+                            }
+                            color={
+                              Boolean(player.static_seating)
+                                ? "primary"
+                                : "default"
+                            }
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>Round {player.started_round}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={
+                              Boolean(player.dropped) ? "Dropped" : "Active"
+                            }
+                            color={
+                              Boolean(player.dropped) ? "error" : "success"
+                            }
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>{formatDate(player.created_at)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
         )}
 
-        {tournamentPlayers.length === 0 ? (
-          <Alert severity="info">
-            {tournament?.is_completed
-              ? "No players were added to this completed tournament."
-              : "No players have been added to this tournament yet. Add players to get started!"}
-          </Alert>
-        ) : (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Seating Type</TableCell>
-                  <TableCell>Started Round</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Added</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {tournamentPlayers.map((player) => (
-                  <TableRow key={player.id}>
-                    <TableCell>{player.name}</TableCell>
-                    <TableCell>
-                      <Chip
+        {/* Matches Tab Content */}
+        {mainTabValue === 1 && (
+          <Box>
+            <Typography variant="h5" gutterBottom>
+              Tournament Matches - {roundNumbers.length} Rounds
+              {getUnresolvedMatchesCount() > 0 && (
+                <Chip
+                  label={`${getUnresolvedMatchesCount()} pending`}
+                  color="warning"
+                  size="small"
+                  sx={{ ml: 2 }}
+                />
+              )}
+            </Typography>
+
+            {/* Round Summary */}
+            {roundNumbers.length > 0 && (
+              <Box sx={{ mb: 3 }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={4}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography variant="h6" color="primary">
+                          {tournament?.is_completed
+                            ? "Final Round"
+                            : "Current Round"}
+                        </Typography>
+                        <Typography variant="h4" color="primary">
+                          {tournament?.is_completed
+                            ? Math.max(...roundNumbers)
+                            : activeRound}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {tournament?.is_completed
+                            ? "Tournament Completed"
+                            : "Active Round"}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography variant="h6" color="secondary">
+                          Total Rounds
+                        </Typography>
+                        <Typography variant="h4" color="secondary">
+                          {roundNumbers.length}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Tournament Structure
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography variant="h6" color="info.main">
+                          Total Matches
+                        </Typography>
+                        <Typography variant="h4" color="info.main">
+                          {matches.length}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Across All Rounds
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+
+            {matches.length === 0 ? (
+              <Box>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  No matches have been created for this tournament yet.
+                </Alert>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => setOpenPairingOptionsDialog(true)}
+                  sx={{ mb: 2 }}
+                  disabled={
+                    tournamentPlayers.length === 0 || tournament?.is_completed
+                  }
+                >
+                  Create First Match
+                </Button>
+                {tournamentPlayers.length === 0 && (
+                  <Alert severity="warning">
+                    Add players to the tournament before creating matches.
+                  </Alert>
+                )}
+                {Boolean(tournament?.is_completed) && (
+                  <Alert severity="warning">
+                    This tournament is completed. No new matches can be created.
+                  </Alert>
+                )}
+              </Box>
+            ) : (
+              <Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 2,
+                  }}
+                >
+                  <Typography variant="h6" gutterBottom>
+                    Round {selectedRound} -{" "}
+                    {selectedRound && matchesByRound[selectedRound]
+                      ? matchesByRound[selectedRound].length
+                      : 0}{" "}
+                    matches
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
+                      gap: 1,
+                    }}
+                  >
+                    <Button
+                      variant="outlined"
+                      startIcon={<AddIcon />}
+                      onClick={() => setOpenPairingOptionsDialog(true)}
+                      disabled={
+                        tournament?.is_completed || !canCreateNextRound()
+                      }
+                    >
+                      Create Match
+                    </Button>
+                    {activeRound && !hasAllResultsForRound(activeRound) && (
+                      <Typography variant="caption" color="text.secondary">
+                        Complete all match results to create next round
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+
+                {/* Round Navigation Tabs */}
+                <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+                  <Tabs
+                    value={selectedRound || activeRound}
+                    onChange={(_, newValue) => setSelectedRound(newValue)}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                  >
+                    {roundNumbers.map((round) => (
+                      <Tab
+                        key={round}
                         label={
-                          Boolean(player.static_seating) ? "Static" : "Dynamic"
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <Typography variant="body2">
+                              Round {round}
+                            </Typography>
+                            {round === activeRound && (
+                              <Chip
+                                label="Active"
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                              />
+                            )}
+                          </Box>
                         }
-                        color={
-                          Boolean(player.static_seating) ? "primary" : "default"
-                        }
-                        size="small"
+                        value={round}
                       />
-                    </TableCell>
-                    <TableCell>Round {player.started_round}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={Boolean(player.dropped) ? "Dropped" : "Active"}
-                        color={Boolean(player.dropped) ? "error" : "success"}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>{formatDate(player.created_at)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                    ))}
+                  </Tabs>
+                </Box>
+
+                {/* Matches for Selected Round */}
+                {selectedRound && matchesByRound[selectedRound] && (
+                  <Box>
+                    <TableContainer>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Player 1</TableCell>
+                            <TableCell>Player 2</TableCell>
+                            <TableCell>Result</TableCell>
+                            <TableCell>Winner</TableCell>
+                            <TableCell>Select Winner</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {matchesByRound[selectedRound].map((match) => (
+                            <TableRow
+                              key={match.id}
+                              sx={{
+                                backgroundColor:
+                                  recentlyUpdatedMatch === match.id
+                                    ? "action.hover"
+                                    : "inherit",
+                              }}
+                            >
+                              <TableCell>
+                                {match.player1_name || "TBD"}
+                              </TableCell>
+                              <TableCell>
+                                {match.player2_name || "TBD"}
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={getResultLabel(match.result || "")}
+                                  color={
+                                    getResultColor(match.result || "") as any
+                                  }
+                                  size="small"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                {match.winner_name || "N/A"}
+                              </TableCell>
+                              <TableCell>
+                                {match.result && match.result !== "" ? (
+                                  <Chip
+                                    label="Result Set"
+                                    color="success"
+                                    size="small"
+                                  />
+                                ) : (
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      gap: 1,
+                                      flexWrap: "wrap",
+                                    }}
+                                  >
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      color="primary"
+                                      disabled={
+                                        updatingMatchResult === match.id
+                                      }
+                                      onClick={() =>
+                                        handleUpdateMatchResult(
+                                          match.id,
+                                          "WIN_P1"
+                                        )
+                                      }
+                                      sx={{ minWidth: "auto", px: 1 }}
+                                    >
+                                      {match.player1_name || "Player 1"} Wins
+                                    </Button>
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      color="warning"
+                                      disabled={
+                                        updatingMatchResult === match.id
+                                      }
+                                      onClick={() =>
+                                        handleUpdateMatchResult(
+                                          match.id,
+                                          "DRAW"
+                                        )
+                                      }
+                                      sx={{ minWidth: "auto", px: 1 }}
+                                    >
+                                      Tie
+                                    </Button>
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      color="secondary"
+                                      disabled={
+                                        updatingMatchResult === match.id
+                                      }
+                                      onClick={() =>
+                                        handleUpdateMatchResult(
+                                          match.id,
+                                          "WIN_P2"
+                                        )
+                                      }
+                                      sx={{ minWidth: "auto", px: 1 }}
+                                    >
+                                      {match.player2_name || "Player 2"} Wins
+                                    </Button>
+                                  </Box>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
         )}
       </Paper>
 
-      {/* Matches Section */}
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h5" gutterBottom>
-          Matches ({matches.length}) - {roundNumbers.length} Rounds
-        </Typography>
-
-        {/* Round Summary */}
-        {roundNumbers.length > 0 && (
-          <Box sx={{ mb: 3 }}>
+      {/* Add Player Dialog */}
+      <Dialog
+        open={openAddPlayerDialog && !tournament?.is_completed}
+        onClose={() => {
+          setOpenAddPlayerDialog(false);
+          setAddPlayerFormError(null);
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Add Players to Tournament</DialogTitle>
+        <form onSubmit={handleAddPlayer}>
+          <DialogContent>
             <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" color="primary">
-                      {tournament?.is_completed
-                        ? "Final Round"
-                        : "Current Round"}
-                    </Typography>
-                    <Typography variant="h4" color="primary">
-                      {tournament?.is_completed
-                        ? Math.max(...roundNumbers)
-                        : activeRound}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {tournament?.is_completed
-                        ? "Tournament Completed"
-                        : "Active Round"}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" color="secondary">
-                      Total Rounds
-                    </Typography>
-                    <Typography variant="h4" color="secondary">
-                      {roundNumbers.length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Tournament Structure
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" color="info.main">
-                      Total Matches
-                    </Typography>
-                    <Typography variant="h4" color="info.main">
-                      {matches.length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Across All Rounds
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          </Box>
-        )}
-
-        {matches.length === 0 ? (
-          <Box>
-            <Alert severity="info" sx={{ mb: 2 }}>
-              No matches have been created for this tournament yet.
-            </Alert>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setOpenPairingOptionsDialog(true)}
-              sx={{ mb: 2 }}
-              disabled={
-                tournamentPlayers.length === 0 || tournament?.is_completed
-              }
-            >
-              Create First Match
-            </Button>
-            {tournamentPlayers.length === 0 && (
-              <Alert severity="warning">
-                Add players to the tournament before creating matches.
-              </Alert>
-            )}
-            {Boolean(tournament?.is_completed) && (
-              <Alert severity="warning">
-                This tournament is completed. No new matches can be created.
-              </Alert>
-            )}
-          </Box>
-        ) : (
-          <Box>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mb: 2,
-              }}
-            >
-              <Typography variant="h6" gutterBottom>
-                Round {selectedRound} -{" "}
-                {selectedRound && matchesByRound[selectedRound]
-                  ? matchesByRound[selectedRound].length
-                  : 0}{" "}
-                matches
-              </Typography>
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-end",
-                  gap: 1,
-                }}
-              >
-                <Button
-                  variant="outlined"
-                  startIcon={<AddIcon />}
-                  onClick={() => setOpenPairingOptionsDialog(true)}
-                  disabled={tournament?.is_completed || !canCreateNextRound()}
-                >
-                  Create Match
-                </Button>
-                {activeRound && !hasAllResultsForRound(activeRound) && (
-                  <Typography variant="caption" color="text.secondary">
-                    Complete all match results to create next round
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-
-            {/* Round Navigation Tabs */}
-            <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-              <Tabs
-                value={selectedRound || activeRound}
-                onChange={(_, newValue) => setSelectedRound(newValue)}
-                variant="scrollable"
-                scrollButtons="auto"
-              >
-                {roundNumbers.map((round) => (
-                  <Tab
-                    key={round}
-                    label={
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Typography variant="body2">Round {round}</Typography>
-                        {round === activeRound && (
+              <Grid item xs={12}>
+                <Autocomplete
+                  multiple
+                  options={players.filter(
+                    (player) =>
+                      !tournamentPlayers.some((tp) => tp.id === player.id)
+                  )}
+                  getOptionLabel={(option) => option.name}
+                  value={addPlayerForm.selectedPlayers}
+                  onChange={(_, newValue) => {
+                    setAddPlayerForm({
+                      ...addPlayerForm,
+                      selectedPlayers: newValue,
+                    });
+                    // Clear error when user selects players
+                    if (newValue.length > 0) {
+                      setAddPlayerFormError(null);
+                    }
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Select Players"
+                      placeholder="Choose players to add"
+                      error={Boolean(addPlayerFormError)}
+                      helperText={addPlayerFormError}
+                    />
+                  )}
+                  renderOption={(props, option) => (
+                    <li {...props}>
+                      <Box display="flex" alignItems="center" width="100%">
+                        <Typography variant="body1">{option.name}</Typography>
+                        {Boolean(option.static_seating) && (
                           <Chip
-                            label="Active"
+                            label="Static"
                             size="small"
-                            color="primary"
-                            variant="outlined"
+                            color="secondary"
+                            sx={{ ml: 1 }}
                           />
                         )}
                       </Box>
-                    }
-                    value={round}
-                  />
-                ))}
-              </Tabs>
-            </Box>
-
-            {/* Matches for Selected Round */}
-            {selectedRound && matchesByRound[selectedRound] && (
-              <Box>
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Player 1</TableCell>
-                        <TableCell>Player 2</TableCell>
-                        <TableCell>Result</TableCell>
-                        <TableCell>Winner</TableCell>
-                        <TableCell>Select Winner</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {matchesByRound[selectedRound].map((match) => (
-                        <TableRow
-                          key={match.id}
-                          sx={{
-                            backgroundColor:
-                              recentlyUpdatedMatch === match.id
-                                ? "action.hover"
-                                : "inherit",
-                          }}
-                        >
-                          <TableCell>{match.player1_name || "TBD"}</TableCell>
-                          <TableCell>{match.player2_name || "TBD"}</TableCell>
-                          <TableCell>
-                            <Chip
-                              label={getResultLabel(match.result || "")}
-                              color={getResultColor(match.result || "") as any}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell>{match.winner_name || "N/A"}</TableCell>
-                          <TableCell>
-                            {match.result && match.result !== "" ? (
-                              <Chip
-                                label="Result Set"
-                                color="success"
-                                size="small"
-                              />
-                            ) : (
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  gap: 1,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <Button
-                                  variant="outlined"
-                                  size="small"
-                                  color="primary"
-                                  disabled={updatingMatchResult === match.id}
-                                  onClick={() =>
-                                    handleUpdateMatchResult(match.id, "WIN_P1")
-                                  }
-                                  sx={{ minWidth: "auto", px: 1 }}
-                                >
-                                  {match.player1_name || "Player 1"} Wins
-                                </Button>
-                                <Button
-                                  variant="outlined"
-                                  size="small"
-                                  color="warning"
-                                  disabled={updatingMatchResult === match.id}
-                                  onClick={() =>
-                                    handleUpdateMatchResult(match.id, "DRAW")
-                                  }
-                                  sx={{ minWidth: "auto", px: 1 }}
-                                >
-                                  Tie
-                                </Button>
-                                <Button
-                                  variant="outlined"
-                                  size="small"
-                                  color="secondary"
-                                  disabled={updatingMatchResult === match.id}
-                                  onClick={() =>
-                                    handleUpdateMatchResult(match.id, "WIN_P2")
-                                  }
-                                  sx={{ minWidth: "auto", px: 1 }}
-                                >
-                                  {match.player2_name || "Player 2"} Wins
-                                </Button>
-                              </Box>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            )}
-          </Box>
-        )}
-
-        {/* Add Player Dialog */}
-        <Dialog
-          open={openAddPlayerDialog && !tournament?.is_completed}
-          onClose={() => {
-            setOpenAddPlayerDialog(false);
-            setAddPlayerFormError(null);
-          }}
-          maxWidth="md"
-          fullWidth
-        >
-          <DialogTitle>Add Players to Tournament</DialogTitle>
-          <form onSubmit={handleAddPlayer}>
-            <DialogContent>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <Autocomplete
-                    multiple
-                    options={players.filter(
-                      (player) =>
-                        !tournamentPlayers.some((tp) => tp.id === player.id)
-                    )}
-                    getOptionLabel={(option) => option.name}
-                    value={addPlayerForm.selectedPlayers}
-                    onChange={(_, newValue) => {
-                      setAddPlayerForm({
-                        ...addPlayerForm,
-                        selectedPlayers: newValue,
-                      });
-                      // Clear error when user selects players
-                      if (newValue.length > 0) {
-                        setAddPlayerFormError(null);
-                      }
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Select Players"
-                        placeholder="Choose players to add"
-                        error={Boolean(addPlayerFormError)}
-                        helperText={addPlayerFormError}
-                      />
-                    )}
-                    renderOption={(props, option) => (
-                      <li {...props}>
-                        <Box display="flex" alignItems="center" width="100%">
-                          <Typography variant="body1">{option.name}</Typography>
-                          {Boolean(option.static_seating) && (
-                            <Chip
-                              label="Static"
-                              size="small"
-                              color="secondary"
-                              sx={{ ml: 1 }}
-                            />
-                          )}
-                        </Box>
-                      </li>
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Started Round"
-                    type="number"
-                    value={addPlayerForm.started_round}
-                    onChange={handleAddPlayerTextFieldChange("started_round")}
-                    inputProps={{ min: 1 }}
-                    required
-                  />
-                </Grid>
-              </Grid>
-            </DialogContent>
-            <DialogActions>
-              <Button
-                onClick={() => {
-                  setOpenAddPlayerDialog(false);
-                  setAddPlayerFormError(null);
-                }}
-                disabled={addingPlayer}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={
-                  addingPlayer || addPlayerForm.selectedPlayers.length === 0
-                }
-              >
-                {addingPlayer
-                  ? "Adding..."
-                  : `Add ${addPlayerForm.selectedPlayers.length} Player${
-                      addPlayerForm.selectedPlayers.length !== 1 ? "s" : ""
-                    }`}
-              </Button>
-            </DialogActions>
-          </form>
-        </Dialog>
-
-        {/* Pairing Options Dialog */}
-        <Dialog
-          open={openPairingOptionsDialog}
-          onClose={() => setOpenPairingOptionsDialog(false)}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>Create Matches</DialogTitle>
-          <DialogContent>
-            <Typography variant="body1" sx={{ mb: 3 }}>
-              Choose how you would like to create matches for this round:
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  size="large"
-                  onClick={() => handlePairingOptionSelect("automatic")}
-                  disabled={creatingPairings}
-                  sx={{
-                    py: 2,
-                    textAlign: "left",
-                    justifyContent: "flex-start",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <Typography variant="h6" sx={{ mb: 1 }}>
-                    🎯 Automatic Pairing
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Automatically pair players based on points and seating
-                    constraints. Static seating players will not be paired
-                    together.
-                  </Typography>
-                </Button>
+                    </li>
+                  )}
+                />
               </Grid>
               <Grid item xs={12}>
-                <Button
-                  variant="outlined"
+                <TextField
                   fullWidth
-                  size="large"
-                  onClick={() => handlePairingOptionSelect("custom")}
-                  disabled={creatingPairings}
-                  sx={{
-                    py: 2,
-                    textAlign: "left",
-                    justifyContent: "flex-start",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <Typography variant="h6" sx={{ mb: 1 }}>
-                    ✏️ Custom Pairing
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Manually select players for each match. You have full
-                    control over the pairings.
-                  </Typography>
-                </Button>
+                  label="Started Round"
+                  type="number"
+                  value={addPlayerForm.started_round}
+                  onChange={handleAddPlayerTextFieldChange("started_round")}
+                  inputProps={{ min: 1 }}
+                  required
+                />
               </Grid>
             </Grid>
           </DialogContent>
           <DialogActions>
             <Button
-              onClick={() => setOpenPairingOptionsDialog(false)}
-              disabled={creatingPairings}
+              onClick={() => {
+                setOpenAddPlayerDialog(false);
+                setAddPlayerFormError(null);
+              }}
+              disabled={addingPlayer}
             >
               Cancel
             </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={
+                addingPlayer || addPlayerForm.selectedPlayers.length === 0
+              }
+            >
+              {addingPlayer
+                ? "Adding..."
+                : `Add ${addPlayerForm.selectedPlayers.length} Player${
+                    addPlayerForm.selectedPlayers.length !== 1 ? "s" : ""
+                  }`}
+            </Button>
           </DialogActions>
-        </Dialog>
+        </form>
+      </Dialog>
 
-        {/* Create Player Dialog */}
-        <Dialog
-          open={openCreatePlayerDialog}
-          onClose={() => setOpenCreatePlayerDialog(false)}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>Create New Player</DialogTitle>
-          <form onSubmit={handleCreatePlayer}>
-            <DialogContent>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Player Name"
-                    value={createPlayerForm.name}
-                    onChange={handleCreatePlayerChange("name")}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={createPlayerForm.static_seating}
-                        onChange={handleCreatePlayerChange("static_seating")}
-                      />
-                    }
-                    label="Static Seating (cannot be paired with other static seating players)"
-                  />
-                </Grid>
-              </Grid>
-            </DialogContent>
-            <DialogActions>
+      {/* Pairing Options Dialog */}
+      <Dialog
+        open={openPairingOptionsDialog}
+        onClose={() => setOpenPairingOptionsDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Create Matches</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 3 }}>
+            Choose how you would like to create matches for this round:
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
               <Button
-                onClick={() => setOpenCreatePlayerDialog(false)}
-                disabled={creatingPlayer}
+                variant="outlined"
+                fullWidth
+                size="large"
+                onClick={() => handlePairingOptionSelect("automatic")}
+                disabled={creatingPairings}
+                sx={{
+                  py: 2,
+                  textAlign: "left",
+                  justifyContent: "flex-start",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                }}
               >
-                Cancel
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  🎯 Automatic Pairing
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Automatically pair players based on points and seating
+                  constraints. Static seating players will not be paired
+                  together.
+                </Typography>
               </Button>
+            </Grid>
+            <Grid item xs={12}>
               <Button
-                type="submit"
-                variant="contained"
-                disabled={creatingPlayer || !createPlayerForm.name.trim()}
+                variant="outlined"
+                fullWidth
+                size="large"
+                onClick={() => handlePairingOptionSelect("custom")}
+                disabled={creatingPairings}
+                sx={{
+                  py: 2,
+                  textAlign: "left",
+                  justifyContent: "flex-start",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                }}
               >
-                {creatingPlayer ? "Creating..." : "Create Player"}
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  ✏️ Custom Pairing
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Manually select players for each match. You have full control
+                  over the pairings.
+                </Typography>
               </Button>
-            </DialogActions>
-          </form>
-        </Dialog>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setOpenPairingOptionsDialog(false)}
+            disabled={creatingPairings}
+          >
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-        {/* Create Match Dialog */}
-        <Dialog
-          open={openCreateMatchDialog && !tournament?.is_completed}
-          onClose={() => setOpenCreateMatchDialog(false)}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>Create New Match</DialogTitle>
-          <form onSubmit={handleCreateMatch}>
-            <DialogContent>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Round Number"
-                    type="number"
-                    value={createMatchForm.round_number}
-                    onChange={handleTextFieldChange("round_number")}
-                    inputProps={{ min: 1 }}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <FormControl fullWidth>
-                    <InputLabel>Player 1 (Optional)</InputLabel>
-                    <Select
-                      value={createMatchForm.player1_id}
-                      label="Player 1 (Optional)"
-                      onChange={handleSelectChange("player1_id")}
-                    >
-                      <MenuItem value="">
-                        <em>Select Player 1</em>
-                      </MenuItem>
-                      {tournamentPlayers
-                        .filter((player) => !Boolean(player.dropped))
-                        .map((player) => (
-                          <MenuItem key={player.id} value={player.id}>
-                            {player.name}
-                          </MenuItem>
-                        ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12}>
-                  <FormControl fullWidth>
-                    <InputLabel>Player 2 (Optional)</InputLabel>
-                    <Select
-                      value={createMatchForm.player2_id}
-                      label="Player 2 (Optional)"
-                      onChange={handleSelectChange("player2_id")}
-                    >
-                      <MenuItem value="">
-                        <em>Select Player 2</em>
-                      </MenuItem>
-                      {tournamentPlayers
-                        .filter((player) => !Boolean(player.dropped))
-                        .map((player) => (
-                          <MenuItem key={player.id} value={player.id}>
-                            {player.name}
-                          </MenuItem>
-                        ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
+      {/* Create Player Dialog */}
+      <Dialog
+        open={openCreatePlayerDialog}
+        onClose={() => setOpenCreatePlayerDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Create New Player</DialogTitle>
+        <form onSubmit={handleCreatePlayer}>
+          <DialogContent>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Player Name"
+                  value={createPlayerForm.name}
+                  onChange={handleCreatePlayerChange("name")}
+                  required
+                />
               </Grid>
-            </DialogContent>
-            <DialogActions>
-              <Button
-                onClick={() => setOpenCreateMatchDialog(false)}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" variant="contained" disabled={submitting}>
-                {submitting ? "Creating..." : "Create Match"}
-              </Button>
-            </DialogActions>
-          </form>
-        </Dialog>
-      </Paper>
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={createPlayerForm.static_seating}
+                      onChange={handleCreatePlayerChange("static_seating")}
+                    />
+                  }
+                  label="Static Seating (cannot be paired with other static seating players)"
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setOpenCreatePlayerDialog(false)}
+              disabled={creatingPlayer}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={creatingPlayer || !createPlayerForm.name.trim()}
+            >
+              {creatingPlayer ? "Creating..." : "Create Player"}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Create Match Dialog */}
+      <Dialog
+        open={openCreateMatchDialog && !tournament?.is_completed}
+        onClose={() => setOpenCreateMatchDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Create New Match</DialogTitle>
+        <form onSubmit={handleCreateMatch}>
+          <DialogContent>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Round Number"
+                  type="number"
+                  value={createMatchForm.round_number}
+                  onChange={handleTextFieldChange("round_number")}
+                  inputProps={{ min: 1 }}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Player 1 (Optional)</InputLabel>
+                  <Select
+                    value={createMatchForm.player1_id}
+                    label="Player 1 (Optional)"
+                    onChange={handleSelectChange("player1_id")}
+                  >
+                    <MenuItem value="">
+                      <em>Select Player 1</em>
+                    </MenuItem>
+                    {tournamentPlayers
+                      .filter((player) => !Boolean(player.dropped))
+                      .map((player) => (
+                        <MenuItem key={player.id} value={player.id}>
+                          {player.name}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Player 2 (Optional)</InputLabel>
+                  <Select
+                    value={createMatchForm.player2_id}
+                    label="Player 2 (Optional)"
+                    onChange={handleSelectChange("player2_id")}
+                  >
+                    <MenuItem value="">
+                      <em>Select Player 2</em>
+                    </MenuItem>
+                    {tournamentPlayers
+                      .filter((player) => !Boolean(player.dropped))
+                      .map((player) => (
+                        <MenuItem key={player.id} value={player.id}>
+                          {player.name}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setOpenCreateMatchDialog(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" disabled={submitting}>
+              {submitting ? "Creating..." : "Create Match"}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
     </Box>
   );
 };
