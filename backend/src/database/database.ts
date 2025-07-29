@@ -701,15 +701,30 @@ export class Database {
           );
 
           // For first round, pair by static seating (static players should not be paired together)
-          const staticPlayers = standings.filter((p) => p.static_seating);
-          const dynamicPlayers = standings.filter((p) => !p.static_seating);
+          // Shuffle the players to make pairings more random
+          const shuffleArray = (array: any[]) => {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+          };
+
+          const shuffledStandings = shuffleArray(standings);
+          const staticPlayers = shuffledStandings.filter(
+            (p) => p.static_seating
+          );
+          const dynamicPlayers = shuffledStandings.filter(
+            (p) => !p.static_seating
+          );
 
           console.log(
-            "Static players:",
+            "Shuffled static players:",
             staticPlayers.map((p) => p.name)
           );
           console.log(
-            "Dynamic players:",
+            "Shuffled dynamic players:",
             dynamicPlayers.map((p) => p.name)
           );
 
@@ -784,7 +799,9 @@ export class Database {
 
           // Handle odd player with bye - give bye to the lowest scoring player who hasn't been used
           if (standings.length % 2 === 1) {
-            const unusedPlayer = standings.find((p) => !usedPlayers.has(p.id));
+            const unusedPlayer = shuffledStandings.find(
+              (p) => !usedPlayers.has(p.id)
+            );
             if (unusedPlayer) {
               console.log(`Giving bye to ${unusedPlayer.name}`);
               pairings.push({
