@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { apiCall } from "./utils/api";
 
 interface AuthContextType {
   user: { name: string; email: string } | null;
@@ -35,9 +36,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [token]);
 
   const login = async (email: string, password: string) => {
-    const res = await fetch("/api/login", {
+    const res = await apiCall("/api/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
     const data = await res.json();
@@ -53,9 +53,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const requestBody = { name, email, password };
     console.log("📝 Request body:", { name, email, hasPassword: !!password });
 
-    const res = await fetch("/api/users", {
+    const res = await apiCall("/api/users", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
     });
 

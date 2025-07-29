@@ -15,7 +15,10 @@ export const apiCall = async (
     headers.Authorization = `Bearer ${token}`;
   }
 
-  return fetch(`${API_BASE_URL}${endpoint}`, {
+  const fullUrl = `${API_BASE_URL}${endpoint}`;
+  console.log("🌐 API Call:", { endpoint, fullUrl, apiBaseUrl: API_BASE_URL });
+
+  return fetch(fullUrl, {
     ...options,
     headers,
   });
