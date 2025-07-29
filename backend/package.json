@@ -7,7 +7,10 @@
     "dev": "nodemon src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "jest"
+    "test": "jest",
+    "reset": "ts-node src/resetDatabase.ts",
+    "seed": "ts-node src/seedData.ts",
+    "reset-and-seed": "npm run reset && npm run seed"
   },
   "dependencies": {
     "express": "^4.18.2",

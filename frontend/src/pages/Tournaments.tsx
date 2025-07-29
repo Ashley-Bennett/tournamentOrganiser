@@ -1,5 +1,5 @@
-import React from "react";
-import { Link as RouterLink } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Typography,
   Button,
@@ -12,35 +12,67 @@ import {
   TableHead,
   TableRow,
   Chip,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 
-const Tournaments: React.FC = () => {
-  // Mock data - will be replaced with API calls
-  const tournaments = [
-    {
-      id: 1,
-      name: "Sample Tournament",
-      description: "A sample tournament for testing",
-      status: "pending",
-      start_date: "2024-01-15",
-      end_date: "2024-01-20",
-      participants_count: 0,
-    },
-  ];
+interface Tournament {
+  id: number;
+  name: string;
+  date: string;
+  league_name?: string;
+  is_completed: boolean;
+  created_at: string;
+}
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "success";
-      case "pending":
-        return "warning";
-      case "completed":
-        return "default";
-      default:
-        return "default";
+const Tournaments: React.FC = () => {
+  const navigate = useNavigate();
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchTournaments();
+  }, []);
+
+  const fetchTournaments = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("http://localhost:3002/api/tournaments");
+      if (response.ok) {
+        const data = await response.json();
+        setTournaments(data);
+      } else {
+        setError("Failed to fetch tournaments");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getCompletionColor = (isCompleted: boolean) => {
+    return isCompleted ? "success" : "warning";
+  };
+
+  if (loading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -63,24 +95,29 @@ const Tournaments: React.FC = () => {
         </Button>
       </Box>
 
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
       <Paper>
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
-                <TableCell>Description</TableCell>
+                <TableCell>Date</TableCell>
+                <TableCell>League</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>Start Date</TableCell>
-                <TableCell>End Date</TableCell>
-                <TableCell>Participants</TableCell>
+                <TableCell>Created</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {tournaments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={6} align="center">
                     <Typography variant="body2" color="text.secondary">
                       No tournaments found. Create your first tournament!
                     </Typography>
@@ -90,19 +127,28 @@ const Tournaments: React.FC = () => {
                 tournaments.map((tournament) => (
                   <TableRow key={tournament.id}>
                     <TableCell>{tournament.name}</TableCell>
-                    <TableCell>{tournament.description}</TableCell>
+                    <TableCell>{formatDate(tournament.date)}</TableCell>
+                    <TableCell>
+                      {tournament.league_name || "No League"}
+                    </TableCell>
                     <TableCell>
                       <Chip
-                        label={tournament.status}
-                        color={getStatusColor(tournament.status) as any}
+                        label={tournament.is_completed ? "Completed" : "Active"}
+                        color={
+                          getCompletionColor(tournament.is_completed) as any
+                        }
                         size="small"
                       />
                     </TableCell>
-                    <TableCell>{tournament.start_date}</TableCell>
-                    <TableCell>{tournament.end_date}</TableCell>
-                    <TableCell>{tournament.participants_count}</TableCell>
+                    <TableCell>{formatDate(tournament.created_at)}</TableCell>
                     <TableCell>
-                      <Button size="small" color="primary">
+                      <Button
+                        size="small"
+                        color="primary"
+                        onClick={() =>
+                          navigate(`/tournaments/${tournament.id}`)
+                        }
+                      >
                         View
                       </Button>
                     </TableCell>

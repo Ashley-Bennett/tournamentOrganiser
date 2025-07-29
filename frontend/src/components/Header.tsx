@@ -34,6 +34,12 @@ const Header: React.FC = () => {
           <Button color="inherit" component={RouterLink} to="/tournaments">
             Tournaments
           </Button>
+          <Button color="inherit" component={RouterLink} to="/players">
+            Players
+          </Button>
+          <Button color="inherit" component={RouterLink} to="/leagues">
+            Leagues
+          </Button>
           <Button
             color="inherit"
             component={RouterLink}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Typography,
@@ -11,36 +11,90 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Alert,
 } from "@mui/material";
 import {
   Save as SaveIcon,
   ArrowBack as ArrowBackIcon,
 } from "@mui/icons-material";
 
+interface League {
+  id: number;
+  name: string;
+  description?: string;
+}
+
 const CreateTournament: React.FC = () => {
   const navigate = useNavigate();
+  const [leagues, setLeagues] = useState<League[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    description: "",
-    start_date: "",
-    end_date: "",
-    max_participants: "",
-    status: "pending",
+    date: "",
+    league_id: "",
   });
 
+  useEffect(() => {
+    fetchLeagues();
+  }, []);
+
+  const fetchLeagues = async () => {
+    try {
+      const response = await fetch("http://localhost:3002/api/leagues");
+      if (response.ok) {
+        const data = await response.json();
+        setLeagues(data);
+      } else {
+        console.error("Failed to fetch leagues");
+      }
+    } catch (error) {
+      console.error("Error fetching leagues:", error);
+    }
+  };
+
   const handleChange =
-    (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    (field: string) =>
+    (event: React.ChangeEvent<HTMLInputElement | { value: unknown }> | any) => {
       setFormData({
         ...formData,
         [field]: event.target.value,
       });
     };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    // TODO: Implement API call to create tournament
-    console.log("Creating tournament:", formData);
-    navigate("/tournaments");
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("http://localhost:3002/api/tournaments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          date: formData.date,
+          league_id: formData.league_id
+            ? parseInt(formData.league_id)
+            : undefined,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Tournament created:", result);
+        navigate("/tournaments");
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to create tournament");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -59,6 +113,12 @@ const CreateTournament: React.FC = () => {
       </Box>
 
       <Paper sx={{ p: 3 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
             <Grid item xs={12}>
@@ -72,68 +132,37 @@ const CreateTournament: React.FC = () => {
               />
             </Grid>
 
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Description"
-                value={formData.description}
-                onChange={handleChange("description")}
-                multiline
-                rows={3}
-                variant="outlined"
-              />
-            </Grid>
-
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Start Date"
+                label="Tournament Date"
                 type="date"
-                value={formData.start_date}
-                onChange={handleChange("start_date")}
+                value={formData.date}
+                onChange={handleChange("date")}
+                required
                 InputLabelProps={{
                   shrink: true,
                 }}
-                variant="outlined"
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="End Date"
-                type="date"
-                value={formData.end_date}
-                onChange={handleChange("end_date")}
-                InputLabelProps={{
-                  shrink: true,
-                }}
-                variant="outlined"
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Max Participants"
-                type="number"
-                value={formData.max_participants}
-                onChange={handleChange("max_participants")}
                 variant="outlined"
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
               <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
+                <InputLabel>League (Optional)</InputLabel>
                 <Select
-                  value={formData.status}
-                  label="Status"
-                  onChange={handleChange("status")}
+                  value={formData.league_id}
+                  label="League (Optional)"
+                  onChange={handleChange("league_id")}
                 >
-                  <MenuItem value="pending">Pending</MenuItem>
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="completed">Completed</MenuItem>
+                  <MenuItem value="">
+                    <em>No League</em>
+                  </MenuItem>
+                  {leagues.map((league) => (
+                    <MenuItem key={league.id} value={league.id}>
+                      {league.name}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Grid>
@@ -143,6 +172,7 @@ const CreateTournament: React.FC = () => {
                 <Button
                   variant="outlined"
                   onClick={() => navigate("/tournaments")}
+                  disabled={loading}
                 >
                   Cancel
                 </Button>
@@ -150,8 +180,9 @@ const CreateTournament: React.FC = () => {
                   type="submit"
                   variant="contained"
                   startIcon={<SaveIcon />}
+                  disabled={loading}
                 >
-                  Create Tournament
+                  {loading ? "Creating..." : "Create Tournament"}
                 </Button>
               </Box>
             </Grid>
