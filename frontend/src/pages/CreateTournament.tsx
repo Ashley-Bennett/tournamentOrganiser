@@ -33,6 +33,7 @@ const CreateTournament: React.FC = () => {
     name: "",
     date: "",
     league_id: "",
+    bracket_type: "SWISS",
   });
 
   useEffect(() => {
@@ -68,18 +69,23 @@ const CreateTournament: React.FC = () => {
     setError(null);
 
     try {
+      const requestBody = {
+        name: formData.name,
+        date: formData.date,
+        league_id: formData.league_id
+          ? parseInt(formData.league_id)
+          : undefined,
+        bracket_type: formData.bracket_type,
+      };
+
+      console.log("Sending tournament creation request:", requestBody);
+
       const response = await fetch("http://localhost:3002/api/tournaments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name: formData.name,
-          date: formData.date,
-          league_id: formData.league_id
-            ? parseInt(formData.league_id)
-            : undefined,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (response.ok) {
@@ -88,6 +94,7 @@ const CreateTournament: React.FC = () => {
         navigate("/tournaments");
       } else {
         const errorData = await response.json();
+        console.error("Server error:", errorData);
         setError(errorData.error || "Failed to create tournament");
       }
     } catch (error) {
@@ -163,6 +170,26 @@ const CreateTournament: React.FC = () => {
                       {league.name}
                     </MenuItem>
                   ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Bracket Type</InputLabel>
+                <Select
+                  value={formData.bracket_type}
+                  label="Bracket Type"
+                  onChange={handleChange("bracket_type")}
+                  required
+                >
+                  <MenuItem value="SWISS">Swiss System</MenuItem>
+                  <MenuItem value="SINGLE_ELIMINATION" disabled>
+                    Single Elimination (Coming Soon)
+                  </MenuItem>
+                  <MenuItem value="DOUBLE_ELIMINATION" disabled>
+                    Double Elimination (Coming Soon)
+                  </MenuItem>
                 </Select>
               </FormControl>
             </Grid>

@@ -123,7 +123,13 @@ app.get("/api/leagues", async (req, res) => {
 // Tournament routes
 app.post("/api/tournaments", async (req, res) => {
   try {
-    const { name, date, league_id } = req.body;
+    const { name, date, league_id, bracket_type } = req.body;
+    console.log("Creating tournament with data:", {
+      name,
+      date,
+      league_id,
+      bracket_type,
+    });
 
     if (!name || !date) {
       return res
@@ -131,11 +137,36 @@ app.post("/api/tournaments", async (req, res) => {
         .json({ error: "Tournament name and date are required" });
     }
 
-    const tournamentId = await db.createTournament({ name, date, league_id });
+    if (
+      !bracket_type ||
+      !["SWISS", "SINGLE_ELIMINATION", "DOUBLE_ELIMINATION"].includes(
+        bracket_type
+      )
+    ) {
+      return res.status(400).json({
+        error:
+          "Valid bracket type is required (SWISS, SINGLE_ELIMINATION, DOUBLE_ELIMINATION)",
+      });
+    }
+
+    // For now, only allow SWISS tournaments
+    if (bracket_type !== "SWISS") {
+      return res
+        .status(400)
+        .json({ error: "Only SWISS tournaments are currently supported" });
+    }
+
+    const tournamentId = await db.createTournament({
+      name,
+      date,
+      league_id,
+      bracket_type,
+    });
     res
       .status(201)
       .json({ id: tournamentId, message: "Tournament created successfully" });
   } catch (error) {
+    console.error("Error creating tournament:", error);
     res.status(500).json({ error: "Failed to create tournament" });
   }
 });
@@ -252,11 +283,9 @@ app.post("/api/tournaments/:id/players/bulk", async (req, res) => {
     }));
 
     await db.addMultiplePlayersToTournament(playersToAdd);
-    res
-      .status(201)
-      .json({
-        message: `${players.length} player(s) added to tournament successfully`,
-      });
+    res.status(201).json({
+      message: `${players.length} player(s) added to tournament successfully`,
+    });
   } catch (error: any) {
     if (error.message.includes("UNIQUE constraint failed")) {
       res

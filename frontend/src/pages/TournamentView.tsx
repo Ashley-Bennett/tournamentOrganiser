@@ -46,6 +46,7 @@ interface Tournament {
   name: string;
   date: string;
   league_name?: string;
+  bracket_type: string;
   is_completed: boolean;
   created_at: string;
 }
@@ -212,6 +213,19 @@ const TournamentView: React.FC = () => {
         return "Bye";
       default:
         return "Pending";
+    }
+  };
+
+  const getBracketTypeLabel = (bracketType: string) => {
+    switch (bracketType) {
+      case "SWISS":
+        return "Swiss System";
+      case "SINGLE_ELIMINATION":
+        return "Single Elimination";
+      case "DOUBLE_ELIMINATION":
+        return "Double Elimination";
+      default:
+        return bracketType;
     }
   };
 
@@ -507,7 +521,7 @@ const TournamentView: React.FC = () => {
         </Box>
 
         <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <Card>
               <CardContent>
                 <Box display="flex" alignItems="center" mb={1}>
@@ -523,7 +537,7 @@ const TournamentView: React.FC = () => {
             </Card>
           </Grid>
 
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <Card>
               <CardContent>
                 <Box display="flex" alignItems="center" mb={1}>
@@ -537,7 +551,20 @@ const TournamentView: React.FC = () => {
             </Card>
           </Grid>
 
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center" mb={1}>
+                  <Typography variant="h6">Bracket Type</Typography>
+                </Box>
+                <Typography variant="body1">
+                  {getBracketTypeLabel(tournament.bracket_type)}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={3}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>

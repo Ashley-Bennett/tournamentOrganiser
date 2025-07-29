@@ -22,6 +22,7 @@ interface Tournament {
   name: string;
   date: string;
   league_name?: string;
+  bracket_type: string;
   is_completed: boolean;
   created_at: string;
 }
@@ -59,6 +60,19 @@ const Tournaments: React.FC = () => {
 
   const getCompletionColor = (isCompleted: boolean) => {
     return isCompleted ? "success" : "warning";
+  };
+
+  const getBracketTypeLabel = (bracketType: string) => {
+    switch (bracketType) {
+      case "SWISS":
+        return "Swiss System";
+      case "SINGLE_ELIMINATION":
+        return "Single Elimination";
+      case "DOUBLE_ELIMINATION":
+        return "Double Elimination";
+      default:
+        return bracketType;
+    }
   };
 
   if (loading) {
@@ -109,6 +123,7 @@ const Tournaments: React.FC = () => {
                 <TableCell>Name</TableCell>
                 <TableCell>Date</TableCell>
                 <TableCell>League</TableCell>
+                <TableCell>Bracket Type</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Created</TableCell>
                 <TableCell>Actions</TableCell>
@@ -117,7 +132,7 @@ const Tournaments: React.FC = () => {
             <TableBody>
               {tournaments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     <Typography variant="body2" color="text.secondary">
                       No tournaments found. Create your first tournament!
                     </Typography>
@@ -130,6 +145,9 @@ const Tournaments: React.FC = () => {
                     <TableCell>{formatDate(tournament.date)}</TableCell>
                     <TableCell>
                       {tournament.league_name || "No League"}
+                    </TableCell>
+                    <TableCell>
+                      {getBracketTypeLabel(tournament.bracket_type)}
                     </TableCell>
                     <TableCell>
                       <Chip

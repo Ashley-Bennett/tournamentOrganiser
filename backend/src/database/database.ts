@@ -48,6 +48,7 @@ export class Database {
         name TEXT NOT NULL,
         date TEXT NOT NULL,
         league_id INTEGER,
+        bracket_type TEXT NOT NULL DEFAULT 'SWISS' CHECK(bracket_type IN ('SWISS', 'SINGLE_ELIMINATION', 'DOUBLE_ELIMINATION')),
         is_completed BOOLEAN DEFAULT FALSE,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -249,16 +250,22 @@ export class Database {
     name: string;
     date: string;
     league_id?: number;
+    bracket_type?: string;
   }): Promise<number> {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT INTO tournaments (name, date, league_id)
-        VALUES (?, ?, ?)
+        INSERT INTO tournaments (name, date, league_id, bracket_type)
+        VALUES (?, ?, ?, ?)
       `;
 
       this.db.run(
         sql,
-        [tournament.name, tournament.date, tournament.league_id || null],
+        [
+          tournament.name,
+          tournament.date,
+          tournament.league_id || null,
+          tournament.bracket_type || "SWISS",
+        ],
         function (err) {
           if (err) {
             reject(err);
@@ -569,6 +576,32 @@ export class Database {
       } else {
         console.log("✅ Database connection closed");
       }
+    });
+  }
+
+  // Method for running raw SQL queries (for migrations)
+  async runRawQuery(sql: string, params: any[] = []): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.db.run(sql, params, function (err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(this);
+        }
+      });
+    });
+  }
+
+  // Method for getting a single row (for migrations)
+  async getRawQuery(sql: string, params: any[] = []): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.db.get(sql, params, (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
     });
   }
 }
