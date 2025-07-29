@@ -32,6 +32,7 @@ import {
   Autocomplete,
   FormControlLabel,
   Checkbox,
+  useTheme,
 } from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
@@ -42,6 +43,7 @@ import {
   Leaderboard as LeaderboardIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
+  Star as StarIcon, // <-- Add this line
 } from "@mui/icons-material";
 
 interface Tournament {
@@ -185,6 +187,7 @@ const TournamentView: React.FC = () => {
   });
   const [editingMatchLoading, setEditingMatchLoading] = useState(false);
   const [deletingMatchId, setDeletingMatchId] = useState<number | null>(null);
+  const theme = useTheme();
 
   const fetchTournamentData = useCallback(async () => {
     try {
@@ -1629,10 +1632,54 @@ const TournamentView: React.FC = () => {
                               }}
                             >
                               <TableCell>
-                                {match.player1_name || "TBD"}
+                                {(() => {
+                                  const p = tournamentPlayers.find(
+                                    (tp) => tp.id === match.player1_id
+                                  );
+                                  if (p && p.static_seating) {
+                                    return (
+                                      <span
+                                        title="Static seating"
+                                        style={{
+                                          textDecoration: "underline",
+                                          textDecorationColor:
+                                            theme.palette.primary.main,
+                                          textDecorationThickness: "2px",
+                                          textUnderlineOffset: "2px",
+                                          color: "inherit",
+                                        }}
+                                      >
+                                        {match.player1_name || "TBD"}
+                                      </span>
+                                    );
+                                  }
+                                  return match.player1_name || "TBD";
+                                })()}
                               </TableCell>
                               <TableCell>
-                                {match.player2_name || "TBD"}
+                                {(() => {
+                                  const p = tournamentPlayers.find(
+                                    (tp) => tp.id === match.player2_id
+                                  );
+                                  if (p && p.static_seating) {
+                                    return (
+                                      <span
+                                        title="Static seating"
+                                        style={{
+                                          textDecoration: "underline",
+                                          textDecorationColor:
+                                            theme.palette.primary.main,
+                                          textDecorationThickness: "2px",
+                                          textUnderlineOffset: "2px",
+                                          color: "inherit",
+                                        }}
+                                      >
+                                        {match.player2_name || "TBD"}
+                                      </span>
+                                    );
+                                  }
+                                  return match.player2_name || "TBD";
+                                })()}
                               </TableCell>
                               <TableCell>
                                 <Chip
