@@ -91,6 +91,8 @@ interface TournamentPlayer {
   created_at: string;
   trainer_id?: string;
   birth_year?: number;
+  player_id?: number;
+  player_name?: string;
 }
 
 interface LeaderboardEntry {
@@ -260,6 +262,7 @@ const TournamentView: React.FC = () => {
       const response = await apiCall(`/api/tournaments/${id}/players`);
       if (response.ok) {
         const data = await response.json();
+        console.log("🔍 TournamentView: tournamentPlayers fetched:", data);
         setTournamentPlayers(data);
       }
     } catch (error) {
@@ -1325,97 +1328,108 @@ const TournamentView: React.FC = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {tournamentPlayers.map((player) => (
-                      <TableRow key={player.id}>
-                        <TableCell>{player.name}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={
-                              Boolean(player.static_seating)
-                                ? "Static"
-                                : "Dynamic"
-                            }
-                            color={
-                              Boolean(player.static_seating)
-                                ? "primary"
-                                : "default"
-                            }
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>Round {player.started_round}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={
-                              Boolean(player.dropped)
-                                ? `Dropped (Round ${player.started_round})`
-                                : "Active"
-                            }
-                            color={
-                              Boolean(player.dropped) ? "error" : "success"
-                            }
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>{formatDate(player.created_at)}</TableCell>
-                        <TableCell>
-                          {tournament.status !== "completed" && (
-                            <>
-                              <Button
-                                size="small"
-                                color="primary"
-                                startIcon={<EditIcon />}
-                                onClick={() => {
-                                  setEditingPlayer(player);
-                                  setEditPlayerForm({
-                                    id: player.id,
-                                    name: player.name,
-                                    static_seating: player.static_seating,
-                                    trainer_id: player.trainer_id || "",
-                                    birth_year: player.birth_year
-                                      ? String(player.birth_year)
-                                      : "",
-                                    dropped: Boolean(player.dropped),
-                                    started_round: player.started_round || 1,
-                                  });
-                                  setOpenEditPlayerDialog(true);
-                                }}
-                                sx={{ mr: 1 }}
-                              >
-                                Edit
-                              </Button>
-                              <FormControlLabel
-                                control={
-                                  <Checkbox
-                                    checked={Boolean(player.dropped)}
-                                    onChange={(e) =>
-                                      setDroppedConfirm({
-                                        player,
-                                        newDropped: e.target.checked,
-                                      })
-                                    }
-                                    color="error"
-                                  />
-                                }
-                                label="Dropped"
-                                sx={{ mr: 1 }}
-                              />
-                              <Button
-                                size="small"
-                                color="error"
-                                startIcon={<DeleteIcon />}
-                                onClick={() => handleRemovePlayer(player.id)}
-                                disabled={removingPlayerId === player.id}
-                              >
-                                {removingPlayerId === player.id
-                                  ? "Removing..."
-                                  : "Remove"}
-                              </Button>
-                            </>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {tournamentPlayers.map((player, idx) => {
+                      console.log(
+                        `🔍 Rendering tournamentPlayer[${idx}]:`,
+                        player
+                      );
+                      return (
+                        <TableRow key={player.id || player.player_id}>
+                          <TableCell>{player.player_name}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={
+                                Boolean(player.static_seating)
+                                  ? "Static"
+                                  : "Dynamic"
+                              }
+                              color={
+                                Boolean(player.static_seating)
+                                  ? "primary"
+                                  : "default"
+                              }
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>Round {player.started_round}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={
+                                Boolean(player.dropped)
+                                  ? `Dropped (Round ${player.started_round})`
+                                  : "Active"
+                              }
+                              color={
+                                Boolean(player.dropped) ? "error" : "success"
+                              }
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>{formatDate(player.created_at)}</TableCell>
+                          <TableCell>
+                            {tournament.status !== "completed" && (
+                              <>
+                                <Button
+                                  size="small"
+                                  color="primary"
+                                  startIcon={<EditIcon />}
+                                  onClick={() => {
+                                    setEditingPlayer(player);
+                                    setEditPlayerForm({
+                                      id:
+                                        player.id !== undefined
+                                          ? player.id
+                                          : player.player_id !== undefined
+                                          ? player.player_id
+                                          : null,
+                                      name: player.player_name || "",
+                                      static_seating: player.static_seating,
+                                      trainer_id: player.trainer_id || "",
+                                      birth_year: player.birth_year
+                                        ? String(player.birth_year)
+                                        : "",
+                                      dropped: Boolean(player.dropped),
+                                      started_round: player.started_round || 1,
+                                    });
+                                    setOpenEditPlayerDialog(true);
+                                  }}
+                                  sx={{ mr: 1 }}
+                                >
+                                  Edit
+                                </Button>
+                                <FormControlLabel
+                                  control={
+                                    <Checkbox
+                                      checked={Boolean(player.dropped)}
+                                      onChange={(e) =>
+                                        setDroppedConfirm({
+                                          player,
+                                          newDropped: e.target.checked,
+                                        })
+                                      }
+                                      color="error"
+                                    />
+                                  }
+                                  label="Dropped"
+                                  sx={{ mr: 1 }}
+                                />
+                                <Button
+                                  size="small"
+                                  color="error"
+                                  startIcon={<DeleteIcon />}
+                                  onClick={() => handleRemovePlayer(player.id)}
+                                  disabled={removingPlayerId === player.id}
+                                >
+                                  {removingPlayerId === player.id
+                                    ? "Removing..."
+                                    : "Remove"}
+                                </Button>
+                              </>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>

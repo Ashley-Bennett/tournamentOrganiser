@@ -408,9 +408,12 @@ app.post("/api/players", async (req, res) => {
 app.get("/api/players", async (req, res) => {
   try {
     const userId = (req.user as any).id;
+    console.log("🔍 API: Getting players for user ID:", userId);
     const players = await db.getAccessiblePlayers(userId);
+    console.log("🔍 API: Players to be sent to frontend:", players);
     res.json(players);
   } catch (error) {
+    console.error("🔍 API: Error getting players:", error);
     res.status(500).json({ error: "Failed to get players" });
   }
 });

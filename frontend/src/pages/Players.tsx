@@ -71,6 +71,16 @@ const Players: React.FC = () => {
       const response = await apiCall("/api/players");
       if (response.ok) {
         const data = await response.json();
+        console.log("🔍 Players data received:", data);
+        console.log("🔍 Players data type:", typeof data);
+        console.log(
+          "🔍 Players data length:",
+          Array.isArray(data) ? data.length : "Not an array"
+        );
+        if (Array.isArray(data) && data.length > 0) {
+          console.log("🔍 First player:", data[0]);
+          console.log("🔍 First player name:", data[0].name);
+        }
         setPlayers(data);
       } else {
         if (response.status === 401) {
@@ -131,6 +141,8 @@ const Players: React.FC = () => {
     };
 
   const openEditDialog = (player: Player) => {
+    console.log("🔍 Opening edit dialog for player:", player);
+    console.log("🔍 Player name in edit:", player.name);
     setEditPlayer(player);
     setEditForm({
       name: player.name,
@@ -263,34 +275,42 @@ const Players: React.FC = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                players.map((player) => (
-                  <TableRow key={player.id}>
-                    <TableCell>{player.name}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={
-                          Boolean(player.static_seating) ? "Static" : "Dynamic"
-                        }
-                        color={
-                          Boolean(player.static_seating) ? "primary" : "default"
-                        }
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>{formatDate(player.created_at)}</TableCell>
-                    <TableCell>{player.trainer_id || "N/A"}</TableCell>
-                    <TableCell>{player.birth_year || "N/A"}</TableCell>
-                    <TableCell>
-                      <Button
-                        size="small"
-                        startIcon={<EditIcon />}
-                        onClick={() => openEditDialog(player)}
-                      >
-                        Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                players.map((player) => {
+                  console.log("🔍 Rendering player:", player);
+                  console.log("🔍 Player name:", player.name);
+                  return (
+                    <TableRow key={player.id}>
+                      <TableCell>{player.name}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={
+                            Boolean(player.static_seating)
+                              ? "Static"
+                              : "Dynamic"
+                          }
+                          color={
+                            Boolean(player.static_seating)
+                              ? "primary"
+                              : "default"
+                          }
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>{formatDate(player.created_at)}</TableCell>
+                      <TableCell>{player.trainer_id || "N/A"}</TableCell>
+                      <TableCell>{player.birth_year || "N/A"}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          startIcon={<EditIcon />}
+                          onClick={() => openEditDialog(player)}
+                        >
+                          Edit
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
