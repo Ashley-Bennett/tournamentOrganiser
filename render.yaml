@@ -12,7 +12,7 @@ services:
       - key: PORT
         value: 10000
       - key: FRONTEND_URL
-        value: https://tournament-organizer-frontend.onrender.com
+        value: https://matchamp.win
       - key: JWT_SECRET
         generateValue: true
       - key: DB_PATH
