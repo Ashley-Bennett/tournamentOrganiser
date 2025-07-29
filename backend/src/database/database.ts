@@ -96,6 +96,7 @@ export class Database {
         winner_id INTEGER,
         result TEXT CHECK(result IN ('WIN_P1', 'WIN_P2', 'DRAW', 'BYE')),
         modified_by_to BOOLEAN DEFAULT FALSE,
+        round_status TEXT DEFAULT 'pending' CHECK(round_status IN ('pending', 'started', 'completed')),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
@@ -690,10 +691,30 @@ export class Database {
 
         let pairings: any[] = [];
 
+        console.log("isFirstRound", isFirstRound);
+
         if (isFirstRound) {
+          console.log("=== STARTING FIRST ROUND PAIRING ===");
+          console.log(
+            "Initial standings:",
+            standings.map((p) => `${p.name} (static:${p.static_seating})`)
+          );
+
           // For first round, pair by static seating (static players should not be paired together)
           const staticPlayers = standings.filter((p) => p.static_seating);
           const dynamicPlayers = standings.filter((p) => !p.static_seating);
+
+          console.log(
+            "Static players:",
+            staticPlayers.map((p) => p.name)
+          );
+          console.log(
+            "Dynamic players:",
+            dynamicPlayers.map((p) => p.name)
+          );
+
+          // Track used players to prevent duplicates
+          const usedPlayers = new Set<number>();
 
           // Pair static players with dynamic players first
           const minStaticDynamic = Math.min(
@@ -701,51 +722,101 @@ export class Database {
             dynamicPlayers.length
           );
           for (let i = 0; i < minStaticDynamic; i++) {
+            console.log(
+              `Pairing ${staticPlayers[i].name} vs ${dynamicPlayers[i].name}`
+            );
             pairings.push({
               player1_id: staticPlayers[i].id,
               player1_name: staticPlayers[i].name,
               player2_id: dynamicPlayers[i].id,
               player2_name: dynamicPlayers[i].name,
             });
+            usedPlayers.add(staticPlayers[i].id);
+            usedPlayers.add(dynamicPlayers[i].id);
           }
 
           // Handle remaining players
           const remainingStatic = staticPlayers.slice(minStaticDynamic);
           const remainingDynamic = dynamicPlayers.slice(minStaticDynamic);
 
+          console.log(
+            "Remaining static players:",
+            remainingStatic.map((p) => p.name)
+          );
+          console.log(
+            "Remaining dynamic players:",
+            remainingDynamic.map((p) => p.name)
+          );
+
           // Pair remaining static players with each other if necessary
           for (let i = 0; i < remainingStatic.length - 1; i += 2) {
+            console.log(
+              `Pairing remaining static: ${remainingStatic[i].name} vs ${
+                remainingStatic[i + 1].name
+              }`
+            );
             pairings.push({
               player1_id: remainingStatic[i].id,
               player1_name: remainingStatic[i].name,
               player2_id: remainingStatic[i + 1].id,
               player2_name: remainingStatic[i + 1].name,
             });
+            usedPlayers.add(remainingStatic[i].id);
+            usedPlayers.add(remainingStatic[i + 1].id);
           }
 
           // Pair remaining dynamic players
           for (let i = 0; i < remainingDynamic.length - 1; i += 2) {
+            console.log(
+              `Pairing remaining dynamic: ${remainingDynamic[i].name} vs ${
+                remainingDynamic[i + 1].name
+              }`
+            );
             pairings.push({
               player1_id: remainingDynamic[i].id,
               player1_name: remainingDynamic[i].name,
               player2_id: remainingDynamic[i + 1].id,
               player2_name: remainingDynamic[i + 1].name,
             });
+            usedPlayers.add(remainingDynamic[i].id);
+            usedPlayers.add(remainingDynamic[i + 1].id);
           }
 
-          // Handle odd player with bye - give bye to the lowest scoring player
+          // Handle odd player with bye - give bye to the lowest scoring player who hasn't been used
           if (standings.length % 2 === 1) {
-            const lowestPlayer = standings[0]; // Already sorted by points ASC
-            pairings.push({
-              player1_id: lowestPlayer.id,
-              player1_name: lowestPlayer.name,
-              player2_id: null,
-              player2_name: "BYE",
-            });
+            const unusedPlayer = standings.find((p) => !usedPlayers.has(p.id));
+            if (unusedPlayer) {
+              console.log(`Giving bye to ${unusedPlayer.name}`);
+              pairings.push({
+                player1_id: unusedPlayer.id,
+                player1_name: unusedPlayer.name,
+                player2_id: null,
+                player2_name: "BYE",
+              });
+            } else {
+              console.log("ERROR: No unused player found for bye!");
+            }
           }
+
+          console.log("=== FINAL FIRST ROUND PAIRINGS ===");
+          pairings.forEach((p, i) => {
+            if (p.player2_id) {
+              console.log(`${i + 1}. ${p.player1_name} vs ${p.player2_name}`);
+            } else {
+              console.log(`${i + 1}. ${p.player1_name} gets BYE`);
+            }
+          });
+          console.log("=== END FIRST ROUND PAIRING ===\n");
         } else {
           // For subsequent rounds, pair by points (Swiss system)
-          const availablePlayers = [...standings];
+          console.log("=== STARTING SUBSEQUENT ROUNDS PAIRING ===");
+          console.log(
+            "Initial standings:",
+            standings.map(
+              (p) => `${p.name} (${p.points}pts, static:${p.static_seating})`
+            )
+          );
+
           const usedPlayers = new Set<number>();
 
           // Track bye history to avoid giving multiple byes to the same player
@@ -758,26 +829,48 @@ export class Database {
               }
             }
           });
+          console.log("Bye history:", Object.fromEntries(byeHistory));
 
-          // Process players one by one until all are paired or given byes
-          let i = 0;
-          while (i < availablePlayers.length) {
-            const currentPlayer = availablePlayers[i];
+          // Create a queue of available players
+          let queue = standings.map((p) => ({ ...p }));
+          console.log(
+            "Initial queue:",
+            queue.map((p) => p.name)
+          );
 
-            // Skip if already used
-            if (usedPlayers.has(currentPlayer.id)) {
-              i++;
+          while (queue.length > 1) {
+            const currentPlayer = queue.shift();
+            console.log(
+              `\n--- Processing player: ${currentPlayer?.name} (${currentPlayer?.id}) ---`
+            );
+            console.log(
+              "Queue before processing:",
+              queue.map((p) => p.name)
+            );
+            console.log("Used players:", Array.from(usedPlayers));
+
+            if (!currentPlayer || usedPlayers.has(currentPlayer.id)) {
+              console.log(
+                `Skipping ${currentPlayer?.name} - already used or null`
+              );
               continue;
             }
 
-            // Find best available opponent
-            let bestOpponent = null;
-            let bestScore = -Infinity;
+            // Find the best available opponent
             let bestOpponentIndex = -1;
+            let bestScore = -Infinity;
+            console.log(`Looking for opponent for ${currentPlayer.name}...`);
 
-            for (let j = i + 1; j < availablePlayers.length; j++) {
-              const opponent = availablePlayers[j];
-              if (usedPlayers.has(opponent.id)) continue;
+            for (let j = 0; j < queue.length; j++) {
+              const opponent = queue[j];
+              console.log(
+                `  Checking opponent ${opponent.name} (${opponent.id})`
+              );
+
+              if (usedPlayers.has(opponent.id)) {
+                console.log(`    Skipping ${opponent.name} - already used`);
+                continue;
+              }
 
               // Check if they've already played
               const alreadyPlayed = existingMatches.some(
@@ -787,24 +880,36 @@ export class Database {
                   (match.player1_id === opponent.id &&
                     match.player2_id === currentPlayer.id)
               );
-
-              if (alreadyPlayed) continue;
-
-              // Check static seating constraint - static players cannot be paired together
-              if (currentPlayer.static_seating && opponent.static_seating)
+              if (alreadyPlayed) {
+                console.log(`    Skipping ${opponent.name} - already played`);
                 continue;
+              }
+
+              // Check static seating constraint
+              if (currentPlayer.static_seating && opponent.static_seating) {
+                console.log(
+                  `    Skipping ${opponent.name} - both static seating`
+                );
+                continue;
+              }
 
               // Score based on point difference (closer is better)
               const score = -Math.abs(currentPlayer.points - opponent.points);
+              console.log(
+                `    ${opponent.name} score: ${score} (current best: ${bestScore})`
+              );
               if (score > bestScore) {
                 bestScore = score;
-                bestOpponent = opponent;
                 bestOpponentIndex = j;
+                console.log(`    New best opponent: ${opponent.name}`);
               }
             }
 
-            if (bestOpponent) {
-              // Create pairing
+            if (bestOpponentIndex !== -1) {
+              const bestOpponent = queue.splice(bestOpponentIndex, 1)[0];
+              console.log(
+                `✓ PAIRING: ${currentPlayer.name} vs ${bestOpponent.name}`
+              );
               pairings.push({
                 player1_id: currentPlayer.id,
                 player1_name: currentPlayer.name,
@@ -813,18 +918,19 @@ export class Database {
               });
               usedPlayers.add(currentPlayer.id);
               usedPlayers.add(bestOpponent.id);
-
-              // Remove both players from available list
-              availablePlayers.splice(bestOpponentIndex, 1);
-              availablePlayers.splice(i, 1);
-              // Don't increment i since we removed the current element
+              console.log(
+                "Queue after pairing:",
+                queue.map((p) => p.name)
+              );
             } else {
               // No suitable opponent found, consider bye
               const currentPlayerByes = byeHistory.get(currentPlayer.id) || 0;
+              console.log(
+                `No suitable opponent found for ${currentPlayer.name}. Current byes: ${currentPlayerByes}`
+              );
 
-              // Only give bye if player hasn't had too many byes already
               if (currentPlayerByes < 2) {
-                // Limit to 2 byes per player
+                console.log(`✓ GIVING BYE to ${currentPlayer.name}`);
                 pairings.push({
                   player1_id: currentPlayer.id,
                   player1_name: currentPlayer.name,
@@ -832,29 +938,57 @@ export class Database {
                   player2_name: "BYE",
                 });
                 usedPlayers.add(currentPlayer.id);
-                availablePlayers.splice(i, 1);
-                // Don't increment i since we removed the current element
               } else {
-                // Player can't get a bye, skip to next player
-                i++;
+                // Can't get a bye, put back at end of queue
+                console.log(
+                  `✗ Can't give bye to ${currentPlayer.name} (already had ${currentPlayerByes}), putting back in queue`
+                );
+                queue.push(currentPlayer);
               }
+              console.log(
+                "Queue after bye decision:",
+                queue.map((p) => p.name)
+              );
             }
           }
 
-          // Handle any remaining unpaired players
-          for (const remainingPlayer of availablePlayers) {
-            if (!usedPlayers.has(remainingPlayer.id)) {
-              const playerByes = byeHistory.get(remainingPlayer.id) || 0;
+          // Handle last unpaired player (if odd number)
+          if (queue.length === 1) {
+            const lastPlayer = queue[0];
+            console.log(`\n--- Handling last player: ${lastPlayer.name} ---`);
+            if (!usedPlayers.has(lastPlayer.id)) {
+              const playerByes = byeHistory.get(lastPlayer.id) || 0;
+              console.log(
+                `Last player ${lastPlayer.name} has ${playerByes} byes`
+              );
               if (playerByes < 2) {
+                console.log(`✓ GIVING BYE to last player ${lastPlayer.name}`);
                 pairings.push({
-                  player1_id: remainingPlayer.id,
-                  player1_name: remainingPlayer.name,
+                  player1_id: lastPlayer.id,
+                  player1_name: lastPlayer.name,
                   player2_id: null,
                   player2_name: "BYE",
                 });
+                usedPlayers.add(lastPlayer.id);
+              } else {
+                console.log(
+                  `✗ Can't give bye to last player ${lastPlayer.name} (already had ${playerByes})`
+                );
               }
+            } else {
+              console.log(`Last player ${lastPlayer.name} already used`);
             }
           }
+
+          console.log("\n=== FINAL PAIRINGS ===");
+          pairings.forEach((p, i) => {
+            if (p.player2_id) {
+              console.log(`${i + 1}. ${p.player1_name} vs ${p.player2_name}`);
+            } else {
+              console.log(`${i + 1}. ${p.player1_name} gets BYE`);
+            }
+          });
+          console.log("=== END PAIRING ===\n");
         }
 
         // Create matches for all pairings
@@ -865,7 +999,7 @@ export class Database {
             round_number: roundNumber,
             player1_id: pairing.player1_id,
             player2_id: pairing.player2_id,
-            result: pairing.player2_id ? undefined : "BYE",
+            result: undefined, // Don't set results immediately - wait for round to start
           });
 
           createdMatches.push({
@@ -1200,6 +1334,119 @@ export class Database {
       this.db.run(
         sql,
         [result, winnerId || null, modifiedByTo, matchId],
+        function (err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  async updateRoundStatus(
+    tournamentId: number,
+    roundNumber: number,
+    status: "pending" | "started" | "completed"
+  ): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const sql = `
+          UPDATE matches 
+          SET round_status = ?, updated_at = CURRENT_TIMESTAMP 
+          WHERE tournament_id = ? AND round_number = ?
+        `;
+
+        this.db.run(sql, [status, tournamentId, roundNumber], async (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            // If starting the round, automatically set bye results
+            if (status === "started") {
+              await this.setByeResultsForRound(tournamentId, roundNumber);
+            }
+            resolve();
+          }
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  async setByeResultsForRound(
+    tournamentId: number,
+    roundNumber: number
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        UPDATE matches 
+        SET result = 'BYE', winner_id = player1_id, updated_at = CURRENT_TIMESTAMP 
+        WHERE tournament_id = ? AND round_number = ? AND player2_id IS NULL AND result IS NULL
+      `;
+
+      this.db.run(sql, [tournamentId, roundNumber], function (err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  async getRoundStatus(
+    tournamentId: number,
+    roundNumber: number
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        SELECT round_status 
+        FROM matches 
+        WHERE tournament_id = ? AND round_number = ? 
+        LIMIT 1
+      `;
+
+      this.db.get(sql, [tournamentId, roundNumber], (err, row: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row ? row.round_status : "pending");
+        }
+      });
+    });
+  }
+
+  async deleteMatch(matchId: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const sql = `DELETE FROM matches WHERE id = ?`;
+
+      this.db.run(sql, [matchId], function (err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  async updateMatch(
+    matchId: number,
+    player1Id?: number,
+    player2Id?: number
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        UPDATE matches 
+        SET player1_id = ?, player2_id = ?, updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `;
+
+      this.db.run(
+        sql,
+        [player1Id || null, player2Id || null, matchId],
         function (err) {
           if (err) {
             reject(err);

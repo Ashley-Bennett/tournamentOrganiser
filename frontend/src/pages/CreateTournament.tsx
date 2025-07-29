@@ -42,7 +42,7 @@ const CreateTournament: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    date: "",
+    date: new Date().toISOString().split("T")[0], // Default to current date
     league_id: "",
     bracket_type: "SWISS",
   });

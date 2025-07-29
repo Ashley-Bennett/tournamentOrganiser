@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Typography,
@@ -66,6 +66,7 @@ interface Match {
   winner_id: number | null;
   winner_name: string | null;
   result: string | null;
+  round_status: string;
   created_at: string;
 }
 
@@ -171,17 +172,21 @@ const TournamentView: React.FC = () => {
     newDropped: boolean;
   }>({ player: null, newDropped: false });
   const [droppedLoading, setDroppedLoading] = useState(false);
+  const [roundStatuses, setRoundStatuses] = useState<Record<number, string>>(
+    {}
+  );
+  const [startingRound, setStartingRound] = useState<number | null>(null);
+  const [completingRound, setCompletingRound] = useState<number | null>(null);
+  const [openEditMatchDialog, setOpenEditMatchDialog] = useState(false);
+  const [editingMatch, setEditingMatch] = useState<Match | null>(null);
+  const [editMatchForm, setEditMatchForm] = useState({
+    player1_id: "",
+    player2_id: "",
+  });
+  const [editingMatchLoading, setEditingMatchLoading] = useState(false);
+  const [deletingMatchId, setDeletingMatchId] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (id) {
-      fetchTournamentData();
-      fetchPlayers();
-      fetchTournamentPlayers();
-      fetchLeaderboard();
-    }
-  }, [id]);
-
-  const fetchTournamentData = async () => {
+  const fetchTournamentData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -209,9 +214,9 @@ const TournamentView: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchPlayers = async () => {
+  const fetchPlayers = useCallback(async () => {
     try {
       const response = await fetch("http://localhost:3002/api/players");
       if (response.ok) {
@@ -221,9 +226,9 @@ const TournamentView: React.FC = () => {
     } catch (error) {
       console.error("Error fetching players:", error);
     }
-  };
+  }, []);
 
-  const fetchTournamentPlayers = async () => {
+  const fetchTournamentPlayers = useCallback(async () => {
     try {
       const response = await fetch(
         `http://localhost:3002/api/tournaments/${id}/players`
@@ -235,9 +240,9 @@ const TournamentView: React.FC = () => {
     } catch (error) {
       console.error("Error fetching tournament players:", error);
     }
-  };
+  }, [id]);
 
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = useCallback(async () => {
     try {
       const response = await fetch(
         `http://localhost:3002/api/tournaments/${id}/leaderboard`
@@ -248,6 +253,140 @@ const TournamentView: React.FC = () => {
       }
     } catch (error) {
       console.error("Error fetching leaderboard:", error);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchTournamentData();
+      fetchPlayers();
+      fetchTournamentPlayers();
+      fetchLeaderboard();
+    }
+  }, [
+    id,
+    fetchTournamentData,
+    fetchPlayers,
+    fetchTournamentPlayers,
+    fetchLeaderboard,
+  ]);
+
+  const handleStartRound = async (roundNumber: number) => {
+    setStartingRound(roundNumber);
+    setError(null);
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/tournaments/${id}/rounds/${roundNumber}/start`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (response.ok) {
+        setSuccess("Round started successfully!");
+        setTimeout(() => setSuccess(null), 3000);
+        await fetchTournamentData();
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to start round");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setStartingRound(null);
+    }
+  };
+
+  const handleCompleteRound = async (roundNumber: number) => {
+    setCompletingRound(roundNumber);
+    setError(null);
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/tournaments/${id}/rounds/${roundNumber}/complete`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (response.ok) {
+        setSuccess("Round completed successfully!");
+        setTimeout(() => setSuccess(null), 3000);
+        await fetchTournamentData();
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to complete round");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setCompletingRound(null);
+    }
+  };
+
+  const handleDeleteMatch = async (matchId: number) => {
+    if (!window.confirm("Are you sure you want to delete this match?")) return;
+
+    setDeletingMatchId(matchId);
+    setError(null);
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/matches/${matchId}`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (response.ok) {
+        setSuccess("Match deleted successfully!");
+        setTimeout(() => setSuccess(null), 3000);
+        await fetchTournamentData();
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to delete match");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setDeletingMatchId(null);
+    }
+  };
+
+  const handleEditMatch = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingMatch) return;
+
+    setEditingMatchLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/matches/${editingMatch.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            player1_id: editMatchForm.player1_id
+              ? parseInt(editMatchForm.player1_id)
+              : null,
+            player2_id: editMatchForm.player2_id
+              ? parseInt(editMatchForm.player2_id)
+              : null,
+          }),
+        }
+      );
+      if (response.ok) {
+        setSuccess("Match updated successfully!");
+        setTimeout(() => setSuccess(null), 3000);
+        setOpenEditMatchDialog(false);
+        setEditingMatch(null);
+        setEditMatchForm({ player1_id: "", player2_id: "" });
+        await fetchTournamentData();
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to update match");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setEditingMatchLoading(false);
     }
   };
 
@@ -317,20 +456,24 @@ const TournamentView: React.FC = () => {
     return hasAllResultsForRound(activeRound);
   };
 
-  // Group matches by round
-  const matchesByRound = matches.reduce((acc, match) => {
-    const round = match.round_number;
-    if (!acc[round]) {
-      acc[round] = [];
-    }
-    acc[round].push(match);
-    return acc;
-  }, {} as Record<number, Match[]>);
+  // Group matches by round - memoized to prevent unnecessary recalculations
+  const matchesByRound = useMemo(() => {
+    return matches.reduce((acc, match) => {
+      const round = match.round_number;
+      if (!acc[round]) {
+        acc[round] = [];
+      }
+      acc[round].push(match);
+      return acc;
+    }, {} as Record<number, Match[]>);
+  }, [matches]);
 
-  // Get all round numbers sorted
-  const roundNumbers = Object.keys(matchesByRound)
-    .map(Number)
-    .sort((a, b) => a - b);
+  // Get all round numbers sorted - memoized to prevent unnecessary recalculations
+  const roundNumbers = useMemo(() => {
+    return Object.keys(matchesByRound)
+      .map(Number)
+      .sort((a, b) => a - b);
+  }, [matchesByRound]);
 
   // Determine the active round (highest round number, but only if tournament is not completed)
   const activeRound =
@@ -363,6 +506,31 @@ const TournamentView: React.FC = () => {
       setMainTabValue(0); // Players
     }
   }, [tournament]);
+
+  // Fetch round statuses when round numbers change
+  useEffect(() => {
+    const fetchRoundStatuses = async () => {
+      try {
+        const statuses: Record<number, string> = {};
+        for (const round of roundNumbers) {
+          const response = await fetch(
+            `http://localhost:3002/api/tournaments/${id}/rounds/${round}/status`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            statuses[round] = data.status;
+          }
+        }
+        setRoundStatuses(statuses);
+      } catch (error) {
+        console.error("Error fetching round statuses:", error);
+      }
+    };
+
+    if (roundNumbers.length > 0) {
+      fetchRoundStatuses();
+    }
+  }, [id, roundNumbers]);
 
   // Use tournament.status for status chip
   const getStatusLabel = (status: string) => {
@@ -1338,7 +1506,7 @@ const TournamentView: React.FC = () => {
                     variant="scrollable"
                     scrollButtons="auto"
                   >
-                    {roundNumbers.map((round) => (
+                    {roundNumbers.map((round: number) => (
                       <Tab
                         key={round}
                         label={
@@ -1368,6 +1536,73 @@ const TournamentView: React.FC = () => {
                   </Tabs>
                 </Box>
 
+                {/* Round Status Controls */}
+                {selectedRound && matchesByRound[selectedRound] && (
+                  <Box sx={{ mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 2,
+                      }}
+                    >
+                      <Typography variant="h6">
+                        Round {selectedRound} Status
+                      </Typography>
+                      <Box sx={{ display: "flex", gap: 1 }}>
+                        {roundStatuses[selectedRound] === "pending" && (
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={() => handleStartRound(selectedRound)}
+                            disabled={startingRound === selectedRound}
+                          >
+                            {startingRound === selectedRound
+                              ? "Starting..."
+                              : "Start Round"}
+                          </Button>
+                        )}
+                        {roundStatuses[selectedRound] === "started" && (
+                          <Button
+                            variant="contained"
+                            color="success"
+                            onClick={() => handleCompleteRound(selectedRound)}
+                            disabled={completingRound === selectedRound}
+                          >
+                            {completingRound === selectedRound
+                              ? "Completing..."
+                              : "Complete Round"}
+                          </Button>
+                        )}
+                        {roundStatuses[selectedRound] === "completed" && (
+                          <Chip
+                            label="Round Completed"
+                            color="success"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                    </Box>
+                    {roundStatuses[selectedRound] === "pending" && (
+                      <Alert severity="info">
+                        Click "Start Round" to unlock result options for this
+                        round.
+                      </Alert>
+                    )}
+                    {roundStatuses[selectedRound] === "started" && (
+                      <Alert severity="success">
+                        Round is active. You can now enter match results.
+                      </Alert>
+                    )}
+                    {roundStatuses[selectedRound] === "completed" && (
+                      <Alert severity="warning">
+                        Round is completed. Results are locked.
+                      </Alert>
+                    )}
+                  </Box>
+                )}
+
                 {/* Matches for Selected Round */}
                 {selectedRound && matchesByRound[selectedRound] && (
                   <Box>
@@ -1379,7 +1614,7 @@ const TournamentView: React.FC = () => {
                             <TableCell>Player 2</TableCell>
                             <TableCell>Result</TableCell>
                             <TableCell>Winner</TableCell>
-                            <TableCell>Select Winner</TableCell>
+                            <TableCell>Actions</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -1412,73 +1647,129 @@ const TournamentView: React.FC = () => {
                                 {match.winner_name || "N/A"}
                               </TableCell>
                               <TableCell>
-                                {match.result && match.result !== "" ? (
-                                  <Chip
-                                    label="Result Set"
-                                    color="success"
-                                    size="small"
-                                  />
-                                ) : (
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      gap: 1,
-                                      flexWrap: "wrap",
-                                    }}
-                                  >
-                                    <Button
-                                      variant="outlined"
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    gap: 1,
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  {/* Edit/Delete buttons - only show when round is pending */}
+                                  {roundStatuses[selectedRound] ===
+                                    "pending" && (
+                                    <>
+                                      <Button
+                                        size="small"
+                                        color="primary"
+                                        startIcon={<EditIcon />}
+                                        onClick={() => {
+                                          setEditingMatch(match);
+                                          setEditMatchForm({
+                                            player1_id: match.player1_id
+                                              ? String(match.player1_id)
+                                              : "",
+                                            player2_id: match.player2_id
+                                              ? String(match.player2_id)
+                                              : "",
+                                          });
+                                          setOpenEditMatchDialog(true);
+                                        }}
+                                      >
+                                        Edit
+                                      </Button>
+                                      <Button
+                                        size="small"
+                                        color="error"
+                                        startIcon={<DeleteIcon />}
+                                        onClick={() =>
+                                          handleDeleteMatch(match.id)
+                                        }
+                                        disabled={deletingMatchId === match.id}
+                                      >
+                                        {deletingMatchId === match.id
+                                          ? "Deleting..."
+                                          : "Delete"}
+                                      </Button>
+                                    </>
+                                  )}
+
+                                  {/* Result buttons - only show when round is started and no result exists */}
+                                  {roundStatuses[selectedRound] === "started" &&
+                                    !match.result && (
+                                      <>
+                                        <Button
+                                          variant="outlined"
+                                          size="small"
+                                          color="primary"
+                                          disabled={
+                                            updatingMatchResult === match.id
+                                          }
+                                          onClick={() =>
+                                            handleUpdateMatchResult(
+                                              match.id,
+                                              "WIN_P1"
+                                            )
+                                          }
+                                          sx={{ minWidth: "auto", px: 1 }}
+                                        >
+                                          {match.player1_name || "Player 1"}{" "}
+                                          Wins
+                                        </Button>
+                                        <Button
+                                          variant="outlined"
+                                          size="small"
+                                          color="warning"
+                                          disabled={
+                                            updatingMatchResult === match.id
+                                          }
+                                          onClick={() =>
+                                            handleUpdateMatchResult(
+                                              match.id,
+                                              "DRAW"
+                                            )
+                                          }
+                                          sx={{ minWidth: "auto", px: 1 }}
+                                        >
+                                          Tie
+                                        </Button>
+                                        <Button
+                                          variant="outlined"
+                                          size="small"
+                                          color="secondary"
+                                          disabled={
+                                            updatingMatchResult === match.id
+                                          }
+                                          onClick={() =>
+                                            handleUpdateMatchResult(
+                                              match.id,
+                                              "WIN_P2"
+                                            )
+                                          }
+                                          sx={{ minWidth: "auto", px: 1 }}
+                                        >
+                                          {match.player2_name || "Player 2"}{" "}
+                                          Wins
+                                        </Button>
+                                      </>
+                                    )}
+
+                                  {/* Show result status when result exists or round is completed */}
+                                  {(match.result ||
+                                    roundStatuses[selectedRound] ===
+                                      "completed") && (
+                                    <Chip
+                                      label={
+                                        match.result
+                                          ? "Result Set"
+                                          : "Round Completed"
+                                      }
+                                      color={
+                                        match.result ? "success" : "warning"
+                                      }
                                       size="small"
-                                      color="primary"
-                                      disabled={
-                                        updatingMatchResult === match.id
-                                      }
-                                      onClick={() =>
-                                        handleUpdateMatchResult(
-                                          match.id,
-                                          "WIN_P1"
-                                        )
-                                      }
-                                      sx={{ minWidth: "auto", px: 1 }}
-                                    >
-                                      {match.player1_name || "Player 1"} Wins
-                                    </Button>
-                                    <Button
-                                      variant="outlined"
-                                      size="small"
-                                      color="warning"
-                                      disabled={
-                                        updatingMatchResult === match.id
-                                      }
-                                      onClick={() =>
-                                        handleUpdateMatchResult(
-                                          match.id,
-                                          "DRAW"
-                                        )
-                                      }
-                                      sx={{ minWidth: "auto", px: 1 }}
-                                    >
-                                      Tie
-                                    </Button>
-                                    <Button
-                                      variant="outlined"
-                                      size="small"
-                                      color="secondary"
-                                      disabled={
-                                        updatingMatchResult === match.id
-                                      }
-                                      onClick={() =>
-                                        handleUpdateMatchResult(
-                                          match.id,
-                                          "WIN_P2"
-                                        )
-                                      }
-                                      sx={{ minWidth: "auto", px: 1 }}
-                                    >
-                                      {match.player2_name || "Player 2"} Wins
-                                    </Button>
-                                  </Box>
-                                )}
+                                    />
+                                  )}
+                                </Box>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -2175,6 +2466,89 @@ const TournamentView: React.FC = () => {
             Confirm
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Edit Match Dialog */}
+      <Dialog
+        open={openEditMatchDialog}
+        onClose={() => setOpenEditMatchDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit Match</DialogTitle>
+        <form onSubmit={handleEditMatch}>
+          <DialogContent>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Player 1 (Optional)</InputLabel>
+                  <Select
+                    value={editMatchForm.player1_id}
+                    label="Player 1 (Optional)"
+                    onChange={(e) =>
+                      setEditMatchForm({
+                        ...editMatchForm,
+                        player1_id: e.target.value,
+                      })
+                    }
+                  >
+                    <MenuItem value="">
+                      <em>Select Player 1</em>
+                    </MenuItem>
+                    {tournamentPlayers
+                      .filter((player) => !Boolean(player.dropped))
+                      .map((player) => (
+                        <MenuItem key={player.id} value={player.id}>
+                          {player.name}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Player 2 (Optional)</InputLabel>
+                  <Select
+                    value={editMatchForm.player2_id}
+                    label="Player 2 (Optional)"
+                    onChange={(e) =>
+                      setEditMatchForm({
+                        ...editMatchForm,
+                        player2_id: e.target.value,
+                      })
+                    }
+                  >
+                    <MenuItem value="">
+                      <em>Select Player 2</em>
+                    </MenuItem>
+                    {tournamentPlayers
+                      .filter((player) => !Boolean(player.dropped))
+                      .map((player) => (
+                        <MenuItem key={player.id} value={player.id}>
+                          {player.name}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setOpenEditMatchDialog(false)}
+              disabled={editingMatchLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={editingMatchLoading}
+            >
+              {editingMatchLoading ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogActions>
+        </form>
       </Dialog>
     </Box>
   );

@@ -574,6 +574,72 @@ app.post("/api/tournaments/:id/pairings", async (req, res) => {
   }
 });
 
+// Start a round (unlock result options)
+app.post("/api/tournaments/:id/rounds/:roundNumber/start", async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id);
+    const roundNumber = parseInt(req.params.roundNumber);
+
+    await db.updateRoundStatus(tournamentId, roundNumber, "started");
+    res.json({ message: "Round started successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to start round" });
+  }
+});
+
+// Complete a round (lock result options)
+app.post(
+  "/api/tournaments/:id/rounds/:roundNumber/complete",
+  async (req, res) => {
+    try {
+      const tournamentId = parseInt(req.params.id);
+      const roundNumber = parseInt(req.params.roundNumber);
+
+      await db.updateRoundStatus(tournamentId, roundNumber, "completed");
+      res.json({ message: "Round completed successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to complete round" });
+    }
+  }
+);
+
+// Get round status
+app.get("/api/tournaments/:id/rounds/:roundNumber/status", async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id);
+    const roundNumber = parseInt(req.params.roundNumber);
+
+    const status = await db.getRoundStatus(tournamentId, roundNumber);
+    res.json({ status });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get round status" });
+  }
+});
+
+// Delete a match
+app.delete("/api/matches/:id", async (req, res) => {
+  try {
+    const matchId = parseInt(req.params.id);
+    await db.deleteMatch(matchId);
+    res.json({ message: "Match deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete match" });
+  }
+});
+
+// Update a match (edit pairing)
+app.patch("/api/matches/:id", async (req, res) => {
+  try {
+    const matchId = parseInt(req.params.id);
+    const { player1_id, player2_id } = req.body;
+
+    await db.updateMatch(matchId, player1_id, player2_id);
+    res.json({ message: "Match updated successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update match" });
+  }
+});
+
 // Error handling middleware
 app.use(
   (
