@@ -1,6 +1,7 @@
 import sqlite3 from "sqlite3";
 import path from "path";
 import bcrypt from "bcrypt";
+import fs from "fs";
 
 const DEBUG = process.env.DEBUG === "true";
 
@@ -9,7 +10,18 @@ export class Database {
   private dbPath: string;
 
   constructor() {
-    this.dbPath = path.join(__dirname, "../../data/tournament.db");
+    // Use environment variable for database path, fallback to local path
+    const dbPath =
+      process.env.DB_PATH || path.join(__dirname, "../../data/tournament.db");
+    this.dbPath = dbPath;
+
+    // Ensure the directory exists
+    const dbDir = path.dirname(this.dbPath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+      console.log(`📁 Created database directory: ${dbDir}`);
+    }
+
     this.db = new sqlite3.Database(this.dbPath, (err) => {
       if (err) {
         console.error("Error opening database:", err.message);
