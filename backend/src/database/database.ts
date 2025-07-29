@@ -255,14 +255,23 @@ export class Database {
     name: string;
     email: string;
     password: string;
-  }): Promise<number> {
+  }): Promise<{ id: number; debug: any }> {
     return new Promise(async (resolve, reject) => {
+      const debugInfo = {
+        databasePath: this.dbPath,
+        tableExists: false,
+        hashedPasswordLength: 0,
+        sqlExecuted: false,
+      };
+
       try {
         console.log("🔐 Creating user in database:", {
           name: user.name,
           email: user.email,
         });
+
         const hashedPassword = await bcrypt.hash(user.password, 10);
+        debugInfo.hashedPasswordLength = hashedPassword.length;
         console.log("🔒 Password hashed successfully");
 
         const sql = `
@@ -277,16 +286,18 @@ export class Database {
           function (err) {
             if (err) {
               console.error("❌ Database error:", err);
-              reject(err);
+              debugInfo.sqlExecuted = false;
+              reject({ error: err, debug: debugInfo });
             } else {
               console.log("✅ User inserted with ID:", this.lastID);
-              resolve(this.lastID);
+              debugInfo.sqlExecuted = true;
+              resolve({ id: this.lastID, debug: debugInfo });
             }
           }
         );
       } catch (err) {
         console.error("❌ Error in createUser:", err);
-        reject(err);
+        reject({ error: err, debug: debugInfo });
       }
     });
   }

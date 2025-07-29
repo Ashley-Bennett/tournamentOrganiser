@@ -47,13 +47,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const register = async (name: string, email: string, password: string) => {
+    console.log("🚀 Starting registration process...");
+    console.log("📤 Sending request to /api/users");
+
+    const requestBody = { name, email, password };
+    console.log("📝 Request body:", { name, email, hasPassword: !!password });
+
     const res = await fetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify(requestBody),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Registration failed");
+
+    console.log("📥 Response status:", res.status);
+    console.log(
+      "📥 Response headers:",
+      Object.fromEntries(res.headers.entries())
+    );
+
+    const responseText = await res.text();
+    console.log("📥 Raw response text:", responseText);
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+      console.log("📥 Parsed response data:", data);
+    } catch (parseError) {
+      console.error("❌ Failed to parse JSON response:", parseError);
+      console.log("📥 Raw response was:", responseText);
+      throw new Error(`Invalid JSON response: ${responseText}`);
+    }
+
+    if (!res.ok) {
+      console.error("❌ Registration failed:", data);
+      throw new Error(data.error || "Registration failed");
+    }
+
+    console.log("✅ Registration successful:", data);
   };
 
   const logout = () => {

@@ -72,6 +72,17 @@ app.get("/api", (req, res) => {
 
 // User routes
 app.post("/api/users", async (req, res) => {
+  const debugInfo = {
+    timestamp: new Date().toISOString(),
+    requestBody: {
+      name: req.body.name,
+      email: req.body.email,
+      hasPassword: !!req.body.password,
+    },
+    databasePath: process.env.DB_PATH || "default path",
+    nodeEnv: process.env.NODE_ENV,
+  };
+
   try {
     console.log("📝 Registration attempt:", {
       name: req.body.name,
@@ -82,26 +93,41 @@ app.post("/api/users", async (req, res) => {
 
     if (!name || !email || !password) {
       console.log("❌ Missing required fields");
-      return res
-        .status(400)
-        .json({ error: "Name, email, and password are required" });
+      return res.status(400).json({
+        error: "Name, email, and password are required",
+        debug: debugInfo,
+      });
     }
 
     console.log("🔐 Creating user in database...");
-    const userId = await db.createUser({ name, email, password });
-    console.log("✅ User created successfully with ID:", userId);
+    const result = await db.createUser({ name, email, password });
+    console.log("✅ User created successfully with ID:", result.id);
 
-    const response = { id: userId, message: "User created successfully" };
+    const response = {
+      id: result.id,
+      message: "User created successfully",
+      debug: { ...debugInfo, ...result.debug },
+    };
     console.log("📤 Sending response:", response);
     res.status(201).json(response);
   } catch (error: any) {
     console.error("❌ Error creating user:", error);
-    if (error.message.includes("UNIQUE constraint failed")) {
-      res.status(409).json({ error: "Email already exists" });
+
+    // Handle the new error structure from database
+    const errorDetails = error.details || error.message;
+    const errorDebug = error.debug || debugInfo;
+
+    if (errorDetails.includes("UNIQUE constraint failed")) {
+      res.status(409).json({
+        error: "Email already exists",
+        debug: errorDebug,
+      });
     } else {
-      res
-        .status(500)
-        .json({ error: "Failed to create user", details: error.message });
+      res.status(500).json({
+        error: "Failed to create user",
+        details: errorDetails,
+        debug: errorDebug,
+      });
     }
   }
 });
