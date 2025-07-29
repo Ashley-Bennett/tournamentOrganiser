@@ -213,6 +213,28 @@ app.patch("/api/tournaments/:id/completion", async (req, res) => {
   }
 });
 
+app.delete("/api/tournaments/:id", async (req, res) => {
+  try {
+    const tournamentId = parseInt(req.params.id);
+    // Delete matches
+    await db.runRawQuery("DELETE FROM matches WHERE tournament_id = ?", [
+      tournamentId,
+    ]);
+    // Delete tournament_players
+    await db.runRawQuery(
+      "DELETE FROM tournament_players WHERE tournament_id = ?",
+      [tournamentId]
+    );
+    // Delete tournament
+    await db.runRawQuery("DELETE FROM tournaments WHERE id = ?", [
+      tournamentId,
+    ]);
+    res.json({ message: "Tournament deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete tournament" });
+  }
+});
+
 // Player routes
 app.post("/api/players", async (req, res) => {
   try {

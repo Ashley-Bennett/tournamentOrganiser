@@ -16,6 +16,7 @@ import {
   Alert,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
 
 interface Tournament {
   id: number;
@@ -33,6 +34,8 @@ const Tournaments: React.FC = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchTournaments();
@@ -52,6 +55,37 @@ const Tournaments: React.FC = () => {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteTournament = async (id: number) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this tournament? This cannot be undone."
+      )
+    )
+      return;
+    setDeletingId(id);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await fetch(
+        `http://localhost:3002/api/tournaments/${id}`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (response.ok) {
+        setTournaments((prev) => prev.filter((t) => t.id !== id));
+        setSuccess("Tournament deleted successfully.");
+      } else {
+        const data = await response.json();
+        setError(data.error || "Failed to delete tournament.");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -130,6 +164,11 @@ const Tournaments: React.FC = () => {
           {error}
         </Alert>
       )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          {success}
+        </Alert>
+      )}
 
       <Paper>
         <TableContainer>
@@ -180,8 +219,20 @@ const Tournaments: React.FC = () => {
                         onClick={() =>
                           navigate(`/tournaments/${tournament.id}`)
                         }
+                        sx={{ mr: 1 }}
                       >
                         View
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        onClick={() => handleDeleteTournament(tournament.id)}
+                        disabled={deletingId === tournament.id}
+                      >
+                        {deletingId === tournament.id
+                          ? "Deleting..."
+                          : "Delete"}
                       </Button>
                     </TableCell>
                   </TableRow>
