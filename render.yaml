@@ -12,18 +12,8 @@ services:
       - key: PORT
         value: 10000
       - key: FRONTEND_URL
-        value: https://tournament-organizer-frontend.onrender.com
+        value: https://your-frontend-url.pages.dev
       - key: JWT_SECRET
         generateValue: true
       - key: DB_PATH
         value: /opt/render/project/src/backend/data/tournament.db
-
-  # Frontend service
-  - type: static
-    name: tournament-organizer-frontend
-    plan: free
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: ./frontend/dist
-    envVars:
-      - key: VITE_API_URL
-        value: https://tournament-organizer-backend.onrender.com
