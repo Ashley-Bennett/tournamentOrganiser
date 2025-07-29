@@ -20,7 +20,8 @@ app.use(helmet());
 // CORS configuration
 const corsOptions = {
   origin: [
-    process.env.FRONTEND_URL || "https://matchamp.win/",
+    process.env.FRONTEND_URL || "https://matchamp.win",
+    "https://matchamp.win",
     "http://localhost:5173",
     "http://localhost:3000",
     "https://localhost:5173",
