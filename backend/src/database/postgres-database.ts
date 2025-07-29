@@ -793,12 +793,28 @@ export class PostgresDatabase {
   ): Promise<any[]> {
     const client = await this.pool.connect();
     try {
-      // Get available players for this round
-      const result = await client.query(
+      // Get player standings for this round
+      const standingsResult = await client.query(
         `
-        SELECT p.id, p.name
+        SELECT 
+          p.id, 
+          p.name,
+          p.static_seating,
+          COALESCE(SUM(
+            CASE 
+              WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 1
+              WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 1
+              WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 0.5
+              WHEN m.result = 'BYE' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
+              ELSE 0
+            END
+          ), 0) as points,
+          COUNT(m.id) as matches_played
         FROM players p
         INNER JOIN tournament_players tp ON p.id = tp.player_id
+        LEFT JOIN matches m ON (m.player1_id = p.id OR m.player2_id = p.id) 
+          AND m.tournament_id = $1 
+          AND m.round_number < $2
         WHERE tp.tournament_id = $1 
           AND tp.dropped = false
           AND tp.started_round <= $2
@@ -807,28 +823,65 @@ export class PostgresDatabase {
             UNION
             SELECT player2_id FROM matches WHERE tournament_id = $1 AND round_number = $2 AND player2_id IS NOT NULL
           )
-        ORDER BY p.name
+        GROUP BY p.id, p.name, p.static_seating
+        ORDER BY points DESC, p.name ASC
       `,
         [tournamentId, roundNumber]
       );
 
-      const players = result.rows;
+      const players = standingsResult.rows;
       const pairings = [];
 
-      // Simple pairing algorithm
-      for (let i = 0; i < players.length; i += 2) {
-        if (i + 1 < players.length) {
+      // Swiss system pairing algorithm
+      const paired = new Set();
+
+      for (let i = 0; i < players.length; i++) {
+        if (paired.has(players[i].id)) continue;
+
+        // Find the best opponent for this player
+        let bestOpponent = null;
+        let bestScore = -1;
+
+        for (let j = i + 1; j < players.length; j++) {
+          if (paired.has(players[j].id)) continue;
+
+          // Check if they've already played each other
+          const alreadyPlayed = await this.havePlayersPlayed(
+            client,
+            tournamentId,
+            players[i].id,
+            players[j].id
+          );
+
+          if (alreadyPlayed) continue;
+
+          // Check static seating constraint
+          if (players[i].static_seating && players[j].static_seating) continue;
+
+          // Calculate pairing score (prefer similar points)
+          const pointDiff = Math.abs(players[i].points - players[j].points);
+          const score = -pointDiff; // Lower difference = higher score
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestOpponent = players[j];
+          }
+        }
+
+        if (bestOpponent) {
           const match = await this.createMatch({
             tournament_id: tournamentId,
             round_number: roundNumber,
             player1_id: players[i].id,
-            player2_id: players[i + 1].id,
+            player2_id: bestOpponent.id,
           });
           pairings.push({
             match_id: match,
             player1: players[i],
-            player2: players[i + 1],
+            player2: bestOpponent,
           });
+          paired.add(players[i].id);
+          paired.add(bestOpponent.id);
         }
       }
 
@@ -836,6 +889,24 @@ export class PostgresDatabase {
     } finally {
       client.release();
     }
+  }
+
+  private async havePlayersPlayed(
+    client: any,
+    tournamentId: number,
+    player1Id: number,
+    player2Id: number
+  ): Promise<boolean> {
+    const result = await client.query(
+      `
+      SELECT COUNT(*) as count
+      FROM matches 
+      WHERE tournament_id = $1 
+        AND ((player1_id = $2 AND player2_id = $3) OR (player1_id = $3 AND player2_id = $2))
+      `,
+      [tournamentId, player1Id, player2Id]
+    );
+    return result.rows[0].count > 0;
   }
 
   async updateRoundStatus(

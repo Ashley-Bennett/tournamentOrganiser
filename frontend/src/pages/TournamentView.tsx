@@ -1827,7 +1827,17 @@ const TournamentView: React.FC = () => {
                                                     (p) =>
                                                       p.id === match.player1_id
                                                   );
-                                                if (p1) currentPlayers.push(p1);
+                                                if (p1) {
+                                                  // Convert TournamentPlayer to Player format
+                                                  currentPlayers.push({
+                                                    id: p1.id,
+                                                    name:
+                                                      p1.player_name || p1.name,
+                                                    static_seating:
+                                                      p1.static_seating,
+                                                    created_at: p1.created_at,
+                                                  });
+                                                }
                                               }
                                               if (match.player2_id) {
                                                 const p2 =
@@ -1835,7 +1845,17 @@ const TournamentView: React.FC = () => {
                                                     (p) =>
                                                       p.id === match.player2_id
                                                   );
-                                                if (p2) currentPlayers.push(p2);
+                                                if (p2) {
+                                                  // Convert TournamentPlayer to Player format
+                                                  currentPlayers.push({
+                                                    id: p2.id,
+                                                    name:
+                                                      p2.player_name || p2.name,
+                                                    static_seating:
+                                                      p2.static_seating,
+                                                    created_at: p2.created_at,
+                                                  });
+                                                }
                                               }
                                               // Remove duplicates
                                               const allPlayers = [
@@ -2402,8 +2422,11 @@ const TournamentView: React.FC = () => {
                     {tournamentPlayers
                       .filter((player) => !Boolean(player.dropped))
                       .map((player) => (
-                        <MenuItem key={player.id} value={player.id}>
-                          {player.name}
+                        <MenuItem
+                          key={player.id || player.player_id}
+                          value={player.id || player.player_id}
+                        >
+                          {player.player_name}
                         </MenuItem>
                       ))}
                   </Select>
@@ -2423,8 +2446,11 @@ const TournamentView: React.FC = () => {
                     {tournamentPlayers
                       .filter((player) => !Boolean(player.dropped))
                       .map((player) => (
-                        <MenuItem key={player.id} value={player.id}>
-                          {player.name}
+                        <MenuItem
+                          key={player.id || player.player_id}
+                          value={player.id || player.player_id}
+                        >
+                          {player.player_name}
                         </MenuItem>
                       ))}
                   </Select>
