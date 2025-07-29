@@ -558,6 +558,8 @@ export class Database {
                 WHEN m.player2_id = p.id AND m.result = 'WIN_P2' THEN 1
                 WHEN m.player1_id = p.id AND m.result = 'DRAW' THEN 0.5
                 WHEN m.player2_id = p.id AND m.result = 'DRAW' THEN 0.5
+                WHEN m.player1_id = p.id AND m.result = 'BYE' THEN 1
+                WHEN m.player2_id = p.id AND m.result = 'BYE' THEN 1
                 ELSE 0
               END
             ), 0) as points,
@@ -571,7 +573,7 @@ export class Database {
         )
         SELECT * FROM player_stats
         WHERE dropped = FALSE
-        ORDER BY points DESC, name ASC
+        ORDER BY points ASC, name ASC
       `;
 
       this.db.all(sql, [tournamentId], (err, rows) => {
@@ -648,12 +650,12 @@ export class Database {
             });
           }
 
-          // Handle odd player with bye
+          // Handle odd player with bye - give bye to the lowest scoring player
           if (standings.length % 2 === 1) {
-            const lastPlayer = standings[standings.length - 1];
+            const lowestPlayer = standings[0]; // Already sorted by points ASC
             pairings.push({
-              player1_id: lastPlayer.id,
-              player1_name: lastPlayer.name,
+              player1_id: lowestPlayer.id,
+              player1_name: lowestPlayer.name,
               player2_id: null,
               player2_name: "BYE",
             });
@@ -662,6 +664,17 @@ export class Database {
           // For subsequent rounds, pair by points (Swiss system)
           const availablePlayers = [...standings];
           const usedPlayers = new Set<number>();
+
+          // Track bye history to avoid giving multiple byes to the same player
+          const byeHistory = new Map<number, number>();
+          existingMatches.forEach((match) => {
+            if (match.result === "BYE") {
+              const playerId = match.player1_id || match.player2_id;
+              if (playerId) {
+                byeHistory.set(playerId, (byeHistory.get(playerId) || 0) + 1);
+              }
+            }
+          });
 
           while (availablePlayers.length > 1) {
             const currentPlayer = availablePlayers.shift()!;
@@ -716,26 +729,53 @@ export class Database {
                 availablePlayers.splice(opponentIndex, 1);
               }
             } else {
-              // No suitable opponent found, give bye
-              pairings.push({
-                player1_id: currentPlayer.id,
-                player1_name: currentPlayer.name,
-                player2_id: null,
-                player2_name: "BYE",
-              });
-              usedPlayers.add(currentPlayer.id);
+              // No suitable opponent found, consider bye
+              const currentPlayerByes = byeHistory.get(currentPlayer.id) || 0;
+
+              // Only give bye if player hasn't had too many byes already
+              if (currentPlayerByes < 2) {
+                // Limit to 2 byes per player
+                pairings.push({
+                  player1_id: currentPlayer.id,
+                  player1_name: currentPlayer.name,
+                  player2_id: null,
+                  player2_name: "BYE",
+                });
+                usedPlayers.add(currentPlayer.id);
+              } else {
+                // Put player back in available list if they can't get a bye
+                availablePlayers.push(currentPlayer);
+              }
             }
           }
 
-          // Handle last player if odd number
+          // Handle last player if odd number - give bye to lowest scoring player
           if (availablePlayers.length === 1) {
             const lastPlayer = availablePlayers[0];
-            pairings.push({
-              player1_id: lastPlayer.id,
-              player1_name: lastPlayer.name,
-              player2_id: null,
-              player2_name: "BYE",
-            });
+            const lastPlayerByes = byeHistory.get(lastPlayer.id) || 0;
+
+            if (lastPlayerByes < 2) {
+              pairings.push({
+                player1_id: lastPlayer.id,
+                player1_name: lastPlayer.name,
+                player2_id: null,
+                player2_name: "BYE",
+              });
+            } else {
+              // If this player has had too many byes, find another player for bye
+              const eligibleForBye = standings.find(
+                (p) => !usedPlayers.has(p.id) && (byeHistory.get(p.id) || 0) < 2
+              );
+
+              if (eligibleForBye) {
+                pairings.push({
+                  player1_id: eligibleForBye.id,
+                  player1_name: eligibleForBye.name,
+                  player2_id: null,
+                  player2_name: "BYE",
+                });
+              }
+            }
           }
         }
 

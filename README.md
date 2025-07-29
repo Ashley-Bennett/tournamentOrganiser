@@ -171,6 +171,8 @@ The tournament organizer now supports automatic pairing for Swiss tournaments wi
 - **Previous Match Avoidance**: Players who have already played each other are not paired again
 - **Static Seating Constraint**: Static seating players are never paired together
 - **Optimal Matching**: Algorithm finds the best available opponent based on point difference
+- **Fair Bye System**: Byes are given to the lowest scoring players and count as 1 point
+- **Bye Limits**: Players are limited to 2 byes per tournament to prevent abuse
 
 ### Pairing Options
 
@@ -200,9 +202,34 @@ The tournament organizer now features dynamic match result entry with the follow
 
 #### Standings Updates
 
-- **Automatic Point Calculation**: Win = 1 point, Draw = 0.5 points, Loss = 0 points
+- **Automatic Point Calculation**: Win = 1 point, Draw = 0.5 points, Loss = 0 points, **Bye = 1 point**
 - **Real-time Refresh**: Standings update immediately after result entry
 - **Tournament Progress**: System tracks completion status for each round
+
+## 🎲 Bye System
+
+### Fair Bye Distribution
+
+The tournament organizer implements a fair bye system to handle odd numbers of players:
+
+#### Bye Rules
+
+- **Point Value**: Byes count as 1 point (same as a win)
+- **Distribution**: Byes are given to the lowest scoring players first
+- **Limits**: Players are limited to 2 byes per tournament
+- **History Tracking**: System tracks bye history to prevent abuse
+
+#### Bye Assignment Logic
+
+- **First Round**: Bye given to the lowest scoring player
+- **Subsequent Rounds**: Byes given to lowest scoring players who haven't exceeded limits
+- **Fallback**: If a player has had too many byes, system finds another eligible player
+
+#### Benefits
+
+- **Fairness**: Lowest scoring players get opportunities to catch up
+- **Prevents Abuse**: Limits prevent players from getting too many free points
+- **Tournament Integrity**: Maintains competitive balance throughout the tournament
 
 ### API Endpoints
 
