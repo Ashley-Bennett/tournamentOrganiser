@@ -503,16 +503,20 @@ const TournamentView: React.FC = () => {
                     <TableCell>{player.name}</TableCell>
                     <TableCell>
                       <Chip
-                        label={player.static_seating ? "Static" : "Dynamic"}
-                        color={player.static_seating ? "primary" : "default"}
+                        label={
+                          Boolean(player.static_seating) ? "Static" : "Dynamic"
+                        }
+                        color={
+                          Boolean(player.static_seating) ? "primary" : "default"
+                        }
                         size="small"
                       />
                     </TableCell>
                     <TableCell>Round {player.started_round}</TableCell>
                     <TableCell>
                       <Chip
-                        label={player.dropped ? "Dropped" : "Active"}
-                        color={player.dropped ? "error" : "success"}
+                        label={Boolean(player.dropped) ? "Dropped" : "Active"}
+                        color={Boolean(player.dropped) ? "error" : "success"}
                         size="small"
                       />
                     </TableCell>
@@ -789,7 +793,7 @@ const TournamentView: React.FC = () => {
                       <li {...props}>
                         <Box display="flex" alignItems="center" width="100%">
                           <Typography variant="body1">{option.name}</Typography>
-                          {option.static_seating && (
+                          {Boolean(option.static_seating) && (
                             <Chip
                               label="Static"
                               size="small"
@@ -873,7 +877,7 @@ const TournamentView: React.FC = () => {
                         <em>Select Player 1</em>
                       </MenuItem>
                       {tournamentPlayers
-                        .filter((player) => !player.dropped)
+                        .filter((player) => !Boolean(player.dropped))
                         .map((player) => (
                           <MenuItem key={player.id} value={player.id}>
                             {player.name}
@@ -894,7 +898,7 @@ const TournamentView: React.FC = () => {
                         <em>Select Player 2</em>
                       </MenuItem>
                       {tournamentPlayers
-                        .filter((player) => !player.dropped)
+                        .filter((player) => !Boolean(player.dropped))
                         .map((player) => (
                           <MenuItem key={player.id} value={player.id}>
                             {player.name}

@@ -173,8 +173,12 @@ const Players: React.FC = () => {
                     <TableCell>{player.name}</TableCell>
                     <TableCell>
                       <Chip
-                        label={player.static_seating ? "Static" : "Dynamic"}
-                        color={player.static_seating ? "primary" : "default"}
+                        label={
+                          Boolean(player.static_seating) ? "Static" : "Dynamic"
+                        }
+                        color={
+                          Boolean(player.static_seating) ? "primary" : "default"
+                        }
                         size="small"
                       />
                     </TableCell>
