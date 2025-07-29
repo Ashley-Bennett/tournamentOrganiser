@@ -1,43 +1,41 @@
-import fs from "fs";
-import path from "path";
+import { PostgresDatabase } from "./database/postgres-database";
 
-const resetDatabase = () => {
-  // Try multiple possible paths for the database file
-  const possiblePaths = [
-    path.join(__dirname, "../../data/tournament.db"),
-    path.join(__dirname, "../data/tournament.db"),
-    path.join(process.cwd(), "data/tournament.db"),
-    path.join(process.cwd(), "src/data/tournament.db"),
-  ];
+const resetDatabase = async () => {
+  const db = new PostgresDatabase();
 
-  let deletedFile = false;
+  try {
+    console.log("🗑️  Resetting PostgreSQL database...");
 
-  for (const dbPath of possiblePaths) {
-    try {
-      if (fs.existsSync(dbPath)) {
-        fs.unlinkSync(dbPath);
-        deletedFile = true;
+    // Truncate all tables in the correct order (respecting foreign key constraints)
+    const tables = [
+      "matches",
+      "tournament_players",
+      "players",
+      "tournaments",
+      "leagues",
+      "users",
+    ];
+
+    for (const table of tables) {
+      try {
+        await db.runRawQuery(
+          `TRUNCATE TABLE ${table} RESTART IDENTITY CASCADE`
+        );
+        console.log(`✅ Truncated ${table} table`);
+      } catch (error: any) {
+        console.log(`ℹ️  Could not truncate ${table} table: ${error.message}`);
       }
-    } catch (error) {
-      // console.log(`ℹ️  Could not access: ${dbPath}`);
     }
-  }
 
-  if (!deletedFile) {
-    // console.log("ℹ️  No existing database file found in common locations");
+    console.log("✅ PostgreSQL database reset completed successfully!");
+    console.log(
+      "💡 You can now run the seed script to populate with sample data"
+    );
+  } catch (error) {
+    console.error("❌ Error resetting database:", error);
+  } finally {
+    await db.close();
   }
-
-  // Ensure data directory exists
-  const dataDir = path.join(process.cwd(), "data");
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-    // console.log("📁 Created data directory");
-  }
-
-  // console.log("✅ Database reset completed successfully!");
-  // console.log(
-  //   "💡 You can now run the seed script to populate with sample data"
-  // );
 };
 
 // Run the reset function if this file is executed directly

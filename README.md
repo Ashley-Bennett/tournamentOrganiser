@@ -1,6 +1,6 @@
 # Matchamp
 
-A full-stack tournament management application built with React, TypeScript, Material-UI, Node.js, Express, and SQLite.
+A full-stack tournament management application built with React, TypeScript, Material-UI, Node.js, Express, and PostgreSQL.
 
 ## 🏗️ Project Structure
 
@@ -8,7 +8,7 @@ A full-stack tournament management application built with React, TypeScript, Mat
 matchamp/
 ├── backend/                 # Node.js/Express backend
 │   ├── src/
-│   │   ├── database/       # SQLite database setup
+│   │   ├── database/       # PostgreSQL database setup
 │   │   └── index.ts        # Express server entry point
 │   ├── package.json
 │   └── tsconfig.json
@@ -75,10 +75,10 @@ matchamp/
 ### Backend (Node.js/Express)
 
 - **Port**: 3002
-- **Database**: SQLite (stored in `backend/data/tournament.db`)
+- **Database**: PostgreSQL (configured via DATABASE_URL environment variable)
 - **Features**:
   - RESTful API endpoints
-  - SQLite database with tournament, participant, and match tables
+  - PostgreSQL database with tournament, participant, and match tables
   - CORS enabled for frontend communication
   - TypeScript for type safety
 

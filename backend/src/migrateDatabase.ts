@@ -1,7 +1,7 @@
-import { Database } from "./database/database";
+import { PostgresDatabase } from "./database/postgres-database";
 
 const migrateDatabase = async () => {
-  const db = new Database();
+  const db = new PostgresDatabase();
 
   try {
     // Add round_status column to matches table if it doesn't exist

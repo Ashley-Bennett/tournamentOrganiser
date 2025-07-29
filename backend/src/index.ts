@@ -3,7 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
-import { Database } from "./database/database";
+import { PostgresDatabase } from "./database/postgres-database";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
@@ -42,7 +42,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Initialize database
-const db = new Database();
+const db = new PostgresDatabase();
 
 // JWT authentication middleware
 function authenticateJWT(req: Request, res: Response, next: NextFunction) {

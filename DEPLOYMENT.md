@@ -31,7 +31,7 @@ This guide will help you deploy your Tournament Organizer app to Render.
    - `PORT`: `10000`
    - `FRONTEND_URL`: `https://your-frontend-service-name.onrender.com`
    - `JWT_SECRET`: (generate a secure random string)
-   - `DB_PATH`: `/opt/render/project/src/backend/data/tournament.db`
+   - `DATABASE_URL`: `postgresql://username:password@host:port/database`
 
 ### 3. Deploy Frontend
 
@@ -59,7 +59,7 @@ NODE_ENV=production
 PORT=10000
 FRONTEND_URL=https://your-frontend-service-name.onrender.com
 JWT_SECRET=your-secure-jwt-secret
-DB_PATH=/opt/render/project/src/backend/data/tournament.db
+DATABASE_URL=postgresql://username:password@host:port/database
 ```
 
 ### Frontend (.env)
@@ -70,7 +70,7 @@ VITE_API_URL=https://your-backend-service-name.onrender.com
 
 ## Important Notes
 
-1. **Database**: The SQLite database will be created automatically in the specified path
+1. **Database**: The PostgreSQL database will be created automatically via the DATABASE_URL environment variable
 2. **CORS**: The backend is configured to accept requests from the frontend URL
 3. **JWT Secret**: Generate a secure random string for production
 4. **Free Tier Limitations**:
@@ -84,7 +84,7 @@ VITE_API_URL=https://your-backend-service-name.onrender.com
 
 1. **Build Failures**: Check that all dependencies are in package.json
 2. **CORS Errors**: Verify FRONTEND_URL is set correctly
-3. **Database Issues**: Ensure DB_PATH is writable
+3. **Database Issues**: Ensure DATABASE_URL is correctly configured
 4. **Port Conflicts**: Use PORT environment variable
 
 ### Logs
