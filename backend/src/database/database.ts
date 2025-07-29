@@ -759,16 +759,24 @@ export class Database {
             }
           });
 
-          while (availablePlayers.length > 1) {
-            const currentPlayer = availablePlayers.shift()!;
-            if (usedPlayers.has(currentPlayer.id)) continue;
+          // Process players one by one until all are paired or given byes
+          let i = 0;
+          while (i < availablePlayers.length) {
+            const currentPlayer = availablePlayers[i];
+
+            // Skip if already used
+            if (usedPlayers.has(currentPlayer.id)) {
+              i++;
+              continue;
+            }
 
             // Find best available opponent
             let bestOpponent = null;
             let bestScore = -Infinity;
+            let bestOpponentIndex = -1;
 
-            for (let i = 0; i < availablePlayers.length; i++) {
-              const opponent = availablePlayers[i];
+            for (let j = i + 1; j < availablePlayers.length; j++) {
+              const opponent = availablePlayers[j];
               if (usedPlayers.has(opponent.id)) continue;
 
               // Check if they've already played
@@ -791,10 +799,12 @@ export class Database {
               if (score > bestScore) {
                 bestScore = score;
                 bestOpponent = opponent;
+                bestOpponentIndex = j;
               }
             }
 
             if (bestOpponent) {
+              // Create pairing
               pairings.push({
                 player1_id: currentPlayer.id,
                 player1_name: currentPlayer.name,
@@ -804,13 +814,10 @@ export class Database {
               usedPlayers.add(currentPlayer.id);
               usedPlayers.add(bestOpponent.id);
 
-              // Remove opponent from available players
-              const opponentIndex = availablePlayers.findIndex(
-                (p) => p.id === bestOpponent.id
-              );
-              if (opponentIndex !== -1) {
-                availablePlayers.splice(opponentIndex, 1);
-              }
+              // Remove both players from available list
+              availablePlayers.splice(bestOpponentIndex, 1);
+              availablePlayers.splice(i, 1);
+              // Don't increment i since we removed the current element
             } else {
               // No suitable opponent found, consider bye
               const currentPlayerByes = byeHistory.get(currentPlayer.id) || 0;
@@ -825,35 +832,23 @@ export class Database {
                   player2_name: "BYE",
                 });
                 usedPlayers.add(currentPlayer.id);
+                availablePlayers.splice(i, 1);
+                // Don't increment i since we removed the current element
               } else {
-                // Put player back in available list if they can't get a bye
-                availablePlayers.push(currentPlayer);
+                // Player can't get a bye, skip to next player
+                i++;
               }
             }
           }
 
-          // Handle last player if odd number - give bye to lowest scoring player
-          if (availablePlayers.length === 1) {
-            const lastPlayer = availablePlayers[0];
-            const lastPlayerByes = byeHistory.get(lastPlayer.id) || 0;
-
-            if (lastPlayerByes < 2) {
-              pairings.push({
-                player1_id: lastPlayer.id,
-                player1_name: lastPlayer.name,
-                player2_id: null,
-                player2_name: "BYE",
-              });
-            } else {
-              // If this player has had too many byes, find another player for bye
-              const eligibleForBye = standings.find(
-                (p) => !usedPlayers.has(p.id) && (byeHistory.get(p.id) || 0) < 2
-              );
-
-              if (eligibleForBye) {
+          // Handle any remaining unpaired players
+          for (const remainingPlayer of availablePlayers) {
+            if (!usedPlayers.has(remainingPlayer.id)) {
+              const playerByes = byeHistory.get(remainingPlayer.id) || 0;
+              if (playerByes < 2) {
                 pairings.push({
-                  player1_id: eligibleForBye.id,
-                  player1_name: eligibleForBye.name,
+                  player1_id: remainingPlayer.id,
+                  player1_name: remainingPlayer.name,
                   player2_id: null,
                   player2_name: "BYE",
                 });
