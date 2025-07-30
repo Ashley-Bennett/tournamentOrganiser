@@ -769,9 +769,15 @@ export class PostgresDatabase {
   }
 
   async getPlayerStandings(tournamentId: number): Promise<any[]> {
+    // Use the same logic as getLeaderboardWithTiebreakers for consistency
+    return this.getLeaderboardWithTiebreakers(tournamentId);
+  }
+
+  async getLeaderboardWithTiebreakers(tournamentId: number): Promise<any[]> {
     const client = await this.pool.connect();
     try {
-      const result = await client.query(
+      // First, get basic standings with points
+      const basicStandings = await client.query(
         `
         SELECT p.id, p.name, 
                COUNT(CASE WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 1 END) +
@@ -789,27 +795,165 @@ export class PostgresDatabase {
                    WHEN m.result = 'BYE' AND m.player1_id = p.id THEN 2
                    ELSE 0
                  END
-               ), 0) as points,
-               0.0 as opponent_resistance,
-               0.0 as opponent_opponent_resistance
+               ), 0) as points
         FROM players p
         INNER JOIN tournament_players tp ON p.id = tp.player_id
         LEFT JOIN matches m ON (m.player1_id = p.id OR m.player2_id = p.id) AND m.tournament_id = tp.tournament_id
         WHERE tp.tournament_id = $1 AND tp.dropped = false
         GROUP BY p.id, p.name
-        ORDER BY points DESC, wins DESC, draws DESC, p.name
       `,
         [tournamentId]
       );
-      return result.rows;
+
+      // Calculate opponent resistance for each player
+      const playersWithResistance = await Promise.all(
+        basicStandings.rows.map(async (player) => {
+          // Get all opponents for this player
+          const opponentsResult = await client.query(
+            `
+            SELECT DISTINCT 
+              CASE 
+                WHEN m.player1_id = $1 THEN m.player2_id
+                WHEN m.player2_id = $1 THEN m.player1_id
+              END as opponent_id
+            FROM matches m
+            WHERE m.tournament_id = $2 
+              AND (m.player1_id = $1 OR m.player2_id = $1)
+              AND m.result IS NOT NULL
+              AND m.result != 'BYE'
+          `,
+            [player.id, tournamentId]
+          );
+
+          const opponentIds = opponentsResult.rows
+            .map((row) => row.opponent_id)
+            .filter((id) => id !== null);
+
+          if (opponentIds.length === 0) {
+            return {
+              ...player,
+              opponent_resistance: 0.0,
+              opponent_opponent_resistance: 0.0,
+            };
+          }
+
+          // Calculate average points of opponents
+          const opponentPointsResult = await client.query(
+            `
+            SELECT AVG(opponent_points.points) as avg_opponent_points
+            FROM (
+              SELECT p.id,
+                     COALESCE(SUM(
+                       CASE 
+                         WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 3
+                         WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 3
+                         WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
+                         WHEN m.result = 'BYE' AND m.player1_id = p.id THEN 2
+                         ELSE 0
+                       END
+                     ), 0) as points
+              FROM players p
+              INNER JOIN tournament_players tp ON p.id = tp.player_id
+              LEFT JOIN matches m ON (m.player1_id = p.id OR m.player2_id = p.id) AND m.tournament_id = tp.tournament_id
+              WHERE p.id = ANY($1) AND tp.tournament_id = $2 AND tp.dropped = false
+              GROUP BY p.id
+            ) opponent_points
+          `,
+            [opponentIds, tournamentId]
+          );
+
+          const avgOpponentPoints = parseFloat(
+            opponentPointsResult.rows[0]?.avg_opponent_points || "0"
+          );
+
+          // Calculate opponent's opponent's resistance
+          const opponentOpponentsResult = await client.query(
+            `
+            SELECT DISTINCT 
+              CASE 
+                WHEN m.player1_id = ANY($1) THEN m.player2_id
+                WHEN m.player2_id = ANY($1) THEN m.player1_id
+              END as opponent_opponent_id
+            FROM matches m
+            WHERE m.tournament_id = $2 
+              AND (m.player1_id = ANY($1) OR m.player2_id = ANY($1))
+              AND m.result IS NOT NULL
+              AND m.result != 'BYE'
+              AND m.player1_id != $3 AND m.player2_id != $3
+          `,
+            [opponentIds, tournamentId, player.id]
+          );
+
+          const opponentOpponentIds = opponentOpponentsResult.rows
+            .map((row) => row.opponent_opponent_id)
+            .filter((id) => id !== null && !opponentIds.includes(id));
+
+          let avgOpponentOpponentPoints = 0;
+          if (opponentOpponentIds.length > 0) {
+            const opponentOpponentPointsResult = await client.query(
+              `
+              SELECT AVG(opponent_opponent_points.points) as avg_opponent_opponent_points
+              FROM (
+                SELECT p.id,
+                       COALESCE(SUM(
+                         CASE 
+                           WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 3
+                           WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 3
+                           WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
+                           WHEN m.result = 'BYE' AND m.player1_id = p.id THEN 2
+                           ELSE 0
+                         END
+                       ), 0) as points
+                FROM players p
+                INNER JOIN tournament_players tp ON p.id = tp.player_id
+                LEFT JOIN matches m ON (m.player1_id = p.id OR m.player2_id = p.id) AND m.tournament_id = tp.tournament_id
+                WHERE p.id = ANY($1) AND tp.tournament_id = $2 AND tp.dropped = false
+                GROUP BY p.id
+              ) opponent_opponent_points
+            `,
+              [opponentOpponentIds, tournamentId]
+            );
+            avgOpponentOpponentPoints = parseFloat(
+              opponentOpponentPointsResult.rows[0]
+                ?.avg_opponent_opponent_points || "0"
+            );
+          }
+
+          // Convert to percentages (assuming max possible points is 3 per match)
+          const maxPossiblePoints = 3 * player.matches_played;
+          const opponentResistance =
+            maxPossiblePoints > 0 ? avgOpponentPoints / maxPossiblePoints : 0;
+          const opponentOpponentResistance =
+            maxPossiblePoints > 0
+              ? avgOpponentOpponentPoints / maxPossiblePoints
+              : 0;
+
+          return {
+            ...player,
+            opponent_resistance: opponentResistance,
+            opponent_opponent_resistance: opponentOpponentResistance,
+          };
+        })
+      );
+
+      // Sort by points, then by opponent resistance, then by opponent's opponent's resistance
+      playersWithResistance.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.opponent_resistance !== a.opponent_resistance)
+          return b.opponent_resistance - a.opponent_resistance;
+        if (b.opponent_opponent_resistance !== a.opponent_opponent_resistance)
+          return (
+            b.opponent_opponent_resistance - a.opponent_opponent_resistance
+          );
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (b.draws !== a.draws) return b.draws - a.draws;
+        return a.name.localeCompare(b.name);
+      });
+
+      return playersWithResistance;
     } finally {
       client.release();
     }
-  }
-
-  async getLeaderboardWithTiebreakers(tournamentId: number): Promise<any[]> {
-    // Simplified version - same as getPlayerStandings for now
-    return this.getPlayerStandings(tournamentId);
   }
 
   async createAutomaticPairings(
