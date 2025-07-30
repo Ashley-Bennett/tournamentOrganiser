@@ -772,10 +772,10 @@ export class PostgresDatabase {
                COUNT(CASE WHEN m.result IS NOT NULL AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1 END) as matches_played,
                COALESCE(SUM(
                  CASE 
-                   WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 1
-                   WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 1
-                   WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 0.5
-                   WHEN m.result = 'BYE' AND m.player1_id = p.id THEN 1
+                   WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 3
+                   WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 3
+                   WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
+                   WHEN m.result = 'BYE' AND m.player1_id = p.id THEN 2
                    ELSE 0
                  END
                ), 0) as points,
@@ -816,10 +816,10 @@ export class PostgresDatabase {
           p.static_seating,
           COALESCE(SUM(
             CASE 
-              WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 1
-              WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 1
-              WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 0.5
-              WHEN m.result = 'BYE' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
+              WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 3
+              WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 3
+              WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
+              WHEN m.result = 'BYE' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 2
               ELSE 0
             END
           ), 0) as points,
