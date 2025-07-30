@@ -171,6 +171,7 @@ The tournament organizer now supports automatic pairing for Swiss tournaments wi
 - **Previous Match Avoidance**: Players who have already played each other are not paired again
 - **Static Seating Constraint**: Static seating players are never paired together
 - **Optimal Matching**: Algorithm finds the best available opponent based on point difference
+- **Floating Down Mechanism**: Unpaired players from higher score brackets are floated down to lower brackets for pairing attempts
 - **Fair Bye System**: Byes are given to the lowest scoring players and count as 1 point
 - **Bye Limits**: Players are limited to 2 byes per tournament to prevent abuse
 
@@ -180,6 +181,26 @@ When creating matches, users can choose between:
 
 1. **🎯 Automatic Pairing**: System automatically creates optimal pairings based on points and constraints
 2. **✏️ Custom Pairing**: Manual selection of players for each match
+
+### Floating Down Algorithm
+
+The Swiss pairing system now implements a sophisticated floating down mechanism:
+
+#### How It Works
+
+1. **Score Bracket Grouping**: Players are grouped by their current tournament points
+2. **Top-Down Processing**: Brackets are processed from highest to lowest points
+3. **Bracket Pairing**: Within each bracket, players are paired optimally
+4. **Floating Down**: Unpaired players from higher brackets are moved down to the next lower bracket
+5. **Re-pairing**: The lower bracket is re-paired including the floated down players
+6. **Iterative Process**: This continues until all players are paired or receive a bye
+
+#### Benefits
+
+- **Maximizes Pairing Opportunities**: Players who can't be paired in their bracket get additional chances
+- **Maintains Fairness**: Players are still paired with opponents of similar skill levels when possible
+- **Reduces Byes**: More players get matches instead of receiving byes
+- **Tournament Integrity**: Preserves the competitive nature of Swiss tournaments
 
 ## 🏆 Match Result System
 

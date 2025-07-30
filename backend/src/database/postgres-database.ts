@@ -395,6 +395,17 @@ export class PostgresDatabase {
   }): Promise<number> {
     const client = await this.pool.connect();
     try {
+      // Prevent self-pairing at database level
+      if (
+        match.player1_id &&
+        match.player2_id &&
+        match.player1_id === match.player2_id
+      ) {
+        throw new Error(
+          `Self-pairing detected: Player ${match.player1_id} cannot be paired against themselves`
+        );
+      }
+
       const result = await client.query(
         `INSERT INTO matches (tournament_id, round_number, player1_id, player2_id, result) 
          VALUES ($1, $2, $3, $4, $5) RETURNING id`,
@@ -864,7 +875,7 @@ export class PostgresDatabase {
         shuffleArray(dynamicSeatingPlayers);
 
         // First, pair static seating players with dynamic seating players
-        const paired = new Set();
+        const paired = new Set<number>();
 
         // Pair static seating players with dynamic seating players first
         for (const staticPlayer of staticSeatingPlayers) {
@@ -934,93 +945,354 @@ export class PostgresDatabase {
         return pairings;
       }
 
-      // Swiss system pairing algorithm for subsequent rounds
-      const paired = new Set();
+      // Swiss system pairing algorithm with floating down for subsequent rounds
+      return await this.createSwissPairingsWithFloatingDown(
+        client,
+        tournamentId,
+        roundNumber,
+        players
+      );
+    } finally {
+      client.release();
+    }
+  }
 
-      for (let i = 0; i < players.length; i++) {
-        if (paired.has(players[i].id)) continue;
+  private async createSwissPairingsWithFloatingDown(
+    client: any,
+    tournamentId: number,
+    roundNumber: number,
+    players: any[]
+  ): Promise<any[]> {
+    const pairings = [];
+    const paired = new Set<number>();
 
-        // Find the best opponent for this player
-        let bestOpponent = null;
-        let bestScore = -1;
+    // Group players by points (score brackets)
+    const scoreBrackets = new Map<number, any[]>();
+    for (const player of players) {
+      const points = player.points;
+      if (!scoreBrackets.has(points)) {
+        scoreBrackets.set(points, []);
+      }
+      scoreBrackets.get(points)!.push(player);
+    }
 
-        for (let j = i + 1; j < players.length; j++) {
-          if (paired.has(players[j].id)) continue;
+    // Sort brackets by points (highest to lowest)
+    const sortedBrackets = Array.from(scoreBrackets.entries()).sort(
+      ([a], [b]) => b - a
+    );
 
-          // Check if they've already played each other
+    console.log(
+      `🎯 Swiss Pairing with Floating Down - Tournament ${tournamentId}, Round ${roundNumber}`
+    );
+    console.log(`👥 Total players to pair: ${players.length}`);
+    console.log(
+      `📊 Score brackets: ${sortedBrackets
+        .map(([points, players]) => `${points}pts(${players.length} players)`)
+        .join(" → ")}`
+    );
+
+    // Process each bracket from highest to lowest
+    for (let i = 0; i < sortedBrackets.length; i++) {
+      const [currentPoints, currentBracketPlayers] = sortedBrackets[i];
+      let unpairedInBracket = currentBracketPlayers.filter(
+        (p) => !paired.has(p.id)
+      );
+
+      console.log(
+        `🏆 Processing ${currentPoints}pt bracket: ${unpairedInBracket.length} unpaired players`
+      );
+
+      // Try to pair all players in current bracket
+      const bracketPairings = await this.pairPlayersInBracket(
+        client,
+        tournamentId,
+        roundNumber,
+        unpairedInBracket,
+        paired
+      );
+      pairings.push(...bracketPairings);
+
+      // Get any remaining unpaired players from this bracket
+      const remainingUnpaired = unpairedInBracket.filter(
+        (p) => !paired.has(p.id)
+      );
+
+      // Float down remaining unpaired players to lower brackets
+      if (remainingUnpaired.length > 0 && i < sortedBrackets.length - 1) {
+        console.log(
+          `⬇️ Floating down ${remainingUnpaired.length} players from ${currentPoints}pt bracket`
+        );
+        console.log(
+          `⬇️ Floating players: ${remainingUnpaired
+            .map((p) => `${p.name} (ID: ${p.id})`)
+            .join(", ")}`
+        );
+
+        // Float down through all remaining brackets
+        let playersToFloat = [...remainingUnpaired];
+
+        for (let j = i + 1; j < sortedBrackets.length; j++) {
+          const [nextPoints, nextBracketPlayers] = sortedBrackets[j];
+
+          console.log(
+            `⬇️ Attempting to pair ${playersToFloat.length} floated players in ${nextPoints}pt bracket`
+          );
+          console.log(
+            `⬇️ Next bracket players: ${nextBracketPlayers
+              .map((p) => `${p.name} (ID: ${p.id})`)
+              .join(", ")}`
+          );
+
+          // Combine next bracket players with floated down players
+          const combinedBracket = [...nextBracketPlayers, ...playersToFloat];
+
+          // Re-pair the combined bracket
+          const rePairings = await this.pairPlayersInBracket(
+            client,
+            tournamentId,
+            roundNumber,
+            combinedBracket,
+            paired
+          );
+
+          console.log(
+            `⬇️ Created ${rePairings.length} new pairings in ${nextPoints}pt bracket`
+          );
+
+          // Replace any existing pairings from the next bracket with new ones
+          // Remove old pairings from this bracket
+          const pairingsToRemove = pairings.filter(
+            (p) =>
+              p.player1 &&
+              p.player2 &&
+              nextBracketPlayers.some(
+                (np) => np.id === p.player1.id || np.id === p.player2.id
+              )
+          );
+
+          console.log(
+            `⬇️ Removing ${pairingsToRemove.length} old pairings from ${nextPoints}pt bracket`
+          );
+
+          for (const pairingToRemove of pairingsToRemove) {
+            const index = pairings.findIndex(
+              (p) => p.match_id === pairingToRemove.match_id
+            );
+            if (index !== -1) {
+              pairings.splice(index, 1);
+            }
+          }
+
+          // Add new pairings
+          pairings.push(...rePairings);
+
+          // Update the sorted brackets array to reflect the changes
+          sortedBrackets[j] = [nextPoints, combinedBracket];
+
+          // Check if there are still unpaired players to float down further
+          playersToFloat = combinedBracket.filter((p) => !paired.has(p.id));
+
+          if (playersToFloat.length === 0) {
+            console.log(
+              `✅ All floated players successfully paired in ${nextPoints}pt bracket`
+            );
+            break; // All players paired, no need to continue floating down
+          }
+
+          console.log(
+            `⬇️ ${
+              playersToFloat.length
+            } players still unpaired, continuing to next bracket: ${playersToFloat
+              .map((p) => `${p.name} (ID: ${p.id})`)
+              .join(", ")}`
+          );
+        }
+      }
+    }
+
+    // Handle any remaining unpaired players - give bye to lowest scoring
+    const allUnpairedPlayers = players.filter((p) => !paired.has(p.id));
+    if (allUnpairedPlayers.length > 0) {
+      console.log(
+        `🎲 Found ${
+          allUnpairedPlayers.length
+        } unpaired players: ${allUnpairedPlayers.map((p) => p.name).join(", ")}`
+      );
+
+      // Get detailed standings for proper tiebreaker resolution
+      const detailedStandings = await this.getDetailedStandingsForBye(
+        client,
+        tournamentId,
+        roundNumber
+      );
+
+      // Find the lowest scoring player among unpaired players
+      const byePlayer = this.selectLowestScoringPlayer(
+        allUnpairedPlayers,
+        detailedStandings
+      );
+
+      console.log(
+        `🎲 Assigning bye to lowest scoring unpaired player: ${byePlayer.name}`
+      );
+
+      const byeMatch = await this.createMatch({
+        tournament_id: tournamentId,
+        round_number: roundNumber,
+        player1_id: byePlayer.id,
+        player2_id: undefined, // No opponent for bye
+      });
+      pairings.push({
+        match_id: byeMatch,
+        player1: byePlayer,
+        player2: null,
+        is_bye: true,
+      });
+
+      // Log any remaining unpaired players (should be 0 if odd number, or 1+ if even number)
+      const remainingUnpaired = allUnpairedPlayers.filter(
+        (p) => p.id !== byePlayer.id
+      );
+      if (remainingUnpaired.length > 0) {
+        console.log(
+          `⚠️  ${
+            remainingUnpaired.length
+          } players still unpaired after bye assignment: ${remainingUnpaired
+            .map((p) => p.name)
+            .join(", ")}`
+        );
+      }
+    }
+
+    console.log(`✅ Pairing complete: ${pairings.length} matches created`);
+
+    // Log final summary
+    const finalUnpaired = players.filter((p) => !paired.has(p.id));
+    if (finalUnpaired.length > 0) {
+      console.log(
+        `⚠️  Final unpaired players: ${finalUnpaired
+          .map((p) => p.name)
+          .join(", ")}`
+      );
+    } else {
+      console.log(`✅ All players successfully paired or assigned bye`);
+    }
+
+    return pairings;
+  }
+
+  private async pairPlayersInBracket(
+    client: any,
+    tournamentId: number,
+    roundNumber: number,
+    bracketPlayers: any[],
+    paired: Set<number>
+  ): Promise<any[]> {
+    const pairings = [];
+
+    for (let i = 0; i < bracketPlayers.length; i++) {
+      if (paired.has(bracketPlayers[i].id)) continue;
+
+      // Find the best opponent for this player
+      let bestOpponent = null;
+      let bestScore = -1;
+      let bestConstraintViolations = Infinity;
+
+      for (let j = i + 1; j < bracketPlayers.length; j++) {
+        if (paired.has(bracketPlayers[j].id)) continue;
+
+        // Prevent self-pairing
+        if (bracketPlayers[i].id === bracketPlayers[j].id) continue;
+
+        // Check if they've already played each other
+        const alreadyPlayed = await this.havePlayersPlayed(
+          client,
+          tournamentId,
+          bracketPlayers[i].id,
+          bracketPlayers[j].id
+        );
+
+        // Check static seating constraint
+        const staticSeatingConflict =
+          bracketPlayers[i].static_seating && bracketPlayers[j].static_seating;
+
+        // Calculate constraint violations (0 = perfect, 1 = one violation, 2 = two violations)
+        let constraintViolations = 0;
+        if (alreadyPlayed) constraintViolations++;
+        if (staticSeatingConflict) constraintViolations++;
+
+        // Calculate pairing score (prefer similar points)
+        const pointDiff = Math.abs(
+          bracketPlayers[i].points - bracketPlayers[j].points
+        );
+        const score = -pointDiff; // Lower difference = higher score
+
+        // Prioritize by constraint violations first, then by score
+        if (
+          constraintViolations < bestConstraintViolations ||
+          (constraintViolations === bestConstraintViolations &&
+            score > bestScore)
+        ) {
+          bestConstraintViolations = constraintViolations;
+          bestScore = score;
+          bestOpponent = bracketPlayers[j];
+        }
+      }
+
+      if (bestOpponent) {
+        // Final validation to prevent self-pairing
+        if (bracketPlayers[i].id !== bestOpponent.id) {
+          // Additional validation to ensure valid player IDs
+          if (!bracketPlayers[i].id || !bestOpponent.id) {
+            console.error(
+              `❌ Invalid player IDs detected: player1_id=${bracketPlayers[i].id}, player2_id=${bestOpponent.id}`
+            );
+            continue;
+          }
+
+          // Log if we're making a pairing with constraint violations
           const alreadyPlayed = await this.havePlayersPlayed(
             client,
             tournamentId,
-            players[i].id,
-            players[j].id
+            bracketPlayers[i].id,
+            bestOpponent.id
           );
+          const staticSeatingConflict =
+            bracketPlayers[i].static_seating && bestOpponent.static_seating;
 
-          if (alreadyPlayed) continue;
-
-          // Check static seating constraint
-          if (players[i].static_seating && players[j].static_seating) continue;
-
-          // Calculate pairing score (prefer similar points)
-          const pointDiff = Math.abs(players[i].points - players[j].points);
-          const score = -pointDiff; // Lower difference = higher score
-
-          if (score > bestScore) {
-            bestScore = score;
-            bestOpponent = players[j];
+          if (alreadyPlayed || staticSeatingConflict) {
+            console.log(
+              `⚠️  Making pairing with constraint violation: ${bracketPlayers[i].name} vs ${bestOpponent.name} ` +
+                `(already played: ${alreadyPlayed}, static seating conflict: ${staticSeatingConflict})`
+            );
           }
-        }
 
-        if (bestOpponent) {
           const match = await this.createMatch({
             tournament_id: tournamentId,
             round_number: roundNumber,
-            player1_id: players[i].id,
+            player1_id: bracketPlayers[i].id,
             player2_id: bestOpponent.id,
           });
           pairings.push({
             match_id: match,
-            player1: players[i],
+            player1: bracketPlayers[i],
             player2: bestOpponent,
           });
-          paired.add(players[i].id);
+          paired.add(bracketPlayers[i].id);
           paired.add(bestOpponent.id);
+        } else {
+          console.error(
+            `❌ Self-pairing detected and prevented: Player ${bracketPlayers[i].id} (${bracketPlayers[i].name})`
+          );
         }
-      }
-
-      // Handle odd number of players - give bye to lowest scoring unpaired player
-      const unpairedPlayers = players.filter((p) => !paired.has(p.id));
-      if (unpairedPlayers.length === 1) {
-        // Get detailed standings for proper tiebreaker resolution
-        const detailedStandings = await this.getDetailedStandingsForBye(
-          client,
-          tournamentId,
-          roundNumber
+      } else {
+        console.log(
+          `⚠️  No opponent found for ${bracketPlayers[i].name} (ID: ${bracketPlayers[i].id}) in bracket`
         );
-
-        // Find the lowest scoring player among unpaired players
-        const byePlayer = this.selectLowestScoringPlayer(
-          unpairedPlayers,
-          detailedStandings
-        );
-
-        const byeMatch = await this.createMatch({
-          tournament_id: tournamentId,
-          round_number: roundNumber,
-          player1_id: byePlayer.id,
-          player2_id: undefined, // No opponent for bye
-        });
-        pairings.push({
-          match_id: byeMatch,
-          player1: byePlayer,
-          player2: null,
-          is_bye: true,
-        });
       }
-
-      return pairings;
-    } finally {
-      client.release();
     }
+
+    return pairings;
   }
 
   private async havePlayersPlayed(

@@ -429,6 +429,13 @@ const TournamentView: React.FC = () => {
     // If Player 1 is removed and Player 2 is set, move Player 2 to Player 1 and clear Player 2
     let player1_id = editMatchForm.player1_id;
     let player2_id = editMatchForm.player2_id;
+
+    // Prevent self-pairing
+    if (player1_id && player2_id && player1_id === player2_id) {
+      setError("A player cannot be paired against themselves");
+      return;
+    }
+
     if (!player1_id && player2_id) {
       player1_id = player2_id;
       player2_id = "";
