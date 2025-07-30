@@ -754,6 +754,17 @@ app.post("/api/tournaments/:id/rounds/:roundNumber/start", async (req, res) => {
     const roundNumber = parseInt(req.params.roundNumber);
 
     await db.updateRoundStatus(tournamentId, roundNumber, "started");
+
+    // Automatically set bye results for matches with null player2_id
+    const byeMatches = await db.runRawQuery(
+      `SELECT id, player1_id FROM matches WHERE tournament_id = $1 AND round_number = $2 AND player2_id IS NULL AND result IS NULL`,
+      [tournamentId, roundNumber]
+    );
+
+    for (const match of byeMatches) {
+      await db.updateMatchResult(match.id, "BYE", match.player1_id, true);
+    }
+
     res.json({ message: "Round started successfully" });
   } catch (error) {
     res.status(500).json({ error: "Failed to start round" });

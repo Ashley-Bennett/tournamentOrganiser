@@ -65,9 +65,9 @@ interface Match {
   tournament_id: number;
   round_number: number;
   player1_id: number;
-  player2_id: number;
+  player2_id: number | null;
   player1_name: string;
-  player2_name: string;
+  player2_name: string | null;
   winner_id: number | null;
   winner_name: string | null;
   result: string | null;
@@ -1900,6 +1900,7 @@ const TournamentView: React.FC = () => {
                                   )}
 
                                   {/* Result buttons - only show when round is started and no result exists */}
+                                  {/* Note: Bye results are automatically set when the round starts */}
                                   {roundStatuses[selectedRound ?? 0] ===
                                     "started" &&
                                     !match.result && (
@@ -1922,41 +1923,45 @@ const TournamentView: React.FC = () => {
                                           {match.player1_name || "Player 1"}{" "}
                                           Wins
                                         </Button>
-                                        <Button
-                                          variant="outlined"
-                                          size="small"
-                                          color="warning"
-                                          disabled={
-                                            updatingMatchResult === match.id
-                                          }
-                                          onClick={() =>
-                                            handleUpdateMatchResult(
-                                              match.id,
-                                              "DRAW"
-                                            )
-                                          }
-                                          sx={{ minWidth: "auto", px: 1 }}
-                                        >
-                                          Tie
-                                        </Button>
-                                        <Button
-                                          variant="outlined"
-                                          size="small"
-                                          color="secondary"
-                                          disabled={
-                                            updatingMatchResult === match.id
-                                          }
-                                          onClick={() =>
-                                            handleUpdateMatchResult(
-                                              match.id,
-                                              "WIN_P2"
-                                            )
-                                          }
-                                          sx={{ minWidth: "auto", px: 1 }}
-                                        >
-                                          {match.player2_name || "Player 2"}{" "}
-                                          Wins
-                                        </Button>
+                                        {match.player2_id !== null && (
+                                          <>
+                                            <Button
+                                              variant="outlined"
+                                              size="small"
+                                              color="warning"
+                                              disabled={
+                                                updatingMatchResult === match.id
+                                              }
+                                              onClick={() =>
+                                                handleUpdateMatchResult(
+                                                  match.id,
+                                                  "DRAW"
+                                                )
+                                              }
+                                              sx={{ minWidth: "auto", px: 1 }}
+                                            >
+                                              Tie
+                                            </Button>
+                                            <Button
+                                              variant="outlined"
+                                              size="small"
+                                              color="secondary"
+                                              disabled={
+                                                updatingMatchResult === match.id
+                                              }
+                                              onClick={() =>
+                                                handleUpdateMatchResult(
+                                                  match.id,
+                                                  "WIN_P2"
+                                                )
+                                              }
+                                              sx={{ minWidth: "auto", px: 1 }}
+                                            >
+                                              {match.player2_name || "Player 2"}{" "}
+                                              Wins
+                                            </Button>
+                                          </>
+                                        )}
                                       </>
                                     )}
 

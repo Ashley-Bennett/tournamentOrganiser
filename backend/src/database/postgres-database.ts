@@ -885,6 +885,24 @@ export class PostgresDatabase {
         }
       }
 
+      // Handle odd number of players - give bye to lowest scoring unpaired player
+      const unpairedPlayers = players.filter((p) => !paired.has(p.id));
+      if (unpairedPlayers.length === 1) {
+        const byePlayer = unpairedPlayers[0];
+        const byeMatch = await this.createMatch({
+          tournament_id: tournamentId,
+          round_number: roundNumber,
+          player1_id: byePlayer.id,
+          player2_id: undefined, // No opponent for bye
+        });
+        pairings.push({
+          match_id: byeMatch,
+          player1: byePlayer,
+          player2: null,
+          is_bye: true,
+        });
+      }
+
       return pairings;
     } finally {
       client.release();
