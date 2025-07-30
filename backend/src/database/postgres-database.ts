@@ -915,6 +915,7 @@ export class PostgresDatabase {
         // Handle any remaining unpaired players (odd number)
         const allUnpairedPlayers = players.filter((p) => !paired.has(p.id));
         if (allUnpairedPlayers.length === 1) {
+          // For first round, randomly select a player for bye
           const byePlayer = allUnpairedPlayers[0];
           const byeMatch = await this.createMatch({
             tournament_id: tournamentId,
@@ -989,7 +990,19 @@ export class PostgresDatabase {
       // Handle odd number of players - give bye to lowest scoring unpaired player
       const unpairedPlayers = players.filter((p) => !paired.has(p.id));
       if (unpairedPlayers.length === 1) {
-        const byePlayer = unpairedPlayers[0];
+        // Get detailed standings for proper tiebreaker resolution
+        const detailedStandings = await this.getDetailedStandingsForBye(
+          client,
+          tournamentId,
+          roundNumber
+        );
+
+        // Find the lowest scoring player among unpaired players
+        const byePlayer = this.selectLowestScoringPlayer(
+          unpairedPlayers,
+          detailedStandings
+        );
+
         const byeMatch = await this.createMatch({
           tournament_id: tournamentId,
           round_number: roundNumber,
@@ -1026,6 +1039,90 @@ export class PostgresDatabase {
       [tournamentId, player1Id, player2Id]
     );
     return result.rows[0].count > 0;
+  }
+
+  private async getDetailedStandingsForBye(
+    client: any,
+    tournamentId: number,
+    roundNumber: number
+  ): Promise<any[]> {
+    const result = await client.query(
+      `
+      SELECT 
+        p.id, 
+        p.name,
+        COUNT(CASE WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 1 END) +
+        COUNT(CASE WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 1 END) +
+        COUNT(CASE WHEN m.result = 'BYE' AND m.player1_id = p.id THEN 1 END) as wins,
+        COUNT(CASE WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1 END) as draws,
+        COUNT(CASE WHEN (m.result = 'WIN_P1' AND m.player2_id = p.id) OR 
+                       (m.result = 'WIN_P2' AND m.player1_id = p.id) THEN 1 END) as losses,
+        COALESCE(SUM(
+          CASE 
+            WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 3
+            WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 3
+            WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1
+            WHEN m.result = 'BYE' AND m.player1_id = p.id THEN 2
+            ELSE 0
+          END
+        ), 0) as points
+      FROM players p
+      INNER JOIN tournament_players tp ON p.id = tp.player_id
+      LEFT JOIN matches m ON (m.player1_id = p.id OR m.player2_id = p.id) 
+        AND m.tournament_id = $1 
+        AND m.round_number < $2
+      WHERE tp.tournament_id = $1 
+        AND tp.dropped = false
+        AND tp.started_round <= $2
+      GROUP BY p.id, p.name
+      ORDER BY points ASC, wins ASC, draws ASC, p.name ASC
+      `,
+      [tournamentId, roundNumber]
+    );
+    return result.rows;
+  }
+
+  private selectLowestScoringPlayer(
+    unpairedPlayers: any[],
+    detailedStandings: any[]
+  ): any {
+    // Create a map of player standings for quick lookup
+    const standingsMap = new Map();
+    detailedStandings.forEach((player) => {
+      standingsMap.set(player.id, player);
+    });
+
+    // Sort unpaired players by their standings (lowest first)
+    const sortedUnpairedPlayers = unpairedPlayers.sort((a, b) => {
+      const aStanding = standingsMap.get(a.id);
+      const bStanding = standingsMap.get(b.id);
+
+      if (!aStanding || !bStanding) {
+        // If we can't find standings, fall back to name comparison
+        return a.name.localeCompare(b.name);
+      }
+
+      // Compare points (ascending - lowest first)
+      if (aStanding.points !== bStanding.points) {
+        return aStanding.points - bStanding.points;
+      }
+
+      // Compare wins (ascending - lowest first)
+      if (aStanding.wins !== bStanding.wins) {
+        return aStanding.wins - bStanding.wins;
+      }
+
+      // Compare draws (ascending - lowest first)
+      if (aStanding.draws !== bStanding.draws) {
+        return aStanding.draws - bStanding.draws;
+      }
+
+      // If still tied, use name as final tiebreaker
+      return a.name.localeCompare(b.name);
+    });
+
+    // Return the lowest scoring player (first in sorted array)
+    return sortedUnpairedPlayers[0];
   }
 
   async updateRoundStatus(
