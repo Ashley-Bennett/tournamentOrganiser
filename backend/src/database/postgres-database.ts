@@ -993,7 +993,7 @@ export class PostgresDatabase {
             SELECT player2_id FROM matches WHERE tournament_id = $1 AND round_number = $2 AND player2_id IS NOT NULL
           )
         GROUP BY p.id, p.name, p.static_seating
-        ORDER BY points DESC, p.name ASC
+        ORDER BY points DESC, RANDOM()
       `,
         [tournamentId, roundNumber]
       );
@@ -1120,6 +1120,19 @@ export class PostgresDatabase {
       scoreBrackets.get(points)!.push(player);
     }
 
+    // Shuffle function for randomization
+    const shuffleArray = (arr: any[]) => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    };
+
+    // Shuffle players within each bracket for randomization
+    for (const [points, bracketPlayers] of scoreBrackets) {
+      shuffleArray(bracketPlayers);
+    }
+
     // Sort brackets by points (highest to lowest)
     const sortedBrackets = Array.from(scoreBrackets.entries()).sort(
       ([a], [b]) => b - a
@@ -1187,8 +1200,19 @@ export class PostgresDatabase {
               .join(", ")}`
           );
 
-          // Combine next bracket players with floated down players
-          const combinedBracket = [...nextBracketPlayers, ...playersToFloat];
+          // Get unpaired players from the next bracket
+          const unpairedNextBracket = nextBracketPlayers.filter(
+            (p) => !paired.has(p.id)
+          );
+
+          // Combine unpaired players from next bracket with floated down players
+          const combinedBracket = [...unpairedNextBracket, ...playersToFloat];
+
+          console.log(
+            `⬇️ Combined bracket for re-pairing: ${combinedBracket
+              .map((p) => `${p.name} (ID: ${p.id})`)
+              .join(", ")}`
+          );
 
           // Re-pair the combined bracket
           const rePairings = await this.pairPlayersInBracket(
@@ -1203,8 +1227,8 @@ export class PostgresDatabase {
             `⬇️ Created ${rePairings.length} new pairings in ${nextPoints}pt bracket`
           );
 
-          // Replace any existing pairings from the next bracket with new ones
-          // Remove old pairings from this bracket
+          // Remove any existing pairings that involve players from the next bracket
+          // This ensures we don't have duplicate pairings
           const pairingsToRemove = pairings.filter(
             (p) =>
               p.player1 &&
@@ -1229,9 +1253,6 @@ export class PostgresDatabase {
 
           // Add new pairings
           pairings.push(...rePairings);
-
-          // Update the sorted brackets array to reflect the changes
-          sortedBrackets[j] = [nextPoints, combinedBracket];
 
           // Check if there are still unpaired players to float down further
           playersToFloat = combinedBracket.filter((p) => !paired.has(p.id));
