@@ -1356,13 +1356,20 @@ export class PostgresDatabase {
           bracketPlayers[j].id
         );
 
+        // Skip if they've already played - this is a hard constraint
+        if (alreadyPlayed) {
+          console.log(
+            `🚫 Skipping ${bracketPlayers[i].name} vs ${bracketPlayers[j].name} - already played`
+          );
+          continue;
+        }
+
         // Check static seating constraint
         const staticSeatingConflict =
           bracketPlayers[i].static_seating && bracketPlayers[j].static_seating;
 
-        // Calculate constraint violations (0 = perfect, 1 = one violation, 2 = two violations)
+        // Calculate constraint violations (0 = perfect, 1 = one violation)
         let constraintViolations = 0;
-        if (alreadyPlayed) constraintViolations++;
         if (staticSeatingConflict) constraintViolations++;
 
         // Calculate pairing score (prefer similar points)
@@ -1394,23 +1401,19 @@ export class PostgresDatabase {
             continue;
           }
 
-          // Log if we're making a pairing with constraint violations
-          const alreadyPlayed = await this.havePlayersPlayed(
-            client,
-            tournamentId,
-            bracketPlayers[i].id,
-            bestOpponent.id
-          );
+          // Log if we're making a pairing with static seating constraint violation
           const staticSeatingConflict =
             bracketPlayers[i].static_seating && bestOpponent.static_seating;
 
-          if (alreadyPlayed || staticSeatingConflict) {
+          if (staticSeatingConflict) {
             console.log(
-              `⚠️  Making pairing with constraint violation: ${bracketPlayers[i].name} vs ${bestOpponent.name} ` +
-                `(already played: ${alreadyPlayed}, static seating conflict: ${staticSeatingConflict})`
+              `⚠️  Making pairing with static seating constraint violation: ${bracketPlayers[i].name} vs ${bestOpponent.name}`
             );
           }
 
+          console.log(
+            `✅ Creating match: ${bracketPlayers[i].name} vs ${bestOpponent.name} (Round ${roundNumber})`
+          );
           const match = await this.createMatch({
             tournament_id: tournamentId,
             round_number: roundNumber,
