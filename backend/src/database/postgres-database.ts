@@ -764,15 +764,29 @@ export class PostgresDatabase {
         `
         SELECT p.id, p.name, 
                COUNT(CASE WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 1 END) +
-               COUNT(CASE WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 1 END) as wins,
+               COUNT(CASE WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 1 END) +
+               COUNT(CASE WHEN m.result = 'BYE' AND m.player1_id = p.id THEN 1 END) as wins,
                COUNT(CASE WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1 END) as draws,
-               COUNT(CASE WHEN m.result IS NOT NULL AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1 END) as matches_played
+               COUNT(CASE WHEN (m.result = 'WIN_P1' AND m.player2_id = p.id) OR 
+                              (m.result = 'WIN_P2' AND m.player1_id = p.id) THEN 1 END) as losses,
+               COUNT(CASE WHEN m.result IS NOT NULL AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 1 END) as matches_played,
+               COALESCE(SUM(
+                 CASE 
+                   WHEN m.result = 'WIN_P1' AND m.player1_id = p.id THEN 1
+                   WHEN m.result = 'WIN_P2' AND m.player2_id = p.id THEN 1
+                   WHEN m.result = 'DRAW' AND (m.player1_id = p.id OR m.player2_id = p.id) THEN 0.5
+                   WHEN m.result = 'BYE' AND m.player1_id = p.id THEN 1
+                   ELSE 0
+                 END
+               ), 0) as points,
+               0.0 as opponent_resistance,
+               0.0 as opponent_opponent_resistance
         FROM players p
         INNER JOIN tournament_players tp ON p.id = tp.player_id
         LEFT JOIN matches m ON (m.player1_id = p.id OR m.player2_id = p.id) AND m.tournament_id = tp.tournament_id
         WHERE tp.tournament_id = $1 AND tp.dropped = false
         GROUP BY p.id, p.name
-        ORDER BY wins DESC, draws DESC, p.name
+        ORDER BY points DESC, wins DESC, draws DESC, p.name
       `,
         [tournamentId]
       );
