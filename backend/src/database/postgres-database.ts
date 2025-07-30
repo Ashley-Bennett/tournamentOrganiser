@@ -843,10 +843,97 @@ export class PostgresDatabase {
         [tournamentId, roundNumber]
       );
 
-      const players = standingsResult.rows;
+      let players = standingsResult.rows;
       const pairings = [];
 
-      // Swiss system pairing algorithm
+      // For first round, implement special pairing logic
+      if (roundNumber === 1) {
+        // Separate static and dynamic seating players
+        const staticSeatingPlayers = players.filter((p) => p.static_seating);
+        const dynamicSeatingPlayers = players.filter((p) => !p.static_seating);
+
+        // Randomize both groups
+        const shuffleArray = (arr: any[]) => {
+          for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+          }
+        };
+
+        shuffleArray(staticSeatingPlayers);
+        shuffleArray(dynamicSeatingPlayers);
+
+        // First, pair static seating players with dynamic seating players
+        const paired = new Set();
+
+        // Pair static seating players with dynamic seating players first
+        for (const staticPlayer of staticSeatingPlayers) {
+          if (paired.has(staticPlayer.id)) continue;
+
+          // Find an unpaired dynamic seating player
+          const availableDynamicPlayer = dynamicSeatingPlayers.find(
+            (p) => !paired.has(p.id)
+          );
+
+          if (availableDynamicPlayer) {
+            const match = await this.createMatch({
+              tournament_id: tournamentId,
+              round_number: roundNumber,
+              player1_id: staticPlayer.id,
+              player2_id: availableDynamicPlayer.id,
+            });
+            pairings.push({
+              match_id: match,
+              player1: staticPlayer,
+              player2: availableDynamicPlayer,
+            });
+            paired.add(staticPlayer.id);
+            paired.add(availableDynamicPlayer.id);
+          }
+        }
+
+        // Pair remaining dynamic seating players with each other
+        const remainingDynamicPlayers = dynamicSeatingPlayers.filter(
+          (p) => !paired.has(p.id)
+        );
+        for (let i = 0; i < remainingDynamicPlayers.length - 1; i += 2) {
+          const match = await this.createMatch({
+            tournament_id: tournamentId,
+            round_number: roundNumber,
+            player1_id: remainingDynamicPlayers[i].id,
+            player2_id: remainingDynamicPlayers[i + 1].id,
+          });
+          pairings.push({
+            match_id: match,
+            player1: remainingDynamicPlayers[i],
+            player2: remainingDynamicPlayers[i + 1],
+          });
+          paired.add(remainingDynamicPlayers[i].id);
+          paired.add(remainingDynamicPlayers[i + 1].id);
+        }
+
+        // Handle any remaining unpaired players (odd number)
+        const allUnpairedPlayers = players.filter((p) => !paired.has(p.id));
+        if (allUnpairedPlayers.length === 1) {
+          const byePlayer = allUnpairedPlayers[0];
+          const byeMatch = await this.createMatch({
+            tournament_id: tournamentId,
+            round_number: roundNumber,
+            player1_id: byePlayer.id,
+            player2_id: undefined,
+          });
+          pairings.push({
+            match_id: byeMatch,
+            player1: byePlayer,
+            player2: null,
+            is_bye: true,
+          });
+        }
+
+        return pairings;
+      }
+
+      // Swiss system pairing algorithm for subsequent rounds
       const paired = new Set();
 
       for (let i = 0; i < players.length; i++) {
