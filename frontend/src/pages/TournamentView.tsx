@@ -48,6 +48,7 @@ import {
 } from "@mui/icons-material";
 import { apiCall } from "../utils/api";
 import { useAuth } from "../AuthContext";
+import { supabase } from "../supabaseClient";
 
 interface Tournament {
   id: number;
@@ -107,7 +108,7 @@ interface LeaderboardEntry {
   opponent_opponent_resistance: number;
 }
 
-const TournamentView: React.FC = () => {
+const LegacyTournamentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -139,7 +140,7 @@ const TournamentView: React.FC = () => {
     started_round: 1,
   });
   const [addPlayerFormError, setAddPlayerFormError] = useState<string | null>(
-    null
+    null,
   );
   const [createPlayerForm, setCreatePlayerForm] = useState({
     name: "",
@@ -152,7 +153,7 @@ const TournamentView: React.FC = () => {
   const [creatingPlayer, setCreatingPlayer] = useState(false);
   const [creatingPairings, setCreatingPairings] = useState(false);
   const [updatingMatchResult, setUpdatingMatchResult] = useState<number | null>(
-    null
+    null,
   );
   const [recentlyUpdatedMatch, setRecentlyUpdatedMatch] = useState<
     number | null
@@ -174,7 +175,7 @@ const TournamentView: React.FC = () => {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [editingPlayer, setEditingPlayer] = useState<TournamentPlayer | null>(
-    null
+    null,
   );
   const [editing, setEditing] = useState(false);
   // Add state for dropped confirmation dialog
@@ -184,7 +185,7 @@ const TournamentView: React.FC = () => {
   }>({ player: null, newDropped: false });
   const [droppedLoading, setDroppedLoading] = useState(false);
   const [roundStatuses, setRoundStatuses] = useState<Record<number, string>>(
-    {}
+    {},
   );
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -301,14 +302,14 @@ const TournamentView: React.FC = () => {
     setUnpairedWarning(null);
     try {
       const response = await apiCall(
-        `/api/tournaments/${id}/rounds/${roundNumber}/unpaired-players`
+        `/api/tournaments/${id}/rounds/${roundNumber}/unpaired-players`,
       );
       const unpaired = await response.json();
       if (Array.isArray(unpaired) && unpaired.length > 0) {
         setUnpairedWarning(
           `Warning: The following players are not paired in this round: ${unpaired
             .map((p) => p.name)
-            .join(", ")}`
+            .join(", ")}`,
         );
         return; // Don't start the round yet
       }
@@ -319,7 +320,7 @@ const TournamentView: React.FC = () => {
           `/api/tournaments/${id}/rounds/${roundNumber}/start`,
           {
             method: "POST",
-          }
+          },
         );
         if (response.ok) {
           setSuccess("Round started successfully!");
@@ -347,7 +348,7 @@ const TournamentView: React.FC = () => {
         `/api/tournaments/${id}/rounds/${roundNumber}/complete`,
         {
           method: "POST",
-        }
+        },
       );
       if (response.ok) {
         setSuccess("Round completed successfully!");
@@ -537,14 +538,17 @@ const TournamentView: React.FC = () => {
 
   // Group matches by round - memoized to prevent unnecessary recalculations
   const matchesByRound = useMemo(() => {
-    return matches.reduce((acc, match) => {
-      const round = match.round_number;
-      if (!acc[round]) {
-        acc[round] = [];
-      }
-      acc[round].push(match);
-      return acc;
-    }, {} as Record<number, Match[]>);
+    return matches.reduce(
+      (acc, match) => {
+        const round = match.round_number;
+        if (!acc[round]) {
+          acc[round] = [];
+        }
+        acc[round].push(match);
+        return acc;
+      },
+      {} as Record<number, Match[]>,
+    );
   }, [matches]);
 
   // Get all round numbers sorted - memoized to prevent unnecessary recalculations
@@ -593,7 +597,7 @@ const TournamentView: React.FC = () => {
         const statuses: Record<number, string> = {};
         for (const round of roundNumbers) {
           const response = await apiCall(
-            `/api/tournaments/${id}/rounds/${round}/status`
+            `/api/tournaments/${id}/rounds/${round}/status`,
           );
           if (response.ok) {
             const data = await response.json();
@@ -771,11 +775,11 @@ const TournamentView: React.FC = () => {
                     result === "WIN_P1"
                       ? match.player1_name
                       : result === "WIN_P2"
-                      ? match.player2_name
-                      : null,
+                        ? match.player2_name
+                        : null,
                 }
-              : match
-          )
+              : match,
+          ),
         );
 
         // Show subtle visual feedback
@@ -795,7 +799,7 @@ const TournamentView: React.FC = () => {
     } catch (error) {
       console.error(
         "Network or unexpected error in handleUpdateMatchResult:",
-        error
+        error,
       );
       setError("Network error. Please try again.");
     } finally {
@@ -828,7 +832,7 @@ const TournamentView: React.FC = () => {
         const result = await response.json();
         console.log(
           "Players added to tournament successfully:",
-          result.message
+          result.message,
         );
         setOpenAddPlayerDialog(false);
         setAddPlayerForm({
@@ -880,7 +884,7 @@ const TournamentView: React.FC = () => {
               player_id: result.id,
               started_round: 1,
             }),
-          }
+          },
         );
 
         if (addToTournamentResponse.ok) {
@@ -892,7 +896,7 @@ const TournamentView: React.FC = () => {
         } else {
           console.warn("Player created but could not be added to tournament");
           setSuccess(
-            "Player created successfully! You can add them to the tournament manually."
+            "Player created successfully! You can add them to the tournament manually.",
           );
           setError(null);
           // Clear success message after 5 seconds
@@ -975,7 +979,7 @@ const TournamentView: React.FC = () => {
         {
           method: "PATCH",
           body: JSON.stringify({ is_completed: true }),
-        }
+        },
       );
       if (response.ok) {
         setSuccess("Tournament marked as completed.");
@@ -996,7 +1000,7 @@ const TournamentView: React.FC = () => {
     if (!tournament) return;
     if (
       !window.confirm(
-        "Are you sure you want to remove this player from the tournament?"
+        "Are you sure you want to remove this player from the tournament?",
       )
     )
       return;
@@ -1008,11 +1012,11 @@ const TournamentView: React.FC = () => {
         `/api/tournaments/${tournament.id}/players/${playerId}`,
         {
           method: "DELETE",
-        }
+        },
       );
       if (response.ok) {
         setTournamentPlayers((prev) =>
-          prev.filter((p) => p.player_id !== playerId)
+          prev.filter((p) => p.player_id !== playerId),
         );
         setSuccess("Player removed from tournament.");
       } else {
@@ -1030,7 +1034,7 @@ const TournamentView: React.FC = () => {
     if (!tournament) return;
     if (
       !window.confirm(
-        "Are you sure you want to remove ALL players from this tournament? This cannot be undone."
+        "Are you sure you want to remove ALL players from this tournament? This cannot be undone.",
       )
     )
       return;
@@ -1042,7 +1046,7 @@ const TournamentView: React.FC = () => {
         `/api/tournaments/${tournament.id}/players`,
         {
           method: "DELETE",
-        }
+        },
       );
       if (response.ok) {
         setTournamentPlayers([]);
@@ -1068,7 +1072,7 @@ const TournamentView: React.FC = () => {
     apiCall(`/api/tournaments/${id}/rounds/${selectedRound}/unpaired-players`)
       .then((res) => res.json())
       .then((data) =>
-        setUnpairedPlayersForRound(Array.isArray(data) ? data : [])
+        setUnpairedPlayersForRound(Array.isArray(data) ? data : []),
       )
       .catch(() => setUnpairedPlayersForRound([]))
       .finally(() => setLoadingUnpairedForRound(false));
@@ -1340,7 +1344,7 @@ const TournamentView: React.FC = () => {
                     {tournamentPlayers.map((player, idx) => {
                       console.log(
                         `🔍 Rendering tournamentPlayer[${idx}]:`,
-                        player
+                        player,
                       );
                       return (
                         <TableRow key={player.id || player.player_id}>
@@ -1389,8 +1393,8 @@ const TournamentView: React.FC = () => {
                                         player.id !== undefined
                                           ? player.id
                                           : player.player_id !== undefined
-                                          ? player.player_id
-                                          : null,
+                                            ? player.player_id
+                                            : null,
                                       name: player.player_name || "",
                                       static_seating: player.static_seating,
                                       trainer_id: player.trainer_id || "",
@@ -1737,7 +1741,7 @@ const TournamentView: React.FC = () => {
                               <TableCell>
                                 {(() => {
                                   const p = tournamentPlayers.find(
-                                    (tp) => tp.player_id === match.player1_id
+                                    (tp) => tp.player_id === match.player1_id,
                                   );
                                   if (p && p.static_seating) {
                                     return (
@@ -1762,7 +1766,7 @@ const TournamentView: React.FC = () => {
                               <TableCell>
                                 {(() => {
                                   const p = tournamentPlayers.find(
-                                    (tp) => tp.player_id === match.player2_id
+                                    (tp) => tp.player_id === match.player2_id,
                                   );
                                   if (p && p.static_seating) {
                                     return (
@@ -1824,7 +1828,7 @@ const TournamentView: React.FC = () => {
                                           });
                                           setUnpairedPlayersLoading(true);
                                           apiCall(
-                                            `/api/tournaments/${id}/rounds/${match.round_number}/unpaired-players`
+                                            `/api/tournaments/${id}/rounds/${match.round_number}/unpaired-players`,
                                           )
                                             .then((res) => res.json())
                                             .then((data) => {
@@ -1836,7 +1840,7 @@ const TournamentView: React.FC = () => {
                                                   tournamentPlayers.find(
                                                     (p) =>
                                                       p.player_id ===
-                                                      match.player1_id
+                                                      match.player1_id,
                                                   );
                                                 if (p1 && p1.player_id) {
                                                   // Convert TournamentPlayer to Player format
@@ -1855,7 +1859,7 @@ const TournamentView: React.FC = () => {
                                                   tournamentPlayers.find(
                                                     (p) =>
                                                       p.player_id ===
-                                                      match.player2_id
+                                                      match.player2_id,
                                                   );
                                                 if (p2 && p2.player_id) {
                                                   // Convert TournamentPlayer to Player format
@@ -1876,14 +1880,14 @@ const TournamentView: React.FC = () => {
                                               ].filter(
                                                 (p, i, arr) =>
                                                   arr.findIndex(
-                                                    (x) => x.id === p.id
-                                                  ) === i
+                                                    (x) => x.id === p.id,
+                                                  ) === i,
                                               );
                                               setUnpairedPlayers(allPlayers);
                                             })
                                             .catch(() => setUnpairedPlayers([]))
                                             .finally(() =>
-                                              setUnpairedPlayersLoading(false)
+                                              setUnpairedPlayersLoading(false),
                                             );
                                           setOpenEditMatchDialog(true);
                                         }}
@@ -1922,7 +1926,7 @@ const TournamentView: React.FC = () => {
                                           onClick={() =>
                                             handleUpdateMatchResult(
                                               match.id,
-                                              "WIN_P1"
+                                              "WIN_P1",
                                             )
                                           }
                                           sx={{ minWidth: "auto", px: 1 }}
@@ -1942,7 +1946,7 @@ const TournamentView: React.FC = () => {
                                               onClick={() =>
                                                 handleUpdateMatchResult(
                                                   match.id,
-                                                  "DRAW"
+                                                  "DRAW",
                                                 )
                                               }
                                               sx={{ minWidth: "auto", px: 1 }}
@@ -1959,7 +1963,7 @@ const TournamentView: React.FC = () => {
                                               onClick={() =>
                                                 handleUpdateMatchResult(
                                                   match.id,
-                                                  "WIN_P2"
+                                                  "WIN_P2",
                                                 )
                                               }
                                               sx={{ minWidth: "auto", px: 1 }}
@@ -2182,8 +2186,8 @@ const TournamentView: React.FC = () => {
                   options={players.filter(
                     (player) =>
                       !tournamentPlayers.some(
-                        (tp) => tp.player_id === player.id
-                      )
+                        (tp) => tp.player_id === player.id,
+                      ),
                   )}
                   getOptionLabel={(option) => option.name}
                   value={addPlayerForm.selectedPlayers}
@@ -2518,7 +2522,7 @@ const TournamentView: React.FC = () => {
                 {
                   method: "PATCH",
                   body: JSON.stringify(payload),
-                }
+                },
               );
               if (!playerRes.ok) {
                 const errorData = await playerRes.json();
@@ -2532,7 +2536,7 @@ const TournamentView: React.FC = () => {
                 {
                   method: "PATCH",
                   body: JSON.stringify({ dropped: editPlayerForm.dropped }),
-                }
+                },
               );
               if (!dropRes.ok) {
                 const errorData = await dropRes.json();
@@ -2548,7 +2552,7 @@ const TournamentView: React.FC = () => {
                   body: JSON.stringify({
                     started_round: editPlayerForm.started_round,
                   }),
-                }
+                },
               );
               if (!roundRes.ok) {
                 const errorData = await roundRes.json();
@@ -2682,12 +2686,12 @@ const TournamentView: React.FC = () => {
                     body: JSON.stringify({
                       dropped: droppedConfirm.newDropped,
                     }),
-                  }
+                  },
                 );
                 if (!dropRes.ok) {
                   const errorData = await dropRes.json();
                   setError(
-                    errorData.error || "Failed to update dropped status"
+                    errorData.error || "Failed to update dropped status",
                   );
                   setDroppedLoading(false);
                   return;
@@ -2744,7 +2748,7 @@ const TournamentView: React.FC = () => {
                       .filter(
                         (player) =>
                           player.id === Number(editMatchForm.player1_id) ||
-                          String(player.id) !== editMatchForm.player2_id
+                          String(player.id) !== editMatchForm.player2_id,
                       )
                       .map((player) => (
                         <MenuItem key={player.id} value={String(player.id)}>
@@ -2779,7 +2783,7 @@ const TournamentView: React.FC = () => {
                       .filter(
                         (player) =>
                           player.id === Number(editMatchForm.player2_id) ||
-                          String(player.id) !== editMatchForm.player1_id
+                          String(player.id) !== editMatchForm.player1_id,
                       )
                       .map((player) => (
                         <MenuItem key={player.id} value={String(player.id)}>
@@ -2833,7 +2837,7 @@ const TournamentView: React.FC = () => {
             if (!editResultForm.matchId) return;
             await handleUpdateMatchResult(
               editResultForm.matchId,
-              editResultForm.result
+              editResultForm.result,
             );
             setOpenEditResultDialog(false);
           }}
@@ -2883,6 +2887,140 @@ const TournamentView: React.FC = () => {
           </DialogActions>
         </form>
       </Dialog>
+    </Box>
+  );
+};
+
+const TournamentView: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const [tournament, setTournament] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) {
+      setError("Missing tournament id");
+      setLoading(false);
+      return;
+    }
+    if (authLoading) return;
+    if (!user) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    const fetchTournament = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const { data, error } = await supabase
+          .from("tournaments")
+          .select("id, name, status, created_at, created_by")
+          .eq("id", id)
+          .eq("created_by", user.id)
+          .maybeSingle();
+
+        if (error) {
+          throw new Error(error.message || "Failed to load tournament");
+        }
+        if (!data) {
+          setError("Tournament not found");
+          setTournament(null);
+        } else {
+          setTournament(data);
+        }
+      } catch (e: any) {
+        setError(e.message || "Failed to load tournament");
+        setTournament(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void fetchTournament();
+  }, [id, user, authLoading, navigate]);
+
+  const formatDateTime = (value: string | null | undefined) => {
+    if (!value) return "-";
+    return new Date(value).toLocaleString();
+  };
+
+  if (authLoading || loading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error || !tournament) {
+    return (
+      <Box>
+        <Box display="flex" alignItems="center" mb={3}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate("/tournaments")}
+            sx={{ mr: 2 }}
+          >
+            Back
+          </Button>
+          <Typography variant="h4" component="h1">
+            Tournament
+          </Typography>
+        </Box>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      <Box display="flex" alignItems="center" mb={3}>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate("/tournaments")}
+          sx={{ mr: 2 }}
+        >
+          Back
+        </Button>
+        <Typography variant="h4" component="h1">
+          {tournament.name}
+        </Typography>
+      </Box>
+
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Basic Details
+        </Typography>
+        <Box display="flex" flexDirection="column" gap={1}>
+          <Box display="flex" gap={1} alignItems="center">
+            <Typography variant="body2" color="text.secondary">
+              Status:
+            </Typography>
+            <Chip label={tournament.status} size="small" />
+          </Box>
+          <Box display="flex" gap={1}>
+            <Typography variant="body2" color="text.secondary">
+              Created at:
+            </Typography>
+            <Typography variant="body2">
+              {formatDateTime(tournament.created_at)}
+            </Typography>
+          </Box>
+        </Box>
+      </Paper>
     </Box>
   );
 };
