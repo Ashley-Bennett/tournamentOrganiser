@@ -30,12 +30,21 @@ import {
   OutlinedInput,
   InputLabel,
   TableSortLabel,
+  Tooltip,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import EditIcon from "@mui/icons-material/Edit";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
+import {
+  generateSwissPairings,
+  calculateMatchPoints,
+  type Pairing,
+  type PlayerStanding,
+} from "../utils/tournamentPairing";
 
 interface TournamentSummary {
   id: string;
@@ -55,7 +64,7 @@ interface Match {
   player2_id: string | null;
   winner_id: string | null;
   result: string | null;
-  status: "pending" | "completed" | "bye";
+  status: "ready" | "pending" | "completed" | "bye";
   created_at: string;
 }
 
@@ -78,6 +87,7 @@ const TournamentMatches: React.FC = () => {
   const [sortBy, setSortBy] = useState<"match" | "status">("match");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
+  const [processingRound, setProcessingRound] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithPlayers | null>(
     null,
   );
@@ -396,6 +406,286 @@ const TournamentMatches: React.FC = () => {
     }
   };
 
+  const handleBeginRound = async () => {
+    if (!tournament || !user) return;
+
+    try {
+      setProcessingRound(true);
+      setError(null);
+
+      // Update all "ready" matches in current round to "pending"
+      const { error: updateError } = await supabase
+        .from("tournament_matches")
+        .update({ status: "pending" })
+        .eq("tournament_id", tournament.id)
+        .eq("round_number", selectedRound)
+        .eq("status", "ready");
+
+      if (updateError) {
+        throw new Error(updateError.message || "Failed to begin round");
+      }
+
+      // Refresh matches
+      const { data: matchesData, error: matchesError } = await supabase
+        .from("tournament_matches")
+        .select("*")
+        .eq("tournament_id", tournament.id)
+        .order("round_number", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
+
+      if (matchesError) {
+        throw new Error(matchesError.message || "Failed to refresh matches");
+      }
+
+      // Fetch updated player names
+      const playerIds = new Set<string>();
+      matchesData?.forEach((match) => {
+        playerIds.add(match.player1_id);
+        if (match.player2_id) {
+          playerIds.add(match.player2_id);
+        }
+        if (match.winner_id) {
+          playerIds.add(match.winner_id);
+        }
+      });
+
+      const { data: playersData } = await supabase
+        .from("tournament_players")
+        .select("id, name")
+        .in("id", Array.from(playerIds));
+
+      const playersMap = new Map<string, string>();
+      playersData?.forEach((player) => {
+        playersMap.set(player.id, player.name);
+      });
+
+      const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
+        (match) => ({
+          ...match,
+          player1_name: playersMap.get(match.player1_id) || "Unknown",
+          player2_name: match.player2_id
+            ? playersMap.get(match.player2_id) || "Unknown"
+            : null,
+          winner_name: match.winner_id
+            ? playersMap.get(match.winner_id) || "Unknown"
+            : null,
+        }),
+      );
+
+      setMatches(matchesWithPlayers);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to begin round");
+    } finally {
+      setProcessingRound(false);
+    }
+  };
+
+  const handleNextRound = async () => {
+    if (!tournament || !user) return;
+
+    try {
+      setProcessingRound(true);
+      setError(null);
+
+      const nextRoundNumber = selectedRound + 1;
+      if (tournament.num_rounds && nextRoundNumber > tournament.num_rounds) {
+        throw new Error("Maximum number of rounds reached");
+      }
+
+      // Calculate standings from all previous rounds
+      const allPreviousMatches = matches.filter(
+        (m) => m.round_number < nextRoundNumber,
+      );
+
+      // Get all players
+      const playerIds = new Set<string>();
+      matches.forEach((match) => {
+        playerIds.add(match.player1_id);
+        if (match.player2_id) {
+          playerIds.add(match.player2_id);
+        }
+      });
+
+      const { data: playersData } = await supabase
+        .from("tournament_players")
+        .select("id, name")
+        .in("id", Array.from(playerIds));
+
+      const playersMap = new Map<string, string>();
+      playersData?.forEach((player) => {
+        playersMap.set(player.id, player.name);
+      });
+
+      // Calculate standings
+      const standingsMap = new Map<string, PlayerStanding>();
+      playersData?.forEach((player) => {
+        standingsMap.set(player.id, {
+          id: player.id,
+          name: player.name,
+          matchPoints: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          matchesPlayed: 0,
+          opponents: [],
+        });
+      });
+
+      // Process matches to calculate standings
+      allPreviousMatches.forEach((match) => {
+        const player1 = standingsMap.get(match.player1_id);
+        const player2 = match.player2_id
+          ? standingsMap.get(match.player2_id)
+          : null;
+
+        if (player1) {
+          player1.matchesPlayed++;
+          if (match.status === "bye" || match.winner_id === match.player1_id) {
+            player1.wins++;
+            player1.matchPoints = calculateMatchPoints(
+              player1.wins,
+              player1.draws,
+            );
+            if (match.player2_id) {
+              player1.opponents.push(match.player2_id);
+            }
+          } else if (match.winner_id === null && match.result === "Draw") {
+            player1.draws++;
+            player1.matchPoints = calculateMatchPoints(
+              player1.wins,
+              player1.draws,
+            );
+            if (match.player2_id) {
+              player1.opponents.push(match.player2_id);
+            }
+          } else if (match.winner_id && match.winner_id !== match.player1_id) {
+            player1.losses++;
+            if (match.player2_id) {
+              player1.opponents.push(match.player2_id);
+            }
+          }
+        }
+
+        if (player2) {
+          player2.matchesPlayed++;
+          if (match.winner_id === match.player2_id) {
+            player2.wins++;
+            player2.matchPoints = calculateMatchPoints(
+              player2.wins,
+              player2.draws,
+            );
+            player2.opponents.push(match.player1_id);
+          } else if (match.winner_id === null && match.result === "Draw") {
+            player2.draws++;
+            player2.matchPoints = calculateMatchPoints(
+              player2.wins,
+              player2.draws,
+            );
+            player2.opponents.push(match.player1_id);
+          } else if (match.winner_id !== match.player2_id) {
+            player2.losses++;
+            player2.opponents.push(match.player1_id);
+          }
+        }
+      });
+
+      const standings = Array.from(standingsMap.values());
+
+      // Get previous pairings to avoid rematches
+      const previousPairings: Pairing[] = allPreviousMatches.map((match) => ({
+        player1Id: match.player1_id,
+        player1Name: match.player1_name,
+        player2Id: match.player2_id,
+        player2Name: match.player2_name,
+        roundNumber: match.round_number,
+      }));
+
+      // Generate pairings for next round
+      const pairings = generateSwissPairings(
+        standings,
+        nextRoundNumber,
+        previousPairings,
+      );
+
+      // Create matches in database
+      const matchesToInsert = pairings.map((pairing) => ({
+        tournament_id: tournament.id,
+        round_number: nextRoundNumber,
+        player1_id: pairing.player1Id,
+        player2_id: pairing.player2Id,
+        status: pairing.player2Id === null ? "bye" : "ready",
+        result: pairing.player2Id === null ? "bye" : null,
+        winner_id: pairing.player2Id === null ? pairing.player1Id : null,
+      }));
+
+      const { error: insertError } = await supabase
+        .from("tournament_matches")
+        .insert(matchesToInsert);
+
+      if (insertError) {
+        throw new Error(insertError.message || "Failed to create next round");
+      }
+
+      // Refresh matches
+      const { data: matchesData, error: matchesError } = await supabase
+        .from("tournament_matches")
+        .select("*")
+        .eq("tournament_id", tournament.id)
+        .order("round_number", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
+
+      if (matchesError) {
+        throw new Error(matchesError.message || "Failed to refresh matches");
+      }
+
+      // Fetch updated player names
+      const allPlayerIds = new Set<string>();
+      matchesData?.forEach((match) => {
+        allPlayerIds.add(match.player1_id);
+        if (match.player2_id) {
+          allPlayerIds.add(match.player2_id);
+        }
+        if (match.winner_id) {
+          allPlayerIds.add(match.winner_id);
+        }
+      });
+
+      const { data: allPlayersData } = await supabase
+        .from("tournament_players")
+        .select("id, name")
+        .in("id", Array.from(allPlayerIds));
+
+      const allPlayersMap = new Map<string, string>();
+      allPlayersData?.forEach((player) => {
+        allPlayersMap.set(player.id, player.name);
+      });
+
+      const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
+        (match) => ({
+          ...match,
+          player1_name: allPlayersMap.get(match.player1_id) || "Unknown",
+          player2_name: match.player2_id
+            ? allPlayersMap.get(match.player2_id) || "Unknown"
+            : null,
+          winner_name: match.winner_id
+            ? allPlayersMap.get(match.winner_id) || "Unknown"
+            : null,
+        }),
+      );
+
+      setMatches(matchesWithPlayers);
+      setSelectedRound(nextRoundNumber);
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : "Failed to generate next round",
+      );
+    } finally {
+      setProcessingRound(false);
+    }
+  };
+
   if (authLoading || loading || matchesLoading) {
     return (
       <Box
@@ -517,6 +807,29 @@ const TournamentMatches: React.FC = () => {
                       .filter((m) => m.round_number === selectedRound)
                       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
+                    // Check round state for button display
+                    const roundMatchesForState = matches.filter(
+                      (m) => m.round_number === selectedRound,
+                    );
+                    const hasReadyMatches = roundMatchesForState.some(
+                      (m) => m.status === "ready",
+                    );
+                    const hasPendingMatches = roundMatchesForState.some(
+                      (m) => m.status === "pending",
+                    );
+                    const allCompleted =
+                      roundMatchesForState.length > 0 &&
+                      roundMatchesForState.every(
+                        (m) => m.status === "completed" || m.status === "bye",
+                      );
+                    const canShowNextRound =
+                      tournament.num_rounds &&
+                      selectedRound < tournament.num_rounds;
+                    const canProceedToNextRound =
+                      allCompleted && canShowNextRound;
+                    const showBeginRound =
+                      hasReadyMatches && !hasPendingMatches;
+
                     // Map match id -> absolute match number (1-based, by id order)
                     const matchNumberById = new Map<string, number>();
                     baseMatches.forEach((m, i) =>
@@ -530,7 +843,12 @@ const TournamentMatches: React.FC = () => {
                         return sortOrder === "asc" ? cmp : -cmp;
                       }
                       // sortBy === "status"
-                      const statusOrder = { pending: 0, completed: 1, bye: 2 };
+                      const statusOrder = {
+                        ready: 0,
+                        pending: 1,
+                        completed: 2,
+                        bye: 3,
+                      };
                       const aVal = statusOrder[a.status] ?? 0;
                       const bVal = statusOrder[b.status] ?? 0;
                       const cmp = aVal - bVal;
@@ -551,88 +869,111 @@ const TournamentMatches: React.FC = () => {
                     };
 
                     return hasMatches ? (
-                      <TableContainer>
-                        <Table>
-                          <TableHead>
-                            <TableRow>
-                              <TableCell
-                                sortDirection={
-                                  sortBy === "match" ? sortOrder : false
-                                }
+                      <Box>
+                        {(showBeginRound || canShowNextRound) && (
+                          <Box
+                            sx={{
+                              mb: 2,
+                              display: "flex",
+                              justifyContent: "flex-end",
+                              gap: 1,
+                            }}
+                          >
+                            {showBeginRound && (
+                              <Button
+                                variant="contained"
+                                color="primary"
+                                startIcon={<PlayArrowIcon />}
+                                onClick={handleBeginRound}
+                                disabled={processingRound}
                               >
-                                <TableSortLabel
-                                  active={sortBy === "match"}
-                                  direction={
-                                    sortBy === "match" ? sortOrder : "asc"
-                                  }
-                                  onClick={() => handleSort("match")}
-                                >
-                                  Match #
-                                </TableSortLabel>
-                              </TableCell>
-                              <TableCell>Player 1</TableCell>
-                              <TableCell>Player 2</TableCell>
-                              <TableCell
-                                sortDirection={
-                                  sortBy === "status" ? sortOrder : false
+                                Begin Round
+                              </Button>
+                            )}
+                            {canShowNextRound && (
+                              <Tooltip
+                                title={
+                                  !canProceedToNextRound
+                                    ? "Complete all matches in this round to proceed to the next round"
+                                    : ""
                                 }
+                                arrow
                               >
-                                <TableSortLabel
-                                  active={sortBy === "status"}
-                                  direction={
-                                    sortBy === "status" ? sortOrder : "asc"
+                                <span>
+                                  <Button
+                                    variant="contained"
+                                    color="primary"
+                                    startIcon={<ArrowForwardIcon />}
+                                    onClick={handleNextRound}
+                                    disabled={
+                                      processingRound || !canProceedToNextRound
+                                    }
+                                  >
+                                    Next Round
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                            )}
+                          </Box>
+                        )}
+                        <TableContainer>
+                          <Table>
+                            <TableHead>
+                              <TableRow>
+                                <TableCell
+                                  sortDirection={
+                                    sortBy === "match" ? sortOrder : false
                                   }
-                                  onClick={() => handleSort("status")}
                                 >
-                                  Status
-                                </TableSortLabel>
-                              </TableCell>
-                              <TableCell>Result</TableCell>
-                              <TableCell>Winner</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {roundMatches.map((match) => {
-                              const canEdit =
-                                match.status === "pending" &&
-                                match.player2_id !== null;
-                              const matchNumber =
-                                matchNumberById.get(match.id) ?? 0;
-                              return (
-                                <TableRow key={match.id}>
-                                  <TableCell>{matchNumber}</TableCell>
-                                  <TableCell>
-                                    <Box
-                                      display="flex"
-                                      alignItems="center"
-                                      gap={1}
-                                    >
-                                      {match.player1_name}
-                                      {canEdit && (
-                                        <IconButton
-                                          size="small"
-                                          color="primary"
-                                          onClick={() =>
-                                            handleOpenScoreDialog(
-                                              match,
-                                              match.player1_id,
-                                            )
-                                          }
-                                          title="Select winner"
-                                        >
-                                          <EmojiEventsIcon fontSize="small" />
-                                        </IconButton>
-                                      )}
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell>
-                                    {match.player2_name ? (
+                                  <TableSortLabel
+                                    active={sortBy === "match"}
+                                    direction={
+                                      sortBy === "match" ? sortOrder : "asc"
+                                    }
+                                    onClick={() => handleSort("match")}
+                                  >
+                                    Match #
+                                  </TableSortLabel>
+                                </TableCell>
+                                <TableCell>Player 1</TableCell>
+                                <TableCell>Player 2</TableCell>
+                                <TableCell
+                                  sortDirection={
+                                    sortBy === "status" ? sortOrder : false
+                                  }
+                                >
+                                  <TableSortLabel
+                                    active={sortBy === "status"}
+                                    direction={
+                                      sortBy === "status" ? sortOrder : "asc"
+                                    }
+                                    onClick={() => handleSort("status")}
+                                  >
+                                    Status
+                                  </TableSortLabel>
+                                </TableCell>
+                                <TableCell>Result</TableCell>
+                                <TableCell>Winner</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {roundMatches.map((match) => {
+                                const canEdit =
+                                  (match.status === "pending" ||
+                                    match.status === "ready") &&
+                                  match.player2_id !== null;
+                                const matchNumber =
+                                  matchNumberById.get(match.id) ?? 0;
+                                return (
+                                  <TableRow key={match.id}>
+                                    <TableCell>{matchNumber}</TableCell>
+                                    <TableCell>
                                       <Box
                                         display="flex"
                                         alignItems="center"
                                         gap={1}
                                       >
-                                        {match.player2_name}
+                                        {match.player1_name}
                                         {canEdit && (
                                           <IconButton
                                             size="small"
@@ -640,7 +981,7 @@ const TournamentMatches: React.FC = () => {
                                             onClick={() =>
                                               handleOpenScoreDialog(
                                                 match,
-                                                match.player2_id!,
+                                                match.player1_id,
                                               )
                                             }
                                             title="Select winner"
@@ -649,63 +990,93 @@ const TournamentMatches: React.FC = () => {
                                           </IconButton>
                                         )}
                                       </Box>
-                                    ) : (
-                                      <Chip
-                                        label="Bye"
-                                        size="small"
-                                        color="info"
-                                        variant="outlined"
-                                      />
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Chip
-                                      label={
-                                        match.status === "bye"
-                                          ? "Bye"
-                                          : match.status === "completed"
-                                            ? "Completed"
-                                            : "Pending"
-                                      }
-                                      size="small"
-                                      color={
-                                        match.status === "bye"
-                                          ? "info"
-                                          : match.status === "completed"
-                                            ? "success"
-                                            : "warning"
-                                      }
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Box
-                                      display="flex"
-                                      alignItems="center"
-                                      gap={1}
-                                    >
-                                      {match.result || "-"}
-                                      {canEdit && (
-                                        <IconButton
-                                          size="small"
-                                          onClick={() =>
-                                            handleOpenScoreDialog(match)
-                                          }
-                                          title="Edit result"
+                                    </TableCell>
+                                    <TableCell>
+                                      {match.player2_name ? (
+                                        <Box
+                                          display="flex"
+                                          alignItems="center"
+                                          gap={1}
                                         >
-                                          <EditIcon fontSize="small" />
-                                        </IconButton>
+                                          {match.player2_name}
+                                          {canEdit && (
+                                            <IconButton
+                                              size="small"
+                                              color="primary"
+                                              onClick={() =>
+                                                handleOpenScoreDialog(
+                                                  match,
+                                                  match.player2_id!,
+                                                )
+                                              }
+                                              title="Select winner"
+                                            >
+                                              <EmojiEventsIcon fontSize="small" />
+                                            </IconButton>
+                                          )}
+                                        </Box>
+                                      ) : (
+                                        <Chip
+                                          label="Bye"
+                                          size="small"
+                                          color="info"
+                                          variant="outlined"
+                                        />
                                       )}
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell>
-                                    {match.winner_name || "-"}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Chip
+                                        label={
+                                          match.status === "bye"
+                                            ? "Bye"
+                                            : match.status === "completed"
+                                              ? "Completed"
+                                              : match.status === "pending"
+                                                ? "Pending"
+                                                : "Ready"
+                                        }
+                                        size="small"
+                                        color={
+                                          match.status === "bye"
+                                            ? "info"
+                                            : match.status === "completed"
+                                              ? "success"
+                                              : match.status === "pending"
+                                                ? "warning"
+                                                : "default"
+                                        }
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Box
+                                        display="flex"
+                                        alignItems="center"
+                                        gap={1}
+                                      >
+                                        {match.result || "-"}
+                                        {canEdit && (
+                                          <IconButton
+                                            size="small"
+                                            onClick={() =>
+                                              handleOpenScoreDialog(match)
+                                            }
+                                            title="Edit result"
+                                          >
+                                            <EditIcon fontSize="small" />
+                                          </IconButton>
+                                        )}
+                                      </Box>
+                                    </TableCell>
+                                    <TableCell>
+                                      {match.winner_name || "-"}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
                     ) : (
                       <Typography
                         variant="body2"

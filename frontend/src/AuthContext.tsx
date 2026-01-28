@@ -7,7 +7,11 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (
+    name: string,
+    email: string,
+    password: string,
+  ) => Promise<{ session: Session | null }>;
   logout: () => void;
 }
 
@@ -80,8 +84,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+  const register = async (
+    name: string,
+    email: string,
+    password: string,
+  ): Promise<{ session: Session | null }> => {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -91,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     if (error) {
       throw new Error(error.message || "Registration failed");
     }
+    return { session: data.session };
   };
 
   const logout = () => {

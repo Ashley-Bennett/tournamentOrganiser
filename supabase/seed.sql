@@ -97,7 +97,7 @@ create table if not exists public.tournament_matches (
   player2_id uuid references public.tournament_players (id) on delete set null,
   winner_id uuid references public.tournament_players (id) on delete set null,
   result text, -- e.g., "2-0", "2-1", "bye"
-  status text not null default 'pending' check (status in ('pending', 'completed', 'bye')),
+  status text not null default 'ready' check (status in ('ready', 'pending', 'completed', 'bye')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

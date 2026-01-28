@@ -3195,7 +3195,7 @@ const TournamentView: React.FC = () => {
         round_number: 1,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
-        status: pairing.player2Id === null ? "bye" : "pending",
+        status: pairing.player2Id === null ? "bye" : "ready",
         result: pairing.player2Id === null ? "bye" : null,
         winner_id: pairing.player2Id === null ? pairing.player1Id : null, // Bye = automatic win (3 points)
       }));

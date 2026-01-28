@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -18,7 +18,18 @@ const Register = () => {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, user } = useAuth();
+
+  // Redirect if user becomes logged in
+  useEffect(() => {
+    if (user && success) {
+      // User was logged in after registration, redirect to dashboard
+      const timer = setTimeout(() => {
+        navigate("/dashboard");
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [user, success, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,12 +37,24 @@ const Register = () => {
     setError("");
     setSuccess("");
     try {
-      await register(name, email, password);
-      setSuccess("Registration successful! You can now log in.");
-      setTimeout(() => navigate("/login"), 1500);
+      const { session } = await register(name, email, password);
+      setLoading(false);
+      if (session) {
+        // User is logged in immediately (auto-confirm enabled)
+        setSuccess("Registration successful! Redirecting to dashboard...");
+        // Redirect directly since we have a session
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 1500);
+      } else {
+        // Email confirmation required
+        setSuccess(
+          "Registration successful! Please check your email to confirm your account, then log in.",
+        );
+        setTimeout(() => navigate("/login"), 3000);
+      }
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
