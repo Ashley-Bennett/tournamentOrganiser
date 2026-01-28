@@ -51,6 +51,10 @@ import {
 import { apiCall } from "../utils/api";
 import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
+import {
+  generateSwissPairings,
+  type Pairing,
+} from "../utils/tournamentPairing";
 
 interface Tournament {
   id: number;
@@ -3100,6 +3104,54 @@ const TournamentView: React.FC = () => {
     }
   };
 
+  const generateRound1Pairings = (
+    tournamentType: string,
+    players: TournamentPlayer[],
+  ): Pairing[] => {
+    if (tournamentType === "swiss") {
+      // Swiss: Random pairing for round 1
+      const standings = players.map((p) => ({
+        id: p.id,
+        name: p.name,
+        matchPoints: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        matchesPlayed: 0,
+        opponents: [],
+      }));
+      return generateSwissPairings(standings, 1, []);
+    } else {
+      // Single Elimination: Pair players in bracket order
+      // Shuffle for first round, then pair sequentially
+      const shuffled = [...players].sort(() => Math.random() - 0.5);
+      const pairings: Pairing[] = [];
+
+      for (let i = 0; i < shuffled.length; i += 2) {
+        if (i + 1 < shuffled.length) {
+          pairings.push({
+            player1Id: shuffled[i].id,
+            player1Name: shuffled[i].name,
+            player2Id: shuffled[i + 1].id,
+            player2Name: shuffled[i + 1].name,
+            roundNumber: 1,
+          });
+        } else {
+          // Odd number - bye for last player
+          pairings.push({
+            player1Id: shuffled[i].id,
+            player1Name: shuffled[i].name,
+            player2Id: null,
+            player2Name: null,
+            roundNumber: 1,
+          });
+        }
+      }
+
+      return pairings;
+    }
+  };
+
   const handleStartTournament = async () => {
     if (!tournament || tournament.status !== "draft" || !user) return;
     if (players.length < 2) return;
@@ -3109,7 +3161,8 @@ const TournamentView: React.FC = () => {
       setStartingTournament(true);
       setError(null);
 
-      const { data, error } = await supabase
+      // Update tournament status
+      const { data: tournamentData, error: tournamentError } = await supabase
         .from("tournaments")
         .update({ status: "active", num_rounds: numRounds })
         .eq("id", tournament.id)
@@ -3119,14 +3172,51 @@ const TournamentView: React.FC = () => {
         )
         .maybeSingle();
 
-      if (error) {
-        throw new Error(error.message || "Failed to start tournament");
+      if (tournamentError) {
+        throw new Error(
+          tournamentError.message || "Failed to start tournament",
+        );
       }
 
-      if (data) {
-        setTournament(data as TournamentSummary);
-        navigate(`/tournaments/${data.id}/matches`);
+      if (!tournamentData) {
+        throw new Error("Failed to update tournament");
       }
+
+      // Generate round 1 pairings
+      const pairings = generateRound1Pairings(
+        tournament.tournament_type,
+        players,
+      );
+
+      // Create matches in database
+      // Note: Byes are worth 3 points (equivalent to a win) per Pokemon tournament rules
+      const matchesToInsert = pairings.map((pairing) => ({
+        tournament_id: tournament.id,
+        round_number: 1,
+        player1_id: pairing.player1Id,
+        player2_id: pairing.player2Id,
+        status: pairing.player2Id === null ? "bye" : "pending",
+        result: pairing.player2Id === null ? "bye" : null,
+        winner_id: pairing.player2Id === null ? pairing.player1Id : null, // Bye = automatic win (3 points)
+      }));
+
+      const { error: matchesError } = await supabase
+        .from("tournament_matches")
+        .insert(matchesToInsert);
+
+      if (matchesError) {
+        // Rollback tournament status if match creation fails
+        await supabase
+          .from("tournaments")
+          .update({ status: "draft" })
+          .eq("id", tournament.id);
+        throw new Error(
+          matchesError.message || "Failed to create round 1 matches",
+        );
+      }
+
+      setTournament(tournamentData as TournamentSummary);
+      navigate(`/tournaments/${tournamentData.id}/matches`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to start tournament");
     } finally {
