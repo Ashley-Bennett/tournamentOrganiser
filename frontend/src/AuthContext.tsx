@@ -40,9 +40,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange((_event, newSession) => {
+        if (!isMounted) return;
         setSession(newSession);
         setUser(newSession?.user ?? null);
-        authSubscription = subscription;
         // Mirror access token into localStorage so existing API helper can keep sending it if needed.
         if (newSession?.access_token) {
           localStorage.setItem("token", newSession.access_token);
@@ -51,6 +51,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       });
 
+      // Assign subscription immediately after the call, not inside the callback
+      authSubscription = subscription;
+
+      if (!isMounted) return;
       setLoading(false);
     };
 
@@ -90,10 +94,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const logout = () => {
+    // Let the Supabase auth state listener drive session/user updates.
     void supabase.auth.signOut();
     localStorage.removeItem("token");
-    setSession(null);
-    setUser(null);
   };
 
   return (

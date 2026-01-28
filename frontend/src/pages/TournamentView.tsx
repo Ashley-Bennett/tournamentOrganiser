@@ -2941,7 +2941,7 @@ const TournamentView: React.FC = () => {
     };
 
     void fetchTournament();
-  }, [id, user, authLoading, navigate]);
+  }, [id, user, authLoading]);
 
   const formatDateTime = (value: string | null | undefined) => {
     if (!value) return "-";
