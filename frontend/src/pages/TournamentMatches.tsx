@@ -7,8 +7,33 @@ import {
   CircularProgress,
   Alert,
   Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  Tabs,
+  Tab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  FormControl,
+  FormLabel,
+  InputAdornment,
+  OutlinedInput,
+  InputLabel,
+  TableSortLabel,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import EditIcon from "@mui/icons-material/Edit";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
 
@@ -16,8 +41,28 @@ interface TournamentSummary {
   id: string;
   name: string;
   status: string;
+  tournament_type: string;
+  num_rounds: number | null;
   created_at: string;
   created_by: string;
+}
+
+interface Match {
+  id: string;
+  tournament_id: string;
+  round_number: number;
+  player1_id: string;
+  player2_id: string | null;
+  winner_id: string | null;
+  result: string | null;
+  status: "pending" | "completed" | "bye";
+  created_at: string;
+}
+
+interface MatchWithPlayers extends Match {
+  player1_name: string;
+  player2_name: string | null;
+  winner_name: string | null;
 }
 
 const TournamentMatches: React.FC = () => {
@@ -25,8 +70,21 @@ const TournamentMatches: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
+  const [matches, setMatches] = useState<MatchWithPlayers[]>([]);
   const [loading, setLoading] = useState(true);
+  const [matchesLoading, setMatchesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRound, setSelectedRound] = useState(1);
+  const [sortBy, setSortBy] = useState<"match" | "status">("match");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<MatchWithPlayers | null>(
+    null,
+  );
+  const [selectedWinner, setSelectedWinner] = useState<string>("");
+  const [player1Wins, setPlayer1Wins] = useState<number>(0);
+  const [player2Wins, setPlayer2Wins] = useState<number>(0);
+  const [updatingMatch, setUpdatingMatch] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -47,7 +105,9 @@ const TournamentMatches: React.FC = () => {
 
         const { data, error } = await supabase
           .from("tournaments")
-          .select("id, name, status, created_at, created_by")
+          .select(
+            "id, name, status, tournament_type, num_rounds, created_at, created_by",
+          )
           .eq("id", id)
           .eq("created_by", user.id)
           .maybeSingle();
@@ -72,7 +132,271 @@ const TournamentMatches: React.FC = () => {
     void fetchTournament();
   }, [id, user, authLoading, navigate]);
 
-  if (authLoading || loading) {
+  useEffect(() => {
+    if (!tournament?.id || !user) return;
+
+    const fetchMatches = async () => {
+      try {
+        setMatchesLoading(true);
+        setError(null);
+
+        // Fetch matches - stable order so match numbers never change
+        const { data: matchesData, error: matchesError } = await supabase
+          .from("tournament_matches")
+          .select("*")
+          .eq("tournament_id", tournament.id)
+          .order("round_number", { ascending: true })
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
+
+        if (matchesError) {
+          throw new Error(matchesError.message || "Failed to load matches");
+        }
+
+        if (!matchesData || matchesData.length === 0) {
+          setMatches([]);
+          setMatchesLoading(false);
+          return;
+        }
+
+        // Fetch player names
+        const playerIds = new Set<string>();
+        matchesData.forEach((match) => {
+          playerIds.add(match.player1_id);
+          if (match.player2_id) {
+            playerIds.add(match.player2_id);
+          }
+          if (match.winner_id) {
+            playerIds.add(match.winner_id);
+          }
+        });
+
+        const { data: playersData, error: playersError } = await supabase
+          .from("tournament_players")
+          .select("id, name")
+          .in("id", Array.from(playerIds));
+
+        if (playersError) {
+          throw new Error(playersError.message || "Failed to load players");
+        }
+
+        const playersMap = new Map<string, string>();
+        playersData?.forEach((player) => {
+          playersMap.set(player.id, player.name);
+        });
+
+        // Combine matches with player names
+        const matchesWithPlayers: MatchWithPlayers[] = matchesData.map(
+          (match) => ({
+            ...match,
+            player1_name: playersMap.get(match.player1_id) || "Unknown",
+            player2_name: match.player2_id
+              ? playersMap.get(match.player2_id) || "Unknown"
+              : null,
+            winner_name: match.winner_id
+              ? playersMap.get(match.winner_id) || "Unknown"
+              : null,
+          }),
+        );
+
+        setMatches(matchesWithPlayers);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to load matches");
+      } finally {
+        setMatchesLoading(false);
+      }
+    };
+
+    void fetchMatches();
+  }, [tournament?.id, user]);
+
+  const handleOpenScoreDialog = (
+    match: MatchWithPlayers,
+    winnerId: string | null = null,
+  ) => {
+    setSelectedMatch(match);
+    // Pre-select winner if provided, otherwise check existing winner
+    if (winnerId) {
+      if (winnerId === match.player1_id) {
+        setSelectedWinner("player1");
+      } else if (winnerId === match.player2_id) {
+        setSelectedWinner("player2");
+      } else {
+        setSelectedWinner("");
+      }
+    } else if (match.winner_id) {
+      if (match.winner_id === match.player1_id) {
+        setSelectedWinner("player1");
+      } else if (match.winner_id === match.player2_id) {
+        setSelectedWinner("player2");
+      } else {
+        setSelectedWinner("");
+      }
+    } else {
+      setSelectedWinner("");
+    }
+
+    // Parse existing score if available (format: "2-0", "2-1", etc.)
+    if (match.result && match.result !== "bye" && match.result !== "Draw") {
+      const parts = match.result.split("-");
+      if (parts.length === 2) {
+        setPlayer1Wins(parseInt(parts[0], 10) || 0);
+        setPlayer2Wins(parseInt(parts[1], 10) || 0);
+      } else {
+        setPlayer1Wins(0);
+        setPlayer2Wins(0);
+      }
+    } else {
+      setPlayer1Wins(0);
+      setPlayer2Wins(0);
+    }
+
+    setScoreDialogOpen(true);
+  };
+
+  const handleCloseScoreDialog = () => {
+    setScoreDialogOpen(false);
+    setSelectedMatch(null);
+    setSelectedWinner("");
+    setPlayer1Wins(0);
+    setPlayer2Wins(0);
+  };
+
+  const getScoreValidationError = (): string | null => {
+    if (!selectedMatch || !selectedWinner) return null;
+
+    // Validate score for non-draw matches
+    if (selectedWinner !== "draw" && selectedMatch.player2_id) {
+      if (player1Wins === 0 && player2Wins === 0) {
+        return "Please enter a valid score";
+      }
+      // Ensure winner has more wins
+      if (
+        (selectedWinner === "player1" && player1Wins <= player2Wins) ||
+        (selectedWinner === "player2" && player2Wins <= player1Wins)
+      ) {
+        return "Winner must have more wins than opponent";
+      }
+    }
+
+    return null;
+  };
+
+  const handleSaveMatchResult = async () => {
+    if (!selectedMatch || !selectedWinner) return;
+
+    const validationError = getScoreValidationError();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    try {
+      setUpdatingMatch(true);
+      setError(null);
+
+      // Determine winner_id based on selection
+      let winnerId: string | null = null;
+      if (selectedWinner === "player1") {
+        winnerId = selectedMatch.player1_id;
+      } else if (selectedWinner === "player2" && selectedMatch.player2_id) {
+        winnerId = selectedMatch.player2_id;
+      } else if (selectedWinner === "draw") {
+        // For draws, winner_id stays null
+        winnerId = null;
+      }
+
+      // Generate score string
+      let resultString = "";
+      if (selectedWinner === "draw") {
+        resultString = "Draw";
+      } else if (selectedMatch.player2_id) {
+        resultString = `${player1Wins}-${player2Wins}`;
+      } else {
+        resultString = "Bye";
+      }
+
+      // Update match in database
+      const updateData: {
+        winner_id?: string | null;
+        result: string;
+        status: "completed" | "pending";
+      } = {
+        result: resultString,
+        status: selectedWinner === "draw" || winnerId ? "completed" : "pending",
+      };
+
+      if (winnerId !== undefined) {
+        updateData.winner_id = winnerId;
+      }
+
+      const { error: updateError } = await supabase
+        .from("tournament_matches")
+        .update(updateData)
+        .eq("id", selectedMatch.id);
+
+      if (updateError) {
+        throw new Error(updateError.message || "Failed to update match");
+      }
+
+      // Refresh matches - same stable order so match numbers stay fixed
+      const { data: matchesData, error: matchesError } = await supabase
+        .from("tournament_matches")
+        .select("*")
+        .eq("tournament_id", tournament!.id)
+        .order("round_number", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
+
+      if (matchesError) {
+        throw new Error(matchesError.message || "Failed to refresh matches");
+      }
+
+      // Fetch updated player names
+      const playerIds = new Set<string>();
+      matchesData?.forEach((match) => {
+        playerIds.add(match.player1_id);
+        if (match.player2_id) {
+          playerIds.add(match.player2_id);
+        }
+        if (match.winner_id) {
+          playerIds.add(match.winner_id);
+        }
+      });
+
+      const { data: playersData } = await supabase
+        .from("tournament_players")
+        .select("id, name")
+        .in("id", Array.from(playerIds));
+
+      const playersMap = new Map<string, string>();
+      playersData?.forEach((player) => {
+        playersMap.set(player.id, player.name);
+      });
+
+      const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
+        (match) => ({
+          ...match,
+          player1_name: playersMap.get(match.player1_id) || "Unknown",
+          player2_name: match.player2_id
+            ? playersMap.get(match.player2_id) || "Unknown"
+            : null,
+          winner_name: match.winner_id
+            ? playersMap.get(match.winner_id) || "Unknown"
+            : null,
+        }),
+      );
+
+      setMatches(matchesWithPlayers);
+      handleCloseScoreDialog();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to update match");
+    } finally {
+      setUpdatingMatch(false);
+    }
+  };
+
+  if (authLoading || loading || matchesLoading) {
     return (
       <Box
         display="flex"
@@ -124,15 +448,425 @@ const TournamentMatches: React.FC = () => {
         </Typography>
       </Box>
 
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Matches
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Match generation and results will go here. For now this is a
-          placeholder screen shown after starting a tournament.
-        </Typography>
-      </Paper>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {matches.length === 0 && !tournament.num_rounds ? (
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            No Matches Yet
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Matches will appear here once the tournament has been started and
+            round 1 pairings have been generated.
+          </Typography>
+        </Paper>
+      ) : (
+        <Paper sx={{ overflow: "hidden" }}>
+          {(() => {
+            const totalRounds = tournament.num_rounds ?? 1;
+            const roundNumbers = Array.from(
+              { length: totalRounds },
+              (_, i) => i + 1,
+            );
+
+            return (
+              <>
+                <Tabs
+                  value={Math.min(selectedRound, totalRounds)}
+                  onChange={(_, value: number) => setSelectedRound(value)}
+                  variant="scrollable"
+                  scrollButtons="auto"
+                  sx={{
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    "& .MuiTab-root": { minHeight: 48 },
+                    "& .Mui-disabled": { opacity: 0.5 },
+                  }}
+                >
+                  {roundNumbers.map((roundNumber) => {
+                    const roundMatches = matches.filter(
+                      (m) => m.round_number === roundNumber,
+                    );
+                    const hasMatches = roundMatches.length > 0;
+                    return (
+                      <Tab
+                        key={roundNumber}
+                        label={`Round ${roundNumber}`}
+                        value={roundNumber}
+                        disabled={!hasMatches}
+                        sx={
+                          hasMatches
+                            ? {}
+                            : {
+                                color: "text.secondary",
+                                fontWeight: 500,
+                              }
+                        }
+                      />
+                    );
+                  })}
+                </Tabs>
+                <Box sx={{ p: 3 }}>
+                  {(() => {
+                    // Stable order by id so match numbers are absolute and never change
+                    const baseMatches = matches
+                      .filter((m) => m.round_number === selectedRound)
+                      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+                    // Map match id -> absolute match number (1-based, by id order)
+                    const matchNumberById = new Map<string, number>();
+                    baseMatches.forEach((m, i) =>
+                      matchNumberById.set(m.id, i + 1),
+                    );
+
+                    // Apply sort by Match # or Status
+                    const roundMatches = [...baseMatches].sort((a, b) => {
+                      if (sortBy === "match") {
+                        const cmp = a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+                        return sortOrder === "asc" ? cmp : -cmp;
+                      }
+                      // sortBy === "status"
+                      const statusOrder = { pending: 0, completed: 1, bye: 2 };
+                      const aVal = statusOrder[a.status] ?? 0;
+                      const bVal = statusOrder[b.status] ?? 0;
+                      const cmp = aVal - bVal;
+                      return sortOrder === "asc" ? cmp : -cmp;
+                    });
+
+                    const hasMatches = roundMatches.length > 0;
+
+                    const handleSort = (column: "match" | "status") => {
+                      setSortBy(column);
+                      setSortOrder((prev) =>
+                        sortBy === column
+                          ? prev === "asc"
+                            ? "desc"
+                            : "asc"
+                          : "asc",
+                      );
+                    };
+
+                    return hasMatches ? (
+                      <TableContainer>
+                        <Table>
+                          <TableHead>
+                            <TableRow>
+                              <TableCell
+                                sortDirection={
+                                  sortBy === "match" ? sortOrder : false
+                                }
+                              >
+                                <TableSortLabel
+                                  active={sortBy === "match"}
+                                  direction={
+                                    sortBy === "match" ? sortOrder : "asc"
+                                  }
+                                  onClick={() => handleSort("match")}
+                                >
+                                  Match #
+                                </TableSortLabel>
+                              </TableCell>
+                              <TableCell>Player 1</TableCell>
+                              <TableCell>Player 2</TableCell>
+                              <TableCell
+                                sortDirection={
+                                  sortBy === "status" ? sortOrder : false
+                                }
+                              >
+                                <TableSortLabel
+                                  active={sortBy === "status"}
+                                  direction={
+                                    sortBy === "status" ? sortOrder : "asc"
+                                  }
+                                  onClick={() => handleSort("status")}
+                                >
+                                  Status
+                                </TableSortLabel>
+                              </TableCell>
+                              <TableCell>Result</TableCell>
+                              <TableCell>Winner</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {roundMatches.map((match) => {
+                              const canEdit =
+                                match.status === "pending" &&
+                                match.player2_id !== null;
+                              const matchNumber =
+                                matchNumberById.get(match.id) ?? 0;
+                              return (
+                                <TableRow key={match.id}>
+                                  <TableCell>{matchNumber}</TableCell>
+                                  <TableCell>
+                                    <Box
+                                      display="flex"
+                                      alignItems="center"
+                                      gap={1}
+                                    >
+                                      {match.player1_name}
+                                      {canEdit && (
+                                        <IconButton
+                                          size="small"
+                                          color="primary"
+                                          onClick={() =>
+                                            handleOpenScoreDialog(
+                                              match,
+                                              match.player1_id,
+                                            )
+                                          }
+                                          title="Select winner"
+                                        >
+                                          <EmojiEventsIcon fontSize="small" />
+                                        </IconButton>
+                                      )}
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell>
+                                    {match.player2_name ? (
+                                      <Box
+                                        display="flex"
+                                        alignItems="center"
+                                        gap={1}
+                                      >
+                                        {match.player2_name}
+                                        {canEdit && (
+                                          <IconButton
+                                            size="small"
+                                            color="primary"
+                                            onClick={() =>
+                                              handleOpenScoreDialog(
+                                                match,
+                                                match.player2_id!,
+                                              )
+                                            }
+                                            title="Select winner"
+                                          >
+                                            <EmojiEventsIcon fontSize="small" />
+                                          </IconButton>
+                                        )}
+                                      </Box>
+                                    ) : (
+                                      <Chip
+                                        label="Bye"
+                                        size="small"
+                                        color="info"
+                                        variant="outlined"
+                                      />
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Chip
+                                      label={
+                                        match.status === "bye"
+                                          ? "Bye"
+                                          : match.status === "completed"
+                                            ? "Completed"
+                                            : "Pending"
+                                      }
+                                      size="small"
+                                      color={
+                                        match.status === "bye"
+                                          ? "info"
+                                          : match.status === "completed"
+                                            ? "success"
+                                            : "warning"
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Box
+                                      display="flex"
+                                      alignItems="center"
+                                      gap={1}
+                                    >
+                                      {match.result || "-"}
+                                      {canEdit && (
+                                        <IconButton
+                                          size="small"
+                                          onClick={() =>
+                                            handleOpenScoreDialog(match)
+                                          }
+                                          title="Edit result"
+                                        >
+                                          <EditIcon fontSize="small" />
+                                        </IconButton>
+                                      )}
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell>
+                                    {match.winner_name || "-"}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontStyle: "italic" }}
+                      >
+                        Pairings not yet generated
+                      </Typography>
+                    );
+                  })()}
+                </Box>
+              </>
+            );
+          })()}
+        </Paper>
+      )}
+
+      {/* Score Entry Dialog */}
+      <Dialog
+        open={scoreDialogOpen}
+        onClose={handleCloseScoreDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Record Match Result</DialogTitle>
+        <DialogContent>
+          {selectedMatch && (
+            <Box sx={{ pt: 2 }}>
+              <Typography variant="body1" gutterBottom>
+                <strong>Match:</strong> {selectedMatch.player1_name} vs{" "}
+                {selectedMatch.player2_name || "Bye"}
+              </Typography>
+              <FormControl component="fieldset" sx={{ mt: 3, mb: 2 }}>
+                <FormLabel component="legend">Select Winner</FormLabel>
+                <RadioGroup
+                  value={selectedWinner}
+                  onChange={(e) => {
+                    setSelectedWinner(e.target.value);
+                    setError(null); // Clear error when winner changes
+                  }}
+                >
+                  {selectedMatch.player2_id && (
+                    <>
+                      <FormControlLabel
+                        value="player1"
+                        control={<Radio />}
+                        label={selectedMatch.player1_name}
+                      />
+                      <FormControlLabel
+                        value="player2"
+                        control={<Radio />}
+                        label={selectedMatch.player2_name}
+                      />
+                      <FormControlLabel
+                        value="draw"
+                        control={<Radio />}
+                        label="Draw"
+                      />
+                    </>
+                  )}
+                  {!selectedMatch.player2_id && (
+                    <FormControlLabel
+                      value="player1"
+                      control={<Radio />}
+                      label={`${selectedMatch.player1_name} (Bye)`}
+                      checked={true}
+                    />
+                  )}
+                </RadioGroup>
+              </FormControl>
+              {selectedMatch.player2_id && selectedWinner !== "draw" && (
+                <Box sx={{ mt: 3 }}>
+                  <FormLabel component="legend" sx={{ mb: 2 }}>
+                    Game Wins
+                  </FormLabel>
+                  <Box display="flex" gap={2} alignItems="center">
+                    <FormControl variant="outlined" sx={{ flex: 1 }}>
+                      <InputLabel>{selectedMatch.player1_name}</InputLabel>
+                      <OutlinedInput
+                        type="number"
+                        value={player1Wins}
+                        onChange={(e) => {
+                          setPlayer1Wins(
+                            Math.max(0, parseInt(e.target.value, 10) || 0),
+                          );
+                          setError(null); // Clear error on change
+                        }}
+                        inputProps={{ min: 0, max: 3 }}
+                        endAdornment={
+                          <InputAdornment position="end">wins</InputAdornment>
+                        }
+                        label={selectedMatch.player1_name}
+                        error={
+                          selectedWinner === "player1" &&
+                          player1Wins <= player2Wins &&
+                          player1Wins + player2Wins > 0
+                        }
+                      />
+                    </FormControl>
+                    <Typography variant="h6">-</Typography>
+                    <FormControl variant="outlined" sx={{ flex: 1 }}>
+                      <InputLabel>{selectedMatch.player2_name}</InputLabel>
+                      <OutlinedInput
+                        type="number"
+                        value={player2Wins}
+                        onChange={(e) => {
+                          setPlayer2Wins(
+                            Math.max(0, parseInt(e.target.value, 10) || 0),
+                          );
+                          setError(null); // Clear error on change
+                        }}
+                        inputProps={{ min: 0, max: 3 }}
+                        endAdornment={
+                          <InputAdornment position="end">wins</InputAdornment>
+                        }
+                        label={selectedMatch.player2_name}
+                        error={
+                          selectedWinner === "player2" &&
+                          player2Wins <= player1Wins &&
+                          player1Wins + player2Wins > 0
+                        }
+                      />
+                    </FormControl>
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
+                    Score will be displayed as: {player1Wins}-{player2Wins}
+                  </Typography>
+                  {(() => {
+                    const validationError = getScoreValidationError();
+                    return validationError ? (
+                      <Alert severity="error" sx={{ mt: 2 }}>
+                        {validationError}
+                      </Alert>
+                    ) : null;
+                  })()}
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseScoreDialog} disabled={updatingMatch}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveMatchResult}
+            variant="contained"
+            disabled={
+              updatingMatch ||
+              !selectedWinner ||
+              getScoreValidationError() !== null
+            }
+          >
+            {updatingMatch ? "Saving..." : "Save Result"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
