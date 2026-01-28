@@ -16,9 +16,6 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: tournament-postgres
-          property: connectionString
 
   # Frontend service
   - type: web
@@ -29,10 +26,3 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://tournament-organizer-backend.onrender.com
-
-# PostgreSQL Database
-databases:
-  - name: tournament-postgres
-    databaseName: tournament_db
-    user: tournament_user
-    plan: free

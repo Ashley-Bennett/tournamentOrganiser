@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import path from "path";
 import { PostgresDatabase } from "./database/postgres-database";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -1000,10 +1001,29 @@ app.use(
   }
 );
 
-// 404 handler
-app.use("*", (req, res) => {
-  res.status(404).json({ error: "Route not found" });
-});
+// Serve static files from the React app build directory in production
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../../frontend/dist")));
+
+  // For any request that doesn't match an API route, serve the React app
+  app.get("*", (req, res) => {
+    // Skip API routes
+    if (req.path.startsWith("/api")) {
+      return res.status(404).json({ error: "Route not found" });
+    }
+
+    // Serve the React app's index.html for all other routes
+    res.sendFile(path.join(__dirname, "../../frontend/dist/index.html"));
+  });
+} else {
+  // In development, redirect non-API routes to the frontend dev server
+  app.use("*", (req, res) => {
+    if (!req.path.startsWith("/api")) {
+      return res.redirect(`http://localhost:5173${req.path}`);
+    }
+    res.status(404).json({ error: "Route not found" });
+  });
+}
 
 // Start server
 app.listen(PORT, () => {
