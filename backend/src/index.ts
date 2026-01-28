@@ -115,16 +115,15 @@ app.use(
   },
 );
 
-// Serve static files from the React app build directory in production
+// Route handling for non-API paths
 if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../../frontend/dist")));
-
-  // For any request that doesn't match an API route, serve the React app
-  app.get("*", (req, res) => {
-    if (req.path.startsWith("/api")) {
+  // In production on Render, the frontend is served by a separate static site.
+  // The backend should only handle /api routes and return 404 for everything else.
+  app.use("*", (req, res) => {
+    if (!req.path.startsWith("/api")) {
       return res.status(404).json({ error: "Route not found" });
     }
-    res.sendFile(path.join(__dirname, "../../frontend/dist/index.html"));
+    res.status(404).json({ error: "Route not found" });
   });
 } else {
   // In development, redirect non-API routes to the frontend dev server
