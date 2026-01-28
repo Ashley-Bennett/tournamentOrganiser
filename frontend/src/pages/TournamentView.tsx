@@ -35,6 +35,7 @@ import {
   useTheme,
   RadioGroup,
   Radio,
+  IconButton,
 } from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
@@ -2891,13 +2892,33 @@ const LegacyTournamentView: React.FC = () => {
   );
 };
 
+interface TournamentSummary {
+  id: string;
+  name: string;
+  status: string;
+  created_at: string;
+  created_by: string;
+}
+
+interface TournamentPlayer {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
 const TournamentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const [tournament, setTournament] = useState<any | null>(null);
+  const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [players, setPlayers] = useState<TournamentPlayer[]>([]);
+  const [playersLoading, setPlayersLoading] = useState(false);
+  const [playersError, setPlayersError] = useState<string | null>(null);
+  const [newPlayerName, setNewPlayerName] = useState("");
+  const [addingPlayer, setAddingPlayer] = useState(false);
+  const [deletingPlayerId, setDeletingPlayerId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -2942,6 +2963,103 @@ const TournamentView: React.FC = () => {
 
     void fetchTournament();
   }, [id, user, authLoading]);
+
+  useEffect(() => {
+    if (!tournament?.id || !user) return;
+
+    const fetchPlayers = async () => {
+      try {
+        setPlayersLoading(true);
+        setPlayersError(null);
+
+        const { data, error } = await supabase
+          .from("tournament_players")
+          .select("id, name, created_at")
+          .eq("tournament_id", tournament.id)
+          .order("created_at", { ascending: true });
+
+        if (error) {
+          throw new Error(error.message || "Failed to load players");
+        }
+
+        setPlayers((data as TournamentPlayer[]) || []);
+      } catch (e: unknown) {
+        setPlayersError(
+          e instanceof Error ? e.message : "Failed to load players",
+        );
+      } finally {
+        setPlayersLoading(false);
+      }
+    };
+
+    void fetchPlayers();
+  }, [tournament?.id, user]);
+
+  const handleAddPlayer = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newPlayerName.trim() || !tournament || !user) return;
+
+    try {
+      setAddingPlayer(true);
+      setPlayersError(null);
+
+      const { data, error } = await supabase
+        .from("tournament_players")
+        .insert({
+          name: newPlayerName.trim(),
+          tournament_id: tournament.id,
+          created_by: user.id,
+        })
+        .select("id, name, created_at")
+        .single();
+
+      if (error) {
+        throw new Error(error.message || "Failed to add player");
+      }
+
+      setPlayers((prev) => [...prev, data as TournamentPlayer]);
+      setNewPlayerName("");
+    } catch (e: unknown) {
+      setPlayersError(e instanceof Error ? e.message : "Failed to add player");
+    } finally {
+      setAddingPlayer(false);
+    }
+  };
+
+  const handleDeletePlayer = async (playerId: string) => {
+    if (!tournament || tournament.status !== "draft" || !user) return;
+    if (
+      !window.confirm(
+        "Remove this player from the tournament? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingPlayerId(playerId);
+      setPlayersError(null);
+
+      const { error } = await supabase
+        .from("tournament_players")
+        .delete()
+        .eq("id", playerId)
+        .eq("tournament_id", tournament.id)
+        .eq("created_by", user.id);
+
+      if (error) {
+        throw new Error(error.message || "Failed to delete player");
+      }
+
+      setPlayers((prev) => prev.filter((p) => p.id !== playerId));
+    } catch (e: unknown) {
+      setPlayersError(
+        e instanceof Error ? e.message : "Failed to delete player",
+      );
+    } finally {
+      setDeletingPlayerId(null);
+    }
+  };
 
   const formatDateTime = (value: string | null | undefined) => {
     if (!value) return "-";
@@ -3000,7 +3118,7 @@ const TournamentView: React.FC = () => {
         </Typography>
       </Box>
 
-      <Paper sx={{ p: 3 }}>
+      <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="subtitle1" gutterBottom>
           Basic Details
         </Typography>
@@ -3020,6 +3138,82 @@ const TournamentView: React.FC = () => {
             </Typography>
           </Box>
         </Box>
+      </Paper>
+
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Players
+        </Typography>
+        {playersError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {playersError}
+          </Alert>
+        )}
+        <Box
+          component="form"
+          onSubmit={handleAddPlayer}
+          display="flex"
+          gap={2}
+          mb={2}
+          flexWrap="wrap"
+        >
+          <TextField
+            label="Player name"
+            value={newPlayerName}
+            onChange={(e) => setNewPlayerName(e.target.value)}
+            size="small"
+            sx={{ minWidth: 240 }}
+          />
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={addingPlayer || !newPlayerName.trim()}
+          >
+            Add Player
+          </Button>
+        </Box>
+
+        {playersLoading ? (
+          <Box display="flex" justifyContent="center" py={2}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : players.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            No players added yet. Add your first player above.
+          </Typography>
+        ) : (
+          <Box display="flex" flexDirection="column" gap={1}>
+            {players.map((player) => (
+              <Box
+                key={player.id}
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                py={0.5}
+                borderBottom="1px solid"
+                borderColor="divider"
+              >
+                <Typography variant="body2">{player.name}</Typography>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    Joined {formatDateTime(player.created_at)}
+                  </Typography>
+                  {tournament.status === "draft" && (
+                    <IconButton
+                      size="small"
+                      color="error"
+                      aria-label="Remove player"
+                      onClick={() => handleDeletePlayer(player.id)}
+                      disabled={deletingPlayerId === player.id}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        )}
       </Paper>
     </Box>
   );

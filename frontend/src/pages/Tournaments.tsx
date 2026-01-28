@@ -12,6 +12,7 @@ import {
   TableHead,
   TableRow,
   Chip,
+  ChipProps,
   CircularProgress,
   Alert,
   TextField,
@@ -69,8 +70,12 @@ const Tournaments: React.FC = () => {
       }
 
       setTournaments(data || []);
-    } catch (error: any) {
-      setError(error.message || "Network error. Please try again.");
+    } catch (error: unknown) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Network error. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -110,7 +115,7 @@ const Tournaments: React.FC = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const getCompletionColor = (status: string) => {
+  const getCompletionColor = (status: string): ChipProps["color"] => {
     switch (status) {
       case "completed":
         return "success";
@@ -241,7 +246,7 @@ const Tournaments: React.FC = () => {
                     <TableCell>
                       <Chip
                         label={getStatusLabel(tournament.status)}
-                        color={getCompletionColor(tournament.status) as any}
+                        color={getCompletionColor(tournament.status)}
                         size="small"
                       />
                     </TableCell>
