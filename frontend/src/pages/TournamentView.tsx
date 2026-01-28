@@ -46,6 +46,7 @@ import {
   Leaderboard as LeaderboardIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
+  PlayArrow as PlayArrowIcon,
 } from "@mui/icons-material";
 import { apiCall } from "../utils/api";
 import { useAuth } from "../AuthContext";
@@ -2919,6 +2920,7 @@ const TournamentView: React.FC = () => {
   const [newPlayerName, setNewPlayerName] = useState("");
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [deletingPlayerId, setDeletingPlayerId] = useState<string | null>(null);
+  const [startingTournament, setStartingTournament] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -3061,6 +3063,37 @@ const TournamentView: React.FC = () => {
     }
   };
 
+  const handleStartTournament = async () => {
+    if (!tournament || tournament.status !== "draft" || !user) return;
+    if (players.length < 2) return;
+
+    try {
+      setStartingTournament(true);
+      setError(null);
+
+      const { data, error } = await supabase
+        .from("tournaments")
+        .update({ status: "active" })
+        .eq("id", tournament.id)
+        .eq("created_by", user.id)
+        .select("id, name, status, created_at, created_by")
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message || "Failed to start tournament");
+      }
+
+      if (data) {
+        setTournament(data as TournamentSummary);
+        navigate(`/tournaments/${data.id}/matches`);
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to start tournament");
+    } finally {
+      setStartingTournament(false);
+    }
+  };
+
   const formatDateTime = (value: string | null | undefined) => {
     if (!value) return "-";
     return new Date(value).toLocaleString();
@@ -3119,9 +3152,25 @@ const TournamentView: React.FC = () => {
       </Box>
 
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Basic Details
-        </Typography>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          mb={1}
+        >
+          <Typography variant="subtitle1" gutterBottom>
+            Basic Details
+          </Typography>
+          {tournament.status !== "draft" && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => navigate(`/tournaments/${tournament.id}/matches`)}
+            >
+              View matches
+            </Button>
+          )}
+        </Box>
         <Box display="flex" flexDirection="column" gap={1}>
           <Box display="flex" gap={1} alignItems="center">
             <Typography variant="body2" color="text.secondary">
@@ -3138,6 +3187,24 @@ const TournamentView: React.FC = () => {
             </Typography>
           </Box>
         </Box>
+        {tournament.status === "draft" && (
+          <Box mt={2} display="flex" flexDirection="column" gap={1}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<PlayArrowIcon />}
+              onClick={handleStartTournament}
+              disabled={startingTournament || players.length < 2}
+            >
+              Start tournament
+            </Button>
+            <Typography variant="caption" color="text.secondary">
+              {players.length < 2
+                ? "Add at least 2 players before starting."
+                : "Once started, players can no longer be removed."}
+            </Typography>
+          </Box>
+        )}
       </Paper>
 
       <Paper sx={{ p: 3 }}>
