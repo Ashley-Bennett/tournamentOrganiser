@@ -22,53 +22,53 @@ import {
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { apiCall, handleApiError } from "../utils/api";
 import { useAuth } from "../AuthContext";
+import { supabase } from "../supabaseClient";
 
 interface Tournament {
-  id: number;
+  id: string;
   name: string;
-  date: string;
-  league_name?: string;
-  bracket_type: string;
-  status: "new" | "active" | "completed";
+  status: "draft" | "active" | "completed";
   created_at: string;
-  updated_at?: string;
+  created_by: string;
 }
 
 const Tournaments: React.FC = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [searchName, setSearchName] = useState("");
-  const [selectedLeague, setSelectedLeague] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const [leagues, setLeagues] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
+    if (!user) return;
     fetchTournaments();
-    fetchLeagues();
-  }, []);
+  }, [user]);
 
   const fetchTournaments = async () => {
     try {
       setLoading(true);
-      const response = await apiCall("/api/tournaments");
-      if (response.ok) {
-        const data = await response.json();
-        setTournaments(data);
-      } else {
-        if (response.status === 401) {
-          logout();
-          navigate("/login");
-          return;
-        }
-        await handleApiError(response);
+      if (!user) {
+        logout();
+        navigate("/login");
+        return;
       }
+
+      const { data, error } = await supabase
+        .from("tournaments")
+        .select("id, name, status, created_at, created_by")
+        .eq("created_by", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setTournaments(data || []);
     } catch (error: any) {
       setError(error.message || "Network error. Please try again.");
     } finally {
@@ -76,22 +76,10 @@ const Tournaments: React.FC = () => {
     }
   };
 
-  const fetchLeagues = async () => {
-    try {
-      const response = await apiCall("/api/leagues");
-      if (response.ok) {
-        const data = await response.json();
-        setLeagues(data);
-      }
-    } catch (error) {
-      // ignore league fetch errors for now
-    }
-  };
-
-  const handleDeleteTournament = async (id: number) => {
+  const handleDeleteTournament = async (id: string) => {
     if (
       !window.confirm(
-        "Are you sure you want to delete this tournament? This cannot be undone."
+        "Are you sure you want to delete this tournament? This cannot be undone.",
       )
     )
       return;
@@ -99,16 +87,18 @@ const Tournaments: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const response = await apiCall(`/api/tournaments/${id}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        setTournaments((prev) => prev.filter((t) => t.id !== id));
-        setSuccess("Tournament deleted successfully.");
-      } else {
-        const data = await response.json();
-        setError(data.error || "Failed to delete tournament.");
+      const { error } = await supabase
+        .from("tournaments")
+        .delete()
+        .eq("id", id)
+        .eq("created_by", user?.id || "");
+
+      if (error) {
+        throw new Error(error.message || "Failed to delete tournament.");
       }
+
+      setTournaments((prev) => prev.filter((t) => t.id !== id));
+      setSuccess("Tournament deleted successfully.");
     } catch (err) {
       setError("Network error. Please try again.");
     } finally {
@@ -126,23 +116,10 @@ const Tournaments: React.FC = () => {
         return "success";
       case "active":
         return "warning";
-      case "new":
+      case "draft":
         return "info";
       default:
         return "default";
-    }
-  };
-
-  const getBracketTypeLabel = (bracketType: string) => {
-    switch (bracketType) {
-      case "SWISS":
-        return "Swiss System";
-      case "SINGLE_ELIMINATION":
-        return "Single Elimination";
-      case "DOUBLE_ELIMINATION":
-        return "Double Elimination";
-      default:
-        return bracketType;
     }
   };
 
@@ -157,20 +134,14 @@ const Tournaments: React.FC = () => {
     .filter((t) =>
       searchName.trim() === ""
         ? true
-        : t.name.toLowerCase().includes(searchName.toLowerCase())
+        : t.name.toLowerCase().includes(searchName.toLowerCase()),
     )
     .filter((t) =>
-      selectedLeague === ""
-        ? true
-        : t.league_name ===
-          leagues.find((l) => l.id.toString() === selectedLeague)?.name
-    )
-    .filter((t) =>
-      selectedStatus === "all" ? true : t.status === selectedStatus
+      selectedStatus === "all" ? true : t.status === selectedStatus,
     )
     .sort(
       (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
 
   if (loading) {
@@ -216,22 +187,6 @@ const Tournaments: React.FC = () => {
           size="small"
           sx={{ minWidth: 200 }}
         />
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel id="league-filter-label">League</InputLabel>
-          <Select
-            labelId="league-filter-label"
-            value={selectedLeague}
-            label="League"
-            onChange={(e) => setSelectedLeague(e.target.value)}
-          >
-            <MenuItem value="">All</MenuItem>
-            {leagues.map((league) => (
-              <MenuItem key={league.id} value={league.id.toString()}>
-                {league.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
         <FormControl size="small" sx={{ minWidth: 160 }}>
           <InputLabel id="status-filter-label">Status</InputLabel>
           <Select
@@ -241,7 +196,7 @@ const Tournaments: React.FC = () => {
             onChange={(e) => setSelectedStatus(e.target.value)}
           >
             <MenuItem value="all">All</MenuItem>
-            <MenuItem value="new">New</MenuItem>
+            <MenuItem value="draft">Draft</MenuItem>
             <MenuItem value="active">Active</MenuItem>
             <MenuItem value="completed">Completed</MenuItem>
           </Select>
@@ -265,9 +220,6 @@ const Tournaments: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>League</TableCell>
-                <TableCell>Bracket Type</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Created</TableCell>
                 <TableCell>Actions</TableCell>
@@ -286,13 +238,6 @@ const Tournaments: React.FC = () => {
                 filteredTournaments.map((tournament) => (
                   <TableRow key={tournament.id}>
                     <TableCell>{tournament.name}</TableCell>
-                    <TableCell>{formatDate(tournament.date)}</TableCell>
-                    <TableCell>
-                      {tournament.league_name || "No League"}
-                    </TableCell>
-                    <TableCell>
-                      {getBracketTypeLabel(tournament.bracket_type)}
-                    </TableCell>
                     <TableCell>
                       <Chip
                         label={getStatusLabel(tournament.status)}
