@@ -20,6 +20,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.1",
+    "@supabase/supabase-js": "^2.48.0",
     "matchamp": "file:.."
   },
   "devDependencies": {

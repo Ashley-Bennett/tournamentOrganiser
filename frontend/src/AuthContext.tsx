@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { apiCall } from "./utils/api";
+import type { Session, User } from "@supabase/supabase-js";
+import { supabase } from "./supabaseClient";
 
 interface AuthContextType {
-  user: { name: string; email: string } | null;
-  token: string | null;
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -14,97 +16,90 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [token, setToken] = useState<string | null>(() =>
-    localStorage.getItem("token")
-  );
-  const [user, setUser] = useState<{ name: string; email: string } | null>(
-    null
-  );
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (token) {
-      // Decode JWT to get user info (simple base64 decode, not verifying signature)
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        setUser({ name: payload.name, email: payload.email });
-      } catch {
-        setUser(null);
-      }
-    } else {
-      setUser(null);
-    }
-  }, [token]);
+    let isMounted = true;
+    let authSubscription:
+      | ReturnType<
+          typeof supabase.auth.onAuthStateChange
+        >["data"]["subscription"]
+      | null = null;
+
+    const initAuth = async () => {
+      setLoading(true);
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession();
+      if (!isMounted) return;
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        authSubscription = subscription;
+        // Mirror access token into localStorage so existing API helper can keep sending it if needed.
+        if (newSession?.access_token) {
+          localStorage.setItem("token", newSession.access_token);
+        } else {
+          localStorage.removeItem("token");
+        }
+      });
+
+      setLoading(false);
+    };
+
+    void initAuth();
+
+    return () => {
+      isMounted = false;
+      authSubscription?.unsubscribe();
+    };
+  }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await apiCall("/api/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Login failed");
-    localStorage.setItem("token", data.token);
-    setToken(data.token);
+    if (error) {
+      throw new Error(error.message || "Login failed");
+    }
+    // Session change handler will update state + localStorage token
+    if (data.session?.access_token) {
+      localStorage.setItem("token", data.session.access_token);
+    }
   };
 
   const register = async (name: string, email: string, password: string) => {
-    console.log("🚀 Starting registration process...");
-    console.log("📤 Sending request to /api/users");
-
-    const requestBody = { name, email, password };
-    console.log("📝 Request body:", { name, email, hasPassword: !!password });
-
-    // First, let's test if we can reach the backend at all
-    console.log("🧪 Testing backend connectivity...");
-    try {
-      const healthRes = await apiCall("/api/health", { method: "GET" });
-      console.log("🏥 Health check status:", healthRes.status);
-      const healthText = await healthRes.text();
-      console.log("🏥 Health check response:", healthText);
-    } catch (healthError) {
-      console.error("❌ Health check failed:", healthError);
-    }
-
-    console.log("🔗 About to call apiCall function...");
-    const res = await apiCall("/api/users", {
-      method: "POST",
-      body: JSON.stringify(requestBody),
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name },
+      },
     });
-
-    console.log("📥 Response status:", res.status);
-    console.log(
-      "📥 Response headers:",
-      Object.fromEntries(res.headers.entries())
-    );
-
-    const responseText = await res.text();
-    console.log("📥 Raw response text:", responseText);
-
-    let data;
-    try {
-      data = JSON.parse(responseText);
-      console.log("📥 Parsed response data:", data);
-    } catch (parseError) {
-      console.error("❌ Failed to parse JSON response:", parseError);
-      console.log("📥 Raw response was:", responseText);
-      throw new Error(`Invalid JSON response: ${responseText}`);
+    if (error) {
+      throw new Error(error.message || "Registration failed");
     }
-
-    if (!res.ok) {
-      console.error("❌ Registration failed:", data);
-      throw new Error(data.error || "Registration failed");
-    }
-
-    console.log("✅ Registration successful:", data);
   };
 
   const logout = () => {
+    void supabase.auth.signOut();
     localStorage.removeItem("token");
-    setToken(null);
+    setSession(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, login, register, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

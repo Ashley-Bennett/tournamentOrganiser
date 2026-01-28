@@ -10,11 +10,15 @@ import Leagues from "./pages/Leagues";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import { useAuth } from "./AuthContext";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
-  const token = localStorage.getItem("token");
+  const { user, loading } = useAuth();
   const location = useLocation();
-  if (!token) {
+  if (loading) {
+    return null;
+  }
+  if (!user) {
     return <Navigate to="/" state={{ from: location }} replace />;
   }
   return children;
