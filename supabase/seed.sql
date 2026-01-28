@@ -6,6 +6,7 @@ create table if not exists public.tournaments (
   name text not null,
   created_by uuid not null references auth.users (id) on delete cascade,
   status text not null default 'draft' check (status in ('draft', 'active', 'completed')),
+  tournament_type text not null default 'single_elimination' check (tournament_type in ('swiss', 'single_elimination')),
   created_at timestamptz not null default now()
 );
 

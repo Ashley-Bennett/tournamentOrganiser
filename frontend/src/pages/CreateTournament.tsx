@@ -27,6 +27,7 @@ const CreateTournament: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
+    tournament_type: "single_elimination",
   });
 
   const handleChange =
@@ -54,6 +55,7 @@ const CreateTournament: React.FC = () => {
         name: formData.name,
         created_by: user.id,
         status: "draft",
+        tournament_type: formData.tournament_type,
       });
 
       if (insertError) {
@@ -101,6 +103,23 @@ const CreateTournament: React.FC = () => {
                 required
                 variant="outlined"
               />
+            </Grid>
+
+            <Grid item xs={12}>
+              <FormControl fullWidth required>
+                <InputLabel>Tournament Type</InputLabel>
+                <Select
+                  value={formData.tournament_type}
+                  onChange={handleChange("tournament_type")}
+                  label="Tournament Type"
+                  variant="outlined"
+                >
+                  <MenuItem value="single_elimination">
+                    Single Elimination
+                  </MenuItem>
+                  <MenuItem value="swiss">Swiss</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
 
             <Grid item xs={12}>

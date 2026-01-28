@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Typography,
@@ -30,6 +30,7 @@ interface Tournament {
   id: string;
   name: string;
   status: "draft" | "active" | "completed";
+  tournament_type: "swiss" | "single_elimination";
   created_at: string;
   created_by: string;
 }
@@ -45,12 +46,7 @@ const Tournaments: React.FC = () => {
   const [searchName, setSearchName] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
 
-  useEffect(() => {
-    if (!user) return;
-    fetchTournaments();
-  }, [user]);
-
-  const fetchTournaments = async () => {
+  const fetchTournaments = useCallback(async () => {
     try {
       setLoading(true);
       if (!user) {
@@ -61,7 +57,7 @@ const Tournaments: React.FC = () => {
 
       const { data, error } = await supabase
         .from("tournaments")
-        .select("id, name, status, created_at, created_by")
+        .select("id, name, status, tournament_type, created_at, created_by")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false });
 
@@ -79,7 +75,12 @@ const Tournaments: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, logout, navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchTournaments();
+  }, [user, fetchTournaments]);
 
   const handleDeleteTournament = async (id: string) => {
     if (
@@ -132,6 +133,12 @@ const Tournaments: React.FC = () => {
   const getStatusLabel = (status: string) => {
     if (!status) return "";
     return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  // Format tournament type for display
+  const getTournamentTypeLabel = (type: string) => {
+    if (!type) return "";
+    return type === "single_elimination" ? "Single Elimination" : "Swiss";
   };
 
   // Filtering and sorting logic
@@ -225,6 +232,7 @@ const Tournaments: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
+                <TableCell>Type</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Created</TableCell>
                 <TableCell>Actions</TableCell>
@@ -233,7 +241,7 @@ const Tournaments: React.FC = () => {
             <TableBody>
               {filteredTournaments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={5} align="center">
                     <Typography variant="body2" color="text.secondary">
                       No tournaments found. Create your first tournament!
                     </Typography>
@@ -243,6 +251,9 @@ const Tournaments: React.FC = () => {
                 filteredTournaments.map((tournament) => (
                   <TableRow key={tournament.id}>
                     <TableCell>{tournament.name}</TableCell>
+                    <TableCell>
+                      {getTournamentTypeLabel(tournament.tournament_type)}
+                    </TableCell>
                     <TableCell>
                       <Chip
                         label={getStatusLabel(tournament.status)}
