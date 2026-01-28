@@ -19,7 +19,6 @@ This guide will help you deploy your Tournament Organizer app to Render.
 
 1. Create a new **Web Service**
 2. Configure the service:
-
    - **Name**: `tournament-organizer-backend`
    - **Environment**: `Node`
    - **Build Command**: `cd backend && npm install && npm run build`
@@ -31,13 +30,11 @@ This guide will help you deploy your Tournament Organizer app to Render.
    - `PORT`: `10000`
    - `FRONTEND_URL`: `https://your-frontend-service-name.onrender.com`
    - `JWT_SECRET`: (generate a secure random string)
-   - `DATABASE_URL`: `postgresql://username:password@host:port/database`
 
 ### 3. Deploy Frontend
 
 1. Create a new **Static Site**
 2. Configure the service:
-
    - **Name**: `tournament-organizer-frontend`
    - **Build Command**: `cd frontend && npm install && npm run build`
    - **Publish Directory**: `frontend/dist`
@@ -59,7 +56,6 @@ NODE_ENV=production
 PORT=10000
 FRONTEND_URL=https://your-frontend-service-name.onrender.com
 JWT_SECRET=your-secure-jwt-secret
-DATABASE_URL=postgresql://username:password@host:port/database
 ```
 
 ### Frontend (.env)
@@ -70,10 +66,9 @@ VITE_API_URL=https://your-backend-service-name.onrender.com
 
 ## Important Notes
 
-1. **Database**: The PostgreSQL database will be created automatically via the DATABASE_URL environment variable
-2. **CORS**: The backend is configured to accept requests from the frontend URL
-3. **JWT Secret**: Generate a secure random string for production
-4. **Free Tier Limitations**:
+1. **CORS**: The backend is configured to accept requests from the frontend URL
+2. **JWT Secret**: Generate a secure random string for production
+3. **Free Tier Limitations**:
    - Services may sleep after 15 minutes of inactivity
    - Limited bandwidth and build minutes
    - Database files may be reset on service restarts
@@ -84,8 +79,7 @@ VITE_API_URL=https://your-backend-service-name.onrender.com
 
 1. **Build Failures**: Check that all dependencies are in package.json
 2. **CORS Errors**: Verify FRONTEND_URL is set correctly
-3. **Database Issues**: Ensure DATABASE_URL is correctly configured
-4. **Port Conflicts**: Use PORT environment variable
+3. **Port Conflicts**: Use PORT environment variable
 
 ### Logs
 

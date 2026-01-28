@@ -15,7 +15,6 @@ services:
         value: https://matchamp.win
       - key: JWT_SECRET
         generateValue: true
-      - key: DATABASE_URL
 
   # Frontend service
   - type: web

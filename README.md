@@ -1,26 +1,25 @@
-# Matchamp
+# Matchamp (stripped-down demo)
 
-A full-stack tournament management application built with React, TypeScript, Material-UI, Node.js, Express, and PostgreSQL.
+A minimal React + Node/Express app with the tournament logic and database removed, kept only as a simple shell so the frontend and basic auth flow can run without any persistence.
 
 ## 🏗️ Project Structure
 
 ```
 matchamp/
-├── backend/                 # Node.js/Express backend
+├── backend/                 # Node.js/Express backend (no database)
 │   ├── src/
-│   │   ├── database/       # PostgreSQL database setup
-│   │   └── index.ts        # Express server entry point
+│   │   └── index.ts         # Express server entry point
 │   ├── package.json
 │   └── tsconfig.json
-├── frontend/               # React/Vite frontend
+├── frontend/                # React/Vite frontend
 │   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── pages/         # Page components
-│   │   ├── App.tsx        # Main app component
-│   │   └── main.tsx       # React entry point
+│   │   ├── components/      # Reusable UI components
+│   │   ├── pages/           # Page components
+│   │   ├── App.tsx          # Main app component
+│   │   └── main.tsx         # React entry point
 │   ├── package.json
 │   └── vite.config.ts
-└── package.json           # Root workspace configuration
+└── package.json             # Root workspace configuration
 ```
 
 ## 🚀 Quick Start
@@ -52,11 +51,16 @@ matchamp/
    npm install --workspace=frontend
    ```
 
-3. **Set up environment variables**
+3. **Environment**
+
+   The backend no longer uses a database. The only important env variable is an optional `JWT_SECRET` for signing demo tokens:
 
    ```bash
-   # Copy backend environment template
-   cp backend/env.example backend/.env
+   # backend/.env
+   PORT=3002
+   NODE_ENV=development
+   FRONTEND_URL=http://localhost:5173
+   JWT_SECRET=dev-secret-key
    ```
 
 4. **Start development servers**
@@ -70,250 +74,21 @@ matchamp/
    npm run dev:frontend # Frontend on http://localhost:5173
    ```
 
-## 🛠️ Development
+## 🛠️ Backend (Node.js/Express, no DB)
 
-### Backend (Node.js/Express)
+- **Port**: 3002 (or `PORT` env)
+- **Endpoints**:
+  - `GET /api/health` – returns a simple health JSON.
+  - `GET /api` – returns basic API info, noting that the database is disabled.
+  - `POST /api/users` – accepts `name`, `email`, `password` and returns a success message without storing anything.
+  - `POST /api/login` – accepts `email`, `password` and returns a dummy JWT so the frontend can treat the user as logged in.
+  - Any other `/api/*` routes respond with `501` to indicate that the old database-backed features are disabled in this build.
 
-- **Port**: 3002
-- **Database**: PostgreSQL (configured via DATABASE_URL environment variable)
-- **Features**:
-  - RESTful API endpoints
-  - PostgreSQL database with tournament, participant, and match tables
-  - CORS enabled for frontend communication
-  - TypeScript for type safety
-
-### Frontend (React/Vite)
+## 🛠️ Frontend (React/Vite)
 
 - **Port**: 5173
-- **Features**:
-  - React 18 with TypeScript
-  - Material-UI for modern UI components
-  - React Router for navigation
-  - Vite for fast development and building
-  - Proxy configuration for API calls
-
-## 📊 Database Schema
-
-### Tournaments Table
-
-- `id` (PRIMARY KEY)
-- `name` (TEXT, NOT NULL)
-- `description` (TEXT)
-- `start_date` (TEXT)
-- `end_date` (TEXT)
-- `max_participants` (INTEGER)
-- `status` (TEXT, DEFAULT 'pending')
-- `created_at` (DATETIME)
-- `updated_at` (DATETIME)
-
-### Participants Table
-
-- `id` (PRIMARY KEY)
-- `tournament_id` (FOREIGN KEY)
-- `name` (TEXT, NOT NULL)
-- `email` (TEXT)
-- `phone` (TEXT)
-- `registration_date` (DATETIME)
-- `status` (TEXT, DEFAULT 'registered')
-
-### Matches Table
-
-- `id` (PRIMARY KEY)
-- `tournament_id` (FOREIGN KEY)
-- `participant1_id` (FOREIGN KEY)
-- `participant2_id` (FOREIGN KEY)
-- `round` (INTEGER)
-- `winner_id` (FOREIGN KEY)
-- `match_date` (TEXT)
-- `status` (TEXT, DEFAULT 'scheduled')
-- `created_at` (DATETIME)
-
-## 🎯 Features
-
-### Current Features
-
-- ✅ Tournament creation and management
-- ✅ Participant registration
-- ✅ Match scheduling and tracking
-- ✅ Modern Material-UI interface
-- ✅ Responsive design
-- ✅ TypeScript for type safety
-- ✅ **Automatic Swiss pairing system**
-- ✅ **Static seating constraint enforcement**
-- ✅ **Dynamic match result entry**
-- ✅ **Real-time standings updates**
-
-### Planned Features
-
-- 🔄 Tournament brackets generation
-- 🔄 Real-time match updates
-- 🔄 Tournament statistics and analytics
-- 🔄 User authentication and authorization
-- 🔄 Tournament templates
-- 🔄 Export/import functionality
-
-## 🎯 Pairing System
-
-### Automatic Pairing
-
-The tournament organizer now supports automatic pairing for Swiss tournaments with the following features:
-
-#### First Round Pairing
-
-- **Static Seating Priority**: Static seating players are paired with dynamic seating players first
-- **Constraint Enforcement**: Two static seating players are never paired together
-- **Remaining Players**: Any remaining players are paired within their own groups
-- **Bye Handling**: Odd players receive a bye
-
-#### Subsequent Round Pairing (Swiss System)
-
-- **Point-Based Pairing**: Players are paired based on their current tournament points
-- **Previous Match Avoidance**: Players who have already played each other are not paired again
-- **Static Seating Constraint**: Static seating players are never paired together
-- **Optimal Matching**: Algorithm finds the best available opponent based on point difference
-- **Floating Down Mechanism**: Unpaired players from higher score brackets are floated down to lower brackets for pairing attempts
-- **Fair Bye System**: Byes are given to the lowest scoring players and count as 1 point
-- **Bye Limits**: Players are limited to 2 byes per tournament to prevent abuse
-
-### Pairing Options
-
-When creating matches, users can choose between:
-
-1. **🎯 Automatic Pairing**: System automatically creates optimal pairings based on points and constraints
-2. **✏️ Custom Pairing**: Manual selection of players for each match
-
-### Floating Down Algorithm
-
-The Swiss pairing system now implements a sophisticated floating down mechanism:
-
-#### How It Works
-
-1. **Score Bracket Grouping**: Players are grouped by their current tournament points
-2. **Top-Down Processing**: Brackets are processed from highest to lowest points
-3. **Bracket Pairing**: Within each bracket, players are paired optimally
-4. **Floating Down**: Unpaired players from higher brackets are moved down to the next lower bracket
-5. **Re-pairing**: The lower bracket is re-paired including the floated down players
-6. **Iterative Process**: This continues until all players are paired or receive a bye
-
-#### Benefits
-
-- **Maximizes Pairing Opportunities**: Players who can't be paired in their bracket get additional chances
-- **Maintains Fairness**: Players are still paired with opponents of similar skill levels when possible
-- **Reduces Byes**: More players get matches instead of receiving byes
-- **Tournament Integrity**: Preserves the competitive nature of Swiss tournaments
-
-## 🏆 Match Result System
-
-### Dynamic Result Entry
-
-The tournament organizer now features dynamic match result entry with the following capabilities:
-
-#### Result Buttons
-
-- **Player-Specific Buttons**: Each match shows three buttons with actual player names
-- **Win Options**: "[Player Name] Wins" buttons for each player
-- **Tie Option**: "Tie" button for draws
-- **Real-time Updates**: Results update immediately and refresh standings
-
-#### Result Validation
-
-- **Complete Round Requirement**: Subsequent rounds cannot be created until all current round results are in
-- **Visual Feedback**: Buttons are disabled during updates with loading states
-- **Success Indicators**: "Result Set" chip appears when match has a result
-
-#### Standings Updates
-
-- **Automatic Point Calculation**: Win = 1 point, Draw = 0.5 points, Loss = 0 points, **Bye = 1 point**
-- **Real-time Refresh**: Standings update immediately after result entry
-- **Tournament Progress**: System tracks completion status for each round
-
-## 🎲 Bye System
-
-### Fair Bye Distribution
-
-The tournament organizer implements a fair bye system to handle odd numbers of players:
-
-#### Bye Rules
-
-- **Point Value**: Byes count as 1 point (same as a win)
-- **Distribution**: Byes are given to the lowest scoring players first
-- **Limits**: Players are limited to 2 byes per tournament
-- **History Tracking**: System tracks bye history to prevent abuse
-
-#### Bye Assignment Logic
-
-- **First Round**: Bye given to the lowest scoring player
-- **Subsequent Rounds**: Byes given to lowest scoring players who haven't exceeded limits
-- **Fallback**: If a player has had too many byes, system finds another eligible player
-
-#### Benefits
-
-- **Fairness**: Lowest scoring players get opportunities to catch up
-- **Prevents Abuse**: Limits prevent players from getting too many free points
-- **Tournament Integrity**: Maintains competitive balance throughout the tournament
-
-### API Endpoints
-
-#### Get Player Standings
-
-```
-GET /api/tournaments/:id/standings
-```
-
-Returns player standings with points, matches played, and seating type.
-
-#### Create Automatic Pairings
-
-```
-POST /api/tournaments/:id/pairings
-Body: { "round_number": number }
-```
-
-Creates automatic pairings for the specified round and returns the created matches.
-
-#### Update Match Result
-
-```
-PATCH /api/matches/:id/result
-Body: { "result": string, "winner_id": number, "modified_by_to": boolean }
-```
-
-Updates match result and automatically recalculates player standings.
-
-### Database Schema Updates
-
-The system now tracks:
-
-- **Player Points**: Calculated from match results (Win = 1, Draw = 0.5, Loss = 0)
-- **Static Seating**: Boolean flag indicating if a player requires fixed seating
-- **Match History**: Prevents repeat pairings in Swiss tournaments
-- **Result Tracking**: Complete match result history with timestamps
-- **Tournament Progress**: Round completion status and validation
-
-## 🧪 API Endpoints
-
-### Health Check
-
-- `GET /api/health` - Server health status
-
-### Tournaments
-
-- `GET /api/tournaments` - Get all tournaments
-- `POST /api/tournaments` - Create new tournament
-- `GET /api/tournaments/:id` - Get tournament by ID
-- `PUT /api/tournaments/:id` - Update tournament
-- `DELETE /api/tournaments/:id` - Delete tournament
-
-### Participants
-
-- `GET /api/tournaments/:id/participants` - Get tournament participants
-- `POST /api/tournaments/:id/participants` - Add participant to tournament
-
-### Matches
-
-- `GET /api/tournaments/:id/matches` - Get tournament matches
-- `POST /api/tournaments/:id/matches` - Create new match
-- `PUT /api/matches/:id` - Update match result
+- Uses React, TypeScript, Material-UI, and React Router.
+- Continues to call the backend for `/api/login` and `/api/users`, but no data is persisted.
 
 ## 🚀 Deployment
 
@@ -333,18 +108,6 @@ npm run build
 # Serve the dist folder with your preferred web server
 ```
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## 📝 License
 
 This project is licensed under the MIT License.
-
-## 🆘 Support
-
-If you encounter any issues or have questions, please open an issue on GitHub.
