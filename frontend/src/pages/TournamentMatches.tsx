@@ -1684,17 +1684,26 @@ const TournamentMatches: React.FC = () => {
                       selectedRound === tournament.num_rounds;
                     const canCompleteTournament = isFinalRound && allCompleted;
 
-                    // Map match id -> absolute match number (1-based, by id order)
+                    // Map match id -> absolute match number (1-based, by DB order within round)
                     const matchNumberById = new Map<string, number>();
                     baseMatches.forEach((m, i) =>
                       matchNumberById.set(m.id, i + 1),
                     );
 
                     // Apply sort by Match # or Status
-                    // baseMatches is already in DB order (created_at), which preserves pairing order with byes at end
                     const roundMatches = [...baseMatches];
-                    if (sortBy === "status") {
-                      // When sorting by status, ensure byes are still last
+                    const getMatchNum = (m: (typeof baseMatches)[0]) =>
+                      matchNumberById.get(m.id) ?? 0;
+
+                    if (sortBy === "match") {
+                      roundMatches.sort((a, b) => {
+                        const numA = getMatchNum(a);
+                        const numB = getMatchNum(b);
+                        const cmp = numA - numB;
+                        return sortOrder === "asc" ? cmp : -cmp;
+                      });
+                    } else {
+                      // sortBy === "status": by status, byes last, then secondary by match number
                       roundMatches.sort((a, b) => {
                         const aIsBye =
                           a.status === "bye" || a.player2_id === null;
@@ -1703,7 +1712,7 @@ const TournamentMatches: React.FC = () => {
                         if (aIsBye && !bIsBye) return 1; // bye comes after
                         if (!aIsBye && bIsBye) return -1; // non-bye comes before
 
-                        const statusOrder = {
+                        const statusOrder: Record<string, number> = {
                           ready: 0,
                           pending: 1,
                           completed: 2,
@@ -1712,10 +1721,11 @@ const TournamentMatches: React.FC = () => {
                         const aVal = statusOrder[a.status] ?? 0;
                         const bVal = statusOrder[b.status] ?? 0;
                         const cmp = aVal - bVal;
-                        return sortOrder === "asc" ? cmp : -cmp;
+                        if (cmp !== 0) return sortOrder === "asc" ? cmp : -cmp;
+                        // Same status: stable sort by match number
+                        return getMatchNum(a) - getMatchNum(b);
                       });
                     }
-                    // When sorting by match, preserve DB order (byes at end) - no re-sort needed
 
                     const hasMatches = roundMatches.length > 0;
 
