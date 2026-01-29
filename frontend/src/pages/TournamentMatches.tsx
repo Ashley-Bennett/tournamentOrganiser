@@ -95,6 +95,9 @@ const TournamentMatches: React.FC = () => {
   const [player1Wins, setPlayer1Wins] = useState<number>(0);
   const [player2Wins, setPlayer2Wins] = useState<number>(0);
   const [updatingMatch, setUpdatingMatch] = useState(false);
+  const [pendingResults, setPendingResults] = useState<
+    Map<string, { winnerId: string | null; result: string }>
+  >(new Map());
 
   const standingsByPlayerId = useMemo(() => {
     // Standings as-of the start of the selected round (all rounds < selectedRound)
@@ -366,6 +369,127 @@ const TournamentMatches: React.FC = () => {
     return null;
   };
 
+  const handleQuickResult = (
+    match: MatchWithPlayers,
+    result: "player1" | "player2" | "draw",
+  ) => {
+    if (!match.player2_id) return; // Can't set result for bye
+
+    let winnerId: string | null = null;
+    let resultString = "";
+
+    if (result === "draw") {
+      winnerId = null;
+      resultString = "Draw";
+    } else if (result === "player1") {
+      winnerId = match.player1_id;
+      resultString = "1-0"; // Best of 1
+    } else {
+      // result === "player2"
+      winnerId = match.player2_id;
+      resultString = "0-1"; // Best of 1
+    }
+
+    // Store in pending results (not saved to DB yet)
+    setPendingResults((prev) => {
+      const next = new Map(prev);
+      next.set(match.id, { winnerId, result: resultString });
+      return next;
+    });
+  };
+
+  const savePendingResults = async (): Promise<void> => {
+    if (pendingResults.size === 0) return;
+
+    try {
+      setUpdatingMatch(true);
+      setError(null);
+
+      // Save all pending results
+      const updates = Array.from(pendingResults.entries()).map(
+        ([matchId, { winnerId, result }]) => ({
+          id: matchId,
+          winner_id: winnerId,
+          result,
+          status: "completed" as const,
+        }),
+      );
+
+      for (const update of updates) {
+        const { error: updateError } = await supabase
+          .from("tournament_matches")
+          .update({
+            winner_id: update.winner_id,
+            result: update.result,
+            status: update.status,
+          })
+          .eq("id", update.id);
+
+        if (updateError) {
+          throw new Error(updateError.message || "Failed to update match");
+        }
+      }
+
+      // Clear pending results
+      setPendingResults(new Map());
+
+      // Refresh matches
+      const { data: matchesData, error: matchesError } = await supabase
+        .from("tournament_matches")
+        .select("*")
+        .eq("tournament_id", tournament!.id)
+        .order("round_number", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
+
+      if (matchesError) {
+        throw new Error(matchesError.message || "Failed to refresh matches");
+      }
+
+      // Fetch updated player names
+      const playerIds = new Set<string>();
+      matchesData?.forEach((m) => {
+        playerIds.add(m.player1_id);
+        if (m.player2_id) {
+          playerIds.add(m.player2_id);
+        }
+        if (m.winner_id) {
+          playerIds.add(m.winner_id);
+        }
+      });
+
+      const { data: playersData } = await supabase
+        .from("tournament_players")
+        .select("id, name")
+        .in("id", Array.from(playerIds));
+
+      const playersMap = new Map<string, string>();
+      playersData?.forEach((player) => {
+        playersMap.set(player.id, player.name);
+      });
+
+      const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
+        (m) => ({
+          ...m,
+          player1_name: playersMap.get(m.player1_id) || "Unknown",
+          player2_name: m.player2_id
+            ? playersMap.get(m.player2_id) || "Unknown"
+            : null,
+          winner_name: m.winner_id
+            ? playersMap.get(m.winner_id) || "Unknown"
+            : null,
+        }),
+      );
+
+      setMatches(matchesWithPlayers);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save results");
+      throw e; // Re-throw so handleNextRound can handle it
+    } finally {
+      setUpdatingMatch(false);
+    }
+  };
+
   const handleSaveMatchResult = async () => {
     if (!selectedMatch || !selectedWinner) return;
 
@@ -562,9 +686,21 @@ const TournamentMatches: React.FC = () => {
       setProcessingRound(true);
       setError(null);
 
+      // Save all pending results before generating next round
+      await savePendingResults();
+
       const nextRoundNumber = selectedRound + 1;
       if (tournament.num_rounds && nextRoundNumber > tournament.num_rounds) {
         throw new Error("Maximum number of rounds reached");
+      }
+
+      // If next round already exists, just navigate to it (do NOT create duplicates)
+      const nextRoundAlreadyExists = matches.some(
+        (m) => m.round_number === nextRoundNumber,
+      );
+      if (nextRoundAlreadyExists) {
+        setSelectedRound(nextRoundNumber);
+        return;
       }
 
       // Calculate standings from all previous rounds
@@ -687,6 +823,7 @@ const TournamentMatches: React.FC = () => {
       );
 
       // Create matches in database
+      // Pairings are already sorted with byes at the end by generateSwissPairings
       const matchesToInsert = pairings.map((pairing) => ({
         tournament_id: tournament.id,
         round_number: nextRoundNumber,
@@ -845,7 +982,11 @@ const TournamentMatches: React.FC = () => {
               <>
                 <Tabs
                   value={Math.min(selectedRound, totalRounds)}
-                  onChange={(_, value: number) => setSelectedRound(value)}
+                  onChange={(_, value: number) => {
+                    setSelectedRound(value);
+                    // Clear pending results when switching rounds
+                    setPendingResults(new Map());
+                  }}
                   variant="scrollable"
                   scrollButtons="auto"
                   sx={{
@@ -897,11 +1038,17 @@ const TournamentMatches: React.FC = () => {
                     const hasPendingMatches = roundMatchesForState.some(
                       (m) => m.status === "pending",
                     );
+                    // A match is "complete" if it's either saved as completed/bye OR has a pending result
                     const allCompleted =
                       roundMatchesForState.length > 0 &&
-                      roundMatchesForState.every(
-                        (m) => m.status === "completed" || m.status === "bye",
-                      );
+                      roundMatchesForState.every((m) => {
+                        // Bye matches are always complete
+                        if (m.status === "bye" || !m.player2_id) return true;
+                        // Check if match is completed in database
+                        if (m.status === "completed") return true;
+                        // Check if match has a pending result set
+                        return pendingResults.has(m.id);
+                      });
                     const canShowNextRound =
                       tournament.num_rounds &&
                       selectedRound < tournament.num_rounds;
@@ -909,6 +1056,10 @@ const TournamentMatches: React.FC = () => {
                       allCompleted && canShowNextRound;
                     const showBeginRound =
                       hasReadyMatches && !hasPendingMatches;
+                    const nextRoundNumber = selectedRound + 1;
+                    const nextRoundAlreadyExists = matches.some(
+                      (m) => m.round_number === nextRoundNumber,
+                    );
 
                     // Map match id -> absolute match number (1-based, by id order)
                     const matchNumberById = new Map<string, number>();
@@ -917,23 +1068,31 @@ const TournamentMatches: React.FC = () => {
                     );
 
                     // Apply sort by Match # or Status
-                    const roundMatches = [...baseMatches].sort((a, b) => {
-                      if (sortBy === "match") {
-                        const cmp = a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+                    // baseMatches is already in DB order (created_at), which preserves pairing order with byes at end
+                    let roundMatches = [...baseMatches];
+                    if (sortBy === "status") {
+                      // When sorting by status, ensure byes are still last
+                      roundMatches.sort((a, b) => {
+                        const aIsBye =
+                          a.status === "bye" || a.player2_id === null;
+                        const bIsBye =
+                          b.status === "bye" || b.player2_id === null;
+                        if (aIsBye && !bIsBye) return 1; // bye comes after
+                        if (!aIsBye && bIsBye) return -1; // non-bye comes before
+
+                        const statusOrder = {
+                          ready: 0,
+                          pending: 1,
+                          completed: 2,
+                          bye: 3,
+                        };
+                        const aVal = statusOrder[a.status] ?? 0;
+                        const bVal = statusOrder[b.status] ?? 0;
+                        const cmp = aVal - bVal;
                         return sortOrder === "asc" ? cmp : -cmp;
-                      }
-                      // sortBy === "status"
-                      const statusOrder = {
-                        ready: 0,
-                        pending: 1,
-                        completed: 2,
-                        bye: 3,
-                      };
-                      const aVal = statusOrder[a.status] ?? 0;
-                      const bVal = statusOrder[b.status] ?? 0;
-                      const cmp = aVal - bVal;
-                      return sortOrder === "asc" ? cmp : -cmp;
-                    });
+                      });
+                    }
+                    // When sorting by match, preserve DB order (byes at end) - no re-sort needed
 
                     const hasMatches = roundMatches.length > 0;
 
@@ -973,6 +1132,7 @@ const TournamentMatches: React.FC = () => {
                             {canShowNextRound && (
                               <Tooltip
                                 title={
+                                  !nextRoundAlreadyExists &&
                                   !canProceedToNextRound
                                     ? "Complete all matches in this round to proceed to the next round"
                                     : ""
@@ -986,10 +1146,14 @@ const TournamentMatches: React.FC = () => {
                                     startIcon={<ArrowForwardIcon />}
                                     onClick={handleNextRound}
                                     disabled={
-                                      processingRound || !canProceedToNextRound
+                                      processingRound ||
+                                      (!nextRoundAlreadyExists &&
+                                        !canProceedToNextRound)
                                     }
                                   >
-                                    Next Round
+                                    {nextRoundAlreadyExists
+                                      ? "View Next Round"
+                                      : "Create Next Round"}
                                   </Button>
                                 </span>
                               </Tooltip>
@@ -1032,26 +1196,79 @@ const TournamentMatches: React.FC = () => {
                                     Status
                                   </TableSortLabel>
                                 </TableCell>
-                                <TableCell>Result</TableCell>
-                                <TableCell>Winner</TableCell>
                               </TableRow>
                             </TableHead>
                             <TableBody>
                               {roundMatches.map((match) => {
                                 const canEdit =
-                                  (match.status === "pending" ||
-                                    match.status === "ready") &&
+                                  match.status === "pending" &&
                                   match.player2_id !== null;
                                 const matchNumber =
                                   matchNumberById.get(match.id) ?? 0;
+
+                                // Get effective result from pending state or match state
+                                const pendingResult = pendingResults.get(
+                                  match.id,
+                                );
+                                const effectiveWinnerId = pendingResult
+                                  ? pendingResult.winnerId
+                                  : match.winner_id;
+                                const effectiveResult = pendingResult
+                                  ? pendingResult.result
+                                  : match.result;
+
+                                // Determine background color for Player 1
+                                const getPlayer1BgColor = () => {
+                                  if (
+                                    match.status === "bye" ||
+                                    !match.player2_id
+                                  ) {
+                                    return "rgba(33, 150, 243, 0.1)"; // Blue for bye
+                                  }
+                                  if (effectiveResult === "Draw") {
+                                    return "rgba(255, 152, 0, 0.1)"; // Orange for draw
+                                  }
+                                  if (effectiveWinnerId === match.player1_id) {
+                                    return "rgba(76, 175, 80, 0.1)"; // Green for winner
+                                  }
+                                  if (effectiveWinnerId === match.player2_id) {
+                                    return "rgba(244, 67, 54, 0.1)"; // Red for loser
+                                  }
+                                  return "transparent";
+                                };
+
+                                // Determine background color for Player 2
+                                const getPlayer2BgColor = () => {
+                                  if (
+                                    match.status === "bye" ||
+                                    !match.player2_id
+                                  ) {
+                                    return "rgba(33, 150, 243, 0.1)"; // Blue for bye
+                                  }
+                                  if (effectiveResult === "Draw") {
+                                    return "rgba(255, 152, 0, 0.1)"; // Orange for draw
+                                  }
+                                  if (effectiveWinnerId === match.player2_id) {
+                                    return "rgba(76, 175, 80, 0.1)"; // Green for winner
+                                  }
+                                  if (effectiveWinnerId === match.player1_id) {
+                                    return "rgba(244, 67, 54, 0.1)"; // Red for loser
+                                  }
+                                  return "transparent";
+                                };
+
                                 return (
                                   <TableRow key={match.id}>
                                     <TableCell>{matchNumber}</TableCell>
-                                    <TableCell>
+                                    <TableCell
+                                      sx={{
+                                        backgroundColor: getPlayer1BgColor(),
+                                      }}
+                                    >
                                       <Box
                                         display="flex"
-                                        alignItems="center"
-                                        gap={1}
+                                        flexDirection="column"
+                                        gap={0.5}
                                       >
                                         <Box>
                                           <Typography variant="body2">
@@ -1073,29 +1290,158 @@ const TournamentMatches: React.FC = () => {
                                             })()}
                                           </Typography>
                                         </Box>
-                                        {canEdit && (
-                                          <IconButton
-                                            size="small"
-                                            color="primary"
-                                            onClick={() =>
-                                              handleOpenScoreDialog(
-                                                match,
-                                                match.player1_id,
-                                              )
-                                            }
-                                            title="Select winner"
+                                        {match.player2_id && (
+                                          <Box
+                                            display="flex"
+                                            gap={0.5}
+                                            flexWrap="wrap"
                                           >
-                                            <EmojiEventsIcon fontSize="small" />
-                                          </IconButton>
+                                            <Chip
+                                              label="1-0"
+                                              size="small"
+                                              variant={
+                                                effectiveWinnerId ===
+                                                match.player1_id
+                                                  ? "filled"
+                                                  : "outlined"
+                                              }
+                                              sx={{
+                                                borderColor: "success.main",
+                                                color:
+                                                  effectiveWinnerId ===
+                                                  match.player1_id
+                                                    ? "white"
+                                                    : "success.main",
+                                                backgroundColor:
+                                                  effectiveWinnerId ===
+                                                  match.player1_id
+                                                    ? "success.main"
+                                                    : "transparent",
+                                                cursor: canEdit
+                                                  ? "pointer"
+                                                  : "default",
+                                                opacity: canEdit ? 1 : 0.7,
+                                                "&:hover": canEdit
+                                                  ? {
+                                                      backgroundColor:
+                                                        effectiveWinnerId ===
+                                                        match.player1_id
+                                                          ? "success.dark"
+                                                          : "success.light",
+                                                      color: "white",
+                                                    }
+                                                  : {},
+                                              }}
+                                              onClick={() =>
+                                                handleQuickResult(
+                                                  match,
+                                                  "player1",
+                                                )
+                                              }
+                                              disabled={
+                                                !canEdit || updatingMatch
+                                              }
+                                            />
+                                            <Chip
+                                              label="Draw"
+                                              size="small"
+                                              variant={
+                                                effectiveResult === "Draw"
+                                                  ? "filled"
+                                                  : "outlined"
+                                              }
+                                              sx={{
+                                                borderColor: "warning.main",
+                                                color:
+                                                  effectiveResult === "Draw"
+                                                    ? "white"
+                                                    : "warning.main",
+                                                backgroundColor:
+                                                  effectiveResult === "Draw"
+                                                    ? "warning.main"
+                                                    : "transparent",
+                                                cursor: canEdit
+                                                  ? "pointer"
+                                                  : "default",
+                                                opacity: canEdit ? 1 : 0.7,
+                                                "&:hover": canEdit
+                                                  ? {
+                                                      backgroundColor:
+                                                        effectiveResult ===
+                                                        "Draw"
+                                                          ? "warning.dark"
+                                                          : "warning.light",
+                                                      color: "white",
+                                                    }
+                                                  : {},
+                                              }}
+                                              onClick={() =>
+                                                handleQuickResult(match, "draw")
+                                              }
+                                              disabled={
+                                                !canEdit || updatingMatch
+                                              }
+                                            />
+                                            <Chip
+                                              label="0-1"
+                                              size="small"
+                                              variant={
+                                                effectiveWinnerId ===
+                                                match.player2_id
+                                                  ? "filled"
+                                                  : "outlined"
+                                              }
+                                              sx={{
+                                                borderColor: "error.main",
+                                                color:
+                                                  effectiveWinnerId ===
+                                                  match.player2_id
+                                                    ? "white"
+                                                    : "error.main",
+                                                backgroundColor:
+                                                  effectiveWinnerId ===
+                                                  match.player2_id
+                                                    ? "error.main"
+                                                    : "transparent",
+                                                cursor: canEdit
+                                                  ? "pointer"
+                                                  : "default",
+                                                opacity: canEdit ? 1 : 0.7,
+                                                "&:hover": canEdit
+                                                  ? {
+                                                      backgroundColor:
+                                                        effectiveWinnerId ===
+                                                        match.player2_id
+                                                          ? "error.dark"
+                                                          : "error.light",
+                                                      color: "white",
+                                                    }
+                                                  : {},
+                                              }}
+                                              onClick={() =>
+                                                handleQuickResult(
+                                                  match,
+                                                  "player2",
+                                                )
+                                              }
+                                              disabled={
+                                                !canEdit || updatingMatch
+                                              }
+                                            />
+                                          </Box>
                                         )}
                                       </Box>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell
+                                      sx={{
+                                        backgroundColor: getPlayer2BgColor(),
+                                      }}
+                                    >
                                       {match.player2_name ? (
                                         <Box
                                           display="flex"
-                                          alignItems="center"
-                                          gap={1}
+                                          flexDirection="column"
+                                          gap={0.5}
                                         >
                                           <Box>
                                             <Typography variant="body2">
@@ -1119,21 +1465,144 @@ const TournamentMatches: React.FC = () => {
                                               })()}
                                             </Typography>
                                           </Box>
-                                          {canEdit && (
-                                            <IconButton
+                                          <Box
+                                            display="flex"
+                                            gap={0.5}
+                                            flexWrap="wrap"
+                                          >
+                                            <Chip
+                                              label="1-0"
                                               size="small"
-                                              color="primary"
+                                              variant={
+                                                effectiveWinnerId ===
+                                                match.player2_id
+                                                  ? "filled"
+                                                  : "outlined"
+                                              }
+                                              sx={{
+                                                borderColor: "success.main",
+                                                color:
+                                                  effectiveWinnerId ===
+                                                  match.player2_id
+                                                    ? "white"
+                                                    : "success.main",
+                                                backgroundColor:
+                                                  effectiveWinnerId ===
+                                                  match.player2_id
+                                                    ? "success.main"
+                                                    : "transparent",
+                                                cursor: canEdit
+                                                  ? "pointer"
+                                                  : "default",
+                                                opacity: canEdit ? 1 : 0.7,
+                                                "&:hover": canEdit
+                                                  ? {
+                                                      backgroundColor:
+                                                        effectiveWinnerId ===
+                                                        match.player2_id
+                                                          ? "success.dark"
+                                                          : "success.light",
+                                                      color: "white",
+                                                    }
+                                                  : {},
+                                              }}
                                               onClick={() =>
-                                                handleOpenScoreDialog(
+                                                handleQuickResult(
                                                   match,
-                                                  match.player2_id!,
+                                                  "player2",
                                                 )
                                               }
-                                              title="Select winner"
-                                            >
-                                              <EmojiEventsIcon fontSize="small" />
-                                            </IconButton>
-                                          )}
+                                              disabled={
+                                                !canEdit || updatingMatch
+                                              }
+                                            />
+                                            <Chip
+                                              label="Draw"
+                                              size="small"
+                                              variant={
+                                                effectiveResult === "Draw"
+                                                  ? "filled"
+                                                  : "outlined"
+                                              }
+                                              sx={{
+                                                borderColor: "warning.main",
+                                                color:
+                                                  effectiveResult === "Draw"
+                                                    ? "white"
+                                                    : "warning.main",
+                                                backgroundColor:
+                                                  effectiveResult === "Draw"
+                                                    ? "warning.main"
+                                                    : "transparent",
+                                                cursor: canEdit
+                                                  ? "pointer"
+                                                  : "default",
+                                                opacity: canEdit ? 1 : 0.7,
+                                                "&:hover": canEdit
+                                                  ? {
+                                                      backgroundColor:
+                                                        effectiveResult ===
+                                                        "Draw"
+                                                          ? "warning.dark"
+                                                          : "warning.light",
+                                                      color: "white",
+                                                    }
+                                                  : {},
+                                              }}
+                                              onClick={() =>
+                                                handleQuickResult(match, "draw")
+                                              }
+                                              disabled={
+                                                !canEdit || updatingMatch
+                                              }
+                                            />
+                                            <Chip
+                                              label="0-1"
+                                              size="small"
+                                              variant={
+                                                effectiveWinnerId ===
+                                                match.player1_id
+                                                  ? "filled"
+                                                  : "outlined"
+                                              }
+                                              sx={{
+                                                borderColor: "error.main",
+                                                color:
+                                                  effectiveWinnerId ===
+                                                  match.player1_id
+                                                    ? "white"
+                                                    : "error.main",
+                                                backgroundColor:
+                                                  effectiveWinnerId ===
+                                                  match.player1_id
+                                                    ? "error.main"
+                                                    : "transparent",
+                                                cursor: canEdit
+                                                  ? "pointer"
+                                                  : "default",
+                                                opacity: canEdit ? 1 : 0.7,
+                                                "&:hover": canEdit
+                                                  ? {
+                                                      backgroundColor:
+                                                        effectiveWinnerId ===
+                                                        match.player1_id
+                                                          ? "error.dark"
+                                                          : "error.light",
+                                                      color: "white",
+                                                    }
+                                                  : {},
+                                              }}
+                                              onClick={() =>
+                                                handleQuickResult(
+                                                  match,
+                                                  "player1",
+                                                )
+                                              }
+                                              disabled={
+                                                !canEdit || updatingMatch
+                                              }
+                                            />
+                                          </Box>
                                         </Box>
                                       ) : (
                                         <Chip
@@ -1166,29 +1635,6 @@ const TournamentMatches: React.FC = () => {
                                                 : "default"
                                         }
                                       />
-                                    </TableCell>
-                                    <TableCell>
-                                      <Box
-                                        display="flex"
-                                        alignItems="center"
-                                        gap={1}
-                                      >
-                                        {match.result || "-"}
-                                        {canEdit && (
-                                          <IconButton
-                                            size="small"
-                                            onClick={() =>
-                                              handleOpenScoreDialog(match)
-                                            }
-                                            title="Edit result"
-                                          >
-                                            <EditIcon fontSize="small" />
-                                          </IconButton>
-                                        )}
-                                      </Box>
-                                    </TableCell>
-                                    <TableCell>
-                                      {match.winner_name || "-"}
                                     </TableCell>
                                   </TableRow>
                                 );
