@@ -32,7 +32,7 @@ const CreateTournament: React.FC = () => {
 
   const handleChange =
     (field: string) =>
-    (event: React.ChangeEvent<HTMLInputElement | { value: unknown }> | any) => {
+    (event: React.ChangeEvent<HTMLInputElement | { value: unknown }>) => {
       setFormData({
         ...formData,
         [field]: event.target.value,
@@ -71,8 +71,12 @@ const CreateTournament: React.FC = () => {
       } else {
         navigate("/tournaments");
       }
-    } catch (error: any) {
-      setError(error.message || "Network error. Please try again.");
+    } catch (error: unknown) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Network error. Please try again.",
+      );
     } finally {
       setLoading(false);
     }

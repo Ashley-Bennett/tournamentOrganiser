@@ -2,10 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../supabaseClient";
 import type { TournamentPlayer } from "../types/tournament";
 
-export function useTournamentPlayers(
-  tournamentId: string | undefined,
-  _user: unknown,
-) {
+export function useTournamentPlayers(tournamentId: string | undefined) {
   const [players, setPlayers] = useState<TournamentPlayer[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

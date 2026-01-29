@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Typography,
   Button,
@@ -60,11 +60,7 @@ const Players: React.FC = () => {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchPlayers();
-  }, []);
-
-  const fetchPlayers = async () => {
+  const fetchPlayers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await apiCall("/api/players");
@@ -75,12 +71,20 @@ const Players: React.FC = () => {
         if (handleUnauthorized(response)) return;
         await handleApiError(response);
       }
-    } catch (error: any) {
-      setError(error.message || "Network error. Please try again.");
+    } catch (error: unknown) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Network error. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, [handleUnauthorized]);
+
+  useEffect(() => {
+    fetchPlayers();
+  }, [fetchPlayers]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -101,8 +105,12 @@ const Players: React.FC = () => {
         if (handleUnauthorized(response)) return;
         await handleApiError(response);
       }
-    } catch (error: any) {
-      setError(error.message || "Network error. Please try again.");
+    } catch (error: unknown) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Network error. Please try again.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -122,8 +130,6 @@ const Players: React.FC = () => {
     };
 
   const openEditDialog = (player: Player) => {
-    console.log("🔍 Opening edit dialog for player:", player);
-    console.log("🔍 Player name in edit:", player.name);
     setEditPlayer(player);
     setEditForm({
       name: player.name,
@@ -149,7 +155,7 @@ const Players: React.FC = () => {
     setEditError(null);
     setSuccess(null);
     try {
-      const payload: any = {
+      const payload = {
         name: editForm.name,
         static_seating: !!editForm.static_seating,
         trainer_id: editForm.trainer_id || null,
@@ -174,8 +180,12 @@ const Players: React.FC = () => {
         if (handleUnauthorized(response)) return;
         await handleApiError(response);
       }
-    } catch (error: any) {
-      setEditError(error.message || "Network error. Please try again.");
+    } catch (error: unknown) {
+      setEditError(
+        error instanceof Error
+          ? error.message
+          : "Network error. Please try again.",
+      );
     } finally {
       setEditSubmitting(false);
     }
@@ -239,42 +249,30 @@ const Players: React.FC = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                players.map((player) => {
-                  console.log("🔍 Rendering player:", player);
-                  console.log("🔍 Player name:", player.name);
-                  return (
-                    <TableRow key={player.id}>
-                      <TableCell>{player.name}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={
-                            Boolean(player.static_seating)
-                              ? "Static"
-                              : "Dynamic"
-                          }
-                          color={
-                            Boolean(player.static_seating)
-                              ? "primary"
-                              : "default"
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{formatDate(player.created_at)}</TableCell>
-                      <TableCell>{player.trainer_id || "N/A"}</TableCell>
-                      <TableCell>{player.birth_year || "N/A"}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="small"
-                          startIcon={<EditIcon />}
-                          onClick={() => openEditDialog(player)}
-                        >
-                          Edit
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                players.map((player) => (
+                  <TableRow key={player.id}>
+                    <TableCell>{player.name}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={player.static_seating ? "Static" : "Dynamic"}
+                        color={player.static_seating ? "primary" : "default"}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>{formatDate(player.created_at)}</TableCell>
+                    <TableCell>{player.trainer_id || "N/A"}</TableCell>
+                    <TableCell>{player.birth_year || "N/A"}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={() => openEditDialog(player)}
+                      >
+                        Edit
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>

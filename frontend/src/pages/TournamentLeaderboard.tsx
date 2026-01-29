@@ -12,7 +12,6 @@ import {
   TableRow,
   Alert,
   Button,
-  Chip,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
@@ -23,10 +22,7 @@ import {
   calculateMatchPoints,
   type PlayerStanding,
 } from "../utils/tournamentPairing";
-import {
-  sortByTieBreakers,
-  type PlayerWithTieBreakers,
-} from "../utils/tieBreaking";
+import { sortByTieBreakers } from "../utils/tieBreaking";
 
 interface TournamentSummary {
   id: string;

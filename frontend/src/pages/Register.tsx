@@ -53,8 +53,8 @@ const Register = () => {
         );
         setTimeout(() => navigate("/login"), 3000);
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Registration failed");
       setLoading(false);
     }
   };

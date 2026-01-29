@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Typography,
   Button,
@@ -42,11 +42,7 @@ const Leagues: React.FC = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchLeagues();
-  }, []);
-
-  const fetchLeagues = async () => {
+  const fetchLeagues = useCallback(async () => {
     try {
       setLoading(true);
       const response = await apiCall("/api/leagues");
@@ -57,12 +53,20 @@ const Leagues: React.FC = () => {
         if (handleUnauthorized(response)) return;
         await handleApiError(response);
       }
-    } catch (error: any) {
-      setError(error.message || "Network error. Please try again.");
+    } catch (error: unknown) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Network error. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, [handleUnauthorized]);
+
+  useEffect(() => {
+    fetchLeagues();
+  }, [fetchLeagues]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -83,8 +87,12 @@ const Leagues: React.FC = () => {
         if (handleUnauthorized(response)) return;
         await handleApiError(response);
       }
-    } catch (error: any) {
-      setError(error.message || "Network error. Please try again.");
+    } catch (error: unknown) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Network error. Please try again.",
+      );
     } finally {
       setSubmitting(false);
     }

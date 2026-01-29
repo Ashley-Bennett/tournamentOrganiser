@@ -19,7 +19,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  IconButton,
   RadioGroup,
   FormControlLabel,
   Radio,
@@ -34,7 +33,6 @@ import {
 import PageLoading from "../components/PageLoading";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
-import EditIcon from "@mui/icons-material/Edit";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -47,10 +45,7 @@ import {
   type PlayerStanding,
   type PairingDecisionLog,
 } from "../utils/tournamentPairing";
-import {
-  sortByTieBreakers,
-  type PlayerWithTieBreakers,
-} from "../utils/tieBreaking";
+import { sortByTieBreakers } from "../utils/tieBreaking";
 
 interface TournamentSummary {
   id: string;
@@ -508,6 +503,8 @@ const TournamentMatches: React.FC = () => {
     return sortByTieBreakers(standings);
   }, [matches]);
 
+  // Reserved for future use: open score dialog with pre-selected match/winner
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- handler kept for wiring to UI
   const handleOpenScoreDialog = (
     match: MatchWithPlayers,
     winnerId: string | null = null,

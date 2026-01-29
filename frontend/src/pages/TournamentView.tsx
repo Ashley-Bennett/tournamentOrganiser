@@ -44,7 +44,7 @@ const TournamentView: React.FC = () => {
     loading: playersLoading,
     error: playersError,
     setError: setPlayersError,
-  } = useTournamentPlayers(tournament?.id, user);
+  } = useTournamentPlayers(tournament?.id);
 
   const [newPlayerName, setNewPlayerName] = useState("");
   const [addingPlayer, setAddingPlayer] = useState(false);

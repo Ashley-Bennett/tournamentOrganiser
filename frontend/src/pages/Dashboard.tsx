@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Grid, Card, CardContent, Typography, Box, Paper } from "@mui/material";
 import {
   SportsEsports as TournamentIcon,
@@ -36,11 +36,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchDashboardStats();
-  }, []);
-
-  const fetchDashboardStats = async () => {
+  const fetchDashboardStats = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -78,13 +74,21 @@ const Dashboard: React.FC = () => {
         totalParticipants,
         completedTournaments,
       });
-    } catch (error: any) {
-      setError(error.message || "Failed to load dashboard statistics");
+    } catch (error: unknown) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load dashboard statistics",
+      );
       console.error("Error fetching dashboard stats:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [handleUnauthorized]);
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, [fetchDashboardStats]);
 
   if (loading) {
     return <PageLoading />;

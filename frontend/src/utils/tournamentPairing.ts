@@ -577,9 +577,6 @@ export function generateSwissPairings(
     byePlayer = sortedByBye[0]!; // Bye to lowest score, fewest previous byes
 
     // Determine bye reason
-    const sameScorePlayers = standings.filter(
-      (p) => p.matchPoints === byePlayer!.matchPoints,
-    );
     const lowerScorePlayers = standings.filter(
       (p) => p.matchPoints < byePlayer!.matchPoints,
     );
