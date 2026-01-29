@@ -269,6 +269,37 @@ export function generateSwissPairings(
 ): Pairing[] {
   const pairings: Pairing[] = [];
 
+  const sortPairingsHighFirst = (
+    ps: Pairing[],
+    standingsById: Map<string, PlayerStanding>,
+  ) => {
+    const pointsOf = (id: string) => standingsById.get(id)?.matchPoints ?? 0;
+    return [...ps].sort((a, b) => {
+      // Byes always last (even though we usually append them last anyway)
+      const aBye = a.player2Id === null ? 1 : 0;
+      const bBye = b.player2Id === null ? 1 : 0;
+      if (aBye !== bBye) return aBye - bBye;
+
+      const a1 = pointsOf(a.player1Id);
+      const a2 = a.player2Id ? pointsOf(a.player2Id) : -1;
+      const b1 = pointsOf(b.player1Id);
+      const b2 = b.player2Id ? pointsOf(b.player2Id) : -1;
+
+      const aTop = Math.max(a1, a2);
+      const bTop = Math.max(b1, b2);
+      if (aTop !== bTop) return bTop - aTop; // highest table first
+
+      const aSum = a1 + a2;
+      const bSum = b1 + b2;
+      if (aSum !== bSum) return bSum - aSum;
+
+      // deterministic fallback
+      const aKey = `${a.player1Id}-${a.player2Id ?? "bye"}`;
+      const bKey = `${b.player1Id}-${b.player2Id ?? "bye"}`;
+      return aKey.localeCompare(bKey);
+    });
+  };
+
   if (roundNumber === 1) {
     // Round 1: bye to lowest score, fewest byes (then id); pair the rest randomly
     const byPriority = [...standings].sort(byePriority);
@@ -300,7 +331,8 @@ export function generateSwissPairings(
         roundNumber,
       });
     }
-    return pairings;
+    const standingsById = new Map(standings.map((s) => [s.id, s]));
+    return sortPairingsHighFirst(pairings, standingsById);
   }
 
   // Subsequent rounds: bye priority, then score groups with float-down logic
@@ -330,5 +362,6 @@ export function generateSwissPairings(
     });
   }
 
-  return pairings;
+  const standingsById = new Map(standings.map((s) => [s.id, s]));
+  return sortPairingsHighFirst(pairings, standingsById);
 }

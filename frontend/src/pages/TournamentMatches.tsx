@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -95,6 +95,80 @@ const TournamentMatches: React.FC = () => {
   const [player1Wins, setPlayer1Wins] = useState<number>(0);
   const [player2Wins, setPlayer2Wins] = useState<number>(0);
   const [updatingMatch, setUpdatingMatch] = useState(false);
+
+  const standingsByPlayerId = useMemo(() => {
+    // Standings as-of the start of the selected round (all rounds < selectedRound)
+    const map = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        wins: number;
+        losses: number;
+        draws: number;
+        matchPoints: number;
+      }
+    >();
+
+    // Seed from known players in matches (names already resolved)
+    for (const m of matches) {
+      if (!map.has(m.player1_id)) {
+        map.set(m.player1_id, {
+          id: m.player1_id,
+          name: m.player1_name,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          matchPoints: 0,
+        });
+      }
+      if (m.player2_id && !map.has(m.player2_id)) {
+        map.set(m.player2_id, {
+          id: m.player2_id,
+          name: m.player2_name || "Unknown",
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          matchPoints: 0,
+        });
+      }
+    }
+
+    const priorMatches = matches.filter((m) => m.round_number < selectedRound);
+
+    for (const m of priorMatches) {
+      const p1 = map.get(m.player1_id);
+      const p2 = m.player2_id ? map.get(m.player2_id) : null;
+      if (!p1) continue;
+
+      const isBye = m.status === "bye" || m.player2_id === null;
+      const isDraw =
+        m.status === "completed" && m.winner_id === null && m.result === "Draw";
+      const isCompletedWin =
+        m.status === "completed" && m.winner_id !== null && m.result !== "Draw";
+
+      if (isBye) {
+        p1.wins += 1;
+      } else if (isDraw) {
+        p1.draws += 1;
+        if (p2) p2.draws += 1;
+      } else if (isCompletedWin) {
+        if (m.winner_id === m.player1_id) {
+          p1.wins += 1;
+          if (p2) p2.losses += 1;
+        } else if (m.player2_id && m.winner_id === m.player2_id) {
+          p1.losses += 1;
+          if (p2) p2.wins += 1;
+        }
+      }
+
+      // Recompute points for players we touched
+      p1.matchPoints = calculateMatchPoints(p1.wins, p1.draws);
+      if (p2) p2.matchPoints = calculateMatchPoints(p2.wins, p2.draws);
+    }
+
+    return map;
+  }, [matches, selectedRound]);
 
   useEffect(() => {
     if (!id) {
@@ -806,10 +880,12 @@ const TournamentMatches: React.FC = () => {
                 </Tabs>
                 <Box sx={{ p: 3 }}>
                   {(() => {
-                    // Stable order by id so match numbers are absolute and never change
-                    const baseMatches = matches
-                      .filter((m) => m.round_number === selectedRound)
-                      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+                    // Preserve DB order (created_at then id) so match numbers follow pairing order:
+                    // highest tables first, and byes at the end.
+                    // Note: matches are already fetched ordered by round_number, created_at, id.
+                    const baseMatches = matches.filter(
+                      (m) => m.round_number === selectedRound,
+                    );
 
                     // Check round state for button display
                     const roundMatchesForState = matches.filter(
@@ -977,7 +1053,26 @@ const TournamentMatches: React.FC = () => {
                                         alignItems="center"
                                         gap={1}
                                       >
-                                        {match.player1_name}
+                                        <Box>
+                                          <Typography variant="body2">
+                                            {match.player1_name}
+                                          </Typography>
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                          >
+                                            {(() => {
+                                              const s = standingsByPlayerId.get(
+                                                match.player1_id,
+                                              );
+                                              const wins = s?.wins ?? 0;
+                                              const losses = s?.losses ?? 0;
+                                              const draws = s?.draws ?? 0;
+                                              const pts = s?.matchPoints ?? 0;
+                                              return `${wins}-${losses}-${draws} • ${pts} pts`;
+                                            })()}
+                                          </Typography>
+                                        </Box>
                                         {canEdit && (
                                           <IconButton
                                             size="small"
@@ -1002,7 +1097,28 @@ const TournamentMatches: React.FC = () => {
                                           alignItems="center"
                                           gap={1}
                                         >
-                                          {match.player2_name}
+                                          <Box>
+                                            <Typography variant="body2">
+                                              {match.player2_name}
+                                            </Typography>
+                                            <Typography
+                                              variant="caption"
+                                              color="text.secondary"
+                                            >
+                                              {(() => {
+                                                const s = match.player2_id
+                                                  ? standingsByPlayerId.get(
+                                                      match.player2_id,
+                                                    )
+                                                  : undefined;
+                                                const wins = s?.wins ?? 0;
+                                                const losses = s?.losses ?? 0;
+                                                const draws = s?.draws ?? 0;
+                                                const pts = s?.matchPoints ?? 0;
+                                                return `${wins}-${losses}-${draws} • ${pts} pts`;
+                                              })()}
+                                            </Typography>
+                                          </Box>
                                           {canEdit && (
                                             <IconButton
                                               size="small"
