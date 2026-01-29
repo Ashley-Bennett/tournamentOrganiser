@@ -1,21 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Box,
-  Paper,
-  CircularProgress,
-} from "@mui/material";
+import { Grid, Card, CardContent, Typography, Box, Paper } from "@mui/material";
 import {
   SportsEsports as TournamentIcon,
   People as PeopleIcon,
   EmojiEvents as TrophyIcon,
 } from "@mui/icons-material";
 import { apiCall, handleApiError } from "../utils/api";
-import { useAuth } from "../AuthContext";
+import { useAuthRedirect } from "../hooks/useAuthRedirect";
+import PageLoading from "../components/PageLoading";
 
 interface Tournament {
   id: number;
@@ -35,8 +27,7 @@ interface DashboardStats {
 }
 
 const Dashboard: React.FC = () => {
-  const navigate = useNavigate();
-  const { logout } = useAuth();
+  const handleUnauthorized = useAuthRedirect();
   const [stats, setStats] = useState<DashboardStats>({
     activeTournaments: 0,
     totalParticipants: 0,
@@ -56,29 +47,25 @@ const Dashboard: React.FC = () => {
 
       // Fetch tournaments
       const tournamentsResponse = await apiCall("/api/tournaments");
+      if (handleUnauthorized(tournamentsResponse)) return;
       if (!tournamentsResponse.ok) {
-        if (tournamentsResponse.status === 401) {
-          logout();
-          navigate("/login");
-          return;
-        }
         await handleApiError(tournamentsResponse);
       }
       const tournaments: Tournament[] = await tournamentsResponse.json();
 
       // Calculate statistics
       const activeTournaments = tournaments.filter(
-        (t) => t.status === "active"
+        (t) => t.status === "active",
       ).length;
       const completedTournaments = tournaments.filter(
-        (t) => t.status === "completed"
+        (t) => t.status === "completed",
       ).length;
 
       // Fetch total participants (players across all tournaments)
       let totalParticipants = 0;
       for (const tournament of tournaments) {
         const playersResponse = await apiCall(
-          `/api/tournaments/${tournament.id}/players`
+          `/api/tournaments/${tournament.id}/players`,
         );
         if (playersResponse.ok) {
           const players = await playersResponse.json();
@@ -100,16 +87,7 @@ const Dashboard: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="400px"
-      >
-        <CircularProgress />
-      </Box>
-    );
+    return <PageLoading />;
   }
 
   return (

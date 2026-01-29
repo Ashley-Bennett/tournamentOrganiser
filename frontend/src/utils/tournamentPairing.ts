@@ -742,3 +742,57 @@ export function generateSwissPairings(
 
   return { pairings: out, decisionLog };
 }
+
+/**
+ * Generate round 1 pairings for a tournament.
+ * Swiss: uses generateSwissPairings with zero points.
+ * Single elimination: shuffle and pair sequentially (bye for odd player).
+ */
+export function generateRound1Pairings(
+  tournamentType: string,
+  players: Array<{ id: string; name: string }>,
+): Pairing[] {
+  if (tournamentType === "swiss") {
+    const standings: PlayerStanding[] = players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      matchPoints: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      matchesPlayed: 0,
+      opponents: [],
+      byesReceived: 0,
+    }));
+    const result = generateSwissPairings(standings, 1, []);
+    return result.pairings;
+  }
+
+  // Single elimination: shuffle then pair in order (bye for odd player)
+  const shuffled = [...players].sort(() => Math.random() - 0.5);
+  const pairings: Pairing[] = [];
+
+  for (let i = 0; i < shuffled.length; i += 2) {
+    const p1 = shuffled[i]!;
+    if (i + 1 < shuffled.length) {
+      const p2 = shuffled[i + 1]!;
+      pairings.push({
+        player1Id: p1.id,
+        player1Name: p1.name,
+        player2Id: p2.id,
+        player2Name: p2.name,
+        roundNumber: 1,
+      });
+    } else {
+      pairings.push({
+        player1Id: p1.id,
+        player1Name: p1.name,
+        player2Id: null,
+        player2Name: null,
+        roundNumber: 1,
+      });
+    }
+  }
+
+  return pairings;
+}

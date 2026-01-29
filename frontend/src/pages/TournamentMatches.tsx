@@ -4,7 +4,6 @@ import {
   Box,
   Typography,
   Paper,
-  CircularProgress,
   Alert,
   Button,
   Table,
@@ -32,6 +31,7 @@ import {
   TableSortLabel,
   Tooltip,
 } from "@mui/material";
+import PageLoading from "../components/PageLoading";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import EditIcon from "@mui/icons-material/Edit";
@@ -1324,16 +1324,7 @@ const TournamentMatches: React.FC = () => {
   };
 
   if (authLoading || loading || matchesLoading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="400px"
-      >
-        <CircularProgress />
-      </Box>
-    );
+    return <PageLoading />;
   }
 
   if (error || !tournament) {

@@ -10,7 +10,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  CircularProgress,
   Alert,
   Button,
   Chip,
@@ -18,6 +17,7 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { supabase } from "../supabaseClient";
+import PageLoading from "../components/PageLoading";
 import { useAuth } from "../AuthContext";
 import {
   calculateMatchPoints,
@@ -285,16 +285,7 @@ const TournamentLeaderboard: React.FC = () => {
   }, [matches]);
 
   if (authLoading || loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="400px"
-      >
-        <CircularProgress />
-      </Box>
-    );
+    return <PageLoading />;
   }
 
   if (error || !tournament) {

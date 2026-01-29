@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Typography,
   Button,
@@ -16,12 +15,13 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  CircularProgress,
   Alert,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import { apiCall, handleApiError } from "../utils/api";
-import { useAuth } from "../AuthContext";
+import { useAuthRedirect } from "../hooks/useAuthRedirect";
+import PageLoading from "../components/PageLoading";
+import { formatDate } from "../utils/format";
 
 interface League {
   id: number;
@@ -31,8 +31,7 @@ interface League {
 }
 
 const Leagues: React.FC = () => {
-  const navigate = useNavigate();
-  const { logout } = useAuth();
+  const handleUnauthorized = useAuthRedirect();
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,11 +54,7 @@ const Leagues: React.FC = () => {
         const data = await response.json();
         setLeagues(data);
       } else {
-        if (response.status === 401) {
-          logout();
-          navigate("/login");
-          return;
-        }
+        if (handleUnauthorized(response)) return;
         await handleApiError(response);
       }
     } catch (error: any) {
@@ -85,11 +80,7 @@ const Leagues: React.FC = () => {
         setFormData({ name: "", description: "" });
         fetchLeagues(); // Refresh the list
       } else {
-        if (response.status === 401) {
-          logout();
-          navigate("/login");
-          return;
-        }
+        if (handleUnauthorized(response)) return;
         await handleApiError(response);
       }
     } catch (error: any) {
@@ -107,21 +98,8 @@ const Leagues: React.FC = () => {
       });
     };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
-
   if (loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="400px"
-      >
-        <CircularProgress />
-      </Box>
-    );
+    return <PageLoading />;
   }
 
   return (

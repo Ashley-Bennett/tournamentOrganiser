@@ -56,7 +56,7 @@ const Header: React.FC = () => {
               Create Tournament
             </Button>
             <Typography variant="body1" sx={{ ml: 2 }}>
-              {user.name}
+              {(user.user_metadata?.name as string) || user.email || "User"}
             </Typography>
             <Button color="inherit" onClick={handleLogout}>
               Logout

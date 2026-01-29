@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Typography,
   Button,
@@ -18,14 +17,15 @@ import {
   TextField,
   FormControlLabel,
   Checkbox,
-  CircularProgress,
   Alert,
   Chip,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import EditIcon from "@mui/icons-material/Edit";
 import { apiCall, handleApiError } from "../utils/api";
-import { useAuth } from "../AuthContext";
+import { useAuthRedirect } from "../hooks/useAuthRedirect";
+import PageLoading from "../components/PageLoading";
+import { formatDate } from "../utils/format";
 
 interface Player {
   id: number;
@@ -38,8 +38,7 @@ interface Player {
 }
 
 const Players: React.FC = () => {
-  const navigate = useNavigate();
-  const { logout } = useAuth();
+  const handleUnauthorized = useAuthRedirect();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,23 +70,9 @@ const Players: React.FC = () => {
       const response = await apiCall("/api/players");
       if (response.ok) {
         const data = await response.json();
-        console.log("🔍 Players data received:", data);
-        console.log("🔍 Players data type:", typeof data);
-        console.log(
-          "🔍 Players data length:",
-          Array.isArray(data) ? data.length : "Not an array"
-        );
-        if (Array.isArray(data) && data.length > 0) {
-          console.log("🔍 First player:", data[0]);
-          console.log("🔍 First player name:", data[0].name);
-        }
         setPlayers(data);
       } else {
-        if (response.status === 401) {
-          logout();
-          navigate("/login");
-          return;
-        }
+        if (handleUnauthorized(response)) return;
         await handleApiError(response);
       }
     } catch (error: any) {
@@ -113,11 +98,7 @@ const Players: React.FC = () => {
         setFormData({ name: "", static_seating: false });
         fetchPlayers(); // Refresh the list
       } else {
-        if (response.status === 401) {
-          logout();
-          navigate("/login");
-          return;
-        }
+        if (handleUnauthorized(response)) return;
         await handleApiError(response);
       }
     } catch (error: any) {
@@ -190,11 +171,7 @@ const Players: React.FC = () => {
         fetchPlayers();
         setSuccess("Player updated successfully.");
       } else {
-        if (response.status === 401) {
-          logout();
-          navigate("/login");
-          return;
-        }
+        if (handleUnauthorized(response)) return;
         await handleApiError(response);
       }
     } catch (error: any) {
@@ -204,21 +181,8 @@ const Players: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
-
   if (loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="400px"
-      >
-        <CircularProgress />
-      </Box>
-    );
+    return <PageLoading />;
   }
 
   return (

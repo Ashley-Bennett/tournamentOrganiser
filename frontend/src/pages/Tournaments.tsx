@@ -13,7 +13,6 @@ import {
   TableRow,
   Chip,
   ChipProps,
-  CircularProgress,
   Alert,
   TextField,
   MenuItem,
@@ -21,6 +20,8 @@ import {
   InputLabel,
   FormControl,
 } from "@mui/material";
+import PageLoading from "../components/PageLoading";
+import { formatDate } from "../utils/format";
 import { Add as AddIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useAuth } from "../AuthContext";
@@ -112,10 +113,6 @@ const Tournaments: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
-
   const getCompletionColor = (status: string): ChipProps["color"] => {
     switch (status) {
       case "completed":
@@ -157,16 +154,7 @@ const Tournaments: React.FC = () => {
     );
 
   if (loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="400px"
-      >
-        <CircularProgress />
-      </Box>
-    );
+    return <PageLoading />;
   }
 
   return (
