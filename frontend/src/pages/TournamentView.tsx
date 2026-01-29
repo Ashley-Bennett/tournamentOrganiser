@@ -3121,7 +3121,8 @@ const TournamentView: React.FC = () => {
         opponents: [],
         byesReceived: 0,
       }));
-      return generateSwissPairings(standings, 1, []);
+      const result = generateSwissPairings(standings, 1, []);
+      return result.pairings;
     } else {
       // Single Elimination: Pair players in bracket order
       // Shuffle for first round, then pair sequentially
@@ -3191,6 +3192,20 @@ const TournamentView: React.FC = () => {
 
       // Create matches in database
       // Note: Byes are worth 3 points (equivalent to a win) per Pokemon tournament rules
+      if (!pairings || !Array.isArray(pairings) || pairings.length === 0) {
+        console.error("Pairings generation failed:", {
+          pairings,
+          type: typeof pairings,
+          isArray: Array.isArray(pairings),
+          length: pairings?.length,
+          tournamentType: tournament.tournament_type,
+          playersCount: players.length,
+        });
+        throw new Error(
+          `No pairings generated. Got: ${typeof pairings}, length: ${pairings?.length}`,
+        );
+      }
+
       const matchesToInsert = pairings.map((pairing) => ({
         tournament_id: tournament.id,
         round_number: 1,
@@ -3201,9 +3216,10 @@ const TournamentView: React.FC = () => {
         winner_id: pairing.player2Id === null ? pairing.player1Id : null, // Bye = automatic win (3 points)
       }));
 
-      const { error: matchesError } = await supabase
+      const { data: insertedMatches, error: matchesError } = await supabase
         .from("tournament_matches")
-        .insert(matchesToInsert);
+        .insert(matchesToInsert)
+        .select();
 
       if (matchesError) {
         // Rollback tournament status if match creation fails
@@ -3212,11 +3228,29 @@ const TournamentView: React.FC = () => {
           .update({ status: "draft" })
           .eq("id", tournament.id);
         throw new Error(
-          matchesError.message || "Failed to create round 1 matches",
+          `Failed to create round 1 matches: ${matchesError.message}`,
+        );
+      }
+
+      if (!insertedMatches || insertedMatches.length === 0) {
+        // Rollback tournament status if no matches were created
+        await supabase
+          .from("tournaments")
+          .update({ status: "draft" })
+          .eq("id", tournament.id);
+        throw new Error(
+          `Failed to create matches - expected ${matchesToInsert.length} matches but got ${insertedMatches?.length ?? 0}`,
+        );
+      }
+
+      if (insertedMatches.length !== matchesToInsert.length) {
+        console.warn(
+          `Mismatch: tried to insert ${matchesToInsert.length} matches but got ${insertedMatches.length}`,
         );
       }
 
       setTournament(tournamentData as TournamentSummary);
+      // Navigate to matches page - the useEffect will fetch matches
       navigate(`/tournaments/${tournamentData.id}/matches`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to start tournament");

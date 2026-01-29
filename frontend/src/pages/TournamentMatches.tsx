@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { ReactNode, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -37,6 +37,7 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import EditIcon from "@mui/icons-material/Edit";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
 import {
@@ -44,7 +45,12 @@ import {
   calculateMatchPoints,
   type Pairing,
   type PlayerStanding,
+  type PairingDecisionLog,
 } from "../utils/tournamentPairing";
+import {
+  sortByTieBreakers,
+  type PlayerWithTieBreakers,
+} from "../utils/tieBreaking";
 
 interface TournamentSummary {
   id: string;
@@ -74,6 +80,53 @@ interface MatchWithPlayers extends Match {
   winner_name: string | null;
 }
 
+// Helper functions to persist pending results to localStorage
+const getPendingResultsKey = (tournamentId: string) =>
+  `tournament_pending_results_${tournamentId}`;
+
+const loadPendingResults = (
+  tournamentId: string,
+): Map<string, { winnerId: string | null; result: string }> => {
+  try {
+    const key = getPendingResultsKey(tournamentId);
+    const stored = localStorage.getItem(key);
+    if (!stored) return new Map();
+    const data = JSON.parse(stored) as Record<
+      string,
+      { winnerId: string | null; result: string }
+    >;
+    return new Map(Object.entries(data));
+  } catch {
+    return new Map();
+  }
+};
+
+const savePendingResultsToStorage = (
+  tournamentId: string,
+  pendingResults: Map<string, { winnerId: string | null; result: string }>,
+) => {
+  try {
+    const key = getPendingResultsKey(tournamentId);
+    if (pendingResults.size === 0) {
+      localStorage.removeItem(key);
+    } else {
+      const data = Object.fromEntries(pendingResults);
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch (error) {
+    console.error("Failed to save pending results to localStorage:", error);
+  }
+};
+
+const clearPendingResultsFromStorage = (tournamentId: string) => {
+  try {
+    const key = getPendingResultsKey(tournamentId);
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.error("Failed to clear pending results from localStorage:", error);
+  }
+};
+
 const TournamentMatches: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -83,7 +136,7 @@ const TournamentMatches: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRound, setSelectedRound] = useState(1);
+  const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [sortBy, setSortBy] = useState<"match" | "status">("match");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
@@ -97,6 +150,9 @@ const TournamentMatches: React.FC = () => {
   const [updatingMatch, setUpdatingMatch] = useState(false);
   const [pendingResults, setPendingResults] = useState<
     Map<string, { winnerId: string | null; result: string }>
+  >(new Map());
+  const [roundDecisionLogs, setRoundDecisionLogs] = useState<
+    Map<number, PairingDecisionLog>
   >(new Map());
 
   const standingsByPlayerId = useMemo(() => {
@@ -137,7 +193,10 @@ const TournamentMatches: React.FC = () => {
       }
     }
 
-    const priorMatches = matches.filter((m) => m.round_number < selectedRound);
+    const priorMatches = matches.filter(
+      (m) =>
+        typeof selectedRound === "number" && m.round_number < selectedRound,
+    );
 
     for (const m of priorMatches) {
       const p1 = map.get(m.player1_id);
@@ -219,6 +278,39 @@ const TournamentMatches: React.FC = () => {
     void fetchTournament();
   }, [id, user, authLoading, navigate]);
 
+  // Load pending results from localStorage when tournament changes
+  useEffect(() => {
+    if (!tournament?.id) return;
+    const loaded = loadPendingResults(tournament.id);
+    setPendingResults(loaded);
+  }, [tournament?.id]);
+
+  // Clean up pending results for matches that no longer exist
+  useEffect(() => {
+    if (matches.length === 0 || pendingResults.size === 0) return;
+    const matchIds = new Set(matches.map((m) => m.id));
+    const hasInvalidEntries = Array.from(pendingResults.keys()).some(
+      (matchId) => !matchIds.has(matchId),
+    );
+    if (hasInvalidEntries) {
+      setPendingResults((prev) => {
+        const next = new Map();
+        for (const [matchId, result] of prev.entries()) {
+          if (matchIds.has(matchId)) {
+            next.set(matchId, result);
+          }
+        }
+        return next;
+      });
+    }
+  }, [matches, pendingResults]);
+
+  // Save pending results to localStorage whenever they change
+  useEffect(() => {
+    if (!tournament?.id) return;
+    savePendingResultsToStorage(tournament.id, pendingResults);
+  }, [tournament?.id, pendingResults]);
+
   useEffect(() => {
     if (!tournament?.id || !user) return;
 
@@ -296,6 +388,125 @@ const TournamentMatches: React.FC = () => {
 
     void fetchMatches();
   }, [tournament?.id, user]);
+
+  // Calculate final standings for leaderboard
+  const finalStandings = useMemo(() => {
+    if (!matches.length) return [];
+
+    // Initialize standings map
+    const standingsMap = new Map<string, PlayerStanding>();
+    matches.forEach((match) => {
+      if (!standingsMap.has(match.player1_id)) {
+        standingsMap.set(match.player1_id, {
+          id: match.player1_id,
+          name: match.player1_name,
+          matchPoints: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          matchesPlayed: 0,
+          opponents: [],
+          byesReceived: 0,
+        });
+      }
+      if (match.player2_id && !standingsMap.has(match.player2_id)) {
+        standingsMap.set(match.player2_id, {
+          id: match.player2_id,
+          name: match.player2_name || "Unknown",
+          matchPoints: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          matchesPlayed: 0,
+          opponents: [],
+          byesReceived: 0,
+        });
+      }
+    });
+
+    // Process all matches to calculate standings
+    matches.forEach((match) => {
+      const player1 = standingsMap.get(match.player1_id);
+      const player2 = match.player2_id
+        ? standingsMap.get(match.player2_id)
+        : null;
+
+      const isBye = match.status === "bye" || !match.player2_id;
+      const isDraw =
+        match.status === "completed" &&
+        match.winner_id === null &&
+        match.result === "Draw";
+      const isCompletedWin =
+        match.status === "completed" &&
+        match.winner_id !== null &&
+        match.result !== "Draw";
+
+      // Only process completed matches or byes
+      if (!isBye && !isDraw && !isCompletedWin) {
+        return; // Skip incomplete matches
+      }
+
+      if (player1) {
+        player1.matchesPlayed++;
+        if (isBye) {
+          player1.byesReceived++;
+          player1.wins++;
+          player1.matchPoints = calculateMatchPoints(
+            player1.wins,
+            player1.draws,
+          );
+        } else if (isDraw) {
+          player1.draws++;
+          player1.matchPoints = calculateMatchPoints(
+            player1.wins,
+            player1.draws,
+          );
+          if (match.player2_id) {
+            player1.opponents.push(match.player2_id);
+          }
+        } else if (isCompletedWin) {
+          if (match.winner_id === match.player1_id) {
+            player1.wins++;
+            player1.matchPoints = calculateMatchPoints(
+              player1.wins,
+              player1.draws,
+            );
+          } else {
+            player1.losses++;
+          }
+          if (match.player2_id) {
+            player1.opponents.push(match.player2_id);
+          }
+        }
+      }
+
+      if (player2) {
+        player2.matchesPlayed++;
+        if (isDraw) {
+          player2.draws++;
+          player2.matchPoints = calculateMatchPoints(
+            player2.wins,
+            player2.draws,
+          );
+          player2.opponents.push(match.player1_id);
+        } else if (isCompletedWin) {
+          if (match.winner_id === match.player2_id) {
+            player2.wins++;
+            player2.matchPoints = calculateMatchPoints(
+              player2.wins,
+              player2.draws,
+            );
+          } else {
+            player2.losses++;
+          }
+          player2.opponents.push(match.player1_id);
+        }
+      }
+    });
+
+    const standings = Array.from(standingsMap.values());
+    return sortByTieBreakers(standings);
+  }, [matches]);
 
   const handleOpenScoreDialog = (
     match: MatchWithPlayers,
@@ -432,6 +643,9 @@ const TournamentMatches: React.FC = () => {
 
       // Clear pending results
       setPendingResults(new Map());
+      if (tournament?.id) {
+        clearPendingResultsFromStorage(tournament.id);
+      }
 
       // Refresh matches
       const { data: matchesData, error: matchesError } = await supabase
@@ -612,6 +826,7 @@ const TournamentMatches: React.FC = () => {
       setError(null);
 
       // Update all "ready" matches in current round to "pending"
+      if (typeof selectedRound !== "number") return;
       const { error: updateError } = await supabase
         .from("tournament_matches")
         .update({ status: "pending" })
@@ -679,6 +894,183 @@ const TournamentMatches: React.FC = () => {
     }
   };
 
+  const handleCompleteTournament = async () => {
+    if (!tournament || !user) return;
+
+    try {
+      setProcessingRound(true);
+      setError(null);
+
+      // Save all pending results first
+      await savePendingResults();
+
+      // Update tournament status to completed
+      const { error: updateError } = await supabase
+        .from("tournaments")
+        .update({ status: "completed" })
+        .eq("id", tournament.id)
+        .eq("created_by", user.id);
+
+      if (updateError) {
+        throw new Error(updateError.message || "Failed to complete tournament");
+      }
+
+      // Switch to standings tab
+      setSelectedRound("standings");
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : "Failed to complete tournament",
+      );
+    } finally {
+      setProcessingRound(false);
+    }
+  };
+
+  const handleRegenerateRound1 = async () => {
+    if (!tournament || !user) return;
+
+    try {
+      setProcessingRound(true);
+      setError(null);
+
+      // Fetch all players for the tournament
+      const { data: playersData, error: playersError } = await supabase
+        .from("tournament_players")
+        .select("id, name")
+        .eq("tournament_id", tournament.id)
+        .order("created_at", { ascending: true });
+
+      if (playersError) {
+        throw new Error(playersError.message || "Failed to load players");
+      }
+
+      if (!playersData || playersData.length < 2) {
+        throw new Error("Tournament needs at least 2 players");
+      }
+
+      // Generate round 1 pairings
+      const standings = playersData.map((p) => ({
+        id: p.id,
+        name: p.name,
+        matchPoints: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        matchesPlayed: 0,
+        opponents: [],
+        byesReceived: 0,
+      }));
+
+      const pairingResult = generateSwissPairings(standings, 1, []);
+
+      if (!pairingResult.pairings || pairingResult.pairings.length === 0) {
+        throw new Error("Failed to generate pairings");
+      }
+
+      // Delete any existing round 1 matches
+      const { error: deleteError } = await supabase
+        .from("tournament_matches")
+        .delete()
+        .eq("tournament_id", tournament.id)
+        .eq("round_number", 1);
+
+      if (deleteError) {
+        throw new Error(
+          deleteError.message || "Failed to delete existing round 1 matches",
+        );
+      }
+
+      // Store decision log if available
+      if (pairingResult.decisionLog) {
+        setRoundDecisionLogs((prev) => {
+          const next = new Map(prev);
+          next.set(1, pairingResult.decisionLog!);
+          return next;
+        });
+      }
+
+      // Create new round 1 matches
+      const matchesToInsert = pairingResult.pairings.map((pairing) => ({
+        tournament_id: tournament.id,
+        round_number: 1,
+        player1_id: pairing.player1Id,
+        player2_id: pairing.player2Id,
+        status: pairing.player2Id === null ? "bye" : "ready",
+        result: pairing.player2Id === null ? "bye" : null,
+        winner_id: pairing.player2Id === null ? pairing.player1Id : null,
+      }));
+
+      const { error: insertError } = await supabase
+        .from("tournament_matches")
+        .insert(matchesToInsert);
+
+      if (insertError) {
+        throw new Error(
+          insertError.message || "Failed to create round 1 matches",
+        );
+      }
+
+      // Refresh matches
+      const { data: matchesData, error: matchesError } = await supabase
+        .from("tournament_matches")
+        .select("*")
+        .eq("tournament_id", tournament.id)
+        .order("round_number", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
+
+      if (matchesError) {
+        throw new Error(matchesError.message || "Failed to refresh matches");
+      }
+
+      // Fetch player names
+      const playerIds = new Set<string>();
+      matchesData?.forEach((match) => {
+        playerIds.add(match.player1_id);
+        if (match.player2_id) {
+          playerIds.add(match.player2_id);
+        }
+        if (match.winner_id) {
+          playerIds.add(match.winner_id);
+        }
+      });
+
+      const { data: updatedPlayersData } = await supabase
+        .from("tournament_players")
+        .select("id, name")
+        .in("id", Array.from(playerIds));
+
+      const playersMap = new Map<string, string>();
+      updatedPlayersData?.forEach((player) => {
+        playersMap.set(player.id, player.name);
+      });
+
+      const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
+        (match) => ({
+          ...match,
+          player1_name: playersMap.get(match.player1_id) || "Unknown",
+          player2_name: match.player2_id
+            ? playersMap.get(match.player2_id) || "Unknown"
+            : null,
+          winner_name: match.winner_id
+            ? playersMap.get(match.winner_id) || "Unknown"
+            : null,
+        }),
+      );
+
+      setMatches(matchesWithPlayers);
+      setSelectedRound(1);
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Failed to regenerate round 1 pairings",
+      );
+    } finally {
+      setProcessingRound(false);
+    }
+  };
+
   const handleNextRound = async () => {
     if (!tournament || !user) return;
 
@@ -689,6 +1081,7 @@ const TournamentMatches: React.FC = () => {
       // Save all pending results before generating next round
       await savePendingResults();
 
+      if (typeof selectedRound !== "number") return;
       const nextRoundNumber = selectedRound + 1;
       if (tournament.num_rounds && nextRoundNumber > tournament.num_rounds) {
         throw new Error("Maximum number of rounds reached");
@@ -744,27 +1137,38 @@ const TournamentMatches: React.FC = () => {
       });
 
       // Process matches to calculate standings
+      // Only count completed matches (or byes) to match display logic
       allPreviousMatches.forEach((match) => {
         const player1 = standingsMap.get(match.player1_id);
         const player2 = match.player2_id
           ? standingsMap.get(match.player2_id)
           : null;
 
+        const isBye = match.status === "bye" || !match.player2_id;
+        const isDraw =
+          match.status === "completed" &&
+          match.winner_id === null &&
+          match.result === "Draw";
+        const isCompletedWin =
+          match.status === "completed" &&
+          match.winner_id !== null &&
+          match.result !== "Draw";
+
+        // Only process completed matches or byes
+        if (!isBye && !isDraw && !isCompletedWin) {
+          return; // Skip incomplete matches
+        }
+
         if (player1) {
           player1.matchesPlayed++;
-          if (match.status === "bye" || !match.player2_id) {
+          if (isBye) {
             player1.byesReceived++;
-          }
-          if (match.status === "bye" || match.winner_id === match.player1_id) {
             player1.wins++;
             player1.matchPoints = calculateMatchPoints(
               player1.wins,
               player1.draws,
             );
-            if (match.player2_id) {
-              player1.opponents.push(match.player2_id);
-            }
-          } else if (match.winner_id === null && match.result === "Draw") {
+          } else if (isDraw) {
             player1.draws++;
             player1.matchPoints = calculateMatchPoints(
               player1.wins,
@@ -773,8 +1177,16 @@ const TournamentMatches: React.FC = () => {
             if (match.player2_id) {
               player1.opponents.push(match.player2_id);
             }
-          } else if (match.winner_id && match.winner_id !== match.player1_id) {
-            player1.losses++;
+          } else if (isCompletedWin) {
+            if (match.winner_id === match.player1_id) {
+              player1.wins++;
+              player1.matchPoints = calculateMatchPoints(
+                player1.wins,
+                player1.draws,
+              );
+            } else {
+              player1.losses++;
+            }
             if (match.player2_id) {
               player1.opponents.push(match.player2_id);
             }
@@ -783,22 +1195,23 @@ const TournamentMatches: React.FC = () => {
 
         if (player2) {
           player2.matchesPlayed++;
-          if (match.winner_id === match.player2_id) {
-            player2.wins++;
-            player2.matchPoints = calculateMatchPoints(
-              player2.wins,
-              player2.draws,
-            );
-            player2.opponents.push(match.player1_id);
-          } else if (match.winner_id === null && match.result === "Draw") {
+          if (isDraw) {
             player2.draws++;
             player2.matchPoints = calculateMatchPoints(
               player2.wins,
               player2.draws,
             );
             player2.opponents.push(match.player1_id);
-          } else if (match.winner_id !== match.player2_id) {
-            player2.losses++;
+          } else if (isCompletedWin) {
+            if (match.winner_id === match.player2_id) {
+              player2.wins++;
+              player2.matchPoints = calculateMatchPoints(
+                player2.wins,
+                player2.draws,
+              );
+            } else {
+              player2.losses++;
+            }
             player2.opponents.push(match.player1_id);
           }
         }
@@ -816,15 +1229,24 @@ const TournamentMatches: React.FC = () => {
       }));
 
       // Generate pairings for next round
-      const pairings = generateSwissPairings(
+      const pairingResult = generateSwissPairings(
         standings,
         nextRoundNumber,
         previousPairings,
       );
 
+      // Store decision log if available
+      if (pairingResult.decisionLog) {
+        setRoundDecisionLogs((prev) => {
+          const next = new Map(prev);
+          next.set(nextRoundNumber, pairingResult.decisionLog!);
+          return next;
+        });
+      }
+
       // Create matches in database
       // Pairings are already sorted with byes at the end by generateSwissPairings
-      const matchesToInsert = pairings.map((pairing) => ({
+      const matchesToInsert = pairingResult.pairings.map((pairing) => ({
         tournament_id: tournament.id,
         round_number: nextRoundNumber,
         player1_id: pairing.player1Id,
@@ -971,21 +1393,32 @@ const TournamentMatches: React.FC = () => {
         </Paper>
       ) : (
         <Paper sx={{ overflow: "hidden" }}>
-          {(() => {
+          {((): ReactNode => {
             const totalRounds = tournament.num_rounds ?? 1;
             const roundNumbers = Array.from(
               { length: totalRounds },
               (_, i) => i + 1,
             );
 
+            const hasMatchesForStandings = matches.length > 0;
+            const tabValue =
+              selectedRound === "standings"
+                ? "standings"
+                : Math.min(
+                    typeof selectedRound === "number" ? selectedRound : 1,
+                    totalRounds,
+                  );
+
             return (
               <>
                 <Tabs
-                  value={Math.min(selectedRound, totalRounds)}
-                  onChange={(_, value: number) => {
-                    setSelectedRound(value);
-                    // Clear pending results when switching rounds
-                    setPendingResults(new Map());
+                  value={tabValue}
+                  onChange={(_, value: number | string) => {
+                    setSelectedRound(
+                      value === "standings" ? "standings" : (value as number),
+                    );
+                    // Note: We keep pending results when switching rounds
+                    // They persist across navigation and are cleared when saved
                   }}
                   variant="scrollable"
                   scrollButtons="auto"
@@ -1018,20 +1451,216 @@ const TournamentMatches: React.FC = () => {
                       />
                     );
                   })}
+                  <Tab
+                    label="Final Standings"
+                    value="standings"
+                    disabled={!hasMatchesForStandings}
+                    sx={
+                      hasMatchesForStandings
+                        ? {}
+                        : {
+                            color: "text.secondary",
+                            fontWeight: 500,
+                          }
+                    }
+                  />
                 </Tabs>
                 <Box sx={{ p: 3 }}>
-                  {(() => {
+                  {((): ReactNode => {
+                    // Standings tab
+                    if (selectedRound === "standings") {
+                      const getRankDisplay = (rank: number): string => {
+                        if (rank === 1) return "🥇";
+                        if (rank === 2) return "🥈";
+                        if (rank === 3) return "🥉";
+                        return `${rank}`;
+                      };
+
+                      return (
+                        <Box>
+                          <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                            Final Standings
+                          </Typography>
+                          {finalStandings.length === 0 ? (
+                            <Typography variant="body2" color="text.secondary">
+                              No standings available yet. Complete some matches
+                              to see standings.
+                            </Typography>
+                          ) : (
+                            <TableContainer>
+                              <Table>
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell sx={{ fontWeight: "bold" }}>
+                                      Rank
+                                    </TableCell>
+                                    <TableCell sx={{ fontWeight: "bold" }}>
+                                      Player
+                                    </TableCell>
+                                    <TableCell
+                                      sx={{ fontWeight: "bold" }}
+                                      align="right"
+                                    >
+                                      Record
+                                    </TableCell>
+                                    <TableCell
+                                      sx={{ fontWeight: "bold" }}
+                                      align="right"
+                                    >
+                                      Match Points
+                                    </TableCell>
+                                    <TableCell
+                                      sx={{ fontWeight: "bold" }}
+                                      align="right"
+                                    >
+                                      OMW%
+                                    </TableCell>
+                                    <TableCell
+                                      sx={{ fontWeight: "bold" }}
+                                      align="right"
+                                    >
+                                      OOMW%
+                                    </TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {finalStandings.map((player, index) => {
+                                    const rank = index + 1;
+                                    const isTopThree = rank <= 3;
+                                    return (
+                                      <TableRow
+                                        key={player.id}
+                                        sx={{
+                                          backgroundColor: isTopThree
+                                            ? rank === 1
+                                              ? "rgba(255, 215, 0, 0.1)"
+                                              : rank === 2
+                                                ? "rgba(192, 192, 192, 0.1)"
+                                                : "rgba(205, 127, 50, 0.1)"
+                                            : "transparent",
+                                          "&:hover": {
+                                            backgroundColor: isTopThree
+                                              ? rank === 1
+                                                ? "rgba(255, 215, 0, 0.15)"
+                                                : rank === 2
+                                                  ? "rgba(192, 192, 192, 0.15)"
+                                                  : "rgba(205, 127, 50, 0.15)"
+                                              : "rgba(0, 0, 0, 0.04)",
+                                          },
+                                        }}
+                                      >
+                                        <TableCell>
+                                          <Box
+                                            display="flex"
+                                            alignItems="center"
+                                            gap={1}
+                                          >
+                                            {isTopThree && (
+                                              <EmojiEventsIcon
+                                                sx={{
+                                                  color:
+                                                    rank === 1
+                                                      ? "gold"
+                                                      : rank === 2
+                                                        ? "silver"
+                                                        : "#CD7F32",
+                                                }}
+                                              />
+                                            )}
+                                            <Typography
+                                              variant="body1"
+                                              sx={{
+                                                fontWeight: isTopThree
+                                                  ? "bold"
+                                                  : "normal",
+                                              }}
+                                            >
+                                              {getRankDisplay(rank)}
+                                            </Typography>
+                                          </Box>
+                                        </TableCell>
+                                        <TableCell>
+                                          <Typography
+                                            variant="body1"
+                                            sx={{
+                                              fontWeight: isTopThree
+                                                ? "bold"
+                                                : "normal",
+                                            }}
+                                          >
+                                            {player.name}
+                                          </Typography>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          <Typography variant="body2">
+                                            {player.wins}-{player.losses}-
+                                            {player.draws}
+                                          </Typography>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          <Typography
+                                            variant="body1"
+                                            sx={{
+                                              fontWeight: isTopThree
+                                                ? "bold"
+                                                : "normal",
+                                            }}
+                                          >
+                                            {player.matchPoints}
+                                          </Typography>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          <Typography variant="body2">
+                                            {(
+                                              player.opponentMatchWinPercentage *
+                                              100
+                                            ).toFixed(1)}
+                                            %
+                                          </Typography>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          <Typography variant="body2">
+                                            {(
+                                              player.opponentOpponentMatchWinPercentage *
+                                              100
+                                            ).toFixed(1)}
+                                            %
+                                          </Typography>
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          )}
+                        </Box>
+                      );
+                    }
+
+                    // Display decision log if available for this round
+                    const decisionLog =
+                      typeof selectedRound === "number"
+                        ? roundDecisionLogs.get(selectedRound)
+                        : undefined;
+
                     // Preserve DB order (created_at then id) so match numbers follow pairing order:
                     // highest tables first, and byes at the end.
                     // Note: matches are already fetched ordered by round_number, created_at, id.
-                    const baseMatches = matches.filter(
-                      (m) => m.round_number === selectedRound,
-                    );
+                    const baseMatches =
+                      typeof selectedRound === "number"
+                        ? matches.filter(
+                            (m) => m.round_number === selectedRound,
+                          )
+                        : [];
 
                     // Check round state for button display
-                    const roundMatchesForState = matches.filter(
-                      (m) => m.round_number === selectedRound,
-                    );
+                    const roundMatchesForState =
+                      typeof selectedRound === "number"
+                        ? matches.filter(
+                            (m) => m.round_number === selectedRound,
+                          )
+                        : [];
                     const hasReadyMatches = roundMatchesForState.some(
                       (m) => m.status === "ready",
                     );
@@ -1051,15 +1680,21 @@ const TournamentMatches: React.FC = () => {
                       });
                     const canShowNextRound =
                       tournament.num_rounds &&
+                      typeof selectedRound === "number" &&
                       selectedRound < tournament.num_rounds;
                     const canProceedToNextRound =
                       allCompleted && canShowNextRound;
                     const showBeginRound =
                       hasReadyMatches && !hasPendingMatches;
-                    const nextRoundNumber = selectedRound + 1;
+                    const nextRoundNumber =
+                      typeof selectedRound === "number" ? selectedRound + 1 : 0;
                     const nextRoundAlreadyExists = matches.some(
                       (m) => m.round_number === nextRoundNumber,
                     );
+                    const isFinalRound =
+                      tournament.num_rounds &&
+                      selectedRound === tournament.num_rounds;
+                    const canCompleteTournament = isFinalRound && allCompleted;
 
                     // Map match id -> absolute match number (1-based, by id order)
                     const matchNumberById = new Map<string, number>();
@@ -1069,7 +1704,7 @@ const TournamentMatches: React.FC = () => {
 
                     // Apply sort by Match # or Status
                     // baseMatches is already in DB order (created_at), which preserves pairing order with byes at end
-                    let roundMatches = [...baseMatches];
+                    const roundMatches = [...baseMatches];
                     if (sortBy === "status") {
                       // When sorting by status, ensure byes are still last
                       roundMatches.sort((a, b) => {
@@ -1109,7 +1744,94 @@ const TournamentMatches: React.FC = () => {
 
                     return hasMatches ? (
                       <Box>
-                        {(showBeginRound || canShowNextRound) && (
+                        {decisionLog && (
+                          <Alert severity="info" sx={{ mb: 2 }} icon={false}>
+                            <Typography variant="subtitle2" gutterBottom>
+                              <strong>
+                                Pairing Decisions (Round{" "}
+                                {typeof selectedRound === "number"
+                                  ? selectedRound
+                                  : "N/A"}
+                                )
+                              </strong>
+                            </Typography>
+                            {decisionLog.byeReason && (
+                              <Typography variant="body2" sx={{ mb: 1 }}>
+                                <strong>Bye:</strong>{" "}
+                                {decisionLog.byePlayerName &&
+                                decisionLog.byePlayerPoints !== undefined ? (
+                                  <>
+                                    <strong>
+                                      {decisionLog.byePlayerName} (
+                                      {decisionLog.byePlayerPoints} pts)
+                                    </strong>
+                                    {" - "}
+                                    {decisionLog.byeReason}
+                                  </>
+                                ) : (
+                                  decisionLog.byeReason
+                                )}
+                              </Typography>
+                            )}
+                            {decisionLog.floatDetails &&
+                              decisionLog.floatDetails.length > 0 && (
+                                <Box sx={{ mb: 1 }}>
+                                  <Typography
+                                    variant="body2"
+                                    component="span"
+                                    sx={{ fontWeight: "bold" }}
+                                  >
+                                    Floats:
+                                  </Typography>
+                                  <Box
+                                    component="ul"
+                                    sx={{ mt: 0.5, mb: 0, pl: 2 }}
+                                  >
+                                    {decisionLog.floatDetails.map((detail) => (
+                                      <li key={detail.playerId}>
+                                        <Typography
+                                          variant="body2"
+                                          component="span"
+                                        >
+                                          <strong>
+                                            {detail.playerName} (
+                                            {detail.playerPoints} pts):
+                                          </strong>{" "}
+                                          {detail.reason}
+                                        </Typography>
+                                      </li>
+                                    ))}
+                                  </Box>
+                                </Box>
+                              )}
+                            <Typography
+                              variant="body2"
+                              sx={{ mb: decisionLog.rematchCount > 0 ? 1 : 0 }}
+                            >
+                              <strong>Max float distance:</strong>{" "}
+                              {decisionLog.maxFloatDistance} point
+                              {decisionLog.maxFloatDistance !== 1 ? "s" : ""}
+                              {decisionLog.maxFloatDistance > 1
+                                ? " (multi-step)"
+                                : ""}
+                            </Typography>
+                            {decisionLog.rematchCount > 0 && (
+                              <Typography variant="body2">
+                                <strong>Rematches:</strong> Stage{" "}
+                                {decisionLog.stageUsed} required (stages 1-3
+                                incomplete - mathematically unavoidable)
+                              </Typography>
+                            )}
+                            {decisionLog.rematchCount === 0 && (
+                              <Typography variant="body2" color="success.main">
+                                ✓ No rematches required
+                              </Typography>
+                            )}
+                          </Alert>
+                        )}
+                        {(showBeginRound ||
+                          canShowNextRound ||
+                          canCompleteTournament) && (
                           <Box
                             sx={{
                               mb: 2,
@@ -1157,6 +1879,23 @@ const TournamentMatches: React.FC = () => {
                                   </Button>
                                 </span>
                               </Tooltip>
+                            )}
+                            {canCompleteTournament && (
+                              <Button
+                                variant="contained"
+                                color="success"
+                                startIcon={<CheckCircleIcon />}
+                                onClick={handleCompleteTournament}
+                                disabled={processingRound}
+                                sx={{
+                                  backgroundColor: "success.main",
+                                  "&:hover": {
+                                    backgroundColor: "success.dark",
+                                  },
+                                }}
+                              >
+                                Complete Tournament
+                              </Button>
                             )}
                           </Box>
                         )}
@@ -1644,13 +2383,35 @@ const TournamentMatches: React.FC = () => {
                         </TableContainer>
                       </Box>
                     ) : (
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ fontStyle: "italic" }}
+                      <Box
+                        display="flex"
+                        flexDirection="column"
+                        alignItems="center"
+                        gap={2}
+                        py={4}
                       >
-                        Pairings not yet generated
-                      </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ fontStyle: "italic" }}
+                        >
+                          Pairings not yet generated
+                        </Typography>
+                        {tournament.status === "active" &&
+                          selectedRound === 1 && (
+                            <Button
+                              variant="contained"
+                              color="primary"
+                              onClick={handleRegenerateRound1}
+                              disabled={processingRound}
+                              startIcon={<PlayArrowIcon />}
+                            >
+                              {processingRound
+                                ? "Generating pairings..."
+                                : "Generate Round 1 Pairings"}
+                            </Button>
+                          )}
+                      </Box>
                     );
                   })()}
                 </Box>

@@ -6,6 +6,7 @@ import Tournaments from "./pages/Tournaments";
 import CreateTournament from "./pages/CreateTournament";
 import TournamentView from "./pages/TournamentView";
 import TournamentMatches from "./pages/TournamentMatches";
+import TournamentLeaderboard from "./pages/TournamentLeaderboard";
 import Players from "./pages/Players";
 import Leagues from "./pages/Leagues";
 import Landing from "./pages/Landing";
@@ -71,6 +72,14 @@ function App() {
             element={
               <RequireAuth>
                 <TournamentMatches />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/tournaments/:id/leaderboard"
+            element={
+              <RequireAuth>
+                <TournamentLeaderboard />
               </RequireAuth>
             }
           />
