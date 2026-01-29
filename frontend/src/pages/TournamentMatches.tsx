@@ -529,6 +529,7 @@ const TournamentMatches: React.FC = () => {
           draws: 0,
           matchesPlayed: 0,
           opponents: [],
+          byesReceived: 0,
         });
       });
 
@@ -541,6 +542,9 @@ const TournamentMatches: React.FC = () => {
 
         if (player1) {
           player1.matchesPlayed++;
+          if (match.status === "bye" || !match.player2_id) {
+            player1.byesReceived++;
+          }
           if (match.status === "bye" || match.winner_id === match.player1_id) {
             player1.wins++;
             player1.matchPoints = calculateMatchPoints(

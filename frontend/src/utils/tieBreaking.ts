@@ -13,6 +13,7 @@ export interface PlayerStanding {
   draws: number;
   matchesPlayed: number;
   opponents: string[]; // Array of opponent player IDs
+  byesReceived?: number; // For bye priority (lowest score, fewest byes)
 }
 
 export interface PlayerWithTieBreakers extends PlayerStanding {

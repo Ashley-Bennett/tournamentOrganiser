@@ -164,4 +164,3 @@ using (
       and t.created_by = (select auth.uid())
   )
 );
-

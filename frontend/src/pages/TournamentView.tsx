@@ -3119,6 +3119,7 @@ const TournamentView: React.FC = () => {
         draws: 0,
         matchesPlayed: 0,
         opponents: [],
+        byesReceived: 0,
       }));
       return generateSwissPairings(standings, 1, []);
     } else {

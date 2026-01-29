@@ -51,18 +51,26 @@ const CreateTournament: React.FC = () => {
         return;
       }
 
-      const { error: insertError } = await supabase.from("tournaments").insert({
-        name: formData.name,
-        created_by: user.id,
-        status: "draft",
-        tournament_type: formData.tournament_type,
-      });
+      const { data, error: insertError } = await supabase
+        .from("tournaments")
+        .insert({
+          name: formData.name,
+          created_by: user.id,
+          status: "draft",
+          tournament_type: formData.tournament_type,
+        })
+        .select("id")
+        .single();
 
       if (insertError) {
         throw new Error(insertError.message || "Failed to create tournament");
       }
 
-      navigate("/tournaments");
+      if (data?.id) {
+        navigate(`/tournaments/${data.id}`);
+      } else {
+        navigate("/tournaments");
+      }
     } catch (error: any) {
       setError(error.message || "Network error. Please try again.");
     } finally {
