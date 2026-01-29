@@ -96,20 +96,6 @@ function pairingOrder(a: PlayerStanding, b: PlayerStanding): number {
 }
 
 /**
- * Deterministic overall ordering for Swiss pairing:
- * - Higher match points first
- * - Then fewer byes received (stabilizes "strength" a bit)
- * - Then id
- */
-function swissOrder(a: PlayerStanding, b: PlayerStanding): number {
-  if (a.matchPoints !== b.matchPoints) return b.matchPoints - a.matchPoints;
-  const aByes = a.byesReceived ?? 0;
-  const bByes = b.byesReceived ?? 0;
-  if (aByes !== bByes) return aByes - bByes;
-  return a.id.localeCompare(b.id);
-}
-
-/**
  * Group players by match points (score groups)
  */
 export function groupByMatchPoints(
@@ -133,6 +119,126 @@ export function groupByMatchPoints(
 }
 
 /**
+ * Who should float when a bracket is odd: fewest byes, then lowest points, then id.
+ * (So the "lowest" in the group floats down.)
+ */
+function floatPriority(a: PlayerStanding, b: PlayerStanding): number {
+  const aByes = a.byesReceived ?? 0;
+  const bByes = b.byesReceived ?? 0;
+  if (aByes !== bByes) return aByes - bByes;
+  if (a.matchPoints !== b.matchPoints) return a.matchPoints - b.matchPoints;
+  return a.id.localeCompare(b.id);
+}
+
+/**
+ * Get score groups as array sorted by points descending (highest bracket first).
+ */
+function getScoreGroupsSorted(
+  pool: PlayerStanding[],
+): Array<{ points: number; players: PlayerStanding[] }> {
+  const map = groupByMatchPoints(pool);
+  const entries = Array.from(map.entries())
+    .map(([points, players]) => ({ points, players }))
+    .sort((a, b) => b.points - a.points);
+  return entries;
+}
+
+/**
+ * Pair an even-sized pool within the bracket. Prefer same-score, no rematches.
+ * Returns pairings. Greedy deterministic: sort by pairingOrder, then for each
+ * unpaired player pick best unpaired opponent (same score no rematch > same score rematch > float).
+ */
+function pairEvenPool(
+  pool: PlayerStanding[],
+  previousPairings: Pairing[],
+  roundNumber: number,
+): Pairing[] {
+  const sorted = [...pool].sort(pairingOrder);
+  const paired = new Set<string>();
+  const hasPlayed = (a: string, b: string) =>
+    havePlayedBefore(a, b, previousPairings);
+  const pairings: Pairing[] = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    const a = sorted[i]!;
+    if (paired.has(a.id)) continue;
+
+    // Best opponent: same score no rematch, then same score rematch, then float (lower score)
+    let bestJ = -1;
+    let bestScore = -1; // 2 = same no rematch, 1 = same rematch, 0 = float
+
+    for (let j = i + 1; j < sorted.length; j++) {
+      const b = sorted[j]!;
+      if (paired.has(b.id)) continue;
+
+      const sameScore = a.matchPoints === b.matchPoints;
+      const rematch = hasPlayed(a.id, b.id);
+      let score = 0;
+      if (sameScore && !rematch) score = 2;
+      else if (sameScore && rematch) score = 1;
+      else if (a.matchPoints > b.matchPoints)
+        score = 0; // a floats down, allowed
+      else if (b.matchPoints > a.matchPoints)
+        score = 0; // b floats down to a, allowed (so low-point player gets paired when processed first)
+      else continue; // same score already handled above
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestJ = j;
+      }
+    }
+
+    if (bestJ >= 0) {
+      const b = sorted[bestJ]!;
+      paired.add(a.id);
+      paired.add(b.id);
+      pairings.push({
+        player1Id: a.id,
+        player1Name: a.name,
+        player2Id: b.id,
+        player2Name: b.name,
+        roundNumber,
+      });
+    }
+  }
+
+  return pairings;
+}
+
+/**
+ * Process one bracket: pair within the pool. If odd, exactly one player floats down
+ * (the "lowest" in the group by floatPriority). Do not look at lower groups yet.
+ */
+function processBracket(
+  pool: PlayerStanding[],
+  previousPairings: Pairing[],
+  roundNumber: number,
+  floatReasons: Map<string, string>,
+): { pairings: Pairing[]; floatDown: PlayerStanding | null } {
+  if (pool.length === 0) {
+    return { pairings: [], floatDown: null };
+  }
+
+  // Who floats if odd: first in floatPriority order (fewest byes, then lowest points, then id)
+  const sorted = [...pool].sort(floatPriority);
+
+  if (sorted.length % 2 === 1) {
+    const floatDown = sorted[0]!;
+    const toPair = sorted.slice(1);
+    const pairings = pairEvenPool(toPair, previousPairings, roundNumber);
+    const points = floatDown.matchPoints;
+    floatReasons.set(
+      floatDown.id,
+      `odd bracket (${points} pts), one player floats to next bracket`,
+    );
+    return { pairings, floatDown };
+  }
+
+  const pairings = pairEvenPool(pool, previousPairings, roundNumber);
+  return { pairings, floatDown: null };
+}
+
+/**
  * Check if two players have already played each other
  */
 export function havePlayedBefore(
@@ -145,287 +251,6 @@ export function havePlayedBefore(
       (pairing.player1Id === player1Id && pairing.player2Id === player2Id) ||
       (pairing.player1Id === player2Id && pairing.player2Id === player1Id),
   );
-}
-
-/**
- * Staged Swiss solver (hard constraints first, relax only when unavoidable).
- *
- * Stages:
- * 1) same-score only, no rematches
- * 2) max 1-step float down, no rematches
- * 3) any float down, no rematches
- * 4) max 1-step float down, allow rematches
- * 5) any float down, allow rematches
- */
-function solveSwissRound(
-  pool: PlayerStanding[],
-  previousPairings: Pairing[],
-  roundNumber: number,
-): {
-  pairings: Pairing[];
-  paired: Set<string>;
-  usedRematch: boolean;
-  maxDownFloatUsed: number;
-  stageUsed: number;
-  stagesTried: { stage: number; complete: boolean }[];
-  floatReasons: Map<string, string>; // playerId -> reason for floating down
-} {
-  const sorted = [...pool].sort(swissOrder);
-  const paired = new Set<string>();
-
-  const hasPlayed = (aId: string, bId: string) =>
-    havePlayedBefore(aId, bId, previousPairings);
-
-  const pickNextUnpairedIndex = (): number => {
-    for (let i = 0; i < sorted.length; i++) {
-      if (!paired.has(sorted[i]!.id)) return i;
-    }
-    return -1;
-  };
-
-  type Stage = {
-    stage: number;
-    maxDownFloat: number | null; // 0 => same-score only; 1 => adjacent; null => any
-    allowRematch: boolean;
-  };
-
-  const stages: Stage[] = [
-    { stage: 1, maxDownFloat: 0, allowRematch: false },
-    { stage: 2, maxDownFloat: 1, allowRematch: false },
-    { stage: 3, maxDownFloat: null, allowRematch: false },
-    { stage: 4, maxDownFloat: 1, allowRematch: true },
-    { stage: 5, maxDownFloat: null, allowRematch: true },
-  ];
-
-  const stagesTried: { stage: number; complete: boolean }[] = [];
-  const floatReasons = new Map<string, string>();
-
-  const solveWithStage = (s: Stage) => {
-    type Candidate = { oppIdx: number; cost: number; reason?: string };
-
-    const isAllowedPair = (a: PlayerStanding, b: PlayerStanding): boolean => {
-      if (a.id === b.id) return false;
-      if (b.matchPoints > a.matchPoints) return false; // never float upward
-      const downFloat = a.matchPoints - b.matchPoints;
-      if (s.maxDownFloat !== null && downFloat > s.maxDownFloat) return false;
-      if (!s.allowRematch && hasPlayed(a.id, b.id)) return false;
-      return true;
-    };
-
-    const pairCost = (a: PlayerStanding, b: PlayerStanding): number => {
-      const isRematch = hasPlayed(a.id, b.id);
-      const downFloat = Math.max(0, a.matchPoints - b.matchPoints);
-
-      // "Rather a 2-step float than a rematch"
-      // Keep rematches far more expensive than multi-step floats.
-      const rematchPenalty = 5_000_000;
-      const multiStepPenalty = downFloat > 1 ? (downFloat - 1) * 200_000 : 0;
-      return (
-        (isRematch ? rematchPenalty : 0) +
-        multiStepPenalty +
-        downFloat * 10_000 +
-        Math.abs(downFloat)
-      );
-    };
-
-    const buildCandidates = (aIdx: number): Candidate[] => {
-      const a = sorted[aIdx]!;
-      const candidates: Candidate[] = [];
-
-      // Check for same-score opponents first
-      const sameScoreOpponents = sorted
-        .slice(aIdx + 1)
-        .filter(
-          (b) =>
-            !paired.has(b.id) &&
-            b.matchPoints === a.matchPoints &&
-            isAllowedPair(a, b),
-        );
-
-      for (let j = aIdx + 1; j < sorted.length; j++) {
-        const b = sorted[j]!;
-        if (paired.has(b.id)) continue;
-        if (!isAllowedPair(a, b)) continue;
-
-        const downFloat = a.matchPoints - b.matchPoints;
-        const isRematch = hasPlayed(a.id, b.id);
-
-        // Generate reason for this pairing
-        let reason = "";
-        if (b.matchPoints === a.matchPoints) {
-          if (sameScoreOpponents.length === 0) {
-            reason = "no legal same-bracket opponents available";
-          } else if (isRematch) {
-            reason = `all ${sameScoreOpponents.length} same-bracket opponents are rematches`;
-          } else {
-            reason = "same-bracket pairing"; // Normal case, no float
-          }
-        } else {
-          // Float down
-          if (sameScoreOpponents.length === 0) {
-            reason = `no legal same-bracket opponents (${downFloat}-point float down)`;
-          } else if (
-            sameScoreOpponents.every((opp) => hasPlayed(a.id, opp.id))
-          ) {
-            reason = `all ${sameScoreOpponents.length} same-bracket opponents are rematches (${downFloat}-point float down)`;
-          } else {
-            reason = `same-bracket pairing blocked, ${downFloat}-point float down`;
-          }
-        }
-
-        candidates.push({ oppIdx: j, cost: pairCost(a, b), reason });
-      }
-
-      // Deterministic preference:
-      // - same-score first
-      // - then smaller float distance
-      // - then lower cost
-      // - then swissOrder tie-break
-      candidates.sort((x, y) => {
-        const bx = sorted[x.oppIdx]!;
-        const by = sorted[y.oppIdx]!;
-        const ax = sorted[aIdx]!;
-
-        const sx = bx.matchPoints === ax.matchPoints ? 0 : 1;
-        const sy = by.matchPoints === ax.matchPoints ? 0 : 1;
-        if (sx !== sy) return sx - sy;
-
-        const dx = ax.matchPoints - bx.matchPoints;
-        const dy = ax.matchPoints - by.matchPoints;
-        if (dx !== dy) return dx - dy;
-
-        if (x.cost !== y.cost) return x.cost - y.cost;
-        return swissOrder(bx, by);
-      });
-
-      return candidates;
-    };
-
-    let bestCost = Number.POSITIVE_INFINITY;
-    let bestPairings: Pairing[] = [];
-
-    const dfs = (current: Pairing[], currentCost: number) => {
-      if (currentCost >= bestCost) return;
-
-      const i = pickNextUnpairedIndex();
-      if (i === -1) {
-        bestCost = currentCost;
-        bestPairings = [...current];
-        return;
-      }
-
-      const a = sorted[i]!;
-      paired.add(a.id);
-      const candidates = buildCandidates(i);
-      for (const cand of candidates) {
-        const b = sorted[cand.oppIdx]!;
-        if (paired.has(b.id)) continue;
-        paired.add(b.id);
-
-        // Note: Float reasons will be captured after final pairing is determined
-
-        current.push({
-          player1Id: a.id,
-          player1Name: a.name,
-          player2Id: b.id,
-          player2Name: b.name,
-          roundNumber,
-        });
-        dfs(current, currentCost + cand.cost);
-        current.pop();
-        paired.delete(b.id);
-
-        // Perfect means: no float beyond allowed (already) and no rematch unless allowed (already).
-        if (bestCost === 0) break;
-      }
-      paired.delete(a.id);
-    };
-
-    dfs([], 0);
-    return bestPairings;
-  };
-
-  let chosenStage = stages[stages.length - 1]!;
-  let pairings: Pairing[] = [];
-  for (const s of stages) {
-    // Ensure clean state for each stage run
-    paired.clear();
-    floatReasons.clear();
-    const result = solveWithStage(s);
-    const complete = result.length * 2 === sorted.length;
-    stagesTried.push({ stage: s.stage, complete });
-    if (complete) {
-      chosenStage = s;
-      pairings = result;
-      break;
-    }
-  }
-
-  const finalPaired = new Set<string>();
-  for (const p of pairings) {
-    finalPaired.add(p.player1Id);
-    if (p.player2Id) finalPaired.add(p.player2Id);
-  }
-
-  // Re-analyze final pairings to capture float reasons accurately
-  const finalFloatReasons = new Map<string, string>();
-  let usedRematch = false;
-  let maxDownFloatUsed = 0;
-
-  for (const p of pairings) {
-    if (p.player2Id) {
-      usedRematch ||= hasPlayed(p.player1Id, p.player2Id);
-      const a = sorted.find((x) => x.id === p.player1Id);
-      const b = sorted.find((x) => x.id === p.player2Id);
-      if (a && b) {
-        const downFloat = a.matchPoints - b.matchPoints;
-        maxDownFloatUsed = Math.max(maxDownFloatUsed, downFloat);
-
-        // Generate float reason for final pairing
-        if (downFloat > 0) {
-          const sameScoreOpponents = sorted.filter(
-            (opp) =>
-              opp.id !== a.id &&
-              opp.id !== b.id &&
-              opp.matchPoints === a.matchPoints &&
-              finalPaired.has(opp.id),
-          );
-
-          const sameScoreRematches = sameScoreOpponents.filter((opp) =>
-            hasPlayed(a.id, opp.id),
-          );
-
-          let reason = "";
-          if (sameScoreOpponents.length === 0) {
-            reason = `no legal same-bracket opponents available (${downFloat}-point float)`;
-          } else if (sameScoreRematches.length === sameScoreOpponents.length) {
-            reason = `all ${sameScoreOpponents.length} same-bracket opponents are rematches (${downFloat}-point float)`;
-          } else {
-            reason = `same-bracket pairing blocked, ${downFloat}-point float down`;
-          }
-
-          finalFloatReasons.set(a.id, reason);
-        }
-      }
-    }
-  }
-
-  // Merge with any reasons captured during DFS
-  floatReasons.forEach((reason, playerId) => {
-    if (!finalFloatReasons.has(playerId)) {
-      finalFloatReasons.set(playerId, reason);
-    }
-  });
-
-  return {
-    pairings,
-    paired: finalPaired,
-    usedRematch,
-    maxDownFloatUsed,
-    stageUsed: chosenStage.stage,
-    stagesTried,
-    floatReasons: finalFloatReasons,
-  };
 }
 
 /**
@@ -566,7 +391,12 @@ export function generateSwissPairings(
     return { pairings: out };
   }
 
-  // Subsequent rounds: bye priority, then score groups with float-down logic
+  // Subsequent rounds: bye priority, then hard-partition by score bracket.
+  // Correct Swiss flow: group by score, process each bracket (highest first).
+  // For each bracket independently: pair everyone inside; if odd, exactly one player
+  // floats down (by floatPriority). That floater is appended to the top of the next
+  // lower bracket; we do not look at lower groups until the current bracket is done.
+  // Only one float per bracket unless rematches force more (we currently do one float per odd bracket).
   const isOddTotal = standings.length % 2 === 1;
 
   let pool = standings;
@@ -595,8 +425,29 @@ export function generateSwissPairings(
     pool = standings.filter((p) => p.id !== byePlayer!.id);
   }
 
-  const result = solveSwissRound(pool, previousPairings, roundNumber);
-  result.pairings.forEach((p) => pairings.push(p));
+  const floatReasons = new Map<string, string>();
+  const groups = getScoreGroupsSorted(pool);
+  let carryOver: PlayerStanding | null = null;
+
+  for (const { players: groupPlayers } of groups) {
+    const currentPool =
+      carryOver !== null ? [carryOver, ...groupPlayers] : [...groupPlayers];
+    const result = processBracket(
+      currentPool,
+      previousPairings,
+      roundNumber,
+      floatReasons,
+    );
+    for (const p of result.pairings) {
+      pairings.push(p);
+    }
+    carryOver = result.floatDown;
+  }
+
+  assert(
+    carryOver === null,
+    "Pool after bye must be even; one bracket should not leave a floater",
+  );
 
   if (byePlayer) {
     pairings.push({
@@ -606,6 +457,23 @@ export function generateSwissPairings(
       player2Name: null,
       roundNumber,
     });
+  }
+
+  const standingsById = new Map(standings.map((s) => [s.id, s]));
+  let usedRematch = false;
+  let maxDownFloatUsed = 0;
+  for (const p of pairings) {
+    if (p.player2Id) {
+      usedRematch =
+        usedRematch ||
+        havePlayedBefore(p.player1Id, p.player2Id, previousPairings);
+      const a = standingsById.get(p.player1Id);
+      const b = standingsById.get(p.player2Id);
+      if (a && b) {
+        const diff = Math.abs(a.matchPoints - b.matchPoints);
+        maxDownFloatUsed = Math.max(maxDownFloatUsed, diff);
+      }
+    }
   }
 
   // Log unavoidable decisions
@@ -618,9 +486,9 @@ export function generateSwissPairings(
       );
     }
 
-    if (result.floatReasons.size > 0) {
+    if (floatReasons.size > 0) {
       console.log("Floats:");
-      result.floatReasons.forEach((reason, playerId) => {
+      floatReasons.forEach((reason, playerId) => {
         const player = standings.find((p) => p.id === playerId);
         if (player) {
           console.log(
@@ -631,20 +499,19 @@ export function generateSwissPairings(
     }
 
     console.log(
-      `Max float distance: ${result.maxDownFloatUsed} points${result.maxDownFloatUsed > 1 ? " (multi-step)" : ""}`,
+      `Max float distance: ${maxDownFloatUsed} points${maxDownFloatUsed > 1 ? " (multi-step)" : ""}`,
     );
 
-    if (result.usedRematch) {
-      console.log(
-        `Rematches used: Stage ${result.stageUsed} required (stages 1-3 incomplete)`,
-      );
+    if (usedRematch) {
+      console.log("Rematches used (unavoidable within bracket constraints)");
     }
 
-    console.log(`Solver stage used: ${result.stageUsed}`);
+    console.log(
+      "Pairing method: hard-partition by score bracket, one float per odd bracket",
+    );
     console.groupEnd();
   }
 
-  const standingsById = new Map(standings.map((s) => [s.id, s]));
   const out = sortPairingsHighFirst(pairings, standingsById);
 
   // ----------------------------
@@ -655,11 +522,8 @@ export function generateSwissPairings(
   const byes = out.filter((p) => p.player2Id === null).length;
   assert(byes === (standings.length % 2 === 1 ? 1 : 0), "Invalid bye count");
 
-  // Determine if rematches are mathematically unavoidable:
-  // if stageUsed >= 4, then stages 1-3 (no-rematch) were incomplete.
-  const rematchesUnavoidable = result.stageUsed >= 4;
-  const multiStepFloatsUnavoidable =
-    result.maxDownFloatUsed > 1 && result.stageUsed >= 3; // stage 1/2 disallow >1
+  const rematchesUnavoidable = usedRematch;
+  const multiStepFloatsUnavoidable = maxDownFloatUsed > 1;
 
   for (const p of out) {
     assert(p.player1Id, "Invalid pairing: missing player1");
@@ -713,7 +577,7 @@ export function generateSwissPairings(
     reason: string;
   }> = [];
 
-  result.floatReasons.forEach((reason, playerId) => {
+  floatReasons.forEach((reason, playerId) => {
     const player = standings.find((p) => p.id === playerId);
     if (player) {
       floatDetails.push({
@@ -730,10 +594,10 @@ export function generateSwissPairings(
     byePlayerId: byePlayer ? byePlayer.id : undefined,
     byePlayerName: byePlayer ? byePlayer.name : undefined,
     byePlayerPoints: byePlayer ? byePlayer.matchPoints : undefined,
-    floatReasons: result.floatReasons,
-    maxFloatDistance: result.maxDownFloatUsed,
-    rematchCount: result.usedRematch ? 1 : 0,
-    stageUsed: result.stageUsed,
+    floatReasons,
+    maxFloatDistance: maxDownFloatUsed,
+    rematchCount: usedRematch ? 1 : 0,
+    stageUsed: 1, // Bracket-by-bracket (hard-partition by score, one float per odd bracket)
     floatDetails,
   };
 
