@@ -215,8 +215,22 @@ const TournamentLeaderboard: React.FC = () => {
       }
     });
 
-    // Process all matches to calculate standings
+    // Process only completed matches and byes (same logic as TournamentMatches)
     matches.forEach((match) => {
+      const isBye = match.status === "bye" || !match.player2_id;
+      const isDraw =
+        match.status === "completed" &&
+        match.winner_id === null &&
+        match.result === "Draw";
+      const isCompletedWin =
+        match.status === "completed" &&
+        match.winner_id !== null &&
+        match.result !== "Draw";
+
+      if (!isBye && !isDraw && !isCompletedWin) {
+        return; // Skip ready/pending matches
+      }
+
       const player1 = standingsMap.get(match.player1_id);
       const player2 = match.player2_id
         ? standingsMap.get(match.player2_id)
@@ -224,7 +238,7 @@ const TournamentLeaderboard: React.FC = () => {
 
       if (player1) {
         player1.matchesPlayed++;
-        if (match.status === "bye" || !match.player2_id) {
+        if (isBye) {
           player1.byesReceived++;
         }
         if (match.status === "bye" || match.winner_id === match.player1_id) {

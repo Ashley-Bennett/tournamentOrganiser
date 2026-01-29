@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
 
@@ -102,11 +108,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return { session: data.session };
   };
 
-  const logout = () => {
-    // Let the Supabase auth state listener drive session/user updates.
+  const logout = useCallback(() => {
     void supabase.auth.signOut();
     localStorage.removeItem("token");
-  };
+  }, []);
 
   return (
     <AuthContext.Provider

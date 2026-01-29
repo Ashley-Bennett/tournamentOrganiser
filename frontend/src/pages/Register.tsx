@@ -40,12 +40,9 @@ const Register = () => {
       const { session } = await register(name, email, password);
       setLoading(false);
       if (session) {
-        // User is logged in immediately (auto-confirm enabled)
+        // User is logged in immediately (auto-confirm enabled). Only set success;
+        // the useEffect will handle the single redirect when user updates.
         setSuccess("Registration successful! Redirecting to dashboard...");
-        // Redirect directly since we have a session
-        setTimeout(() => {
-          navigate("/dashboard");
-        }, 1500);
       } else {
         // Email confirmation required
         setSuccess(
