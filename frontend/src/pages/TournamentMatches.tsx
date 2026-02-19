@@ -1099,8 +1099,45 @@ const TournamentMatches: React.FC = () => {
         throw new Error("Maximum number of rounds reached");
       }
 
+      // Refetch matches so standings use the just-saved results (state may not have updated yet)
+      const { data: currentMatchesData, error: fetchErr } = await supabase
+        .from("tournament_matches")
+        .select("*")
+        .eq("tournament_id", tournament.id)
+        .order("round_number", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
+      if (fetchErr)
+        throw new Error(fetchErr.message || "Failed to refresh matches");
+      const currentMatchesRaw = (currentMatchesData ?? []) as Match[];
+
+      const playerIdsForNames = new Set<string>();
+      currentMatchesRaw.forEach((m) => {
+        playerIdsForNames.add(m.player1_id);
+        if (m.player2_id) playerIdsForNames.add(m.player2_id);
+        if (m.winner_id) playerIdsForNames.add(m.winner_id);
+      });
+      const { data: namesData } = await supabase
+        .from("tournament_players")
+        .select("id, name")
+        .in("id", Array.from(playerIdsForNames));
+      const namesMap = new Map<string, string>();
+      namesData?.forEach((p: { id: string; name: string }) =>
+        namesMap.set(p.id, p.name),
+      );
+      const currentMatches: MatchWithPlayers[] = currentMatchesRaw.map((m) => ({
+        ...m,
+        player1_name: namesMap.get(m.player1_id) ?? "Unknown",
+        player2_name: m.player2_id
+          ? namesMap.get(m.player2_id) ?? "Unknown"
+          : null,
+        winner_name: m.winner_id
+          ? namesMap.get(m.winner_id) ?? "Unknown"
+          : null,
+      }));
+
       // If next round already exists, just navigate to it (do NOT create duplicates)
-      const nextRoundAlreadyExists = matches.some(
+      const nextRoundAlreadyExists = currentMatches.some(
         (m) => m.round_number === nextRoundNumber,
       );
       if (nextRoundAlreadyExists) {
@@ -1108,14 +1145,14 @@ const TournamentMatches: React.FC = () => {
         return;
       }
 
-      // Calculate standings from all previous rounds
-      const allPreviousMatches = matches.filter(
+      // Calculate standings from all previous rounds (using refetched matches)
+      const allPreviousMatches = currentMatches.filter(
         (m) => m.round_number < nextRoundNumber,
       );
 
       // Get all players
       const playerIds = new Set<string>();
-      matches.forEach((match) => {
+      currentMatches.forEach((match) => {
         playerIds.add(match.player1_id);
         if (match.player2_id) {
           playerIds.add(match.player2_id);
@@ -1797,7 +1834,8 @@ const TournamentMatches: React.FC = () => {
                                   <>
                                     <strong>
                                       {decisionLog.byePlayerName} (
-                                      {decisionLog.byePlayerPoints} pts)
+                                      {decisionLog.byePlayerPoints} pts at time
+                                      of pairing)
                                     </strong>
                                     {" - "}
                                     {decisionLog.byeReason}
