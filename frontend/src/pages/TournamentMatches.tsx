@@ -66,6 +66,7 @@ interface Match {
   winner_id: string | null;
   result: string | null;
   status: "ready" | "pending" | "completed" | "bye";
+  pairing_decision_log?: PairingDecisionLog | null;
   created_at: string;
 }
 
@@ -120,6 +121,17 @@ const clearPendingResultsFromStorage = (tournamentId: string) => {
   } catch (error) {
     console.error("Failed to clear pending results from localStorage:", error);
   }
+};
+
+// Helper to convert PairingDecisionLog for database storage (Map -> object)
+const serializeDecisionLog = (
+  log: PairingDecisionLog | undefined,
+): Record<string, unknown> | null => {
+  if (!log) return null;
+  return {
+    ...log,
+    floatReasons: Object.fromEntries(log.floatReasons),
+  };
 };
 
 const TournamentMatches: React.FC = () => {
@@ -374,6 +386,36 @@ const TournamentMatches: React.FC = () => {
         );
 
         setMatches(matchesWithPlayers);
+
+        // Extract decision logs from matches (stored on first match of each round)
+        const decisionLogsMap = new Map<number, PairingDecisionLog>();
+        const roundsProcessed = new Set<number>();
+
+        for (const match of matchesData) {
+          if (
+            match.pairing_decision_log &&
+            !roundsProcessed.has(match.round_number)
+          ) {
+            const log = match.pairing_decision_log as Omit<
+              PairingDecisionLog,
+              "floatReasons"
+            > & {
+              floatReasons: Map<string, string> | Record<string, string>;
+            };
+            // Convert floatReasons object back to Map if needed
+            const floatReasonsMap =
+              log.floatReasons instanceof Map
+                ? log.floatReasons
+                : new Map(Object.entries(log.floatReasons));
+            decisionLogsMap.set(match.round_number, {
+              ...log,
+              floatReasons: floatReasonsMap,
+            } as PairingDecisionLog);
+            roundsProcessed.add(match.round_number);
+          }
+        }
+
+        setRoundDecisionLogs(decisionLogsMap);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed to load matches");
       } finally {
@@ -992,17 +1034,8 @@ const TournamentMatches: React.FC = () => {
         );
       }
 
-      // Store decision log if available
-      if (pairingResult.decisionLog) {
-        setRoundDecisionLogs((prev) => {
-          const next = new Map(prev);
-          next.set(1, pairingResult.decisionLog!);
-          return next;
-        });
-      }
-
       // Create new round 1 matches
-      const matchesToInsert = pairingResult.pairings.map((pairing) => ({
+      const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
         round_number: 1,
         player1_id: pairing.player1Id,
@@ -1010,6 +1043,8 @@ const TournamentMatches: React.FC = () => {
         status: pairing.player2Id === null ? "bye" : "ready",
         result: pairing.player2Id === null ? "bye" : null,
         winner_id: pairing.player2Id === null ? pairing.player1Id : null,
+        pairing_decision_log:
+          index === 0 ? serializeDecisionLog(pairingResult.decisionLog) : null,
       }));
 
       const { error: insertError } = await supabase
@@ -1071,6 +1106,36 @@ const TournamentMatches: React.FC = () => {
       );
 
       setMatches(matchesWithPlayers);
+
+      // Extract decision logs from refreshed matches (including the regenerated round 1)
+      const decisionLogsMap = new Map<number, PairingDecisionLog>();
+      const roundsProcessed = new Set<number>();
+
+      for (const match of matchesData || []) {
+        if (
+          match.pairing_decision_log &&
+          !roundsProcessed.has(match.round_number)
+        ) {
+          const log = match.pairing_decision_log as Omit<
+            PairingDecisionLog,
+            "floatReasons"
+          > & {
+            floatReasons: Map<string, string> | Record<string, string>;
+          };
+          // Convert floatReasons object back to Map if needed
+          const floatReasonsMap =
+            log.floatReasons instanceof Map
+              ? log.floatReasons
+              : new Map(Object.entries(log.floatReasons));
+          decisionLogsMap.set(match.round_number, {
+            ...log,
+            floatReasons: floatReasonsMap,
+          } as PairingDecisionLog);
+          roundsProcessed.add(match.round_number);
+        }
+      }
+
+      setRoundDecisionLogs(decisionLogsMap);
       setSelectedRound(1);
     } catch (e: unknown) {
       setError(
@@ -1305,18 +1370,10 @@ const TournamentMatches: React.FC = () => {
         previousPairings,
       );
 
-      // Store decision log if available
-      if (pairingResult.decisionLog) {
-        setRoundDecisionLogs((prev) => {
-          const next = new Map(prev);
-          next.set(nextRoundNumber, pairingResult.decisionLog!);
-          return next;
-        });
-      }
-
       // Create matches in database
       // Pairings are already sorted with byes at the end by generateSwissPairings
-      const matchesToInsert = pairingResult.pairings.map((pairing) => ({
+      // Store decision log on the first match of the round
+      const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
         round_number: nextRoundNumber,
         player1_id: pairing.player1Id,
@@ -1324,6 +1381,8 @@ const TournamentMatches: React.FC = () => {
         status: pairing.player2Id === null ? "bye" : "ready",
         result: pairing.player2Id === null ? "bye" : null,
         winner_id: pairing.player2Id === null ? pairing.player1Id : null,
+        pairing_decision_log:
+          index === 0 ? serializeDecisionLog(pairingResult.decisionLog) : null,
       }));
 
       const { error: insertError } = await supabase
@@ -1383,6 +1442,36 @@ const TournamentMatches: React.FC = () => {
       );
 
       setMatches(matchesWithPlayers);
+
+      // Extract decision logs from refreshed matches (including the newly created round)
+      const decisionLogsMap = new Map<number, PairingDecisionLog>();
+      const roundsProcessed = new Set<number>();
+
+      for (const match of matchesData || []) {
+        if (
+          match.pairing_decision_log &&
+          !roundsProcessed.has(match.round_number)
+        ) {
+          const log = match.pairing_decision_log as Omit<
+            PairingDecisionLog,
+            "floatReasons"
+          > & {
+            floatReasons: Map<string, string> | Record<string, string>;
+          };
+          // Convert floatReasons object back to Map if needed
+          const floatReasonsMap =
+            log.floatReasons instanceof Map
+              ? log.floatReasons
+              : new Map(Object.entries(log.floatReasons));
+          decisionLogsMap.set(match.round_number, {
+            ...log,
+            floatReasons: floatReasonsMap,
+          } as PairingDecisionLog);
+          roundsProcessed.add(match.round_number);
+        }
+      }
+
+      setRoundDecisionLogs(decisionLogsMap);
       setSelectedRound(nextRoundNumber);
     } catch (e: unknown) {
       setError(

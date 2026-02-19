@@ -98,6 +98,7 @@ create table if not exists public.tournament_matches (
   winner_id uuid references public.tournament_players (id) on delete set null,
   result text, -- e.g., "2-0", "2-1", "bye"
   status text not null default 'ready' check (status in ('ready', 'pending', 'completed', 'bye')),
+  pairing_decision_log jsonb, -- Stores PairingDecisionLog for this round (on first match of round)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
