@@ -246,6 +246,128 @@ describe("generateSwissPairings", () => {
     expect(byePlayer.matchPoints).toBe(0);
   });
 
+  it("round 3: four at 3 pts pair without float when rematch is avoidable by re-pairing", () => {
+    // User scenario: 2@6pts, 4@3pts, 2@0pts. The 4 at 3pts must pair as two 3v3 matches
+    // by picking the permutation that has 0 rematches, instead of floating one down.
+    // R1: a-b, c-d, e-f, g-h. Winners a,c,e,g (3pt). R2: a-c, e-g (3v3), b-d, f-h (0v0).
+    // A and E win -> 6pt; C and G stay 3; B and F win -> 3pt. So 2@6 (a,e), 4@3 (c,g,b,f), 2@0 (d,h).
+    // In R1 we had e-f so E and F played. So for 3pt group {c,g,b,f}: no one played each other in R1.
+    // In R2 we had b-d, f-h so b and f didn't play c or g. So the only way to get a rematch in the 4
+    // is if we arrange so two of {c,g,b,f} played in R2. So R2: a-c, e-b, g-f, d-h. Then a,e win (6).
+    // c,b,g,f: c lost to a, b lost to e, g lost to f, f lost to g -> so b,c at 3 and g,f at 3. And d,h at 0.
+    // So 3pt = c,b,g,f. In R2 we had g-f so G and F played. So naive top=[c,b] bottom=[g,f] gives c-g, b-f.
+    // If that yields a rematch we need c-g or b-f to have played. They didn't. So we need one of the
+    // two pairings to be rematch: e.g. have c and b play in R1 so naive c-g, b-f -> c and b didn't play g,f in R1.
+    // So we need c-b as rematch. So in R1 we need c vs b: R1 a-b, c-d, e-f, g-h -> change to a-c, b-d, e-f, g-h.
+    // Then a,c,e,g win (3pt). R2: a-e, c-g (3v3), b-f, d-h (0v0). A and C win (6). E and G stay 3. B and F win 3.
+    // So 3pt = e,g,b,f. In R1 c and b didn't play (we had a-c, b-d). So in R2 we need two of e,g,b,f to have played.
+    // R2 we have c-g and b-f. So e didn't play g,b,f. So we need e to play one of g,b,f in R1. R1 we had e-f. So e and f played.
+    // So 3pt = e,g,b,f with e-f being a rematch. Sort by id: b,e,f,g. Top=[b,e], bottom=[f,g]. Naive: b-f, e-g.
+    // b-f and e-g: e-g not played, b-f not played. So we need e-f (rematch) so we need top=[e,b] bottom=[f,g] -> e-f, b-g. So e-f is rematch. Swap to e-g, b-f -> both no rematch. So this works.
+    const standings: PlayerStanding[] = [
+      makeStandingFromWLD("a", "A", 2, 0, 0), // 6
+      makeStandingFromWLD("c", "C", 2, 0, 0), // 6
+      makeStandingFromWLD("e", "E", 1, 0, 0), // 3
+      makeStandingFromWLD("g", "G", 1, 0, 0), // 3
+      makeStandingFromWLD("b", "B", 1, 0, 0), // 3
+      makeStandingFromWLD("f", "F", 1, 0, 0), // 3
+      makeStandingFromWLD("d", "D", 0, 2, 0), // 0
+      makeStandingFromWLD("h", "H", 0, 2, 0), // 0
+    ];
+
+    // R1: a-b, c-d, e-f, g-h. R2: a-e, c-g (3v3), b-d, f-h (0v0). So a,c=6; e,g,b,f=3; d,h=0. 6pt pair never met.
+    const previousPairings: Pairing[] = [
+      {
+        player1Id: "a",
+        player1Name: "A",
+        player2Id: "b",
+        player2Name: "B",
+        roundNumber: 1,
+      },
+      {
+        player1Id: "c",
+        player1Name: "C",
+        player2Id: "d",
+        player2Name: "D",
+        roundNumber: 1,
+      },
+      {
+        player1Id: "e",
+        player1Name: "E",
+        player2Id: "f",
+        player2Name: "F",
+        roundNumber: 1,
+      },
+      {
+        player1Id: "g",
+        player1Name: "G",
+        player2Id: "h",
+        player2Name: "H",
+        roundNumber: 1,
+      },
+      {
+        player1Id: "a",
+        player1Name: "A",
+        player2Id: "e",
+        player2Name: "E",
+        roundNumber: 2,
+      },
+      {
+        player1Id: "c",
+        player1Name: "C",
+        player2Id: "g",
+        player2Name: "G",
+        roundNumber: 2,
+      },
+      {
+        player1Id: "b",
+        player1Name: "B",
+        player2Id: "d",
+        player2Name: "D",
+        roundNumber: 2,
+      },
+      {
+        player1Id: "f",
+        player1Name: "F",
+        player2Id: "h",
+        player2Name: "H",
+        roundNumber: 2,
+      },
+    ];
+
+    const result = generateSwissPairings(standings, 3, previousPairings);
+    assertRoundInvariants(result, standings);
+
+    const threePointIds = new Set(["e", "g", "b", "f"]);
+    const zeroPointIds = new Set(["d", "h"]);
+
+    const threeVsThree: Pairing[] = result.pairings.filter(
+      (p) =>
+        p.player2Id &&
+        threePointIds.has(p.player1Id) &&
+        threePointIds.has(p.player2Id),
+    );
+    const threeVsZero: Pairing[] = result.pairings.filter(
+      (p) =>
+        p.player2Id &&
+        ((threePointIds.has(p.player1Id) && zeroPointIds.has(p.player2Id)) ||
+          (zeroPointIds.has(p.player1Id) && threePointIds.has(p.player2Id))),
+    );
+
+    expect(threeVsThree).toHaveLength(2);
+    expect(threeVsZero).toHaveLength(0);
+
+    const havePlayedBefore = (id1: string, id2: string) =>
+      previousPairings.some(
+        (q) =>
+          (q.player1Id === id1 && q.player2Id === id2) ||
+          (q.player1Id === id2 && q.player2Id === id1),
+      );
+    for (const p of threeVsThree) {
+      expect(havePlayedBefore(p.player1Id, p.player2Id!)).toBe(false);
+    }
+  });
+
   it("bye must always come from the minimum score bracket (when odd)", () => {
     const standings: PlayerStanding[] = [
       makeStandingFromWLD("a", "A", 2, 0, 0), // 6 pts

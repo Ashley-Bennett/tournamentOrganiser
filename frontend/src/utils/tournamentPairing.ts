@@ -239,9 +239,29 @@ function buildPairingError(
 }
 
 /**
+ * Generate all permutations of [0, 1, ..., n-1]. Used to pick the best bottom-half
+ * assignment in pairEvenPool so we avoid rematches when possible (e.g. 4 players in
+ * same bracket: try both pairings and take the one with 0 rematches).
+ */
+function allPermutations(n: number): number[][] {
+  if (n <= 0) return [[]];
+  if (n === 1) return [[0]];
+  const prev = allPermutations(n - 1);
+  const out: number[][] = [];
+  for (const p of prev) {
+    for (let i = 0; i <= p.length; i++) {
+      out.push([...p.slice(0, i), n - 1, ...p.slice(i)]);
+    }
+  }
+  return out;
+}
+
+/**
  * Pair an even-sized pool within the bracket. Guarantees a perfect matching (N/2 pairings).
  * Always sorts by compareForPairing (points DESC, then byes, id) — never pairingOrder on mixed pools.
  * Special case: exactly one floater + one lower score group → pair floater with best low.
+ * For small pools (k <= 4), tries all permutations of bottom-half vs top-half to minimize
+ * rematches and avoid unnecessary float-down.
  */
 function pairEvenPool(
   pool: PlayerStanding[],
@@ -304,30 +324,53 @@ function pairEvenPool(
   const hasPlayed = (a: string, b: string) =>
     havePlayedBefore(a, b, previousPairings);
 
-  const perm = Array.from({ length: k }, (_, i) => i);
-
-  let changed = true;
-  while (changed) {
-    changed = false;
+  const countRematches = (perm: number[]): number => {
+    let count = 0;
     for (let i = 0; i < k; i++) {
-      if (!hasPlayed(top[i]!.id, bottom[perm[i]!]!.id)) continue; // no rematch at i
-      for (let j = i + 1; j < k; j++) {
-        const a = top[i]!.id;
-        const b = top[j]!.id;
-        const bi = bottom[perm[i]!]!.id;
-        const bj = bottom[perm[j]!]!.id;
-        const currentIRematch = hasPlayed(a, bi);
-        const currentJRematch = hasPlayed(b, bj);
-        const afterSwapIRematch = hasPlayed(a, bj);
-        const afterSwapJRematch = hasPlayed(b, bi);
-        const rematchesBefore =
-          (currentIRematch ? 1 : 0) + (currentJRematch ? 1 : 0);
-        const rematchesAfter =
-          (afterSwapIRematch ? 1 : 0) + (afterSwapJRematch ? 1 : 0);
-        if (rematchesAfter < rematchesBefore) {
-          [perm[i], perm[j]] = [perm[j]!, perm[i]!];
-          changed = true;
-          break;
+      if (hasPlayed(top[i]!.id, bottom[perm[i]!]!.id)) count++;
+    }
+    return count;
+  };
+
+  // For small k, try all permutations and pick the one with fewest rematches.
+  // This avoids unnecessary float-down when a rematch-free pairing exists (e.g. 4 at 3pts).
+  const MAX_K_FOR_FULL_PERM = 4;
+  let perm: number[];
+
+  if (k <= MAX_K_FOR_FULL_PERM) {
+    const perms = allPermutations(k);
+    let bestPerm = perms[0]!;
+    let bestCount = countRematches(bestPerm);
+    for (let i = 1; i < perms.length; i++) {
+      const c = countRematches(perms[i]!);
+      if (c < bestCount) {
+        bestCount = c;
+        bestPerm = perms[i]!;
+      }
+    }
+    perm = bestPerm;
+  } else {
+    // Greedy: start with identity and swap when we strictly reduce rematches
+    perm = Array.from({ length: k }, (_, i) => i);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let i = 0; i < k; i++) {
+        if (!hasPlayed(top[i]!.id, bottom[perm[i]!]!.id)) continue;
+        for (let j = i + 1; j < k; j++) {
+          const a = top[i]!.id;
+          const b = top[j]!.id;
+          const bi = bottom[perm[i]!]!.id;
+          const bj = bottom[perm[j]!]!.id;
+          const rematchesBefore =
+            (hasPlayed(a, bi) ? 1 : 0) + (hasPlayed(b, bj) ? 1 : 0);
+          const rematchesAfter =
+            (hasPlayed(a, bj) ? 1 : 0) + (hasPlayed(b, bi) ? 1 : 0);
+          if (rematchesAfter < rematchesBefore) {
+            [perm[i], perm[j]] = [perm[j]!, perm[i]!];
+            changed = true;
+            break;
+          }
         }
       }
     }
