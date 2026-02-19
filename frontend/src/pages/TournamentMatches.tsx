@@ -468,6 +468,10 @@ const TournamentMatches: React.FC = () => {
             );
           } else {
             player1.losses++;
+            player1.matchPoints = calculateMatchPoints(
+              player1.wins,
+              player1.draws,
+            );
           }
           if (match.player2_id) {
             player1.opponents.push(match.player2_id);
@@ -493,10 +497,21 @@ const TournamentMatches: React.FC = () => {
             );
           } else {
             player2.losses++;
+            player2.matchPoints = calculateMatchPoints(
+              player2.wins,
+              player2.draws,
+            );
           }
           player2.opponents.push(match.player1_id);
         }
       }
+    });
+
+    standingsMap.forEach((standing) => {
+      standing.matchPoints = calculateMatchPoints(
+        standing.wins,
+        standing.draws,
+      );
     });
 
     const standings = Array.from(standingsMap.values());
@@ -1183,6 +1198,10 @@ const TournamentMatches: React.FC = () => {
               );
             } else {
               player1.losses++;
+              player1.matchPoints = calculateMatchPoints(
+                player1.wins,
+                player1.draws,
+              );
             }
             if (match.player2_id) {
               player1.opponents.push(match.player2_id);
@@ -1208,16 +1227,33 @@ const TournamentMatches: React.FC = () => {
               );
             } else {
               player2.losses++;
+              player2.matchPoints = calculateMatchPoints(
+                player2.wins,
+                player2.draws,
+              );
             }
             player2.opponents.push(match.player1_id);
           }
         }
       });
 
+      // Recompute matchPoints for every player so standings are correct for pairing
+      standingsMap.forEach((standing) => {
+        standing.matchPoints = calculateMatchPoints(
+          standing.wins,
+          standing.draws,
+        );
+      });
+
       const standings = Array.from(standingsMap.values());
 
-      // Get previous pairings to avoid rematches
-      const previousPairings: Pairing[] = allPreviousMatches.map((match) => ({
+      // Get previous pairings to avoid rematches (deterministic order: by round, then id)
+      const sortedPrevious = [...allPreviousMatches].sort(
+        (a, b) =>
+          a.round_number - b.round_number ||
+          (a.id ?? "").localeCompare(b.id ?? ""),
+      );
+      const previousPairings: Pairing[] = sortedPrevious.map((match) => ({
         player1Id: match.player1_id,
         player1Name: match.player1_name,
         player2Id: match.player2_id,
@@ -1523,16 +1559,16 @@ const TournamentMatches: React.FC = () => {
                                             ? rank === 1
                                               ? "rgba(255, 215, 0, 0.1)"
                                               : rank === 2
-                                                ? "rgba(192, 192, 192, 0.1)"
-                                                : "rgba(205, 127, 50, 0.1)"
+                                              ? "rgba(192, 192, 192, 0.1)"
+                                              : "rgba(205, 127, 50, 0.1)"
                                             : "transparent",
                                           "&:hover": {
                                             backgroundColor: isTopThree
                                               ? rank === 1
                                                 ? "rgba(255, 215, 0, 0.15)"
                                                 : rank === 2
-                                                  ? "rgba(192, 192, 192, 0.15)"
-                                                  : "rgba(205, 127, 50, 0.15)"
+                                                ? "rgba(192, 192, 192, 0.15)"
+                                                : "rgba(205, 127, 50, 0.15)"
                                               : "rgba(0, 0, 0, 0.04)",
                                           },
                                         }}
@@ -1550,8 +1586,8 @@ const TournamentMatches: React.FC = () => {
                                                     rank === 1
                                                       ? "gold"
                                                       : rank === 2
-                                                        ? "silver"
-                                                        : "#CD7F32",
+                                                      ? "silver"
+                                                      : "#CD7F32",
                                                 }}
                                               />
                                             )}
@@ -2356,20 +2392,20 @@ const TournamentMatches: React.FC = () => {
                                           match.status === "bye"
                                             ? "Bye"
                                             : match.status === "completed"
-                                              ? "Completed"
-                                              : match.status === "pending"
-                                                ? "Pending"
-                                                : "Ready"
+                                            ? "Completed"
+                                            : match.status === "pending"
+                                            ? "Pending"
+                                            : "Ready"
                                         }
                                         size="small"
                                         color={
                                           match.status === "bye"
                                             ? "info"
                                             : match.status === "completed"
-                                              ? "success"
-                                              : match.status === "pending"
-                                                ? "warning"
-                                                : "default"
+                                            ? "success"
+                                            : match.status === "pending"
+                                            ? "warning"
+                                            : "default"
                                         }
                                       />
                                     </TableCell>

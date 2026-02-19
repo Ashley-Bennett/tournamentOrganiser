@@ -261,6 +261,10 @@ const TournamentLeaderboard: React.FC = () => {
           }
         } else if (match.winner_id && match.winner_id !== match.player1_id) {
           player1.losses++;
+          player1.matchPoints = calculateMatchPoints(
+            player1.wins,
+            player1.draws,
+          );
           if (match.player2_id) {
             player1.opponents.push(match.player2_id);
           }
@@ -285,9 +289,20 @@ const TournamentLeaderboard: React.FC = () => {
           player2.opponents.push(match.player1_id);
         } else if (match.winner_id !== match.player2_id) {
           player2.losses++;
+          player2.matchPoints = calculateMatchPoints(
+            player2.wins,
+            player2.draws,
+          );
           player2.opponents.push(match.player1_id);
         }
       }
+    });
+
+    standingsMap.forEach((standing) => {
+      standing.matchPoints = calculateMatchPoints(
+        standing.wins,
+        standing.draws,
+      );
     });
 
     const standings = Array.from(standingsMap.values());

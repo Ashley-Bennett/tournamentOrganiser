@@ -102,9 +102,7 @@ create table if not exists public.tournament_matches (
   updated_at timestamptz not null default now()
 );
 
-alter table public.tournament_matches enable row level security;
-
--- Users can manage matches for tournaments they own
+alter table public.tournament_matches enable row level security;-- Users can manage matches for tournaments they own
 drop policy if exists "tournament_matches_select_own" on public.tournament_matches;
 create policy "tournament_matches_select_own"
 on public.tournament_matches
@@ -162,5 +160,79 @@ using (
     from public.tournaments t
     where t.id = tournament_matches.tournament_id
       and t.created_by = (select auth.uid())
+  )
+);
+
+-- Pairing integrity: prevent duplicate pair in same round (A,B) and (B,A)
+create unique index if not exists tournament_matches_unique_pair_per_round
+on public.tournament_matches (
+  tournament_id,
+  round_number,
+  least(player1_id, player2_id),
+  greatest(player1_id, player2_id)
+)
+where player2_id is not null;
+
+-- Each player appears at most once per round (as player1 or player2)
+create unique index if not exists tournament_matches_unique_player1_per_round
+on public.tournament_matches (tournament_id, round_number, player1_id);
+
+create unique index if not exists tournament_matches_unique_player2_per_round
+on public.tournament_matches (tournament_id, round_number, player2_id)
+where player2_id is not null;
+
+-- Materialized standings for pairing: single source of truth (update when results/byes are set)
+create table if not exists public.tournament_standings (
+  tournament_id uuid not null references public.tournaments (id) on delete cascade,
+  player_id uuid not null references public.tournament_players (id) on delete cascade,
+  match_points integer not null default 0,
+  wins integer not null default 0,
+  losses integer not null default 0,
+  draws integer not null default 0,
+  matches_played integer not null default 0,
+  byes_received integer not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (tournament_id, player_id)
+);
+
+alter table public.tournament_standings enable row level security;
+
+drop policy if exists "tournament_standings_select_own" on public.tournament_standings;
+create policy "tournament_standings_select_own"
+on public.tournament_standings for select
+using (
+  exists (
+    select 1 from public.tournaments t
+    where t.id = tournament_standings.tournament_id and t.created_by = (select auth.uid())
+  )
+);
+
+drop policy if exists "tournament_standings_insert_own" on public.tournament_standings;
+create policy "tournament_standings_insert_own"
+on public.tournament_standings for insert
+with check (
+  exists (
+    select 1 from public.tournaments t
+    where t.id = tournament_standings.tournament_id and t.created_by = (select auth.uid())
+  )
+);
+
+drop policy if exists "tournament_standings_update_own" on public.tournament_standings;
+create policy "tournament_standings_update_own"
+on public.tournament_standings for update
+using (
+  exists (
+    select 1 from public.tournaments t
+    where t.id = tournament_standings.tournament_id and t.created_by = (select auth.uid())
+  )
+);
+
+drop policy if exists "tournament_standings_delete_own" on public.tournament_standings;
+create policy "tournament_standings_delete_own"
+on public.tournament_standings for delete
+using (
+  exists (
+    select 1 from public.tournaments t
+    where t.id = tournament_standings.tournament_id and t.created_by = (select auth.uid())
   )
 );

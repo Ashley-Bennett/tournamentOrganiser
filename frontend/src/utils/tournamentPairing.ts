@@ -1,7 +1,13 @@
 /**
- * Pokemon Tournament Swiss Pairing Logic
- * Based on Play! Pokémon Tournament Rules Handbook
- * Reference: https://www.pokemon.com/static-assets/content-assets/cms2/pdf/play-pokemon/rules/play-pokemon-tournament-rules-handbook-en.pdf
+ * Swiss Pairing Algorithm (bracket-first implementation).
+ *
+ * Rules: Win = 3 pts, Draw = 1 pt, Loss = 0 pts, Bye = 3 pts.
+ * - Players grouped by match points (score brackets); pair within bracket first.
+ * - Odd bracket: exactly one player floats down to the next lower bracket.
+ * - Bye: lowest score, then fewest byes received, then stable tie-breaker (player ID).
+ * - Rematches avoided unless no legal pairing exists; determinism via player ID.
+ *
+ * Reference: Play! Pokémon Tournament Rules Handbook (Section 5.3, 5.6).
  */
 
 export interface PlayerStanding {
@@ -68,17 +74,19 @@ function hash32(input: string): number {
 }
 
 /**
- * Compare for bye priority (hard rule):
- * - fewest byes
- * - then lowest points
- * - then seeded tie-break (deterministic)
+ * Bye priority (Swiss):
+ * - lowest matchPoints first
+ * - then fewest byes
+ * - then deterministic seeded tie-break
  */
 function byePriority(seed: string) {
   return (a: PlayerStanding, b: PlayerStanding): number => {
+    if (a.matchPoints !== b.matchPoints) return a.matchPoints - b.matchPoints;
+
     const aByes = a.byesReceived ?? 0;
     const bByes = b.byesReceived ?? 0;
     if (aByes !== bByes) return aByes - bByes;
-    if (a.matchPoints !== b.matchPoints) return a.matchPoints - b.matchPoints;
+
     return hash32(`${seed}:${a.id}`) - hash32(`${seed}:${b.id}`);
   };
 }
@@ -119,15 +127,14 @@ export function groupByMatchPoints(
 }
 
 /**
- * Who should float when a bracket is odd: fewest byes, then lowest points, then id.
- * (So the "lowest" in the group floats down.)
+ * Who should float when a bracket is odd: the "worst" in the group floats down.
+ * Groups are already isolated by matchPoints, so we only compare byes then id.
  */
 function floatPriority(a: PlayerStanding, b: PlayerStanding): number {
   const aByes = a.byesReceived ?? 0;
   const bByes = b.byesReceived ?? 0;
-  if (aByes !== bByes) return aByes - bByes;
-  if (a.matchPoints !== b.matchPoints) return a.matchPoints - b.matchPoints;
-  return a.id.localeCompare(b.id);
+  if (aByes !== bByes) return bByes - aByes; // MOST byes floats
+  return b.id.localeCompare(a.id); // deterministic "worst" by id
 }
 
 /**
@@ -144,70 +151,72 @@ function getScoreGroupsSorted(
 }
 
 /**
- * Pair an even-sized pool within the bracket. Prefer same-score, no rematches.
- * Returns pairings. Greedy deterministic: sort by pairingOrder, then for each
- * unpaired player pick best unpaired opponent (same score no rematch > same score rematch > float).
+ * Pair an even-sized pool within the bracket. Guarantees a perfect matching (N/2 pairings).
+ * Strategy: sort by pairingOrder (bracket structure is already enforced by caller). Split into top-half and bottom-half, pair top[i] vs bottom[i].
+ * If a pair is a rematch, try swapping within the bottom-half to fix; if impossible, allow rematch.
  */
 function pairEvenPool(
   pool: PlayerStanding[],
   previousPairings: Pairing[],
   roundNumber: number,
 ): Pairing[] {
+  assert(pool.length % 2 === 0, "pairEvenPool requires an even-sized pool");
   const sorted = [...pool].sort(pairingOrder);
-  const paired = new Set<string>();
+  const k = sorted.length / 2;
+  const top = sorted.slice(0, k);
+  const bottom = sorted.slice(k, 2 * k);
   const hasPlayed = (a: string, b: string) =>
     havePlayedBefore(a, b, previousPairings);
-  const pairings: Pairing[] = [];
 
-  for (let i = 0; i < sorted.length; i++) {
-    const a = sorted[i]!;
-    if (paired.has(a.id)) continue;
+  // perm[i] = index into bottom that top[i] is paired with; initially top[i] vs bottom[i]
+  const perm = Array.from({ length: k }, (_, i) => i);
 
-    // Best opponent: same score no rematch, then same score rematch, then float (lower score)
-    let bestJ = -1;
-    let bestScore = -1; // 2 = same no rematch, 1 = same rematch, 0 = float
-
-    for (let j = i + 1; j < sorted.length; j++) {
-      const b = sorted[j]!;
-      if (paired.has(b.id)) continue;
-
-      const sameScore = a.matchPoints === b.matchPoints;
-      const rematch = hasPlayed(a.id, b.id);
-      let score = 0;
-      if (sameScore && !rematch) score = 2;
-      else if (sameScore && rematch) score = 1;
-      else if (a.matchPoints > b.matchPoints)
-        score = 0; // a floats down, allowed
-      else if (b.matchPoints > a.matchPoints)
-        score = 0; // b floats down to a, allowed (so low-point player gets paired when processed first)
-      else continue; // same score already handled above
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestJ = j;
+  // Repair rematches: try swapping bottom indices so fewer rematches
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < k; i++) {
+      if (!hasPlayed(top[i]!.id, bottom[perm[i]!]!.id)) continue; // no rematch at i
+      for (let j = i + 1; j < k; j++) {
+        const a = top[i]!.id;
+        const b = top[j]!.id;
+        const bi = bottom[perm[i]!]!.id;
+        const bj = bottom[perm[j]!]!.id;
+        const currentIRematch = hasPlayed(a, bi);
+        const currentJRematch = hasPlayed(b, bj);
+        const afterSwapIRematch = hasPlayed(a, bj);
+        const afterSwapJRematch = hasPlayed(b, bi);
+        const rematchesBefore =
+          (currentIRematch ? 1 : 0) + (currentJRematch ? 1 : 0);
+        const rematchesAfter =
+          (afterSwapIRematch ? 1 : 0) + (afterSwapJRematch ? 1 : 0);
+        if (rematchesAfter < rematchesBefore) {
+          [perm[i], perm[j]] = [perm[j]!, perm[i]!];
+          changed = true;
+          break;
+        }
       }
-    }
-
-    if (bestJ >= 0) {
-      const b = sorted[bestJ]!;
-      paired.add(a.id);
-      paired.add(b.id);
-      pairings.push({
-        player1Id: a.id,
-        player1Name: a.name,
-        player2Id: b.id,
-        player2Name: b.name,
-        roundNumber,
-      });
     }
   }
 
+  const pairings: Pairing[] = [];
+  for (let i = 0; i < k; i++) {
+    const a = top[i]!;
+    const b = bottom[perm[i]!]!;
+    pairings.push({
+      player1Id: a.id,
+      player1Name: a.name,
+      player2Id: b.id,
+      player2Name: b.name,
+      roundNumber,
+    });
+  }
   return pairings;
 }
 
 /**
  * Process one bracket: pair within the pool. If odd, exactly one player floats down
- * (the "lowest" in the group by floatPriority). Do not look at lower groups yet.
+ * (the "worst" in the group by floatPriority). Do not look at lower groups yet.
  */
 function processBracket(
   pool: PlayerStanding[],
@@ -219,13 +228,18 @@ function processBracket(
     return { pairings: [], floatDown: null };
   }
 
-  // Who floats if odd: first in floatPriority order (fewest byes, then lowest points, then id)
+  // Who floats if odd: first in floatPriority order (most byes, then id — "worst" in bracket)
   const sorted = [...pool].sort(floatPriority);
 
   if (sorted.length % 2 === 1) {
     const floatDown = sorted[0]!;
     const toPair = sorted.slice(1);
     const pairings = pairEvenPool(toPair, previousPairings, roundNumber);
+    const expected = toPair.length / 2;
+    assert(
+      pairings.length === expected,
+      `Bracket pairing incomplete: expected ${expected} pairings, got ${pairings.length}`,
+    );
     const points = floatDown.matchPoints;
     floatReasons.set(
       floatDown.id,
@@ -235,6 +249,11 @@ function processBracket(
   }
 
   const pairings = pairEvenPool(pool, previousPairings, roundNumber);
+  const expected = pool.length / 2;
+  assert(
+    pairings.length === expected,
+    `Bracket pairing incomplete: expected ${expected} pairings, got ${pairings.length}`,
+  );
   return { pairings, floatDown: null };
 }
 
@@ -331,13 +350,18 @@ export function generateSwissPairings(
   }
 
   if (roundNumber === 1) {
-    // Round 1: bye to lowest score, fewest byes (then id); pair the rest randomly
+    // Round 1: same byePriority as later rounds (lowest pts, fewest byes, then seed); everyone is 0 pts so order is by byes/id
     const byPriority = [...standings].sort(byePriority(`bye:r1`));
     const isOdd = byPriority.length % 2 === 1;
     let toPair = byPriority;
     let byePlayer: PlayerStanding | null = null;
     if (isOdd) {
       byePlayer = byPriority[0]!; // Bye to lowest score, fewest byes (first in asc order)
+      const minPts = Math.min(...standings.map((s) => s.matchPoints));
+      assert(
+        byePlayer.matchPoints === minPts,
+        `Bye selection bug: picked ${byePlayer.name} (${byePlayer.matchPoints}) but min points is ${minPts}`,
+      );
       toPair = byPriority.slice(1);
     }
     const shuffled = [...toPair].sort(() => Math.random() - 0.5);
@@ -394,7 +418,7 @@ export function generateSwissPairings(
   // Subsequent rounds: bye priority, then hard-partition by score bracket.
   // Correct Swiss flow: group by score, process each bracket (highest first).
   // For each bracket independently: pair everyone inside; if odd, exactly one player
-  // floats down (by floatPriority). That floater is appended to the top of the next
+  // floats down (worst in bracket by floatPriority). That floater is appended to the top of the next
   // lower bracket; we do not look at lower groups until the current bracket is done.
   // Only one float per bracket unless rematches force more (we currently do one float per odd bracket).
   const isOddTotal = standings.length % 2 === 1;
@@ -405,6 +429,11 @@ export function generateSwissPairings(
   if (isOddTotal) {
     const sortedByBye = [...standings].sort(byePriority(`bye:r${roundNumber}`));
     byePlayer = sortedByBye[0]!; // Bye to lowest score, fewest previous byes
+    const minPts = Math.min(...standings.map((s) => s.matchPoints));
+    assert(
+      byePlayer.matchPoints === minPts,
+      `Bye selection bug: picked ${byePlayer.name} (${byePlayer.matchPoints}) but min points is ${minPts}`,
+    );
 
     // Determine bye reason
     const lowerScorePlayers = standings.filter(
@@ -459,6 +488,11 @@ export function generateSwissPairings(
     });
   }
 
+  assert(
+    pairings.length === Math.ceil(standings.length / 2),
+    "Incorrect total number of pairings generated",
+  );
+
   const standingsById = new Map(standings.map((s) => [s.id, s]));
   let usedRematch = false;
   let maxDownFloatUsed = 0;
@@ -499,7 +533,9 @@ export function generateSwissPairings(
     }
 
     console.log(
-      `Max float distance: ${maxDownFloatUsed} points${maxDownFloatUsed > 1 ? " (multi-step)" : ""}`,
+      `Max float distance: ${maxDownFloatUsed} points${
+        maxDownFloatUsed > 1 ? " (multi-step)" : ""
+      }`,
     );
 
     if (usedRematch) {
