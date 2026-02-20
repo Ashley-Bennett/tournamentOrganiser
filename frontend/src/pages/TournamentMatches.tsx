@@ -1978,9 +1978,9 @@ const TournamentMatches: React.FC = () => {
                             </Typography>
                             {decisionLog.rematchCount > 0 && (
                               <Typography variant="body2">
-                                <strong>Rematches:</strong> Stage{" "}
-                                {decisionLog.stageUsed} required (stages 1-3
-                                incomplete - mathematically unavoidable)
+                                <strong>Rematches:</strong> Occurred in this
+                                round (pairing minimizes rematches within
+                                bracket-first rules)
                               </Typography>
                             )}
                             {decisionLog.rematchCount === 0 && (

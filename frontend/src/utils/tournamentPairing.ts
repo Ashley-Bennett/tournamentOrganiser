@@ -239,29 +239,84 @@ function buildPairingError(
 }
 
 /**
- * Generate all permutations of [0, 1, ..., n-1]. Used to pick the best bottom-half
- * assignment in pairEvenPool so we avoid rematches when possible (e.g. 4 players in
- * same bracket: try both pairings and take the one with 0 rematches).
+ * Deterministic backtracking: find a perfect matching of players that minimizes
+ * rematch count. Tries all (n-1)!! matchings for small n; deterministic by
+ * always pairing the first unpaired player with others in sorted order.
+ * Used for same-score brackets so we never trigger float-up repair when a
+ * rematch-free pairing exists.
  */
-function allPermutations(n: number): number[][] {
-  if (n <= 0) return [[]];
-  if (n === 1) return [[0]];
-  const prev = allPermutations(n - 1);
-  const out: number[][] = [];
-  for (const p of prev) {
-    for (let i = 0; i <= p.length; i++) {
-      out.push([...p.slice(0, i), n - 1, ...p.slice(i)]);
+const MAX_POOL_FOR_FULL_BACKTRACK = 10;
+
+function findMinRematchMatching(
+  sorted: PlayerStanding[],
+  previousPairings: Pairing[],
+  roundNumber: number,
+): { pairings: Pairing[]; rematchCount: number } {
+  const hasPlayed = (a: string, b: string) =>
+    havePlayedBefore(a, b, previousPairings);
+
+  function recurse(indices: number[]): {
+    pairings: Pairing[];
+    rematchCount: number;
+  } {
+    if (indices.length === 0) return { pairings: [], rematchCount: 0 };
+    if (indices.length === 2) {
+      const i = indices[0]!;
+      const j = indices[1]!;
+      const p1 = sorted[i]!;
+      const p2 = sorted[j]!;
+      const pairings: Pairing[] = [
+        {
+          player1Id: p1.id,
+          player1Name: p1.name,
+          player2Id: p2.id,
+          player2Name: p2.name,
+          roundNumber,
+        },
+      ];
+      const rematchCount = hasPlayed(p1.id, p2.id) ? 1 : 0;
+      return { pairings, rematchCount };
     }
+    const first = indices[0]!;
+    const p1 = sorted[first]!;
+    let best: { pairings: Pairing[]; rematchCount: number } | null = null;
+    for (let idx = 1; idx < indices.length; idx++) {
+      const second = indices[idx]!;
+      const p2 = sorted[second]!;
+      const rematchHere = hasPlayed(p1.id, p2.id) ? 1 : 0;
+      const rest = indices.filter((_, i) => i !== 0 && i !== idx);
+      const sub = recurse(rest);
+      const total = rematchHere + sub.rematchCount;
+      if (best === null || total < best.rematchCount) {
+        best = {
+          pairings: [
+            {
+              player1Id: p1.id,
+              player1Name: p1.name,
+              player2Id: p2.id,
+              player2Name: p2.name,
+              roundNumber,
+            },
+            ...sub.pairings,
+          ],
+          rematchCount: total,
+        };
+      }
+    }
+    return best!;
   }
-  return out;
+
+  const indices = Array.from({ length: sorted.length }, (_, i) => i);
+  return recurse(indices);
 }
 
 /**
  * Pair an even-sized pool within the bracket. Guarantees a perfect matching (N/2 pairings).
  * Always sorts by compareForPairing (points DESC, then byes, id) — never pairingOrder on mixed pools.
  * Special case: exactly one floater + one lower score group → pair floater with best low.
- * For small pools (k <= 4), tries all permutations of bottom-half vs top-half to minimize
- * rematches and avoid unnecessary float-down.
+ * For same-score pools (and mixed when not single-floater), uses deterministic min-rematch
+ * backtracking when pool size <= MAX_POOL_FOR_FULL_BACKTRACK so we explore all perfect
+ * matchings and never falsely trigger float-up repair.
  */
 function pairEvenPool(
   pool: PlayerStanding[],
@@ -318,59 +373,43 @@ function pairEvenPool(
     }
   }
 
+  // Same-score (or mixed with no single-floater): use min-rematch backtracking when small
+  if (sorted.length <= MAX_POOL_FOR_FULL_BACKTRACK) {
+    const { pairings } = findMinRematchMatching(
+      sorted,
+      previousPairings,
+      roundNumber,
+    );
+    validatePerfectMatching(pool, pairings, context);
+    return pairings;
+  }
+
+  // Fallback for large pools: top-half vs bottom-half with greedy swap (may miss optimal)
   const k = sorted.length / 2;
   const top = sorted.slice(0, k);
   const bottom = sorted.slice(k, 2 * k);
   const hasPlayed = (a: string, b: string) =>
     havePlayedBefore(a, b, previousPairings);
 
-  const countRematches = (perm: number[]): number => {
-    let count = 0;
+  const perm = Array.from({ length: k }, (_, i) => i);
+  let changed = true;
+  while (changed) {
+    changed = false;
     for (let i = 0; i < k; i++) {
-      if (hasPlayed(top[i]!.id, bottom[perm[i]!]!.id)) count++;
-    }
-    return count;
-  };
-
-  // For small k, try all permutations and pick the one with fewest rematches.
-  // This avoids unnecessary float-down when a rematch-free pairing exists (e.g. 4 at 3pts).
-  const MAX_K_FOR_FULL_PERM = 4;
-  let perm: number[];
-
-  if (k <= MAX_K_FOR_FULL_PERM) {
-    const perms = allPermutations(k);
-    let bestPerm = perms[0]!;
-    let bestCount = countRematches(bestPerm);
-    for (let i = 1; i < perms.length; i++) {
-      const c = countRematches(perms[i]!);
-      if (c < bestCount) {
-        bestCount = c;
-        bestPerm = perms[i]!;
-      }
-    }
-    perm = bestPerm;
-  } else {
-    // Greedy: start with identity and swap when we strictly reduce rematches
-    perm = Array.from({ length: k }, (_, i) => i);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (let i = 0; i < k; i++) {
-        if (!hasPlayed(top[i]!.id, bottom[perm[i]!]!.id)) continue;
-        for (let j = i + 1; j < k; j++) {
-          const a = top[i]!.id;
-          const b = top[j]!.id;
-          const bi = bottom[perm[i]!]!.id;
-          const bj = bottom[perm[j]!]!.id;
-          const rematchesBefore =
-            (hasPlayed(a, bi) ? 1 : 0) + (hasPlayed(b, bj) ? 1 : 0);
-          const rematchesAfter =
-            (hasPlayed(a, bj) ? 1 : 0) + (hasPlayed(b, bi) ? 1 : 0);
-          if (rematchesAfter < rematchesBefore) {
-            [perm[i], perm[j]] = [perm[j]!, perm[i]!];
-            changed = true;
-            break;
-          }
+      if (!hasPlayed(top[i]!.id, bottom[perm[i]!]!.id)) continue;
+      for (let j = i + 1; j < k; j++) {
+        const a = top[i]!.id;
+        const b = top[j]!.id;
+        const bi = bottom[perm[i]!]!.id;
+        const bj = bottom[perm[j]!]!.id;
+        const rematchesBefore =
+          (hasPlayed(a, bi) ? 1 : 0) + (hasPlayed(b, bj) ? 1 : 0);
+        const rematchesAfter =
+          (hasPlayed(a, bj) ? 1 : 0) + (hasPlayed(b, bi) ? 1 : 0);
+        if (rematchesAfter < rematchesBefore) {
+          [perm[i], perm[j]] = [perm[j]!, perm[i]!];
+          changed = true;
+          break;
         }
       }
     }
@@ -671,72 +710,14 @@ export function generateSwissPairings(
   }));
   let carryOver: PlayerStanding | null = null;
 
-  const pairingHasRematch = (p: Pairing): boolean =>
-    p.player2Id !== null &&
-    havePlayedBefore(p.player1Id, p.player2Id, previousPairings);
-
+  // Process brackets top-down. Float only when bracket is odd (one player must float down).
+  // We do NOT float to avoid rematches in even brackets; pairEvenPool uses min-rematch
+  // backtracking so a rematch-free pairing is found when one exists.
   for (let i = 0; i < groupsMutable.length; i++) {
     const { players: groupPlayers } = groupsMutable[i]!;
     const isLastBracket = i === groupsMutable.length - 1;
-    const hasNextGroup = i + 1 < groupsMutable.length;
-    const nextGroup = hasNextGroup ? groupsMutable[i + 1]! : null;
     const currentPool =
       carryOver !== null ? [carryOver, ...groupPlayers] : [...groupPlayers];
-
-    if (
-      currentPool.length % 2 === 0 &&
-      !isLastBracket &&
-      nextGroup &&
-      nextGroup.players.length >= 2
-    ) {
-      const trialResult = processBracket(
-        currentPool,
-        previousPairings,
-        roundNumber,
-        new Map(),
-        false,
-        carryOver?.id ?? null,
-      );
-      const hasRematch = trialResult.pairings.some(pairingHasRematch);
-      if (hasRematch) {
-        const floatUpCandidate = [...nextGroup.players].sort(
-          byePriority(`floatup:r${roundNumber}`),
-        )[0]!;
-        nextGroup.players = nextGroup.players.filter(
-          (p) => p.id !== floatUpCandidate.id,
-        );
-        const poolWithFloatUp = [...currentPool, floatUpCandidate];
-        const floatDown = [...groupPlayers].sort(floatPriority)[0]!;
-        const toPair = poolWithFloatUp.filter((p) => p.id !== floatDown.id);
-        const ctx: PairingContext = {
-          roundNumber,
-          bracketPoints: [
-            ...new Set(poolWithFloatUp.map((x) => x.matchPoints)),
-          ].sort((a, b) => b - a),
-          carryOverId: carryOver?.id ?? null,
-          previousPairingsCount: previousPairings.length,
-        };
-        const repairPairings = pairEvenPool(
-          toPair,
-          previousPairings,
-          roundNumber,
-          ctx,
-        );
-        floatReasons.set(
-          floatDown.id,
-          `float down to avoid rematch; one from lower bracket floated up`,
-        );
-        floatReasons.set(
-          floatUpCandidate.id,
-          `floated up from ${floatUpCandidate.matchPoints} bracket to avoid rematch above`,
-        );
-        for (const p of repairPairings) {
-          pairings.push(p);
-        }
-        carryOver = floatDown;
-        continue;
-      }
-    }
 
     const result = processBracket(
       currentPool,
@@ -834,7 +815,9 @@ export function generateSwissPairings(
     );
 
     if (usedRematch) {
-      console.log("Rematches used (unavoidable within bracket constraints)");
+      console.log(
+        "Rematches in this round (min-rematch pairing used; rematches only when no 0-rematch pairing exists within bracket)",
+      );
     }
 
     console.log(
