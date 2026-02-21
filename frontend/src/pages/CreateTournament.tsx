@@ -12,7 +12,9 @@ import {
   Select,
   MenuItem,
   Alert,
+  Tooltip,
 } from "@mui/material";
+import type { SelectChangeEvent } from "@mui/material/Select";
 import {
   Save as SaveIcon,
   ArrowBack as ArrowBackIcon,
@@ -27,7 +29,7 @@ const CreateTournament: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    tournament_type: "single_elimination",
+    tournament_type: "swiss",
   });
 
   const handleChange =
@@ -38,6 +40,13 @@ const CreateTournament: React.FC = () => {
         [field]: event.target.value,
       });
     };
+
+  const handleSelectChange = (event: SelectChangeEvent<string>) => {
+    setFormData({
+      ...formData,
+      tournament_type: event.target.value,
+    });
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -122,13 +131,17 @@ const CreateTournament: React.FC = () => {
                 <InputLabel>Tournament Type</InputLabel>
                 <Select
                   value={formData.tournament_type}
-                  onChange={handleChange("tournament_type")}
+                  onChange={handleSelectChange}
                   label="Tournament Type"
                   variant="outlined"
                 >
-                  <MenuItem value="single_elimination">
-                    Single Elimination
-                  </MenuItem>
+                  <Tooltip title="Coming soon">
+                    <span>
+                      <MenuItem value="single_elimination" disabled>
+                        Single Elimination
+                      </MenuItem>
+                    </span>
+                  </Tooltip>
                   <MenuItem value="swiss">Swiss</MenuItem>
                 </Select>
               </FormControl>
