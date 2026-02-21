@@ -22,17 +22,30 @@ const Header: React.FC = () => {
   return (
     <AppBar position="static">
       <Toolbar>
-        <IconButton
-          edge="start"
-          color="inherit"
-          aria-label="menu"
-          sx={{ mr: 2 }}
+        <Box
+          component={RouterLink}
+          to="/dashboard"
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            textDecoration: "none",
+            color: "inherit",
+            mr: 2,
+            flexGrow: 1,
+          }}
         >
-          <TournamentIcon />
-        </IconButton>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          Matchamp
-        </Typography>
+          <IconButton
+            edge="start"
+            color="inherit"
+            aria-label="Go to dashboard"
+            sx={{ mr: 1 }}
+          >
+            <TournamentIcon />
+          </IconButton>
+          <Typography variant="h6" component="div">
+            Matchamp
+          </Typography>
+        </Box>
         {user ? (
           <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
             <Button color="inherit" component={RouterLink} to="/dashboard">
