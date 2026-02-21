@@ -20,10 +20,12 @@ export function calculateSuggestedRounds(
     return Math.ceil(Math.log2(playerCount));
   }
 
-  // Swiss: typical formula by player count
-  if (playerCount <= 4) return 3;
-  if (playerCount <= 8) return 4;
-  if (playerCount <= 16) return 5;
-  if (playerCount <= 32) return 6;
-  return 7;
+  // Swiss: standard bracket thresholds (Pokémon/MTG tournament rules)
+  if (playerCount <= 8) return 3;
+  if (playerCount <= 16) return 4;
+  if (playerCount <= 32) return 5;
+  if (playerCount <= 64) return 6;
+  if (playerCount <= 128) return 7;
+  if (playerCount <= 226) return 8;
+  return 9;
 }
