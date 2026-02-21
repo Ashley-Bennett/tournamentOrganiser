@@ -7,6 +7,7 @@ import {
   Button,
   Box,
   IconButton,
+  Tooltip,
 } from "@mui/material";
 import { SportsEsports as TournamentIcon } from "@mui/icons-material";
 import { useAuth } from "../AuthContext";
@@ -40,12 +41,38 @@ const Header: React.FC = () => {
             <Button color="inherit" component={RouterLink} to="/tournaments">
               Tournaments
             </Button>
-            <Button color="inherit" component={RouterLink} to="/players">
-              Players
-            </Button>
-            <Button color="inherit" component={RouterLink} to="/leagues">
-              Leagues
-            </Button>
+            <Tooltip title="Coming soon">
+              <span>
+                <Button
+                  color="inherit"
+                  disabled
+                  sx={{
+                    "&.Mui-disabled": {
+                      color: "rgba(255,255,255,0.85)",
+                      opacity: 1,
+                    },
+                  }}
+                >
+                  Players
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip title="Coming soon">
+              <span>
+                <Button
+                  color="inherit"
+                  disabled
+                  sx={{
+                    "&.Mui-disabled": {
+                      color: "rgba(255,255,255,0.85)",
+                      opacity: 1,
+                    },
+                  }}
+                >
+                  Leagues
+                </Button>
+              </span>
+            </Tooltip>
             <Button
               color="inherit"
               component={RouterLink}
