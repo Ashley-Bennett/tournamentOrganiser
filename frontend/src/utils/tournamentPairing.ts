@@ -31,6 +31,10 @@ export interface PlayerStanding {
   matchesPlayed: number;
   opponents: string[]; // Array of opponent player IDs
   byesReceived: number; // For bye priority: give bye to fewest previous byes (among lowest score)
+  // Optional extended fields for tie-breaking
+  opponentResults?: Record<string, "win" | "loss" | "draw">;
+  gameWins?: number;
+  gameLosses?: number;
 }
 
 export interface Pairing {

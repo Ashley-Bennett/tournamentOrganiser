@@ -9,6 +9,11 @@ import jwt from "jsonwebtoken";
 // Load environment variables
 dotenv.config();
 
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret && process.env.NODE_ENV === "production") {
+  throw new Error("JWT_SECRET environment variable must be set in production");
+}
+
 const app = express();
 const PORT = process.env.PORT || 3002;
 
@@ -82,7 +87,7 @@ app.post("/api/login", (req, res) => {
   // Issue a dummy JWT payload so the frontend can treat the user as logged in
   const token = jwt.sign(
     { id: 1, email, name: email.split("@")[0] || "User" },
-    process.env.JWT_SECRET || "devsecret",
+    jwtSecret ?? "devsecret-not-for-production",
     { expiresIn: "12h" },
   );
 

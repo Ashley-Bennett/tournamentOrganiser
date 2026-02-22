@@ -42,10 +42,10 @@ import {
   generateSwissPairings,
   calculateMatchPoints,
   type Pairing,
-  type PlayerStanding,
   type PairingDecisionLog,
 } from "../utils/tournamentPairing";
 import { sortByTieBreakers } from "../utils/tieBreaking";
+import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 
 interface TournamentSummary {
   id: string;
@@ -76,52 +76,13 @@ interface MatchWithPlayers extends Match {
   winner_name: string | null;
 }
 
-// Helper functions to persist pending results to localStorage
-const getPendingResultsKey = (tournamentId: string) =>
-  `tournament_pending_results_${tournamentId}`;
 
-const loadPendingResults = (
-  tournamentId: string,
-): Map<string, { winnerId: string | null; result: string }> => {
-  try {
-    const key = getPendingResultsKey(tournamentId);
-    const stored = localStorage.getItem(key);
-    if (!stored) return new Map();
-    const data = JSON.parse(stored) as Record<
-      string,
-      { winnerId: string | null; result: string }
-    >;
-    return new Map(Object.entries(data));
-  } catch {
-    return new Map();
-  }
-};
-
-const savePendingResultsToStorage = (
-  tournamentId: string,
-  pendingResults: Map<string, { winnerId: string | null; result: string }>,
-) => {
-  try {
-    const key = getPendingResultsKey(tournamentId);
-    if (pendingResults.size === 0) {
-      localStorage.removeItem(key);
-    } else {
-      const data = Object.fromEntries(pendingResults);
-      localStorage.setItem(key, JSON.stringify(data));
-    }
-  } catch (error) {
-    console.error("Failed to save pending results to localStorage:", error);
-  }
-};
-
-const clearPendingResultsFromStorage = (tournamentId: string) => {
-  try {
-    const key = getPendingResultsKey(tournamentId);
-    localStorage.removeItem(key);
-  } catch (error) {
-    console.error("Failed to clear pending results from localStorage:", error);
-  }
-};
+const MATCH_STATUS = {
+  READY: "ready",
+  PENDING: "pending",
+  COMPLETED: "completed",
+  BYE: "bye",
+} as const;
 
 // Helper to convert PairingDecisionLog for database storage (Map -> object)
 const serializeDecisionLog = (
@@ -173,6 +134,7 @@ const TournamentMatches: React.FC = () => {
         losses: number;
         draws: number;
         matchPoints: number;
+        byesReceived: number;
       }
     >();
 
@@ -186,6 +148,7 @@ const TournamentMatches: React.FC = () => {
           losses: 0,
           draws: 0,
           matchPoints: 0,
+          byesReceived: 0,
         });
       }
       if (m.player2_id && !map.has(m.player2_id)) {
@@ -196,6 +159,7 @@ const TournamentMatches: React.FC = () => {
           losses: 0,
           draws: 0,
           matchPoints: 0,
+          byesReceived: 0,
         });
       }
     }
@@ -218,6 +182,7 @@ const TournamentMatches: React.FC = () => {
 
       if (isBye) {
         p1.wins += 1;
+        p1.byesReceived += 1;
       } else if (isDraw) {
         p1.draws += 1;
         if (p2) p2.draws += 1;
@@ -285,12 +250,7 @@ const TournamentMatches: React.FC = () => {
     void fetchTournament();
   }, [id, user, authLoading, navigate]);
 
-  // Load pending results from localStorage when tournament changes
-  useEffect(() => {
-    if (!tournament?.id) return;
-    const loaded = loadPendingResults(tournament.id);
-    setPendingResults(loaded);
-  }, [tournament?.id]);
+
 
   // Clean up pending results for matches that no longer exist
   useEffect(() => {
@@ -312,11 +272,7 @@ const TournamentMatches: React.FC = () => {
     }
   }, [matches, pendingResults]);
 
-  // Save pending results to localStorage whenever they change
-  useEffect(() => {
-    if (!tournament?.id) return;
-    savePendingResultsToStorage(tournament.id, pendingResults);
-  }, [tournament?.id, pendingResults]);
+
 
   useEffect(() => {
     if (!tournament?.id || !user) return;
@@ -429,135 +385,7 @@ const TournamentMatches: React.FC = () => {
   // Calculate final standings for leaderboard
   const finalStandings = useMemo(() => {
     if (!matches.length) return [];
-
-    // Initialize standings map
-    const standingsMap = new Map<string, PlayerStanding>();
-    matches.forEach((match) => {
-      if (!standingsMap.has(match.player1_id)) {
-        standingsMap.set(match.player1_id, {
-          id: match.player1_id,
-          name: match.player1_name,
-          matchPoints: 0,
-          wins: 0,
-          losses: 0,
-          draws: 0,
-          matchesPlayed: 0,
-          opponents: [],
-          byesReceived: 0,
-        });
-      }
-      if (match.player2_id && !standingsMap.has(match.player2_id)) {
-        standingsMap.set(match.player2_id, {
-          id: match.player2_id,
-          name: match.player2_name || "Unknown",
-          matchPoints: 0,
-          wins: 0,
-          losses: 0,
-          draws: 0,
-          matchesPlayed: 0,
-          opponents: [],
-          byesReceived: 0,
-        });
-      }
-    });
-
-    // Process all matches to calculate standings
-    matches.forEach((match) => {
-      const player1 = standingsMap.get(match.player1_id);
-      const player2 = match.player2_id
-        ? standingsMap.get(match.player2_id)
-        : null;
-
-      const isBye = match.status === "bye" || !match.player2_id;
-      const isDraw =
-        match.status === "completed" &&
-        match.winner_id === null &&
-        match.result === "Draw";
-      const isCompletedWin =
-        match.status === "completed" &&
-        match.winner_id !== null &&
-        match.result !== "Draw";
-
-      // Only process completed matches or byes
-      if (!isBye && !isDraw && !isCompletedWin) {
-        return; // Skip incomplete matches
-      }
-
-      if (player1) {
-        player1.matchesPlayed++;
-        if (isBye) {
-          player1.byesReceived++;
-          player1.wins++;
-          player1.matchPoints = calculateMatchPoints(
-            player1.wins,
-            player1.draws,
-          );
-        } else if (isDraw) {
-          player1.draws++;
-          player1.matchPoints = calculateMatchPoints(
-            player1.wins,
-            player1.draws,
-          );
-          if (match.player2_id) {
-            player1.opponents.push(match.player2_id);
-          }
-        } else if (isCompletedWin) {
-          if (match.winner_id === match.player1_id) {
-            player1.wins++;
-            player1.matchPoints = calculateMatchPoints(
-              player1.wins,
-              player1.draws,
-            );
-          } else {
-            player1.losses++;
-            player1.matchPoints = calculateMatchPoints(
-              player1.wins,
-              player1.draws,
-            );
-          }
-          if (match.player2_id) {
-            player1.opponents.push(match.player2_id);
-          }
-        }
-      }
-
-      if (player2) {
-        player2.matchesPlayed++;
-        if (isDraw) {
-          player2.draws++;
-          player2.matchPoints = calculateMatchPoints(
-            player2.wins,
-            player2.draws,
-          );
-          player2.opponents.push(match.player1_id);
-        } else if (isCompletedWin) {
-          if (match.winner_id === match.player2_id) {
-            player2.wins++;
-            player2.matchPoints = calculateMatchPoints(
-              player2.wins,
-              player2.draws,
-            );
-          } else {
-            player2.losses++;
-            player2.matchPoints = calculateMatchPoints(
-              player2.wins,
-              player2.draws,
-            );
-          }
-          player2.opponents.push(match.player1_id);
-        }
-      }
-    });
-
-    standingsMap.forEach((standing) => {
-      standing.matchPoints = calculateMatchPoints(
-        standing.wins,
-        standing.draws,
-      );
-    });
-
-    const standings = Array.from(standingsMap.values());
-    return sortByTieBreakers(standings);
+    return sortByTieBreakers(buildStandingsFromMatches(matches));
   }, [matches]);
 
   // Reserved for future use: open score dialog with pre-selected match/winner
@@ -617,10 +445,25 @@ const TournamentMatches: React.FC = () => {
   const getScoreValidationError = (): string | null => {
     if (!selectedMatch || !selectedWinner) return null;
 
+    // Draws are not permitted in single-elimination
+    if (
+      selectedWinner === "draw" &&
+      tournament?.tournament_type === "single_elimination"
+    ) {
+      return "Draws are not allowed in single-elimination tournaments";
+    }
+
     // Validate score for non-draw matches
     if (selectedWinner !== "draw" && selectedMatch.player2_id) {
       if (player1Wins === 0 && player2Wins === 0) {
         return "Please enter a valid score";
+      }
+      // Best-of-3: max 2 wins per player, max 3 games total
+      if (player1Wins > 2 || player2Wins > 2) {
+        return "Maximum 2 wins per player (best of 3)";
+      }
+      if (player1Wins + player2Wins > 3) {
+        return "Maximum 3 games total (best of 3)";
       }
       // Ensure winner has more wins
       if (
@@ -676,7 +519,7 @@ const TournamentMatches: React.FC = () => {
           id: matchId,
           winner_id: winnerId,
           result,
-          status: "completed" as const,
+          status: MATCH_STATUS.COMPLETED,
         }),
       );
 
@@ -697,9 +540,6 @@ const TournamentMatches: React.FC = () => {
 
       // Clear pending results
       setPendingResults(new Map());
-      if (tournament?.id) {
-        clearPendingResultsFromStorage(tournament.id);
-      }
 
       // Refresh matches
       const { data: matchesData, error: matchesError } = await supabase
@@ -883,7 +723,7 @@ const TournamentMatches: React.FC = () => {
       if (typeof selectedRound !== "number") return;
       const { error: updateError } = await supabase
         .from("tournament_matches")
-        .update({ status: "pending" })
+        .update({ status: MATCH_STATUS.PENDING })
         .eq("tournament_id", tournament.id)
         .eq("round_number", selectedRound)
         .eq("status", "ready");
@@ -1040,7 +880,7 @@ const TournamentMatches: React.FC = () => {
         round_number: 1,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
-        status: pairing.player2Id === null ? "bye" : "ready",
+        status: pairing.player2Id === null ? MATCH_STATUS.BYE : MATCH_STATUS.READY,
         result: pairing.player2Id === null ? "bye" : null,
         winner_id: pairing.player2Id === null ? pairing.player1Id : null,
         pairing_decision_log:
@@ -1210,6 +1050,19 @@ const TournamentMatches: React.FC = () => {
         return;
       }
 
+      // Ensure all matches in the current round are completed or bye before proceeding
+      const currentRoundMatches = currentMatches.filter(
+        (m) => m.round_number === selectedRound,
+      );
+      const incompleteMatches = currentRoundMatches.filter(
+        (m) => m.status !== "completed" && m.status !== "bye",
+      );
+      if (incompleteMatches.length > 0) {
+        throw new Error(
+          `${incompleteMatches.length} match${incompleteMatches.length > 1 ? "es" : ""} in round ${selectedRound} still need${incompleteMatches.length === 1 ? "s" : ""} a result before advancing`,
+        );
+      }
+
       // Calculate standings from all previous rounds (using refetched matches)
       const allPreviousMatches = currentMatches.filter(
         (m) => m.round_number < nextRoundNumber,
@@ -1234,120 +1087,11 @@ const TournamentMatches: React.FC = () => {
         playersMap.set(player.id, player.name);
       });
 
-      // Calculate standings
-      const standingsMap = new Map<string, PlayerStanding>();
-      playersData?.forEach((player) => {
-        standingsMap.set(player.id, {
-          id: player.id,
-          name: player.name,
-          matchPoints: 0,
-          wins: 0,
-          losses: 0,
-          draws: 0,
-          matchesPlayed: 0,
-          opponents: [],
-          byesReceived: 0,
-        });
-      });
-
-      // Process matches to calculate standings
-      // Only count completed matches (or byes) to match display logic
-      allPreviousMatches.forEach((match) => {
-        const player1 = standingsMap.get(match.player1_id);
-        const player2 = match.player2_id
-          ? standingsMap.get(match.player2_id)
-          : null;
-
-        const isBye = match.status === "bye" || !match.player2_id;
-        const isDraw =
-          match.status === "completed" &&
-          match.winner_id === null &&
-          match.result === "Draw";
-        const isCompletedWin =
-          match.status === "completed" &&
-          match.winner_id !== null &&
-          match.result !== "Draw";
-
-        // Only process completed matches or byes
-        if (!isBye && !isDraw && !isCompletedWin) {
-          return; // Skip incomplete matches
-        }
-
-        if (player1) {
-          player1.matchesPlayed++;
-          if (isBye) {
-            player1.byesReceived++;
-            player1.wins++;
-            player1.matchPoints = calculateMatchPoints(
-              player1.wins,
-              player1.draws,
-            );
-          } else if (isDraw) {
-            player1.draws++;
-            player1.matchPoints = calculateMatchPoints(
-              player1.wins,
-              player1.draws,
-            );
-            if (match.player2_id) {
-              player1.opponents.push(match.player2_id);
-            }
-          } else if (isCompletedWin) {
-            if (match.winner_id === match.player1_id) {
-              player1.wins++;
-              player1.matchPoints = calculateMatchPoints(
-                player1.wins,
-                player1.draws,
-              );
-            } else {
-              player1.losses++;
-              player1.matchPoints = calculateMatchPoints(
-                player1.wins,
-                player1.draws,
-              );
-            }
-            if (match.player2_id) {
-              player1.opponents.push(match.player2_id);
-            }
-          }
-        }
-
-        if (player2) {
-          player2.matchesPlayed++;
-          if (isDraw) {
-            player2.draws++;
-            player2.matchPoints = calculateMatchPoints(
-              player2.wins,
-              player2.draws,
-            );
-            player2.opponents.push(match.player1_id);
-          } else if (isCompletedWin) {
-            if (match.winner_id === match.player2_id) {
-              player2.wins++;
-              player2.matchPoints = calculateMatchPoints(
-                player2.wins,
-                player2.draws,
-              );
-            } else {
-              player2.losses++;
-              player2.matchPoints = calculateMatchPoints(
-                player2.wins,
-                player2.draws,
-              );
-            }
-            player2.opponents.push(match.player1_id);
-          }
-        }
-      });
-
-      // Recompute matchPoints for every player so standings are correct for pairing
-      standingsMap.forEach((standing) => {
-        standing.matchPoints = calculateMatchPoints(
-          standing.wins,
-          standing.draws,
-        );
-      });
-
-      const standings = Array.from(standingsMap.values());
+      // Calculate standings from all previous matches, seeding from full player list
+      const standings = buildStandingsFromMatches(
+        allPreviousMatches,
+        playersData ?? [],
+      );
 
       // Get previous pairings to avoid rematches (deterministic order: by round, then id)
       const sortedPrevious = [...allPreviousMatches].sort(
@@ -1363,9 +1107,20 @@ const TournamentMatches: React.FC = () => {
         roundNumber: match.round_number,
       }));
 
+      // For single-elimination, only undefeated players advance to the next round
+      const standingsForPairing =
+        tournament.tournament_type === "single_elimination" &&
+        nextRoundNumber > 1
+          ? standings.filter((s) => s.losses === 0)
+          : standings;
+
+      if (standingsForPairing.length < 2) {
+        throw new Error("Not enough players remaining to generate pairings");
+      }
+
       // Generate pairings for next round
       const pairingResult = generateSwissPairings(
-        standings,
+        standingsForPairing,
         nextRoundNumber,
         previousPairings,
       );
@@ -1378,7 +1133,7 @@ const TournamentMatches: React.FC = () => {
         round_number: nextRoundNumber,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
-        status: pairing.player2Id === null ? "bye" : "ready",
+        status: pairing.player2Id === null ? MATCH_STATUS.BYE : MATCH_STATUS.READY,
         result: pairing.player2Id === null ? "bye" : null,
         winner_id: pairing.player2Id === null ? pairing.player1Id : null,
         pairing_decision_log:
@@ -2648,11 +2403,11 @@ const TournamentMatches: React.FC = () => {
                         value={player1Wins}
                         onChange={(e) => {
                           setPlayer1Wins(
-                            Math.max(0, parseInt(e.target.value, 10) || 0),
+                            Math.min(2, Math.max(0, parseInt(e.target.value, 10) || 0)),
                           );
                           setError(null); // Clear error on change
                         }}
-                        inputProps={{ min: 0, max: 3 }}
+                        inputProps={{ min: 0, max: 2 }}
                         endAdornment={
                           <InputAdornment position="end">wins</InputAdornment>
                         }
@@ -2672,11 +2427,11 @@ const TournamentMatches: React.FC = () => {
                         value={player2Wins}
                         onChange={(e) => {
                           setPlayer2Wins(
-                            Math.max(0, parseInt(e.target.value, 10) || 0),
+                            Math.min(2, Math.max(0, parseInt(e.target.value, 10) || 0)),
                           );
                           setError(null); // Clear error on change
                         }}
-                        inputProps={{ min: 0, max: 3 }}
+                        inputProps={{ min: 0, max: 2 }}
                         endAdornment={
                           <InputAdornment position="end">wins</InputAdornment>
                         }

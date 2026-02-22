@@ -18,11 +18,8 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
 import { useAuth } from "../AuthContext";
-import {
-  calculateMatchPoints,
-  type PlayerStanding,
-} from "../utils/tournamentPairing";
 import { sortByTieBreakers } from "../utils/tieBreaking";
+import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 
 interface TournamentSummary {
   id: string;
@@ -174,139 +171,7 @@ const TournamentLeaderboard: React.FC = () => {
 
   const finalStandings = useMemo(() => {
     if (!matches.length) return [];
-
-    // Get all unique players
-    const playerIds = new Set<string>();
-    matches.forEach((match) => {
-      playerIds.add(match.player1_id);
-      if (match.player2_id) {
-        playerIds.add(match.player2_id);
-      }
-    });
-
-    // Initialize standings
-    const standingsMap = new Map<string, PlayerStanding>();
-    matches.forEach((match) => {
-      if (!standingsMap.has(match.player1_id)) {
-        standingsMap.set(match.player1_id, {
-          id: match.player1_id,
-          name: match.player1_name,
-          matchPoints: 0,
-          wins: 0,
-          losses: 0,
-          draws: 0,
-          matchesPlayed: 0,
-          opponents: [],
-          byesReceived: 0,
-        });
-      }
-      if (match.player2_id && !standingsMap.has(match.player2_id)) {
-        standingsMap.set(match.player2_id, {
-          id: match.player2_id,
-          name: match.player2_name || "Unknown",
-          matchPoints: 0,
-          wins: 0,
-          losses: 0,
-          draws: 0,
-          matchesPlayed: 0,
-          opponents: [],
-          byesReceived: 0,
-        });
-      }
-    });
-
-    // Process only completed matches and byes (same logic as TournamentMatches)
-    matches.forEach((match) => {
-      const isBye = match.status === "bye" || !match.player2_id;
-      const isDraw =
-        match.status === "completed" &&
-        match.winner_id === null &&
-        match.result === "Draw";
-      const isCompletedWin =
-        match.status === "completed" &&
-        match.winner_id !== null &&
-        match.result !== "Draw";
-
-      if (!isBye && !isDraw && !isCompletedWin) {
-        return; // Skip ready/pending matches
-      }
-
-      const player1 = standingsMap.get(match.player1_id);
-      const player2 = match.player2_id
-        ? standingsMap.get(match.player2_id)
-        : null;
-
-      if (player1) {
-        player1.matchesPlayed++;
-        if (isBye) {
-          player1.byesReceived++;
-        }
-        if (match.status === "bye" || match.winner_id === match.player1_id) {
-          player1.wins++;
-          player1.matchPoints = calculateMatchPoints(
-            player1.wins,
-            player1.draws,
-          );
-          if (match.player2_id) {
-            player1.opponents.push(match.player2_id);
-          }
-        } else if (match.winner_id === null && match.result === "Draw") {
-          player1.draws++;
-          player1.matchPoints = calculateMatchPoints(
-            player1.wins,
-            player1.draws,
-          );
-          if (match.player2_id) {
-            player1.opponents.push(match.player2_id);
-          }
-        } else if (match.winner_id && match.winner_id !== match.player1_id) {
-          player1.losses++;
-          player1.matchPoints = calculateMatchPoints(
-            player1.wins,
-            player1.draws,
-          );
-          if (match.player2_id) {
-            player1.opponents.push(match.player2_id);
-          }
-        }
-      }
-
-      if (player2) {
-        player2.matchesPlayed++;
-        if (match.winner_id === match.player2_id) {
-          player2.wins++;
-          player2.matchPoints = calculateMatchPoints(
-            player2.wins,
-            player2.draws,
-          );
-          player2.opponents.push(match.player1_id);
-        } else if (match.winner_id === null && match.result === "Draw") {
-          player2.draws++;
-          player2.matchPoints = calculateMatchPoints(
-            player2.wins,
-            player2.draws,
-          );
-          player2.opponents.push(match.player1_id);
-        } else if (match.winner_id !== match.player2_id) {
-          player2.losses++;
-          player2.matchPoints = calculateMatchPoints(
-            player2.wins,
-            player2.draws,
-          );
-          player2.opponents.push(match.player1_id);
-        }
-      }
-    });
-
-    standingsMap.forEach((standing) => {
-      standing.matchPoints = calculateMatchPoints(
-        standing.wins,
-        standing.draws,
-      );
-    });
-
-    const standings = Array.from(standingsMap.values());
-    return sortByTieBreakers(standings);
+    return sortByTieBreakers(buildStandingsFromMatches(matches));
   }, [matches]);
 
   if (authLoading || loading) {

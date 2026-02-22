@@ -14,11 +14,16 @@ export interface PlayerStanding {
   matchesPlayed: number;
   opponents: string[]; // Array of opponent player IDs
   byesReceived?: number; // For bye priority (lowest score, fewest byes)
+  // Optional fields for extended tie-breaking
+  opponentResults?: Record<string, "win" | "loss" | "draw">; // Head-to-head results keyed by opponent ID
+  gameWins?: number; // Individual game wins (across all matches)
+  gameLosses?: number; // Individual game losses (across all matches)
 }
 
 export interface PlayerWithTieBreakers extends PlayerStanding {
   opponentMatchWinPercentage: number; // OMW%
   opponentOpponentMatchWinPercentage: number; // OOMW%
+  gameWinPercentage: number; // GW%
 }
 
 /**
@@ -86,15 +91,21 @@ export function addTieBreakers(
     standingsMap.set(standing.id, standing);
   }
 
-  return standings.map((player) => ({
-    ...player,
-    opponentMatchWinPercentage: calculateOpponentMatchWinPercentage(
-      player,
-      standingsMap,
-    ),
-    opponentOpponentMatchWinPercentage:
-      calculateOpponentOpponentMatchWinPercentage(player, standingsMap),
-  }));
+  return standings.map((player) => {
+    const gw = player.gameWins ?? 0;
+    const gl = player.gameLosses ?? 0;
+    const totalGames = gw + gl;
+    return {
+      ...player,
+      opponentMatchWinPercentage: calculateOpponentMatchWinPercentage(
+        player,
+        standingsMap,
+      ),
+      opponentOpponentMatchWinPercentage:
+        calculateOpponentOpponentMatchWinPercentage(player, standingsMap),
+      gameWinPercentage: totalGames > 0 ? gw / totalGames : 0,
+    };
+  });
 }
 
 /**
@@ -102,7 +113,9 @@ export function addTieBreakers(
  * 1. Match Points (descending)
  * 2. Opponent's Match Win Percentage (descending)
  * 3. Opponent's Opponent's Match Win Percentage (descending)
- * 4. Head-to-Head (if applicable - not implemented here)
+ * 4. Head-to-Head record (if the two players faced each other directly)
+ * 5. Game Win Percentage (descending)
+ * 6. Name alphabetical (stable deterministic fallback)
  */
 export function sortByTieBreakers(
   standings: PlayerStanding[],
@@ -136,8 +149,18 @@ export function sortByTieBreakers(
       );
     }
 
-    // 4. Head-to-Head could be added here if needed
-    // For now, maintain original order if all tie-breakers are equal
-    return 0;
+    // 4. Head-to-Head: if these two players faced each other, the winner ranks higher
+    const aVsB = a.opponentResults?.[b.id];
+    const bVsA = b.opponentResults?.[a.id];
+    if (aVsB === "win" || bVsA === "loss") return -1;
+    if (aVsB === "loss" || bVsA === "win") return 1;
+
+    // 5. Game Win Percentage
+    if (Math.abs(b.gameWinPercentage - a.gameWinPercentage) > 0.0001) {
+      return b.gameWinPercentage - a.gameWinPercentage;
+    }
+
+    // 6. Alphabetical fallback for deterministic ordering
+    return a.name.localeCompare(b.name);
   });
 }
