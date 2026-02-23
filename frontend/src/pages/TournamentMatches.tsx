@@ -323,7 +323,7 @@ const TournamentMatches: React.FC = () => {
     didRestoreRef.current = true;
     const toRestore = new Map<string, { winnerId: string | null; result: string }>();
     for (const match of matches) {
-      if (match.status === "ready" && match.temp_result) {
+      if (match.status !== "completed" && match.status !== "bye" && match.temp_result) {
         toRestore.set(match.id, {
           winnerId: match.temp_winner_id,
           result: match.temp_result,
@@ -582,7 +582,7 @@ const TournamentMatches: React.FC = () => {
     return null;
   };
 
-  const handleQuickResult = (
+  const handleQuickResult = async (
     match: MatchWithPlayers,
     result: "player1" | "player2" | "draw",
   ) => {
@@ -610,12 +610,13 @@ const TournamentMatches: React.FC = () => {
     });
 
     // Auto-save temp result to DB so it survives navigation
-    void (async () => {
-      await supabase
-        .from("tournament_matches")
-        .update({ temp_winner_id: winnerId, temp_result: resultString })
-        .eq("id", match.id);
-    })();
+    const { error } = await supabase
+      .from("tournament_matches")
+      .update({ temp_winner_id: winnerId, temp_result: resultString })
+      .eq("id", match.id);
+    if (error) {
+      console.error("Failed to auto-save temp result:", error.message);
+    }
   };
 
   const savePendingResults = async (): Promise<void> => {
