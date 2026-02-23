@@ -2060,9 +2060,9 @@ const TournamentMatches: React.FC = () => {
                           </Alert>
                         )}
                         {(showBeginRound ||
-                          canShowNextRound ||
+                          (hasPendingMatches && !allCompletedInDB) ||
+                          canProceedToNextRound ||
                           canCompleteTournament ||
-                          (hasPendingMatches && allResultsEntered) ||
                           editingPairings) && (
                           <Box
                             sx={{
@@ -2092,6 +2092,7 @@ const TournamentMatches: React.FC = () => {
                               </>
                             ) : (
                               <>
+                                {/* Phase 1: pairings ready, round not yet started */}
                                 {showBeginRound && (
                                   <>
                                     <Button
@@ -2112,18 +2113,29 @@ const TournamentMatches: React.FC = () => {
                                     </Button>
                                   </>
                                 )}
-                                {hasPendingMatches &&
-                                  allResultsEntered &&
-                                  !allCompletedInDB && (
-                                  <Button
-                                    variant="contained"
-                                    color="success"
-                                    disabled={updatingMatch}
-                                    onClick={() => void savePendingResults()}
+                                {/* Phase 2: round active — greyed until all results entered */}
+                                {hasPendingMatches && !allCompletedInDB && (
+                                  <Tooltip
+                                    title={
+                                      !allResultsEntered
+                                        ? "Enter all match results to submit"
+                                        : ""
+                                    }
+                                    arrow
                                   >
-                                    {updatingMatch ? "Saving…" : "Submit Results"}
-                                  </Button>
+                                    <span>
+                                      <Button
+                                        variant="contained"
+                                        color="success"
+                                        disabled={!allResultsEntered || updatingMatch}
+                                        onClick={() => void savePendingResults()}
+                                      >
+                                        {updatingMatch ? "Saving…" : "Submit Results"}
+                                      </Button>
+                                    </span>
+                                  </Tooltip>
                                 )}
+                                {/* Phase 3 (non-final): results in DB */}
                                 {canShowNextRound &&
                                   !nextRoundAlreadyExists &&
                                   allCompletedInDB && (
@@ -2135,66 +2147,37 @@ const TournamentMatches: React.FC = () => {
                                     Manage Drops
                                   </Button>
                                 )}
-                                {canShowNextRound && (
-                                  <Tooltip
-                                    title={
-                                      !nextRoundAlreadyExists &&
-                                      !canProceedToNextRound
-                                        ? allResultsEntered && !allCompletedInDB
-                                          ? "Submit results before creating the next round"
-                                          : "Complete all matches in this round to proceed to the next round"
-                                        : ""
-                                    }
-                                    arrow
+                                {canShowNextRound &&
+                                  (nextRoundAlreadyExists || canProceedToNextRound) && (
+                                  <Button
+                                    variant="contained"
+                                    color="primary"
+                                    startIcon={<ArrowForwardIcon />}
+                                    onClick={handleNextRound}
+                                    disabled={processingRound}
                                   >
-                                    <span>
-                                      <Button
-                                        variant="contained"
-                                        color="primary"
-                                        startIcon={<ArrowForwardIcon />}
-                                        onClick={handleNextRound}
-                                        disabled={
-                                          processingRound ||
-                                          (!nextRoundAlreadyExists &&
-                                            !canProceedToNextRound)
-                                        }
-                                      >
-                                        {nextRoundAlreadyExists
-                                          ? "View Next Round"
-                                          : "Create Next Round"}
-                                      </Button>
-                                    </span>
-                                  </Tooltip>
+                                    {nextRoundAlreadyExists
+                                      ? "View Next Round"
+                                      : "Create Next Round"}
+                                  </Button>
                                 )}
-                                {isFinalRound && hasPendingMatches && (
-                                  <Tooltip
-                                    title={
-                                      !allCompletedInDB
-                                        ? allResultsEntered
-                                          ? "Submit results before completing the tournament"
-                                          : "Complete all matches in this round to finish the tournament"
-                                        : ""
-                                    }
-                                    arrow
+                                {/* Phase 3 (final): results in DB */}
+                                {canCompleteTournament && (
+                                  <Button
+                                    variant="contained"
+                                    color="success"
+                                    startIcon={<CheckCircleIcon />}
+                                    onClick={handleCompleteTournament}
+                                    disabled={processingRound}
+                                    sx={{
+                                      backgroundColor: "success.main",
+                                      "&:hover": {
+                                        backgroundColor: "success.dark",
+                                      },
+                                    }}
                                   >
-                                    <span>
-                                      <Button
-                                        variant="contained"
-                                        color="success"
-                                        startIcon={<CheckCircleIcon />}
-                                        onClick={handleCompleteTournament}
-                                        disabled={processingRound || !allCompletedInDB}
-                                        sx={{
-                                          backgroundColor: "success.main",
-                                          "&:hover": {
-                                            backgroundColor: "success.dark",
-                                          },
-                                        }}
-                                      >
-                                        Complete Tournament
-                                      </Button>
-                                    </span>
-                                  </Tooltip>
+                                    Complete Tournament
+                                  </Button>
                                 )}
                               </>
                             )}
