@@ -117,8 +117,8 @@ const TournamentMatches: React.FC = () => {
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
-  const [sortBy, setSortBy] = useState<"match" | "status">("match");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<"match" | "status" | "record">("record");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
   const [processingRound, setProcessingRound] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithPlayers | null>(
@@ -1910,6 +1910,27 @@ const TournamentMatches: React.FC = () => {
                         const cmp = numA - numB;
                         return sortOrder === "asc" ? cmp : -cmp;
                       });
+                    } else if (sortBy === "record") {
+                      // Sort by combined match points of both players, byes last
+                      roundMatches.sort((a, b) => {
+                        const aIsBye =
+                          a.status === "bye" || a.player2_id === null;
+                        const bIsBye =
+                          b.status === "bye" || b.player2_id === null;
+                        if (aIsBye && !bIsBye) return 1;
+                        if (!aIsBye && bIsBye) return -1;
+
+                        const ptsA =
+                          (standingsByPlayerId.get(a.player1_id)?.matchPoints ?? 0) +
+                          (a.player2_id ? standingsByPlayerId.get(a.player2_id)?.matchPoints ?? 0 : 0);
+                        const ptsB =
+                          (standingsByPlayerId.get(b.player1_id)?.matchPoints ?? 0) +
+                          (b.player2_id ? standingsByPlayerId.get(b.player2_id)?.matchPoints ?? 0 : 0);
+                        const cmp = ptsA - ptsB;
+                        if (cmp !== 0) return sortOrder === "asc" ? cmp : -cmp;
+                        // Tiebreak by match number
+                        return getMatchNum(a) - getMatchNum(b);
+                      });
                     } else {
                       // sortBy === "status": by status, byes last, then secondary by match number
                       roundMatches.sort((a, b) => {
@@ -1937,14 +1958,16 @@ const TournamentMatches: React.FC = () => {
 
                     const hasMatches = roundMatches.length > 0;
 
-                    const handleSort = (column: "match" | "status") => {
+                    const handleSort = (column: "match" | "status" | "record") => {
                       setSortBy(column);
                       setSortOrder((prev) =>
                         sortBy === column
                           ? prev === "asc"
                             ? "desc"
                             : "asc"
-                          : "asc",
+                          : column === "record"
+                            ? "desc"
+                            : "asc",
                       );
                     };
 
@@ -2205,7 +2228,21 @@ const TournamentMatches: React.FC = () => {
                                     Match #
                                   </TableSortLabel>
                                 </TableCell>
-                                <TableCell>Player 1</TableCell>
+                                <TableCell
+                                  sortDirection={
+                                    sortBy === "record" ? sortOrder : false
+                                  }
+                                >
+                                  <TableSortLabel
+                                    active={sortBy === "record"}
+                                    direction={
+                                      sortBy === "record" ? sortOrder : "desc"
+                                    }
+                                    onClick={() => handleSort("record")}
+                                  >
+                                    Player 1
+                                  </TableSortLabel>
+                                </TableCell>
                                 <TableCell>Player 2</TableCell>
                                 <TableCell
                                   sortDirection={
