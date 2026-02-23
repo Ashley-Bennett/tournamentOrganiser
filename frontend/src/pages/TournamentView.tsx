@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Typography,
@@ -12,6 +12,11 @@ import {
   Checkbox,
   IconButton,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import { PlayArrow as PlayArrowIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -48,10 +53,15 @@ const TournamentView: React.FC = () => {
 
   const [newPlayerName, setNewPlayerName] = useState("");
   const [addingPlayer, setAddingPlayer] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkNames, setBulkNames] = useState("");
+  const [addingBulk, setAddingBulk] = useState(false);
   const [deletingPlayerId, setDeletingPlayerId] = useState<string | null>(null);
+  const [confirmDeletePlayerId, setConfirmDeletePlayerId] = useState<string | null>(null);
   const [startingTournament, setStartingTournament] = useState(false);
   const [numRounds, setNumRounds] = useState<number | null>(null);
   const [useSuggestedRounds, setUseSuggestedRounds] = useState(true);
+  const playerNameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -106,10 +116,44 @@ const TournamentView: React.FC = () => {
 
       setPlayers((prev) => [...prev, data as TournamentPlayer]);
       setNewPlayerName("");
+      playerNameInputRef.current?.focus();
     } catch (e: unknown) {
       setPlayersError(e instanceof Error ? e.message : "Failed to add player");
     } finally {
       setAddingPlayer(false);
+    }
+  };
+
+  const handleBulkAdd = async () => {
+    if (!tournament || !user) return;
+    const names = bulkNames
+      .split("\n")
+      .map((n) => n.trim())
+      .filter((n) => n.length > 0);
+    if (names.length === 0) return;
+
+    setAddingBulk(true);
+    setPlayersError(null);
+    try {
+      const inserts = names.map((name) => ({
+        name,
+        tournament_id: tournament.id,
+        created_by: user.id,
+      }));
+      const { data, error } = await supabase
+        .from("tournament_players")
+        .insert(inserts)
+        .select("id, name, created_at");
+
+      if (error) throw new Error(error.message || "Failed to add players");
+
+      setPlayers((prev) => [...prev, ...(data as TournamentPlayer[])]);
+      setBulkNames("");
+      setBulkMode(false);
+    } catch (e: unknown) {
+      setPlayersError(e instanceof Error ? e.message : "Failed to add players");
+    } finally {
+      setAddingBulk(false);
     }
   };
 
@@ -142,15 +186,15 @@ const TournamentView: React.FC = () => {
     }
   };
 
-  const handleDeletePlayer = async (playerId: string) => {
+  const handleDeletePlayer = (playerId: string) => {
     if (!tournament || tournament.status !== "draft" || !user) return;
-    if (
-      !window.confirm(
-        "Remove this player from the tournament? This cannot be undone.",
-      )
-    ) {
-      return;
-    }
+    setConfirmDeletePlayerId(playerId);
+  };
+
+  const handleConfirmDeletePlayer = async () => {
+    const playerId = confirmDeletePlayerId;
+    if (!playerId || !tournament || !user) return;
+    setConfirmDeletePlayerId(null);
 
     try {
       setDeletingPlayerId(playerId);
@@ -458,36 +502,93 @@ const TournamentView: React.FC = () => {
 
       <Paper sx={{ p: 3 }}>
         <Typography variant="subtitle1" gutterBottom>
-          Players
+          Players ({players.length})
         </Typography>
         {playersError && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {playersError}
           </Alert>
         )}
-        <Box
-          component="form"
-          onSubmit={handleAddPlayer}
-          display="flex"
-          gap={2}
-          mb={2}
-          flexWrap="wrap"
-        >
-          <TextField
-            label="Player name"
-            value={newPlayerName}
-            onChange={(e) => setNewPlayerName(e.target.value)}
-            size="small"
-            sx={{ minWidth: 240 }}
-          />
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={addingPlayer || !newPlayerName.trim()}
+        {!bulkMode ? (
+          <Box
+            component="form"
+            onSubmit={handleAddPlayer}
+            display="flex"
+            gap={2}
+            mb={2}
+            flexWrap="wrap"
+            alignItems="flex-start"
           >
-            Add Player
-          </Button>
-        </Box>
+            <TextField
+              label="Player name"
+              value={newPlayerName}
+              onChange={(e) => setNewPlayerName(e.target.value)}
+              size="small"
+              sx={{ minWidth: 240 }}
+              inputRef={playerNameInputRef}
+            />
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={addingPlayer || !newPlayerName.trim()}
+            >
+              Add Player
+            </Button>
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => setBulkMode(true)}
+              sx={{ alignSelf: "center" }}
+            >
+              Bulk add
+            </Button>
+          </Box>
+        ) : (
+          <Box display="flex" flexDirection="column" gap={1} mb={2}>
+            <TextField
+              label="One name per line"
+              multiline
+              minRows={4}
+              value={bulkNames}
+              onChange={(e) => setBulkNames(e.target.value)}
+              size="small"
+              placeholder={"Alice\nBob\nCharlie"}
+              autoFocus
+            />
+            <Box display="flex" gap={1}>
+              <Button
+                variant="contained"
+                onClick={() => void handleBulkAdd()}
+                disabled={
+                  addingBulk ||
+                  bulkNames
+                    .split("\n")
+                    .map((n) => n.trim())
+                    .filter((n) => n.length > 0).length === 0
+                }
+              >
+                {addingBulk
+                  ? "Adding…"
+                  : `Add ${
+                      bulkNames
+                        .split("\n")
+                        .map((n) => n.trim())
+                        .filter((n) => n.length > 0).length
+                    } Players`}
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setBulkMode(false);
+                  setBulkNames("");
+                }}
+                disabled={addingBulk}
+              >
+                Cancel
+              </Button>
+            </Box>
+          </Box>
+        )}
 
         {playersLoading ? (
           <Box display="flex" justifyContent="center" py={2}>
@@ -531,6 +632,29 @@ const TournamentView: React.FC = () => {
           </Box>
         )}
       </Paper>
+
+      <Dialog
+        open={confirmDeletePlayerId !== null}
+        onClose={() => setConfirmDeletePlayerId(null)}
+      >
+        <DialogTitle>Remove player?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {(() => {
+              const player = players.find((p) => p.id === confirmDeletePlayerId);
+              return player
+                ? `Remove "${player.name}" from the tournament? This cannot be undone.`
+                : "Remove this player from the tournament? This cannot be undone.";
+            })()}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeletePlayerId(null)}>Cancel</Button>
+          <Button color="error" onClick={() => void handleConfirmDeletePlayer()}>
+            Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

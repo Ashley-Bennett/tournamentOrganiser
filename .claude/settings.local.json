@@ -5,7 +5,8 @@
       "Bash(npx tsc:*)",
       "mcp__claude_ai_Supabase__list_projects",
       "mcp__claude_ai_Supabase__execute_sql",
-      "Bash(docker ps:*)"
+      "Bash(docker ps:*)",
+      "mcp__claude_ai_Supabase__apply_migration"
     ]
   }
 }

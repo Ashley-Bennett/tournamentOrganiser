@@ -19,6 +19,11 @@ import {
   Select,
   InputLabel,
   FormControl,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import PageLoading from "../components/PageLoading";
 import { formatDate } from "../utils/format";
@@ -44,8 +49,15 @@ const Tournaments: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [searchName, setSearchName] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
+
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => setSuccess(null), 3000);
+    return () => clearTimeout(timer);
+  }, [success]);
 
   const fetchTournaments = useCallback(async () => {
     try {
@@ -83,13 +95,14 @@ const Tournaments: React.FC = () => {
     fetchTournaments();
   }, [user, fetchTournaments]);
 
-  const handleDeleteTournament = async (id: string) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this tournament? This cannot be undone.",
-      )
-    )
-      return;
+  const handleDeleteTournament = (id: string) => {
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDeleteTournament = async () => {
+    const id = confirmDeleteId;
+    if (!id) return;
+    setConfirmDeleteId(null);
     setDeletingId(id);
     setError(null);
     setSuccess(null);
@@ -281,6 +294,29 @@ const Tournaments: React.FC = () => {
           </Table>
         </TableContainer>
       </Paper>
+
+      <Dialog
+        open={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+      >
+        <DialogTitle>Delete tournament?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {(() => {
+              const t = tournaments.find((t) => t.id === confirmDeleteId);
+              return t
+                ? `Delete "${t.name}"? This cannot be undone.`
+                : "Are you sure you want to delete this tournament? This cannot be undone.";
+            })()}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+          <Button color="error" onClick={() => void handleConfirmDeleteTournament()}>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

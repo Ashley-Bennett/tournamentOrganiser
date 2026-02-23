@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useMemo, useState } from "react";
+import React, { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -77,6 +77,8 @@ interface Match {
   player2_id: string | null;
   winner_id: string | null;
   result: string | null;
+  temp_winner_id: string | null;
+  temp_result: string | null;
   status: "ready" | "pending" | "completed" | "bye";
   pairing_decision_log?: PairingDecisionLog | null;
   created_at: string;
@@ -143,6 +145,7 @@ const TournamentMatches: React.FC = () => {
   const [players, setPlayers] = useState<TournamentPlayer[]>([]);
   const [dropDialogOpen, setDropDialogOpen] = useState(false);
   const [togglingDrop, setTogglingDrop] = useState<string | null>(null);
+  const didRestoreRef = useRef(false);
 
   const standingsByPlayerId = useMemo(() => {
     // Standings as-of the start of the selected round (all rounds < selectedRound)
@@ -313,6 +316,22 @@ const TournamentMatches: React.FC = () => {
   }, [id, user, authLoading, navigate]);
 
 
+
+  // Restore pending results from DB temp columns when matches first load
+  useEffect(() => {
+    if (matches.length === 0 || didRestoreRef.current) return;
+    didRestoreRef.current = true;
+    const toRestore = new Map<string, { winnerId: string | null; result: string }>();
+    for (const match of matches) {
+      if (match.status === "ready" && match.temp_result) {
+        toRestore.set(match.id, {
+          winnerId: match.temp_winner_id,
+          result: match.temp_result,
+        });
+      }
+    }
+    if (toRestore.size > 0) setPendingResults(toRestore);
+  }, [matches]);
 
   // Clean up pending results for matches that no longer exist
   useEffect(() => {
@@ -584,12 +603,19 @@ const TournamentMatches: React.FC = () => {
       resultString = "0-1"; // Best of 1
     }
 
-    // Store in pending results (not saved to DB yet)
     setPendingResults((prev) => {
       const next = new Map(prev);
       next.set(match.id, { winnerId, result: resultString });
       return next;
     });
+
+    // Auto-save temp result to DB so it survives navigation
+    void (async () => {
+      await supabase
+        .from("tournament_matches")
+        .update({ temp_winner_id: winnerId, temp_result: resultString })
+        .eq("id", match.id);
+    })();
   };
 
   const savePendingResults = async (): Promise<void> => {
@@ -616,6 +642,8 @@ const TournamentMatches: React.FC = () => {
             winner_id: update.winner_id,
             result: update.result,
             status: update.status,
+            temp_winner_id: null,
+            temp_result: null,
           })
           .eq("id", update.id);
 
@@ -624,7 +652,6 @@ const TournamentMatches: React.FC = () => {
         }
       }
 
-      // Clear pending results
       setPendingResults(new Map());
 
       // Refresh matches
@@ -1606,10 +1633,67 @@ const TournamentMatches: React.FC = () => {
                       (m) => m.round_number === roundNumber,
                     );
                     const hasMatches = roundMatches.length > 0;
+                    const completedCount = roundMatches.filter(
+                      (m) => m.status === "completed" || m.status === "bye",
+                    ).length;
+                    const allDone =
+                      hasMatches && completedCount === roundMatches.length;
+                    const hasPendingForRound =
+                      hasMatches &&
+                      roundMatches.some((m) => pendingResults.has(m.id));
+
+                    let indicator: ReactNode = null;
+                    if (hasMatches) {
+                      if (allDone) {
+                        indicator = (
+                          <Box
+                            component="span"
+                            sx={{ color: "success.main", ml: 0.5, lineHeight: 1 }}
+                          >
+                            ✓
+                          </Box>
+                        );
+                      } else if (hasPendingForRound) {
+                        indicator = (
+                          <Box
+                            component="span"
+                            sx={{
+                              display: "inline-block",
+                              width: 7,
+                              height: 7,
+                              borderRadius: "50%",
+                              backgroundColor: "warning.main",
+                              ml: 0.75,
+                              verticalAlign: "middle",
+                              mb: "1px",
+                            }}
+                          />
+                        );
+                      } else if (completedCount > 0) {
+                        indicator = (
+                          <Box
+                            component="span"
+                            sx={{
+                              color: "text.secondary",
+                              ml: 0.5,
+                              fontSize: "0.7rem",
+                            }}
+                          >
+                            {completedCount}/{roundMatches.length}
+                          </Box>
+                        );
+                      }
+                    }
+
                     return (
                       <Tab
                         key={roundNumber}
-                        label={`Round ${roundNumber}`}
+                        label={
+                          <Box display="flex" alignItems="center">
+                            {`Round ${roundNumber}`}
+                            {indicator}
+                          </Box>
+                        }
                         value={roundNumber}
                         disabled={!hasMatches}
                         sx={
@@ -1853,6 +1937,9 @@ const TournamentMatches: React.FC = () => {
                             (m) => m.round_number === selectedRound,
                           )
                         : [];
+                    const currentRoundPendingCount = roundMatchesForState.filter(
+                      (m) => pendingResults.has(m.id),
+                    ).length;
                     const hasReadyMatches = roundMatchesForState.some(
                       (m) => m.status === "ready",
                     );
@@ -2081,14 +2168,25 @@ const TournamentMatches: React.FC = () => {
                                 >
                                   Cancel
                                 </Button>
-                                <Button
-                                  variant="contained"
-                                  color="success"
-                                  disabled={!pairingEditsValid || savingPairings}
-                                  onClick={handleSavePairingEdits}
+                                <Tooltip
+                                  title={
+                                    !pairingEditsValid && availablePool.size > 0
+                                      ? `Assign ${[...availablePool.values()].join(", ")} before saving`
+                                      : ""
+                                  }
+                                  arrow
                                 >
-                                  Save Pairings
-                                </Button>
+                                  <span>
+                                    <Button
+                                      variant="contained"
+                                      color="success"
+                                      disabled={!pairingEditsValid || savingPairings}
+                                      onClick={handleSavePairingEdits}
+                                    >
+                                      Save Pairings
+                                    </Button>
+                                  </span>
+                                </Tooltip>
                               </>
                             ) : (
                               <>
@@ -2130,7 +2228,9 @@ const TournamentMatches: React.FC = () => {
                                         disabled={!allResultsEntered || updatingMatch}
                                         onClick={() => void savePendingResults()}
                                       >
-                                        {updatingMatch ? "Saving…" : "Submit Results"}
+                                        {updatingMatch
+                                          ? "Saving…"
+                                          : `Submit Results (${currentRoundPendingCount})`}
                                       </Button>
                                     </span>
                                   </Tooltip>
@@ -2184,12 +2284,23 @@ const TournamentMatches: React.FC = () => {
                           </Box>
                         )}
                         {editingPairings && (
-                          <Alert severity="info" sx={{ mb: 1 }}>
-                            Remove a player from their slot to add them to the
-                            pool, then assign them to an empty slot in another
-                            match.
-                            {availablePool.size > 0 &&
-                              ` Players in pool: ${[...availablePool.values()].join(", ")}`}
+                          <Alert
+                            severity={availablePool.size > 0 ? "warning" : "info"}
+                            sx={{ mb: 1 }}
+                          >
+                            {availablePool.size > 0 ? (
+                              <>
+                                <strong>
+                                  {[...availablePool.values()].join(
+                                    availablePool.size === 2 ? " and " : ", ",
+                                  )}
+                                </strong>{" "}
+                                {availablePool.size === 1 ? "needs" : "need"}{" "}
+                                to be assigned to a match before you can save.
+                              </>
+                            ) : (
+                              "Remove a player from their slot to add them to the pool, then assign them to an empty slot in another match."
+                            )}
                           </Alert>
                         )}
                         <TableContainer>
@@ -3070,6 +3181,7 @@ const TournamentMatches: React.FC = () => {
           <Button onClick={() => setDropDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+
     </Box>
   );
 };
