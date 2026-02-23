@@ -52,6 +52,13 @@ import {
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 
+interface TournamentPlayer {
+  id: string;
+  name: string;
+  dropped: boolean;
+  dropped_at_round: number | null;
+}
+
 interface TournamentSummary {
   id: string;
   name: string;
@@ -133,6 +140,9 @@ const TournamentMatches: React.FC = () => {
     Map<string, { player1Id: string | null; player2Id: string | null }>
   >(new Map());
   const [savingPairings, setSavingPairings] = useState(false);
+  const [players, setPlayers] = useState<TournamentPlayer[]>([]);
+  const [dropDialogOpen, setDropDialogOpen] = useState(false);
+  const [togglingDrop, setTogglingDrop] = useState<string | null>(null);
 
   const standingsByPlayerId = useMemo(() => {
     // Standings as-of the start of the selected round (all rounds < selectedRound)
@@ -378,6 +388,14 @@ const TournamentMatches: React.FC = () => {
         playersData?.forEach((player) => {
           playersMap.set(player.id, player.name);
         });
+
+        // Load all tournament players (with drop status) for the drop manager
+        const { data: allPlayersData } = await supabase
+          .from("tournament_players")
+          .select("id, name, dropped, dropped_at_round")
+          .eq("tournament_id", tournament.id)
+          .order("name");
+        setPlayers((allPlayersData as TournamentPlayer[]) ?? []);
 
         // Combine matches with player names
         const matchesWithPlayers: MatchWithPlayers[] = matchesData.map(
@@ -803,6 +821,51 @@ const TournamentMatches: React.FC = () => {
       }),
     );
     setMatches(matchesWithPlayers);
+
+    const { data: freshPlayers } = await supabase
+      .from("tournament_players")
+      .select("id, name, dropped, dropped_at_round")
+      .eq("tournament_id", tournament.id)
+      .order("name");
+    setPlayers((freshPlayers as TournamentPlayer[]) ?? []);
+  };
+
+  // ── Drop manager ─────────────────────────────────────────────────────────────
+
+  const handleToggleDrop = async (
+    playerId: string,
+    currentlyDropped: boolean,
+  ) => {
+    if (!tournament) return;
+    setTogglingDrop(playerId);
+    try {
+      const nowDropped = !currentlyDropped;
+      const { error } = await supabase
+        .from("tournament_players")
+        .update({
+          dropped: nowDropped,
+          dropped_at_round: nowDropped
+            ? typeof selectedRound === "number"
+              ? selectedRound
+              : null
+            : null,
+        })
+        .eq("id", playerId);
+      if (error) throw new Error(error.message || "Failed to update drop status");
+
+      const { data: fresh } = await supabase
+        .from("tournament_players")
+        .select("id, name, dropped, dropped_at_round")
+        .eq("tournament_id", tournament.id)
+        .order("name");
+      setPlayers((fresh as TournamentPlayer[]) ?? []);
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : "Failed to update drop status",
+      );
+    } finally {
+      setTogglingDrop(null);
+    }
   };
 
   // ── Pairing editor ──────────────────────────────────────────────────────────
@@ -1252,10 +1315,12 @@ const TournamentMatches: React.FC = () => {
         }
       });
 
+      // Fetch all tournament players (including drop status) so we can seed
+      // standings correctly and exclude dropped players from the next round.
       const { data: playersData } = await supabase
         .from("tournament_players")
-        .select("id, name")
-        .in("id", Array.from(playerIds));
+        .select("id, name, dropped, dropped_at_round")
+        .eq("tournament_id", tournament.id);
 
       const playersMap = new Map<string, string>();
       playersData?.forEach((player) => {
@@ -1289,13 +1354,23 @@ const TournamentMatches: React.FC = () => {
           ? standings.filter((s) => s.losses === 0)
           : standings;
 
-      if (standingsForPairing.length < 2) {
-        throw new Error("Not enough players remaining to generate pairings");
+      // Exclude dropped players from the pairing pool
+      const droppedIds = new Set(
+        playersData?.filter((p) => p.dropped).map((p) => p.id) ?? [],
+      );
+      const standingsToUse = standingsForPairing.filter(
+        (s) => !droppedIds.has(s.id),
+      );
+
+      if (standingsToUse.length < 2) {
+        throw new Error(
+          "Not enough active (non-dropped) players remaining to generate pairings",
+        );
       }
 
       // Generate pairings for next round
       const pairingResult = generateSwissPairings(
-        standingsForPairing,
+        standingsToUse,
         nextRoundNumber,
         previousPairings,
       );
@@ -1972,6 +2047,16 @@ const TournamentMatches: React.FC = () => {
                                       Begin Round
                                     </Button>
                                   </>
+                                )}
+                                {canShowNextRound && !nextRoundAlreadyExists &&
+                                  canProceedToNextRound && (
+                                  <Button
+                                    variant="outlined"
+                                    color="warning"
+                                    onClick={() => setDropDialogOpen(true)}
+                                  >
+                                    Manage Drops
+                                  </Button>
                                 )}
                                 {canShowNextRound && (
                                   <Tooltip
@@ -2834,6 +2919,66 @@ const TournamentMatches: React.FC = () => {
           >
             {updatingMatch ? "Saving..." : "Save Result"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Drop management dialog */}
+      <Dialog
+        open={dropDialogOpen}
+        onClose={() => setDropDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Manage Player Drops</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Dropped players keep their current record but are excluded from
+            future round pairings.
+          </Typography>
+          {players.map((player, idx) => {
+            const standing = standingsByPlayerId.get(player.id);
+            return (
+              <Box
+                key={player.id}
+                display="flex"
+                alignItems="center"
+                justifyContent="space-between"
+                py={1.5}
+                sx={{
+                  borderBottom:
+                    idx < players.length - 1 ? "1px solid" : "none",
+                  borderColor: "divider",
+                  opacity: player.dropped ? 0.65 : 1,
+                }}
+              >
+                <Box>
+                  <Typography variant="body1">{player.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {player.dropped
+                      ? `Dropped after Round ${player.dropped_at_round}`
+                      : `${standing?.wins ?? 0}W – ${standing?.losses ?? 0}L – ${standing?.draws ?? 0}D · ${standing?.matchPoints ?? 0} pts`}
+                  </Typography>
+                </Box>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color={player.dropped ? "success" : "error"}
+                  onClick={() => handleToggleDrop(player.id, player.dropped)}
+                  disabled={!!togglingDrop}
+                  sx={{ ml: 2, minWidth: 80 }}
+                >
+                  {togglingDrop === player.id
+                    ? "…"
+                    : player.dropped
+                      ? "Restore"
+                      : "Drop"}
+                </Button>
+              </Box>
+            );
+          })}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDropDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>

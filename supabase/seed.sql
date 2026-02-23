@@ -49,7 +49,9 @@ create table if not exists public.tournament_players (
   tournament_id uuid not null references public.tournaments (id) on delete cascade,
   name text not null,
   created_by uuid not null references auth.users (id) on delete cascade,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  dropped boolean not null default false,
+  dropped_at_round integer
 );
 
 alter table public.tournament_players enable row level security;

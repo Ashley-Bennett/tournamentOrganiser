@@ -12,6 +12,7 @@ import {
   TableRow,
   Alert,
   Button,
+  Chip,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
@@ -49,12 +50,20 @@ interface MatchWithPlayers extends Match {
   winner_name: string | null;
 }
 
+interface LeaderboardPlayer {
+  id: string;
+  name: string;
+  dropped: boolean;
+  dropped_at_round: number | null;
+}
+
 const TournamentLeaderboard: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [matches, setMatches] = useState<MatchWithPlayers[]>([]);
+  const [players, setPlayers] = useState<LeaderboardPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -144,6 +153,13 @@ const TournamentLeaderboard: React.FC = () => {
           playersMap.set(player.id, player.name);
         });
 
+        // Load all tournament players with drop status
+        const { data: allPlayersData } = await supabase
+          .from("tournament_players")
+          .select("id, name, dropped, dropped_at_round")
+          .eq("tournament_id", id);
+        setPlayers((allPlayersData as LeaderboardPlayer[]) ?? []);
+
         // Combine matches with player names
         const matchesWithPlayers: MatchWithPlayers[] = matchesData.map(
           (match) => ({
@@ -173,6 +189,14 @@ const TournamentLeaderboard: React.FC = () => {
     if (!matches.length) return [];
     return sortByTieBreakers(buildStandingsFromMatches(matches));
   }, [matches]);
+
+  const droppedMap = useMemo(() => {
+    const m = new Map<string, number | null>();
+    players.forEach((p) => {
+      if (p.dropped) m.set(p.id, p.dropped_at_round);
+    });
+    return m;
+  }, [players]);
 
   if (authLoading || loading) {
     return <PageLoading />;
@@ -255,17 +279,22 @@ const TournamentLeaderboard: React.FC = () => {
               {finalStandings.map((player, index) => {
                 const rank = index + 1;
                 const isTopThree = rank <= 3;
+                const droppedRound = droppedMap.get(player.id);
+                const isDropped = droppedRound !== undefined;
                 return (
                   <TableRow
                     key={player.id}
                     sx={{
-                      backgroundColor: isTopThree
-                        ? rank === 1
-                          ? "rgba(255, 215, 0, 0.1)"
-                          : rank === 2
-                            ? "rgba(192, 192, 192, 0.1)"
-                            : "rgba(205, 127, 50, 0.1)"
-                        : "transparent",
+                      opacity: isDropped ? 0.65 : 1,
+                      backgroundColor: isDropped
+                        ? "action.hover"
+                        : isTopThree
+                          ? rank === 1
+                            ? "rgba(255, 215, 0, 0.1)"
+                            : rank === 2
+                              ? "rgba(192, 192, 192, 0.1)"
+                              : "rgba(205, 127, 50, 0.1)"
+                          : "transparent",
                       "&:hover": {
                         backgroundColor: isTopThree
                           ? rank === 1
@@ -300,12 +329,22 @@ const TournamentLeaderboard: React.FC = () => {
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Typography
-                        variant="body1"
-                        sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
-                      >
-                        {player.name}
-                      </Typography>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Typography
+                          variant="body1"
+                          sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
+                        >
+                          {player.name}
+                        </Typography>
+                        {isDropped && (
+                          <Chip
+                            label={`Dropped Rd ${droppedRound}`}
+                            size="small"
+                            variant="outlined"
+                            color="default"
+                          />
+                        )}
+                      </Box>
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2">
