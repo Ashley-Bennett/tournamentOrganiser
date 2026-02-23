@@ -329,27 +329,37 @@ const TournamentLeaderboard: React.FC = () => {
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <Typography
-                          variant="body1"
-                          sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
-                        >
-                          {player.name}
-                        </Typography>
+                      <Typography
+                        variant="body1"
+                        sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
+                      >
+                        {player.name}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="flex-end"
+                        gap={1}
+                        sx={{ flexWrap: "nowrap" }}
+                      >
                         {isDropped && (
                           <Chip
                             label={`Dropped Rd ${droppedRound}`}
                             size="small"
                             variant="outlined"
                             color="default"
+                            sx={{ whiteSpace: "nowrap" }}
                           />
                         )}
+                        <Typography
+                          variant="body2"
+                          sx={{ whiteSpace: "nowrap" }}
+                        >
+                          {player.wins}-{player.losses}-{player.draws}
+                        </Typography>
                       </Box>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2">
-                        {player.wins}-{player.losses}-{player.draws}
-                      </Typography>
                     </TableCell>
                     <TableCell align="right">
                       <Typography

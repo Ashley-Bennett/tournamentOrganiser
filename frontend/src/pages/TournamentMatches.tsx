@@ -458,6 +458,22 @@ const TournamentMatches: React.FC = () => {
     return sortByTieBreakers(buildStandingsFromMatches(matches));
   }, [matches]);
 
+  // Map from player ID → standing (all completed matches), used in the drop dialog
+  const finalStandingsById = useMemo(() => {
+    const map = new Map<string, (typeof finalStandings)[0]>();
+    for (const s of finalStandings) map.set(s.id, s);
+    return map;
+  }, [finalStandings]);
+
+  // Map from player ID → dropped_at_round (for final standings table indicators)
+  const droppedPlayersMap = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const p of players) {
+      if (p.dropped) map.set(p.id, p.dropped_at_round);
+    }
+    return map;
+  }, [players]);
+
   // Reserved for future use: open score dialog with pre-selected match/winner
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- handler kept for wiring to UI
   const handleOpenScoreDialog = (
@@ -1683,10 +1699,13 @@ const TournamentMatches: React.FC = () => {
                                   {finalStandings.map((player, index) => {
                                     const rank = index + 1;
                                     const isTopThree = rank <= 3;
+                                    const droppedAtRound = droppedPlayersMap.get(player.id);
+                                    const isDropped = droppedPlayersMap.has(player.id);
                                     return (
                                       <TableRow
                                         key={player.id}
                                         sx={{
+                                          opacity: isDropped ? 0.7 : 1,
                                           backgroundColor: isTopThree
                                             ? rank === 1
                                               ? "rgba(255, 215, 0, 0.1)"
@@ -1748,10 +1767,27 @@ const TournamentMatches: React.FC = () => {
                                           </Typography>
                                         </TableCell>
                                         <TableCell align="right">
-                                          <Typography variant="body2">
-                                            {player.wins}-{player.losses}-
-                                            {player.draws}
-                                          </Typography>
+                                          <Box
+                                            display="flex"
+                                            alignItems="center"
+                                            justifyContent="flex-end"
+                                            gap={1}
+                                            sx={{ flexWrap: "nowrap" }}
+                                          >
+                                            {isDropped && (
+                                              <Chip
+                                                label={`Dropped Rd ${droppedAtRound ?? "?"}`}
+                                                size="small"
+                                                variant="outlined"
+                                                color="default"
+                                                sx={{ whiteSpace: "nowrap" }}
+                                              />
+                                            )}
+                                            <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
+                                              {player.wins}-{player.losses}-
+                                              {player.draws}
+                                            </Typography>
+                                          </Box>
                                         </TableCell>
                                         <TableCell align="right">
                                           <Typography
@@ -1823,23 +1859,27 @@ const TournamentMatches: React.FC = () => {
                     const hasPendingMatches = roundMatchesForState.some(
                       (m) => m.status === "pending",
                     );
-                    // A match is "complete" if it's either saved as completed/bye OR has a pending result
-                    const allCompleted =
+                    // All matches have results (either saved to DB or pending in UI)
+                    const allResultsEntered =
                       roundMatchesForState.length > 0 &&
                       roundMatchesForState.every((m) => {
-                        // Bye matches are complete once the round has begun (status transitions to "bye")
                         if (m.status === "bye") return true;
-                        // Check if match is completed in database
                         if (m.status === "completed") return true;
-                        // Check if match has a pending result set
                         return pendingResults.has(m.id);
                       });
+                    // All matches are saved to DB (no pending UI results outstanding)
+                    const allCompletedInDB =
+                      roundMatchesForState.length > 0 &&
+                      roundMatchesForState.every(
+                        (m) => m.status === "completed" || m.status === "bye",
+                      );
                     const canShowNextRound =
                       tournament.num_rounds &&
                       typeof selectedRound === "number" &&
                       selectedRound < tournament.num_rounds;
+                    // Only allow proceeding once results are in the DB (so Manage Drops sees current standings)
                     const canProceedToNextRound =
-                      allCompleted && canShowNextRound;
+                      allCompletedInDB && canShowNextRound;
                     const showBeginRound =
                       hasReadyMatches && !hasPendingMatches;
                     const nextRoundNumber =
@@ -1850,7 +1890,7 @@ const TournamentMatches: React.FC = () => {
                     const isFinalRound =
                       tournament.num_rounds &&
                       selectedRound === tournament.num_rounds;
-                    const canCompleteTournament = isFinalRound && allCompleted;
+                    const canCompleteTournament = isFinalRound && allCompletedInDB;
 
                     // Map match id -> absolute match number (1-based, by DB order within round)
                     const matchNumberById = new Map<string, number>();
@@ -1999,6 +2039,7 @@ const TournamentMatches: React.FC = () => {
                         {(showBeginRound ||
                           canShowNextRound ||
                           canCompleteTournament ||
+                          (hasPendingMatches && allResultsEntered) ||
                           editingPairings) && (
                           <Box
                             sx={{
@@ -2048,8 +2089,21 @@ const TournamentMatches: React.FC = () => {
                                     </Button>
                                   </>
                                 )}
-                                {canShowNextRound && !nextRoundAlreadyExists &&
-                                  canProceedToNextRound && (
+                                {hasPendingMatches &&
+                                  allResultsEntered &&
+                                  !allCompletedInDB && (
+                                  <Button
+                                    variant="contained"
+                                    color="success"
+                                    disabled={updatingMatch}
+                                    onClick={() => void savePendingResults()}
+                                  >
+                                    {updatingMatch ? "Saving…" : "Submit Results"}
+                                  </Button>
+                                )}
+                                {canShowNextRound &&
+                                  !nextRoundAlreadyExists &&
+                                  allCompletedInDB && (
                                   <Button
                                     variant="outlined"
                                     color="warning"
@@ -2063,7 +2117,9 @@ const TournamentMatches: React.FC = () => {
                                     title={
                                       !nextRoundAlreadyExists &&
                                       !canProceedToNextRound
-                                        ? "Complete all matches in this round to proceed to the next round"
+                                        ? allResultsEntered && !allCompletedInDB
+                                          ? "Submit results before creating the next round"
+                                          : "Complete all matches in this round to proceed to the next round"
                                         : ""
                                     }
                                     arrow
@@ -2087,22 +2143,35 @@ const TournamentMatches: React.FC = () => {
                                     </span>
                                   </Tooltip>
                                 )}
-                                {canCompleteTournament && (
-                                  <Button
-                                    variant="contained"
-                                    color="success"
-                                    startIcon={<CheckCircleIcon />}
-                                    onClick={handleCompleteTournament}
-                                    disabled={processingRound}
-                                    sx={{
-                                      backgroundColor: "success.main",
-                                      "&:hover": {
-                                        backgroundColor: "success.dark",
-                                      },
-                                    }}
+                                {isFinalRound && hasPendingMatches && (
+                                  <Tooltip
+                                    title={
+                                      !allCompletedInDB
+                                        ? allResultsEntered
+                                          ? "Submit results before completing the tournament"
+                                          : "Complete all matches in this round to finish the tournament"
+                                        : ""
+                                    }
+                                    arrow
                                   >
-                                    Complete Tournament
-                                  </Button>
+                                    <span>
+                                      <Button
+                                        variant="contained"
+                                        color="success"
+                                        startIcon={<CheckCircleIcon />}
+                                        onClick={handleCompleteTournament}
+                                        disabled={processingRound || !allCompletedInDB}
+                                        sx={{
+                                          backgroundColor: "success.main",
+                                          "&:hover": {
+                                            backgroundColor: "success.dark",
+                                          },
+                                        }}
+                                      >
+                                        Complete Tournament
+                                      </Button>
+                                    </span>
+                                  </Tooltip>
                                 )}
                               </>
                             )}
@@ -2936,7 +3005,7 @@ const TournamentMatches: React.FC = () => {
             future round pairings.
           </Typography>
           {players.map((player, idx) => {
-            const standing = standingsByPlayerId.get(player.id);
+            const standing = finalStandingsById.get(player.id);
             return (
               <Box
                 key={player.id}
