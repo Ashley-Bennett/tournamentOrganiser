@@ -29,6 +29,9 @@ import {
   InputLabel,
   TableSortLabel,
   Tooltip,
+  Select,
+  MenuItem,
+  IconButton,
 } from "@mui/material";
 import PageLoading from "../components/PageLoading";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -36,6 +39,8 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import EditIcon from "@mui/icons-material/Edit";
+import CloseIcon from "@mui/icons-material/Close";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
 import {
@@ -122,6 +127,12 @@ const TournamentMatches: React.FC = () => {
   const [roundDecisionLogs, setRoundDecisionLogs] = useState<
     Map<number, PairingDecisionLog>
   >(new Map());
+  const [editingPairings, setEditingPairings] = useState(false);
+  // matchId → { player1Id: string|null, player2Id: string|null }; null = slot emptied
+  const [editedPairings, setEditedPairings] = useState<
+    Map<string, { player1Id: string | null; player2Id: string | null }>
+  >(new Map());
+  const [savingPairings, setSavingPairings] = useState(false);
 
   const standingsByPlayerId = useMemo(() => {
     // Standings as-of the start of the selected round (all rounds < selectedRound)
@@ -203,6 +214,47 @@ const TournamentMatches: React.FC = () => {
 
     return map;
   }, [matches, selectedRound]);
+
+  // All players appearing in the current round's matches (for the pairing editor)
+  const roundPlayers = useMemo(() => {
+    const seen = new Map<string, string>();
+    matches
+      .filter(
+        (m) =>
+          typeof selectedRound === "number" &&
+          m.round_number === selectedRound,
+      )
+      .forEach((m) => {
+        seen.set(m.player1_id, m.player1_name);
+        if (m.player2_id && m.player2_name)
+          seen.set(m.player2_id, m.player2_name);
+      });
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  }, [matches, selectedRound]);
+
+  // Players not currently assigned to any slot in editedPairings
+  const availablePool = useMemo(() => {
+    if (!editingPairings) return new Map<string, string>();
+    const assigned = new Set<string>();
+    for (const { player1Id, player2Id } of editedPairings.values()) {
+      if (player1Id) assigned.add(player1Id);
+      if (player2Id) assigned.add(player2Id);
+    }
+    const pool = new Map<string, string>();
+    roundPlayers.forEach((p) => {
+      if (!assigned.has(p.id)) pool.set(p.id, p.name);
+    });
+    return pool;
+  }, [editingPairings, editedPairings, roundPlayers]);
+
+  // Save is only enabled when every player is assigned exactly once (pool is empty)
+  const pairingEditsValid = useMemo(() => {
+    if (!editingPairings) return true;
+    if (availablePool.size > 0) return false;
+    return Array.from(editedPairings.values()).every(
+      (e) => e.player1Id !== null,
+    );
+  }, [editingPairings, availablePool, editedPairings]);
 
   useEffect(() => {
     if (!id) {
@@ -712,75 +764,196 @@ const TournamentMatches: React.FC = () => {
     }
   };
 
+  // Shared helper: fetch all tournament matches (with player names) and update state
+  const refreshMatches = async () => {
+    if (!tournament) return;
+    const { data: matchesData, error: matchesError } = await supabase
+      .from("tournament_matches")
+      .select("*")
+      .eq("tournament_id", tournament.id)
+      .order("round_number", { ascending: true })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
+    if (matchesError)
+      throw new Error(matchesError.message || "Failed to refresh matches");
+
+    const playerIds = new Set<string>();
+    matchesData?.forEach((m) => {
+      playerIds.add(m.player1_id);
+      if (m.player2_id) playerIds.add(m.player2_id);
+      if (m.winner_id) playerIds.add(m.winner_id);
+    });
+    const { data: playersData } = await supabase
+      .from("tournament_players")
+      .select("id, name")
+      .in("id", Array.from(playerIds));
+    const playersMap = new Map<string, string>();
+    playersData?.forEach((p) => playersMap.set(p.id, p.name));
+
+    const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
+      (m) => ({
+        ...m,
+        player1_name: playersMap.get(m.player1_id) || "Unknown",
+        player2_name: m.player2_id
+          ? playersMap.get(m.player2_id) || "Unknown"
+          : null,
+        winner_name: m.winner_id
+          ? playersMap.get(m.winner_id) || "Unknown"
+          : null,
+      }),
+    );
+    setMatches(matchesWithPlayers);
+  };
+
+  // ── Pairing editor ──────────────────────────────────────────────────────────
+
+  const handleEditPairings = () => {
+    const initial = new Map<
+      string,
+      { player1Id: string | null; player2Id: string | null }
+    >();
+    matches
+      .filter(
+        (m) =>
+          typeof selectedRound === "number" &&
+          m.round_number === selectedRound,
+      )
+      .forEach((m) => {
+        initial.set(m.id, { player1Id: m.player1_id, player2Id: m.player2_id });
+      });
+    setEditedPairings(initial);
+    setEditingPairings(true);
+  };
+
+  const handleCancelEditPairings = () => {
+    setEditedPairings(new Map());
+    setEditingPairings(false);
+  };
+
+  const removeFromSlot = (matchId: string, slot: "player1" | "player2") => {
+    setEditedPairings((prev) => {
+      const next = new Map(prev);
+      const cur = next.get(matchId);
+      if (!cur) return prev;
+      next.set(matchId, {
+        ...cur,
+        [slot === "player1" ? "player1Id" : "player2Id"]: null,
+      });
+      return next;
+    });
+  };
+
+  const assignToSlot = (
+    matchId: string,
+    slot: "player1" | "player2",
+    playerId: string,
+  ) => {
+    setEditedPairings((prev) => {
+      const next = new Map(prev);
+      const cur = next.get(matchId);
+      if (!cur) return prev;
+      next.set(matchId, {
+        ...cur,
+        [slot === "player1" ? "player1Id" : "player2Id"]: playerId,
+      });
+      return next;
+    });
+  };
+
+  const handleSavePairingEdits = async () => {
+    if (!tournament) return;
+    setSavingPairings(true);
+    setError(null);
+    try {
+      const currentRoundMatches = matches.filter(
+        (m) =>
+          typeof selectedRound === "number" &&
+          m.round_number === selectedRound,
+      );
+      for (const match of currentRoundMatches) {
+        const edited = editedPairings.get(match.id);
+        if (!edited || edited.player1Id === null) continue;
+        const p1Changed = edited.player1Id !== match.player1_id;
+        const p2Changed = edited.player2Id !== match.player2_id;
+        // Also update matches that are still in legacy "bye" status so they
+        // get reset to "ready" and are re-processed by handleBeginRound.
+        const isLegacyBye = match.status === MATCH_STATUS.BYE;
+        if (!p1Changed && !p2Changed && !isLegacyBye) continue;
+
+        // Always save as "ready" — handleBeginRound will auto-complete byes when
+        // the round starts. This keeps pairings editable until Begin Round.
+        const { error: updateError } = await supabase
+          .from("tournament_matches")
+          .update({
+            player1_id: edited.player1Id,
+            player2_id: edited.player2Id,
+            status: MATCH_STATUS.READY,
+            result: null,
+            winner_id: null,
+          })
+          .eq("id", match.id);
+        if (updateError)
+          throw new Error(
+            updateError.message || "Failed to update pairing",
+          );
+      }
+      await refreshMatches();
+      setEditingPairings(false);
+      setEditedPairings(new Map());
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : "Failed to save pairing edits",
+      );
+    } finally {
+      setSavingPairings(false);
+    }
+  };
+
+  // ────────────────────────────────────────────────────────────────────────────
+
   const handleBeginRound = async () => {
     if (!tournament || !user) return;
 
     try {
       setProcessingRound(true);
       setError(null);
-
-      // Update all "ready" matches in current round to "pending"
       if (typeof selectedRound !== "number") return;
+
+      // Auto-complete any bye matches (player2_id is null) that are still "ready".
+      // Byes are created as "ready" so the organiser can edit pairings; we finalise
+      // them here when the round officially starts.
+      const readyByeMatches = matches.filter(
+        (m) =>
+          m.round_number === selectedRound &&
+          m.status === MATCH_STATUS.READY &&
+          !m.player2_id,
+      );
+      for (const byeMatch of readyByeMatches) {
+        const { error: byeError } = await supabase
+          .from("tournament_matches")
+          .update({
+            status: MATCH_STATUS.BYE,
+            result: "bye",
+            winner_id: byeMatch.player1_id,
+          })
+          .eq("id", byeMatch.id);
+        if (byeError)
+          throw new Error(byeError.message || "Failed to complete bye match");
+      }
+
+      // Transition all remaining "ready" matches (real matches) to "pending"
       const { error: updateError } = await supabase
         .from("tournament_matches")
         .update({ status: MATCH_STATUS.PENDING })
         .eq("tournament_id", tournament.id)
         .eq("round_number", selectedRound)
-        .eq("status", "ready");
+        .eq("status", MATCH_STATUS.READY);
 
       if (updateError) {
         throw new Error(updateError.message || "Failed to begin round");
       }
 
-      // Refresh matches
-      const { data: matchesData, error: matchesError } = await supabase
-        .from("tournament_matches")
-        .select("*")
-        .eq("tournament_id", tournament.id)
-        .order("round_number", { ascending: true })
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true });
-
-      if (matchesError) {
-        throw new Error(matchesError.message || "Failed to refresh matches");
-      }
-
-      // Fetch updated player names
-      const playerIds = new Set<string>();
-      matchesData?.forEach((match) => {
-        playerIds.add(match.player1_id);
-        if (match.player2_id) {
-          playerIds.add(match.player2_id);
-        }
-        if (match.winner_id) {
-          playerIds.add(match.winner_id);
-        }
-      });
-
-      const { data: playersData } = await supabase
-        .from("tournament_players")
-        .select("id, name")
-        .in("id", Array.from(playerIds));
-
-      const playersMap = new Map<string, string>();
-      playersData?.forEach((player) => {
-        playersMap.set(player.id, player.name);
-      });
-
-      const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
-        (match) => ({
-          ...match,
-          player1_name: playersMap.get(match.player1_id) || "Unknown",
-          player2_name: match.player2_id
-            ? playersMap.get(match.player2_id) || "Unknown"
-            : null,
-          winner_name: match.winner_id
-            ? playersMap.get(match.winner_id) || "Unknown"
-            : null,
-        }),
-      );
-
-      setMatches(matchesWithPlayers);
+      await refreshMatches();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to begin round");
     } finally {
@@ -875,14 +1048,16 @@ const TournamentMatches: React.FC = () => {
       }
 
       // Create new round 1 matches
+      // Byes are created as "ready" so the organiser can edit pairings before beginning the round.
+      // handleBeginRound will auto-complete them when the round starts.
       const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
         round_number: 1,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
-        status: pairing.player2Id === null ? MATCH_STATUS.BYE : MATCH_STATUS.READY,
-        result: pairing.player2Id === null ? "bye" : null,
-        winner_id: pairing.player2Id === null ? pairing.player1Id : null,
+        status: MATCH_STATUS.READY,
+        result: null,
+        winner_id: null,
         pairing_decision_log:
           index === 0 ? serializeDecisionLog(pairingResult.decisionLog) : null,
       }));
@@ -1127,15 +1302,16 @@ const TournamentMatches: React.FC = () => {
 
       // Create matches in database
       // Pairings are already sorted with byes at the end by generateSwissPairings
-      // Store decision log on the first match of the round
+      // Store decision log on the first match of the round.
+      // Byes are created as "ready" so the organiser can edit pairings before beginning the round.
       const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
         round_number: nextRoundNumber,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
-        status: pairing.player2Id === null ? MATCH_STATUS.BYE : MATCH_STATUS.READY,
-        result: pairing.player2Id === null ? "bye" : null,
-        winner_id: pairing.player2Id === null ? pairing.player1Id : null,
+        status: MATCH_STATUS.READY,
+        result: null,
+        winner_id: null,
         pairing_decision_log:
           index === 0 ? serializeDecisionLog(pairingResult.decisionLog) : null,
       }));
@@ -1576,8 +1752,8 @@ const TournamentMatches: React.FC = () => {
                     const allCompleted =
                       roundMatchesForState.length > 0 &&
                       roundMatchesForState.every((m) => {
-                        // Bye matches are always complete
-                        if (m.status === "bye" || !m.player2_id) return true;
+                        // Bye matches are complete once the round has begun (status transitions to "bye")
+                        if (m.status === "bye") return true;
                         // Check if match is completed in database
                         if (m.status === "completed") return true;
                         // Check if match has a pending result set
@@ -1747,7 +1923,8 @@ const TournamentMatches: React.FC = () => {
                         )}
                         {(showBeginRound ||
                           canShowNextRound ||
-                          canCompleteTournament) && (
+                          canCompleteTournament ||
+                          editingPairings) && (
                           <Box
                             sx={{
                               mb: 2,
@@ -1756,64 +1933,104 @@ const TournamentMatches: React.FC = () => {
                               gap: 1,
                             }}
                           >
-                            {showBeginRound && (
-                              <Button
-                                variant="contained"
-                                color="primary"
-                                startIcon={<PlayArrowIcon />}
-                                onClick={handleBeginRound}
-                                disabled={processingRound}
-                              >
-                                Begin Round
-                              </Button>
-                            )}
-                            {canShowNextRound && (
-                              <Tooltip
-                                title={
-                                  !nextRoundAlreadyExists &&
-                                  !canProceedToNextRound
-                                    ? "Complete all matches in this round to proceed to the next round"
-                                    : ""
-                                }
-                                arrow
-                              >
-                                <span>
+                            {editingPairings ? (
+                              <>
+                                <Button
+                                  variant="outlined"
+                                  onClick={handleCancelEditPairings}
+                                  disabled={savingPairings}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  variant="contained"
+                                  color="success"
+                                  disabled={!pairingEditsValid || savingPairings}
+                                  onClick={handleSavePairingEdits}
+                                >
+                                  Save Pairings
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                {showBeginRound && (
+                                  <>
+                                    <Button
+                                      variant="outlined"
+                                      startIcon={<EditIcon />}
+                                      onClick={handleEditPairings}
+                                    >
+                                      Edit Pairings
+                                    </Button>
+                                    <Button
+                                      variant="contained"
+                                      color="primary"
+                                      startIcon={<PlayArrowIcon />}
+                                      onClick={handleBeginRound}
+                                      disabled={processingRound}
+                                    >
+                                      Begin Round
+                                    </Button>
+                                  </>
+                                )}
+                                {canShowNextRound && (
+                                  <Tooltip
+                                    title={
+                                      !nextRoundAlreadyExists &&
+                                      !canProceedToNextRound
+                                        ? "Complete all matches in this round to proceed to the next round"
+                                        : ""
+                                    }
+                                    arrow
+                                  >
+                                    <span>
+                                      <Button
+                                        variant="contained"
+                                        color="primary"
+                                        startIcon={<ArrowForwardIcon />}
+                                        onClick={handleNextRound}
+                                        disabled={
+                                          processingRound ||
+                                          (!nextRoundAlreadyExists &&
+                                            !canProceedToNextRound)
+                                        }
+                                      >
+                                        {nextRoundAlreadyExists
+                                          ? "View Next Round"
+                                          : "Create Next Round"}
+                                      </Button>
+                                    </span>
+                                  </Tooltip>
+                                )}
+                                {canCompleteTournament && (
                                   <Button
                                     variant="contained"
-                                    color="primary"
-                                    startIcon={<ArrowForwardIcon />}
-                                    onClick={handleNextRound}
-                                    disabled={
-                                      processingRound ||
-                                      (!nextRoundAlreadyExists &&
-                                        !canProceedToNextRound)
-                                    }
+                                    color="success"
+                                    startIcon={<CheckCircleIcon />}
+                                    onClick={handleCompleteTournament}
+                                    disabled={processingRound}
+                                    sx={{
+                                      backgroundColor: "success.main",
+                                      "&:hover": {
+                                        backgroundColor: "success.dark",
+                                      },
+                                    }}
                                   >
-                                    {nextRoundAlreadyExists
-                                      ? "View Next Round"
-                                      : "Create Next Round"}
+                                    Complete Tournament
                                   </Button>
-                                </span>
-                              </Tooltip>
-                            )}
-                            {canCompleteTournament && (
-                              <Button
-                                variant="contained"
-                                color="success"
-                                startIcon={<CheckCircleIcon />}
-                                onClick={handleCompleteTournament}
-                                disabled={processingRound}
-                                sx={{
-                                  backgroundColor: "success.main",
-                                  "&:hover": {
-                                    backgroundColor: "success.dark",
-                                  },
-                                }}
-                              >
-                                Complete Tournament
-                              </Button>
+                                )}
+                              </>
                             )}
                           </Box>
+                        )}
+                        {editingPairings && (
+                          <Alert severity="info" sx={{ mb: 1 }}>
+                            Remove a player from their slot to add them to the
+                            pool, then assign them to an empty slot in another
+                            match.
+                            {availablePool.size > 0 &&
+                              ` Players in pool: ${[...availablePool.values()].join(", ")}`}
+                          </Alert>
                         )}
                         <TableContainer>
                           <Table>
@@ -1917,9 +2134,76 @@ const TournamentMatches: React.FC = () => {
                                     <TableCell>{matchNumber}</TableCell>
                                     <TableCell
                                       sx={{
-                                        backgroundColor: getPlayer1BgColor(),
+                                        backgroundColor:
+                                          editingPairings &&
+                                          (match.status === MATCH_STATUS.READY ||
+                                            match.status === MATCH_STATUS.BYE)
+                                            ? "transparent"
+                                            : getPlayer1BgColor(),
                                       }}
                                     >
+                                      {editingPairings &&
+                                      (match.status === MATCH_STATUS.READY ||
+                                        match.status === MATCH_STATUS.BYE) ? (
+                                        (() => {
+                                          const ep = editedPairings.get(
+                                            match.id,
+                                          );
+                                          const p1Id = ep?.player1Id ?? null;
+                                          const p1Name = p1Id
+                                            ? (roundPlayers.find(
+                                                (p) => p.id === p1Id,
+                                              )?.name ?? "Unknown")
+                                            : null;
+                                          return p1Id ? (
+                                            <Box
+                                              display="flex"
+                                              alignItems="center"
+                                              gap={0.5}
+                                            >
+                                              <Typography variant="body2">
+                                                {p1Name}
+                                              </Typography>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() =>
+                                                  removeFromSlot(
+                                                    match.id,
+                                                    "player1",
+                                                  )
+                                                }
+                                              >
+                                                <CloseIcon fontSize="small" />
+                                              </IconButton>
+                                            </Box>
+                                          ) : (
+                                            <Select
+                                              size="small"
+                                              displayEmpty
+                                              value=""
+                                              onChange={(e) =>
+                                                assignToSlot(
+                                                  match.id,
+                                                  "player1",
+                                                  e.target.value,
+                                                )
+                                              }
+                                              renderValue={() => (
+                                                <em>Select player…</em>
+                                              )}
+                                              sx={{ minWidth: 140 }}
+                                            >
+                                              {[
+                                                ...availablePool.entries(),
+                                              ].map(([id, name]) => (
+                                                <MenuItem key={id} value={id}>
+                                                  {name}
+                                                </MenuItem>
+                                              ))}
+                                            </Select>
+                                          );
+                                        })()
+                                      ) : (
                                       <Box
                                         display="flex"
                                         flexDirection="column"
@@ -2086,13 +2370,84 @@ const TournamentMatches: React.FC = () => {
                                           </Box>
                                         )}
                                       </Box>
+                                      )}
                                     </TableCell>
                                     <TableCell
                                       sx={{
-                                        backgroundColor: getPlayer2BgColor(),
+                                        backgroundColor:
+                                          editingPairings &&
+                                          (match.status === MATCH_STATUS.READY ||
+                                            match.status === MATCH_STATUS.BYE)
+                                            ? "transparent"
+                                            : getPlayer2BgColor(),
                                       }}
                                     >
-                                      {match.player2_name ? (
+                                      {editingPairings &&
+                                      (match.status === MATCH_STATUS.READY ||
+                                        match.status === MATCH_STATUS.BYE) ? (
+                                        (() => {
+                                          const ep = editedPairings.get(
+                                            match.id,
+                                          );
+                                          const p2Id = ep?.player2Id ?? null;
+                                          const p2Name = p2Id
+                                            ? (roundPlayers.find(
+                                                (p) => p.id === p2Id,
+                                              )?.name ?? "Unknown")
+                                            : null;
+                                          return p2Id ? (
+                                            <Box
+                                              display="flex"
+                                              alignItems="center"
+                                              gap={0.5}
+                                            >
+                                              <Typography variant="body2">
+                                                {p2Name}
+                                              </Typography>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() =>
+                                                  removeFromSlot(
+                                                    match.id,
+                                                    "player2",
+                                                  )
+                                                }
+                                              >
+                                                <CloseIcon fontSize="small" />
+                                              </IconButton>
+                                            </Box>
+                                          ) : (
+                                            <Select
+                                              size="small"
+                                              displayEmpty
+                                              value=""
+                                              onChange={(e) =>
+                                                assignToSlot(
+                                                  match.id,
+                                                  "player2",
+                                                  e.target.value,
+                                                )
+                                              }
+                                              renderValue={() => (
+                                                <em>
+                                                  {!match.player2_id
+                                                    ? "Bye — assign to pair"
+                                                    : "Select player…"}
+                                                </em>
+                                              )}
+                                              sx={{ minWidth: 160 }}
+                                            >
+                                              {[
+                                                ...availablePool.entries(),
+                                              ].map(([id, name]) => (
+                                                <MenuItem key={id} value={id}>
+                                                  {name}
+                                                </MenuItem>
+                                              ))}
+                                            </Select>
+                                          );
+                                        })()
+                                      ) : match.player2_name ? (
                                         <Box
                                           display="flex"
                                           flexDirection="column"
