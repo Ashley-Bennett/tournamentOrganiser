@@ -51,7 +51,9 @@ create table if not exists public.tournament_players (
   created_by uuid not null references auth.users (id) on delete cascade,
   created_at timestamptz not null default now(),
   dropped boolean not null default false,
-  dropped_at_round integer
+  dropped_at_round integer,
+  has_static_seating boolean not null default false,
+  static_seat_number integer
 );
 
 alter table public.tournament_players enable row level security;

@@ -32,6 +32,8 @@ import {
   Select,
   MenuItem,
   IconButton,
+  Switch,
+  TextField,
 } from "@mui/material";
 import PageLoading from "../components/PageLoading";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -41,6 +43,7 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import EditIcon from "@mui/icons-material/Edit";
 import CloseIcon from "@mui/icons-material/Close";
+import PushPinIcon from "@mui/icons-material/PushPin";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
 import {
@@ -50,13 +53,15 @@ import {
   type PairingDecisionLog,
 } from "../utils/tournamentPairing";
 import { sortByTieBreakers } from "../utils/tieBreaking";
-import { buildStandingsFromMatches } from "../utils/tournamentUtils";
+import { buildStandingsFromMatches, assignMatchNumbers } from "../utils/tournamentUtils";
 
 interface TournamentPlayer {
   id: string;
   name: string;
   dropped: boolean;
   dropped_at_round: number | null;
+  has_static_seating: boolean;
+  static_seat_number: number | null;
 }
 
 interface TournamentSummary {
@@ -73,6 +78,7 @@ interface Match {
   id: string;
   tournament_id: string;
   round_number: number;
+  match_number: number | null;
   player1_id: string;
   player2_id: string | null;
   winner_id: string | null;
@@ -145,6 +151,7 @@ const TournamentMatches: React.FC = () => {
   const [players, setPlayers] = useState<TournamentPlayer[]>([]);
   const [dropDialogOpen, setDropDialogOpen] = useState(false);
   const [togglingDrop, setTogglingDrop] = useState<string | null>(null);
+  const [savingSeat, setSavingSeat] = useState<string | null>(null);
   const didRestoreRef = useRef(false);
 
   const standingsByPlayerId = useMemo(() => {
@@ -411,7 +418,7 @@ const TournamentMatches: React.FC = () => {
         // Load all tournament players (with drop status) for the drop manager
         const { data: allPlayersData } = await supabase
           .from("tournament_players")
-          .select("id, name, dropped, dropped_at_round")
+          .select("id, name, dropped, dropped_at_round, has_static_seating, static_seat_number")
           .eq("tournament_id", tournament.id)
           .order("name");
         setPlayers((allPlayersData as TournamentPlayer[]) ?? []);
@@ -489,6 +496,15 @@ const TournamentMatches: React.FC = () => {
     const map = new Map<string, number | null>();
     for (const p of players) {
       if (p.dropped) map.set(p.id, p.dropped_at_round);
+    }
+    return map;
+  }, [players]);
+
+  // Map from player ID → static seating info (for match card pin indicator)
+  const playerStaticSeatMap = useMemo(() => {
+    const map = new Map<string, { hasStaticSeating: boolean; seatNumber: number | null }>();
+    for (const p of players) {
+      map.set(p.id, { hasStaticSeating: p.has_static_seating, seatNumber: p.static_seat_number });
     }
     return map;
   }, [players]);
@@ -868,7 +884,7 @@ const TournamentMatches: React.FC = () => {
 
     const { data: freshPlayers } = await supabase
       .from("tournament_players")
-      .select("id, name, dropped, dropped_at_round")
+      .select("id, name, dropped, dropped_at_round, has_static_seating, static_seat_number")
       .eq("tournament_id", tournament.id)
       .order("name");
     setPlayers((freshPlayers as TournamentPlayer[]) ?? []);
@@ -899,7 +915,7 @@ const TournamentMatches: React.FC = () => {
 
       const { data: fresh } = await supabase
         .from("tournament_players")
-        .select("id, name, dropped, dropped_at_round")
+        .select("id, name, dropped, dropped_at_round, has_static_seating, static_seat_number")
         .eq("tournament_id", tournament.id)
         .order("name");
       setPlayers((fresh as TournamentPlayer[]) ?? []);
@@ -909,6 +925,36 @@ const TournamentMatches: React.FC = () => {
       );
     } finally {
       setTogglingDrop(null);
+    }
+  };
+
+  const handleUpdateStaticSeat = async (
+    playerId: string,
+    hasStaticSeating: boolean,
+    seatNumber: number | null,
+  ) => {
+    if (!tournament) return;
+    setSavingSeat(playerId);
+    try {
+      const { error } = await supabase
+        .from("tournament_players")
+        .update({
+          has_static_seating: hasStaticSeating,
+          static_seat_number: hasStaticSeating ? seatNumber : null,
+        })
+        .eq("id", playerId);
+      if (error) throw new Error(error.message || "Failed to update seating");
+
+      const { data: fresh } = await supabase
+        .from("tournament_players")
+        .select("id, name, dropped, dropped_at_round, has_static_seating, static_seat_number")
+        .eq("tournament_id", tournament.id)
+        .order("name");
+      setPlayers((fresh as TournamentPlayer[]) ?? []);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to update seating");
+    } finally {
+      setSavingSeat(null);
     }
   };
 
@@ -1110,7 +1156,7 @@ const TournamentMatches: React.FC = () => {
       // Fetch all players for the tournament
       const { data: playersData, error: playersError } = await supabase
         .from("tournament_players")
-        .select("id, name")
+        .select("id, name, has_static_seating, static_seat_number")
         .eq("tournament_id", tournament.id)
         .order("created_at", { ascending: true });
 
@@ -1157,10 +1203,24 @@ const TournamentMatches: React.FC = () => {
       // Create new round 1 matches
       // Byes are created as "ready" so the organiser can edit pairings before beginning the round.
       // handleBeginRound will auto-complete them when the round starts.
+
+      // Build static seat map and assign table numbers
+      const staticSeatsR1 = new Map<string, number>();
+      playersData.forEach((p) => {
+        if (p.has_static_seating && p.static_seat_number != null) {
+          staticSeatsR1.set(p.id, p.static_seat_number);
+        }
+      });
+      const seatAssignmentsR1 = assignMatchNumbers(pairingResult.pairings, staticSeatsR1);
+      const seatWarningsR1 = seatAssignmentsR1.map((a) => a.warning).filter(Boolean) as string[];
+      if (seatWarningsR1.length > 0) {
+        setError(seatWarningsR1.join("\n"));
+      }
+
       const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
         round_number: 1,
-        match_number: index + 1,
+        match_number: seatAssignmentsR1[index].matchNumber,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
         status: MATCH_STATUS.READY,
@@ -1364,7 +1424,7 @@ const TournamentMatches: React.FC = () => {
       // standings correctly and exclude dropped players from the next round.
       const { data: playersData } = await supabase
         .from("tournament_players")
-        .select("id, name, dropped, dropped_at_round")
+        .select("id, name, dropped, dropped_at_round, has_static_seating, static_seat_number")
         .eq("tournament_id", tournament.id);
 
       const playersMap = new Map<string, string>();
@@ -1424,10 +1484,24 @@ const TournamentMatches: React.FC = () => {
       // Pairings are already sorted with byes at the end by generateSwissPairings
       // Store decision log on the first match of the round.
       // Byes are created as "ready" so the organiser can edit pairings before beginning the round.
+
+      // Build static seat map and assign table numbers
+      const staticSeats = new Map<string, number>();
+      playersData?.forEach((p) => {
+        if (p.has_static_seating && p.static_seat_number != null) {
+          staticSeats.set(p.id, p.static_seat_number);
+        }
+      });
+      const seatAssignments = assignMatchNumbers(pairingResult.pairings, staticSeats);
+      const seatWarnings = seatAssignments.map((a) => a.warning).filter(Boolean) as string[];
+      if (seatWarnings.length > 0) {
+        setError(seatWarnings.join("\n"));
+      }
+
       const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
         round_number: nextRoundNumber,
-        match_number: index + 1,
+        match_number: seatAssignments[index].matchNumber,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
         status: MATCH_STATUS.READY,
@@ -2450,9 +2524,27 @@ const TournamentMatches: React.FC = () => {
                                   return "transparent";
                                 };
 
+                                const p1Seat = playerStaticSeatMap.get(match.player1_id);
+                                const p2Seat = match.player2_id
+                                  ? playerStaticSeatMap.get(match.player2_id)
+                                  : undefined;
+                                const hasStaticSeating =
+                                  p1Seat?.hasStaticSeating || p2Seat?.hasStaticSeating;
+
                                 return (
                                   <TableRow key={match.id}>
-                                    <TableCell>{matchNumber}</TableCell>
+                                    <TableCell>
+                                      <Box display="flex" alignItems="center" gap={0.5}>
+                                        {matchNumber}
+                                        {hasStaticSeating && (
+                                          <Tooltip title="Static seating">
+                                            <PushPinIcon
+                                              sx={{ fontSize: 13, color: "text.secondary", opacity: 0.7 }}
+                                            />
+                                          </Tooltip>
+                                        )}
+                                      </Box>
+                                    </TableCell>
                                     <TableCell
                                       sx={{
                                         backgroundColor:
@@ -3158,27 +3250,25 @@ const TournamentMatches: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Drop management dialog */}
+      {/* Player management dialog (drops + static seating) */}
       <Dialog
         open={dropDialogOpen}
         onClose={() => setDropDialogOpen(false)}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Manage Player Drops</DialogTitle>
+        <DialogTitle>Manage Players</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Dropped players keep their current record but are excluded from
-            future round pairings.
+            Dropped players keep their record but are excluded from future pairings.
+            Static seating keeps a player at a fixed table each round.
           </Typography>
           {players.map((player, idx) => {
             const standing = finalStandingsById.get(player.id);
+            const isSaving = savingSeat === player.id;
             return (
               <Box
                 key={player.id}
-                display="flex"
-                alignItems="center"
-                justifyContent="space-between"
                 py={1.5}
                 sx={{
                   borderBottom:
@@ -3187,28 +3277,72 @@ const TournamentMatches: React.FC = () => {
                   opacity: player.dropped ? 0.65 : 1,
                 }}
               >
-                <Box>
-                  <Typography variant="body1">{player.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {player.dropped
-                      ? `Dropped after Round ${player.dropped_at_round}`
-                      : `${standing?.wins ?? 0}W – ${standing?.losses ?? 0}L – ${standing?.draws ?? 0}D · ${standing?.matchPoints ?? 0} pts`}
-                  </Typography>
+                {/* Top row: name + record + drop button */}
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Typography variant="body1">{player.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {player.dropped
+                        ? `Dropped after Round ${player.dropped_at_round}`
+                        : `${standing?.wins ?? 0}W – ${standing?.losses ?? 0}L – ${standing?.draws ?? 0}D · ${standing?.matchPoints ?? 0} pts`}
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color={player.dropped ? "success" : "error"}
+                    onClick={() => handleToggleDrop(player.id, player.dropped)}
+                    disabled={!!togglingDrop}
+                    sx={{ ml: 2, minWidth: 80 }}
+                  >
+                    {togglingDrop === player.id
+                      ? "…"
+                      : player.dropped
+                        ? "Restore"
+                        : "Drop"}
+                  </Button>
                 </Box>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color={player.dropped ? "success" : "error"}
-                  onClick={() => handleToggleDrop(player.id, player.dropped)}
-                  disabled={!!togglingDrop}
-                  sx={{ ml: 2, minWidth: 80 }}
-                >
-                  {togglingDrop === player.id
-                    ? "…"
-                    : player.dropped
-                      ? "Restore"
-                      : "Drop"}
-                </Button>
+                {/* Bottom row: static seating toggle + table number input */}
+                <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        size="small"
+                        checked={player.has_static_seating}
+                        disabled={isSaving}
+                        onChange={(e) =>
+                          handleUpdateStaticSeat(
+                            player.id,
+                            e.target.checked,
+                            player.static_seat_number,
+                          )
+                        }
+                      />
+                    }
+                    label={
+                      <Typography variant="caption">Static seating</Typography>
+                    }
+                    sx={{ mr: 0 }}
+                  />
+                  {player.has_static_seating && (
+                    <TextField
+                      size="small"
+                      label="Table #"
+                      type="number"
+                      disabled={isSaving}
+                      value={player.static_seat_number ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value === "" ? null : parseInt(e.target.value, 10);
+                        handleUpdateStaticSeat(player.id, true, val);
+                      }}
+                      inputProps={{ min: 1, style: { width: 60 } }}
+                      sx={{ width: 90 }}
+                    />
+                  )}
+                  {isSaving && (
+                    <Typography variant="caption" color="text.secondary">Saving…</Typography>
+                  )}
+                </Box>
               </Box>
             );
           })}

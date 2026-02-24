@@ -2,7 +2,7 @@
  * Tournament display and setup helpers.
  */
 
-import { calculateMatchPoints, type PlayerStanding } from "./tournamentPairing";
+import { calculateMatchPoints, type PlayerStanding, type Pairing } from "./tournamentPairing";
 
 /** Minimal match shape required by buildStandingsFromMatches */
 export interface MatchForStandings {
@@ -161,4 +161,68 @@ export function calculateSuggestedRounds(
   if (playerCount <= 128) return 7;
   if (playerCount <= 226) return 8;
   return 9;
+}
+
+export interface SeatAssignment {
+  matchNumber: number;
+  warning: string | null;
+}
+
+/**
+ * Assign match (table) numbers to a list of pairings, honouring static seat requests.
+ *
+ * - Players with a static seat number always play at that table.
+ * - When two statically-seated players face each other, the lower seat number wins.
+ * - Seat numbers apply to bye matches too.
+ * - Colliding static-seat claims (two separate matches both wanting the same number)
+ *   are resolved by deferring the later claim to the next free sequential number.
+ * - All remaining pairings receive sequential numbers, skipping reserved ones.
+ */
+export function assignMatchNumbers(
+  pairings: Pairing[],
+  staticSeats: Map<string, number>, // playerId → seatNumber
+): SeatAssignment[] {
+  const result: (SeatAssignment | null)[] = new Array(pairings.length).fill(null);
+  const taken = new Set<number>();
+  const deferred: number[] = [];
+
+  for (let i = 0; i < pairings.length; i++) {
+    const p = pairings[i];
+    const s1 = staticSeats.get(p.player1Id);
+    const s2 = p.player2Id ? staticSeats.get(p.player2Id) : undefined;
+
+    if (s1 !== undefined || s2 !== undefined) {
+      let target: number;
+      let warning: string | null = null;
+
+      if (s1 !== undefined && s2 !== undefined) {
+        // Both players have a static seat — lower number wins
+        target = Math.min(s1, s2);
+        warning = `Seat conflict: ${p.player1Name} (table ${s1}) vs ${p.player2Name} (table ${s2}) — using table ${target}`;
+      } else {
+        target = s1 ?? s2!;
+      }
+
+      if (taken.has(target)) {
+        // Another statically-seated pairing already claimed this number — defer
+        deferred.push(i);
+      } else {
+        taken.add(target);
+        result[i] = { matchNumber: target, warning };
+      }
+    } else {
+      deferred.push(i);
+    }
+  }
+
+  // Fill deferred pairings with the next available sequential numbers
+  let next = 1;
+  for (const i of deferred) {
+    while (taken.has(next)) next++;
+    taken.add(next);
+    result[i] = { matchNumber: next, warning: null };
+    next++;
+  }
+
+  return result as SeatAssignment[];
 }
