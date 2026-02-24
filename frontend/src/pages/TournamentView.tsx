@@ -261,9 +261,10 @@ const TournamentView: React.FC = () => {
         );
       }
 
-      const matchesToInsert = pairings.map((pairing) => ({
+      const matchesToInsert = pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
         round_number: 1,
+        match_number: index + 1,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
         status: pairing.player2Id === null ? "bye" : "ready",

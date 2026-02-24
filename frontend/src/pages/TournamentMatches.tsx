@@ -1160,6 +1160,7 @@ const TournamentMatches: React.FC = () => {
       const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
         round_number: 1,
+        match_number: index + 1,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
         status: MATCH_STATUS.READY,
@@ -1426,6 +1427,7 @@ const TournamentMatches: React.FC = () => {
       const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
         round_number: nextRoundNumber,
+        match_number: index + 1,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
         status: MATCH_STATUS.READY,
@@ -1980,11 +1982,44 @@ const TournamentMatches: React.FC = () => {
                       selectedRound === tournament.num_rounds;
                     const canCompleteTournament = isFinalRound && allCompletedInDB;
 
-                    // Map match id -> absolute match number (1-based, by DB order within round)
+                    // Build match number map: prefer stored match_number from DB (assigned at pairing
+                    // creation time so table numbers are stable across sessions). Fall back to
+                    // ranking-based computation for legacy matches that pre-date this column.
                     const matchNumberById = new Map<string, number>();
-                    baseMatches.forEach((m, i) =>
-                      matchNumberById.set(m.id, i + 1),
-                    );
+                    if (baseMatches.every((m) => m.match_number != null)) {
+                      // All matches have a stored number — use them directly
+                      baseMatches.forEach((m) =>
+                        matchNumberById.set(m.id, m.match_number!),
+                      );
+                    } else {
+                      // Legacy fallback: sort by ranking and assign 1-based index
+                      const rankedForNumbering = [...baseMatches].sort((a, b) => {
+                        const aIsBye = a.player2_id === null;
+                        const bIsBye = b.player2_id === null;
+                        if (aIsBye && !bIsBye) return 1;
+                        if (!aIsBye && bIsBye) return -1;
+                        if (aIsBye && bIsBye) {
+                          const aPts = standingsByPlayerId.get(a.player1_id)?.matchPoints ?? 0;
+                          const bPts = standingsByPlayerId.get(b.player1_id)?.matchPoints ?? 0;
+                          if (aPts !== bPts) return aPts - bPts;
+                          return a.player1_id.localeCompare(b.player1_id);
+                        }
+                        const a1 = standingsByPlayerId.get(a.player1_id)?.matchPoints ?? 0;
+                        const a2 = standingsByPlayerId.get(a.player2_id!)?.matchPoints ?? 0;
+                        const b1 = standingsByPlayerId.get(b.player1_id)?.matchPoints ?? 0;
+                        const b2 = standingsByPlayerId.get(b.player2_id!)?.matchPoints ?? 0;
+                        const aTop = Math.max(a1, a2);
+                        const bTop = Math.max(b1, b2);
+                        if (aTop !== bTop) return bTop - aTop;
+                        const aSum = a1 + a2;
+                        const bSum = b1 + b2;
+                        if (aSum !== bSum) return bSum - aSum;
+                        return `${a.player1_id}-${a.player2_id}`.localeCompare(`${b.player1_id}-${b.player2_id}`);
+                      });
+                      rankedForNumbering.forEach((m, i) =>
+                        matchNumberById.set(m.id, i + 1),
+                      );
+                    }
 
                     // Apply sort by Match # or Status
                     const roundMatches = [...baseMatches];
