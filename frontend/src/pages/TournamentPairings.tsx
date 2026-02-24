@@ -38,6 +38,7 @@ interface Match {
   result: string | null;
   temp_winner_id: string | null;
   temp_result: string | null;
+  pairings_published: boolean;
   status: "ready" | "pending" | "completed" | "bye";
 }
 
@@ -102,7 +103,7 @@ const TournamentPairings: React.FC = () => {
       const { data: mData, error: mErr } = await supabase
         .from("tournament_matches")
         .select(
-          "id, tournament_id, round_number, match_number, player1_id, player2_id, winner_id, result, temp_winner_id, temp_result, status",
+          "id, tournament_id, round_number, match_number, player1_id, player2_id, winner_id, result, temp_winner_id, temp_result, pairings_published, status",
         )
         .eq("tournament_id", id)
         .order("round_number", { ascending: true })
@@ -114,7 +115,7 @@ const TournamentPairings: React.FC = () => {
         return;
       }
 
-      const enriched: MatchWithPlayers[] = (mData ?? []).map((m) => ({
+      const allEnriched: MatchWithPlayers[] = (mData ?? []).map((m) => ({
         ...m,
         player1_name: playerMap.get(m.player1_id) ?? "Unknown",
         player2_name: m.player2_id
@@ -122,12 +123,17 @@ const TournamentPairings: React.FC = () => {
           : null,
       }));
 
+      // Only expose matches that have been published or are in progress/complete
+      const enriched = allEnriched.filter(
+        (m) => m.status !== "ready" || m.pairings_published,
+      );
+
       setMatches(enriched);
 
-      // Auto-select the current active round
+      // Auto-select the current active round (only from visible matches)
       if (enriched.length > 0) {
         const pendingRounds = enriched
-          .filter((m) => m.status === "pending" || m.status === "ready")
+          .filter((m) => m.status === "pending" || (m.status === "ready" && m.pairings_published))
           .map((m) => m.round_number);
         const allRounds = enriched.map((m) => m.round_number);
         const active =

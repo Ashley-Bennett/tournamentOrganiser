@@ -87,6 +87,7 @@ interface Match {
   result: string | null;
   temp_winner_id: string | null;
   temp_result: string | null;
+  pairings_published: boolean;
   status: "ready" | "pending" | "completed" | "bye";
   pairing_decision_log?: PairingDecisionLog | null;
   created_at: string;
@@ -1026,33 +1027,62 @@ const TournamentMatches: React.FC = () => {
           typeof selectedRound === "number" &&
           m.round_number === selectedRound,
       );
+
+      // Collect matches that have actually changed
+      const changedMatches: {
+        match: MatchWithPlayers;
+        edited: { player1Id: string; player2Id: string | null };
+      }[] = [];
       for (const match of currentRoundMatches) {
         const edited = editedPairings.get(match.id);
         if (!edited || edited.player1Id === null) continue;
         const p1Changed = edited.player1Id !== match.player1_id;
         const p2Changed = edited.player2Id !== match.player2_id;
-        // Also update matches that are still in legacy "bye" status so they
-        // get reset to "ready" and are re-processed by handleBeginRound.
         const isLegacyBye = match.status === MATCH_STATUS.BYE;
         if (!p1Changed && !p2Changed && !isLegacyBye) continue;
-
-        // Always save as "ready" — handleBeginRound will auto-complete byes when
-        // the round starts. This keeps pairings editable until Begin Round.
-        const { error: updateError } = await supabase
-          .from("tournament_matches")
-          .update({
-            player1_id: edited.player1Id,
-            player2_id: edited.player2Id,
-            status: MATCH_STATUS.READY,
-            result: null,
-            winner_id: null,
-          })
-          .eq("id", match.id);
-        if (updateError)
-          throw new Error(
-            updateError.message || "Failed to update pairing",
-          );
+        changedMatches.push({ match, edited });
       }
+
+      if (changedMatches.length > 0) {
+        // DELETE then re-INSERT changed matches to avoid the unique constraint
+        // on player1_id firing mid-loop when players are swapped between rows.
+        const idsToDelete = changedMatches.map(({ match }) => match.id);
+        const { error: deleteError } = await supabase
+          .from("tournament_matches")
+          .delete()
+          .in("id", idsToDelete);
+        if (deleteError)
+          throw new Error(deleteError.message || "Failed to update pairings");
+
+        const rowsToInsert = changedMatches.map(({ match, edited }) => ({
+          tournament_id: match.tournament_id,
+          round_number: match.round_number,
+          match_number: match.match_number,
+          player1_id: edited.player1Id,
+          player2_id: edited.player2Id,
+          status: MATCH_STATUS.READY,
+          result: null,
+          winner_id: null,
+          temp_winner_id: null,
+          temp_result: null,
+          pairings_published: false,
+          pairing_decision_log: match.pairing_decision_log ?? null,
+        }));
+        const { error: insertError } = await supabase
+          .from("tournament_matches")
+          .insert(rowsToInsert);
+        if (insertError)
+          throw new Error(insertError.message || "Failed to update pairings");
+      }
+
+      // Reset published state for any unchanged matches that were already published
+      await supabase
+        .from("tournament_matches")
+        .update({ pairings_published: false })
+        .eq("tournament_id", tournament.id)
+        .eq("round_number", selectedRound as number)
+        .eq("status", MATCH_STATUS.READY);
+
       await refreshMatches();
       setEditingPairings(false);
       setEditedPairings(new Map());
@@ -1112,6 +1142,27 @@ const TournamentMatches: React.FC = () => {
       await refreshMatches();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to begin round");
+    } finally {
+      setProcessingRound(false);
+    }
+  };
+
+  const handlePublishPairings = async () => {
+    if (!tournament || typeof selectedRound !== "number") return;
+    try {
+      setProcessingRound(true);
+      setError(null);
+      const { error: updateError } = await supabase
+        .from("tournament_matches")
+        .update({ pairings_published: true })
+        .eq("tournament_id", tournament.id)
+        .eq("round_number", selectedRound)
+        .eq("status", MATCH_STATUS.READY);
+      if (updateError)
+        throw new Error(updateError.message || "Failed to publish pairings");
+      await refreshMatches();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to publish pairings");
     } finally {
       setProcessingRound(false);
     }
@@ -2073,8 +2124,15 @@ const TournamentMatches: React.FC = () => {
                     // Only allow proceeding once results are in the DB (so Manage Drops sees current standings)
                     const canProceedToNextRound =
                       allCompletedInDB && canShowNextRound;
+                    const allPairingsPublished =
+                      hasReadyMatches &&
+                      roundMatchesForState
+                        .filter((m) => m.status === "ready")
+                        .every((m) => m.pairings_published);
+                    const showPrePublish =
+                      hasReadyMatches && !hasPendingMatches && !allPairingsPublished;
                     const showBeginRound =
-                      hasReadyMatches && !hasPendingMatches;
+                      hasReadyMatches && !hasPendingMatches && allPairingsPublished;
                     const nextRoundNumber =
                       typeof selectedRound === "number" ? selectedRound + 1 : 0;
                     const nextRoundAlreadyExists = matches.some(
@@ -2317,7 +2375,8 @@ const TournamentMatches: React.FC = () => {
                             )}
                           </Alert>
                         )}
-                        {(showBeginRound ||
+                        {(showPrePublish ||
+                          showBeginRound ||
                           (hasPendingMatches && !allCompletedInDB) ||
                           canProceedToNextRound ||
                           canCompleteTournament ||
@@ -2361,7 +2420,27 @@ const TournamentMatches: React.FC = () => {
                               </>
                             ) : (
                               <>
-                                {/* Phase 1: pairings ready, round not yet started */}
+                                {/* Phase 1a: pairings ready, not yet published */}
+                                {showPrePublish && (
+                                  <>
+                                    <Button
+                                      variant="outlined"
+                                      startIcon={<EditIcon />}
+                                      onClick={handleEditPairings}
+                                    >
+                                      Edit Pairings
+                                    </Button>
+                                    <Button
+                                      variant="contained"
+                                      color="primary"
+                                      onClick={handlePublishPairings}
+                                      disabled={processingRound}
+                                    >
+                                      Publish Pairings
+                                    </Button>
+                                  </>
+                                )}
+                                {/* Phase 1b: pairings published, round not yet started */}
                                 {showBeginRound && (
                                   <>
                                     <Button
@@ -2371,6 +2450,20 @@ const TournamentMatches: React.FC = () => {
                                     >
                                       Edit Pairings
                                     </Button>
+                                    {tournament.is_public && (
+                                      <Button
+                                        variant="outlined"
+                                        startIcon={<OpenInNewIcon />}
+                                        onClick={() =>
+                                          window.open(
+                                            `/tournaments/${tournament.id}/pairings`,
+                                            "_blank",
+                                          )
+                                        }
+                                      >
+                                        View Pairings
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="contained"
                                       color="primary"
