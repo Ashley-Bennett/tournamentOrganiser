@@ -53,7 +53,7 @@ import {
   type PairingDecisionLog,
 } from "../utils/tournamentPairing";
 import { sortByTieBreakers } from "../utils/tieBreaking";
-import { buildStandingsFromMatches, assignMatchNumbers } from "../utils/tournamentUtils";
+import { buildStandingsFromMatches, assignMatchNumbers, type SeatConflict } from "../utils/tournamentUtils";
 
 interface TournamentPlayer {
   id: string;
@@ -124,6 +124,7 @@ const TournamentMatches: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [seatWarnings, setSeatWarnings] = useState<string[]>([]);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [sortBy, setSortBy] = useState<"match" | "status" | "record">("record");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -1152,6 +1153,7 @@ const TournamentMatches: React.FC = () => {
     try {
       setProcessingRound(true);
       setError(null);
+      setSeatWarnings([]);
 
       // Fetch all players for the tournament
       const { data: playersData, error: playersError } = await supabase
@@ -1213,8 +1215,11 @@ const TournamentMatches: React.FC = () => {
       });
       const seatAssignmentsR1 = assignMatchNumbers(pairingResult.pairings, staticSeatsR1);
       const seatWarningsR1 = seatAssignmentsR1.map((a) => a.warning).filter(Boolean) as string[];
-      if (seatWarningsR1.length > 0) {
-        setError(seatWarningsR1.join("\n"));
+      setSeatWarnings(seatWarningsR1);
+
+      const seatConflictsR1 = seatAssignmentsR1.map((a) => a.conflict).filter(Boolean) as SeatConflict[];
+      if (seatConflictsR1.length > 0 && pairingResult.decisionLog) {
+        pairingResult.decisionLog.seatConflicts = seatConflictsR1;
       }
 
       const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
@@ -1337,6 +1342,7 @@ const TournamentMatches: React.FC = () => {
     try {
       setProcessingRound(true);
       setError(null);
+      setSeatWarnings([]);
 
       // Save all pending results before generating next round
       await savePendingResults();
@@ -1493,9 +1499,12 @@ const TournamentMatches: React.FC = () => {
         }
       });
       const seatAssignments = assignMatchNumbers(pairingResult.pairings, staticSeats);
-      const seatWarnings = seatAssignments.map((a) => a.warning).filter(Boolean) as string[];
-      if (seatWarnings.length > 0) {
-        setError(seatWarnings.join("\n"));
+      const seatWarningsNext = seatAssignments.map((a) => a.warning).filter(Boolean) as string[];
+      setSeatWarnings(seatWarningsNext);
+
+      const seatConflictsNext = seatAssignments.map((a) => a.conflict).filter(Boolean) as SeatConflict[];
+      if (seatConflictsNext.length > 0 && pairingResult.decisionLog) {
+        pairingResult.decisionLog.seatConflicts = seatConflictsNext;
       }
 
       const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
@@ -1665,6 +1674,13 @@ const TournamentMatches: React.FC = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
+        </Alert>
+      )}
+      {seatWarnings.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setSeatWarnings([])}>
+          {seatWarnings.length === 1
+            ? seatWarnings[0]
+            : seatWarnings.map((w, i) => <div key={i}>{w}</div>)}
         </Alert>
       )}
 
@@ -2236,6 +2252,38 @@ const TournamentMatches: React.FC = () => {
                                             {detail.playerPoints} pts):
                                           </strong>{" "}
                                           {detail.reason}
+                                        </Typography>
+                                      </li>
+                                    ))}
+                                  </Box>
+                                </Box>
+                              )}
+                            {decisionLog.seatConflicts &&
+                              decisionLog.seatConflicts.length > 0 && (
+                                <Box sx={{ mb: 1 }}>
+                                  <Typography
+                                    variant="body2"
+                                    component="span"
+                                    sx={{ fontWeight: "bold" }}
+                                  >
+                                    Seat conflicts:
+                                  </Typography>
+                                  <Box
+                                    component="ul"
+                                    sx={{ mt: 0.5, mb: 0, pl: 2 }}
+                                  >
+                                    {decisionLog.seatConflicts.map((sc, i) => (
+                                      <li key={i}>
+                                        <Typography
+                                          variant="body2"
+                                          component="span"
+                                        >
+                                          <strong>{sc.movedPlayerName}</strong>{" "}
+                                          moved from table {sc.movedPlayerOriginalSeat} to table{" "}
+                                          {sc.resolvedSeat} — paired against{" "}
+                                          <strong>{sc.opponentName}</strong> who
+                                          has static seating at table{" "}
+                                          {sc.opponentSeat} (lower seat wins)
                                         </Typography>
                                       </li>
                                     ))}

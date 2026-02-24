@@ -60,6 +60,13 @@ export interface PairingDecisionLog {
     playerPoints: number;
     reason: string;
   }>;
+  seatConflicts?: Array<{
+    movedPlayerName: string;
+    movedPlayerOriginalSeat: number;
+    opponentName: string;
+    opponentSeat: number;
+    resolvedSeat: number;
+  }>;
 }
 
 /**

@@ -163,9 +163,18 @@ export function calculateSuggestedRounds(
   return 9;
 }
 
+export interface SeatConflict {
+  movedPlayerName: string;
+  movedPlayerOriginalSeat: number;
+  opponentName: string;
+  opponentSeat: number;
+  resolvedSeat: number;
+}
+
 export interface SeatAssignment {
   matchNumber: number;
   warning: string | null;
+  conflict?: SeatConflict;
 }
 
 /**
@@ -195,10 +204,20 @@ export function assignMatchNumbers(
       let target: number;
       let warning: string | null = null;
 
+      let conflict: SeatConflict | undefined;
       if (s1 !== undefined && s2 !== undefined) {
         // Both players have a static seat — lower number wins
         target = Math.min(s1, s2);
         warning = `Seat conflict: ${p.player1Name} (table ${s1}) vs ${p.player2Name} (table ${s2}) — using table ${target}`;
+        // The player with the higher seat number is the one who gets moved
+        const movedIsP1 = s1 > s2;
+        conflict = {
+          movedPlayerName: movedIsP1 ? p.player1Name : p.player2Name ?? "",
+          movedPlayerOriginalSeat: movedIsP1 ? s1 : s2,
+          opponentName: movedIsP1 ? p.player2Name ?? "" : p.player1Name,
+          opponentSeat: movedIsP1 ? s2 : s1,
+          resolvedSeat: target,
+        };
       } else {
         target = s1 ?? s2!;
       }
@@ -208,7 +227,7 @@ export function assignMatchNumbers(
         deferred.push(i);
       } else {
         taken.add(target);
-        result[i] = { matchNumber: target, warning };
+        result[i] = { matchNumber: target, warning, conflict };
       }
     } else {
       deferred.push(i);
