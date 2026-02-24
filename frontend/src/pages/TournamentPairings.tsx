@@ -18,6 +18,8 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { supabase } from "../supabaseClient";
+import { sortByTieBreakers } from "../utils/tieBreaking";
+import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 
 interface Tournament {
   id: string;
@@ -25,6 +27,12 @@ interface Tournament {
   status: string;
   num_rounds: number | null;
   is_public: boolean;
+}
+
+interface Player {
+  id: string;
+  name: string;
+  dropped: boolean;
 }
 
 interface Match {
@@ -50,10 +58,11 @@ interface MatchWithPlayers extends Match {
 const TournamentPairings: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<MatchWithPlayers[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRound, setSelectedRound] = useState<number>(1);
+  const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
 
   useEffect(() => {
     if (!id) {
@@ -86,10 +95,10 @@ const TournamentPairings: React.FC = () => {
 
       setTournament(tData);
 
-      // Fetch players (needed to resolve names)
+      // Fetch players
       const { data: pData, error: pErr } = await supabase
         .from("tournament_players")
-        .select("id, name")
+        .select("id, name, dropped")
         .eq("tournament_id", id);
 
       if (pErr) {
@@ -97,7 +106,9 @@ const TournamentPairings: React.FC = () => {
         setLoading(false);
         return;
       }
-      const playerMap = new Map((pData ?? []).map((p) => [p.id, p.name]));
+      const playerList = pData ?? [];
+      setPlayers(playerList);
+      const playerMap = new Map(playerList.map((p) => [p.id, p.name]));
 
       // Fetch all matches
       const { data: mData, error: mErr } = await supabase
@@ -130,8 +141,10 @@ const TournamentPairings: React.FC = () => {
 
       setMatches(enriched);
 
-      // Auto-select the current active round (only from visible matches)
-      if (enriched.length > 0) {
+      // Auto-select: standings tab for completed tournaments, otherwise current active round
+      if (tData.status === "completed") {
+        setSelectedRound("standings");
+      } else if (enriched.length > 0) {
         const pendingRounds = enriched
           .filter((m) => m.status === "pending" || (m.status === "ready" && m.pairings_published))
           .map((m) => m.round_number);
@@ -163,11 +176,24 @@ const TournamentPairings: React.FC = () => {
 
   const roundMatches = useMemo(
     () =>
-      matches
-        .filter((m) => m.round_number === selectedRound)
-        .sort((a, b) => (a.match_number ?? 0) - (b.match_number ?? 0)),
+      typeof selectedRound === "number"
+        ? matches
+            .filter((m) => m.round_number === selectedRound)
+            .sort((a, b) => (a.match_number ?? 0) - (b.match_number ?? 0))
+        : [],
     [matches, selectedRound],
   );
+
+  const standings = useMemo(() => {
+    const completed = matches.filter(
+      (m) => m.status === "completed" || m.status === "bye",
+    );
+    const raw = buildStandingsFromMatches(
+      completed,
+      players.map((p) => ({ id: p.id, name: p.name })),
+    );
+    return sortByTieBreakers(raw);
+  }, [matches, players]);
 
   if (loading) {
     return (
@@ -196,32 +222,39 @@ const TournamentPairings: React.FC = () => {
   const isPreRound =
     roundMatches.length > 0 && roundMatches.every((m) => m.status === "ready");
 
+  const isStandings = selectedRound === "standings";
+
   const header = (
     <Box mb={isPreRound ? 2 : 1.5} textAlign="center">
       <Typography variant={isPreRound ? "h4" : "h5"} fontWeight={700}>
         {tournament.name}
       </Typography>
-      <Typography variant="body1" color="text.secondary">
-        {tournament.num_rounds
-          ? `Round ${selectedRound} of ${tournament.num_rounds}`
-          : `Round ${selectedRound}`}
-        {!isPreRound &&
-          totalMatchCount > 0 &&
-          ` · ${completedMatchCount}/${totalMatchCount} complete`}
-      </Typography>
+      {!isStandings && (
+        <Typography variant="body1" color="text.secondary">
+          {tournament.num_rounds
+            ? `Round ${selectedRound} of ${tournament.num_rounds}`
+            : `Round ${selectedRound}`}
+          {!isPreRound &&
+            totalMatchCount > 0 &&
+            ` · ${completedMatchCount}/${totalMatchCount} complete`}
+        </Typography>
+      )}
     </Box>
   );
 
-  const roundTabs = rounds.length > 1 && (
+  const roundTabs = (rounds.length > 1 || tournament.status === "completed") && (
     <Tabs
       value={selectedRound}
-      onChange={(_e, v: number) => setSelectedRound(v)}
+      onChange={(_e, v: number | "standings") => setSelectedRound(v)}
       centered
       sx={{ mb: isPreRound ? 2.5 : 1.5 }}
     >
       {rounds.map((r) => (
         <Tab key={r} label={`Round ${r}`} value={r} />
       ))}
+      {tournament.status === "completed" && (
+        <Tab label="Standings" value="standings" />
+      )}
     </Tabs>
   );
 
@@ -232,6 +265,77 @@ const TournamentPairings: React.FC = () => {
       </Typography>
     </Box>
   );
+
+  // ── FINAL STANDINGS ─────────────────────────────────────────────────────────
+  if (isStandings) {
+    return (
+      <Box>
+        {header}
+        {roundTabs}
+        <Paper variant="outlined">
+          <Box px={2} py={1}>
+            <Typography variant="subtitle2" fontWeight={600}>
+              Final Standings
+            </Typography>
+          </Box>
+          <Divider />
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ width: 32, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>#</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>Player</TableCell>
+                  <TableCell sx={{ width: 60, textAlign: "right", fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>Record</TableCell>
+                  <TableCell sx={{ width: 44, textAlign: "right", fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>Pts</TableCell>
+                  <TableCell sx={{ width: 60, textAlign: "right", fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>OMW%</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {standings.map((s, i) => {
+                  const dropped = players.find((p) => p.id === s.id)?.dropped;
+                  const omw = Math.round(s.opponentMatchWinPercentage * 100);
+                  return (
+                    <TableRow key={s.id} hover sx={{ opacity: dropped ? 0.5 : 1 }}>
+                      <TableCell sx={{ color: "text.secondary", fontSize: "0.85rem", fontWeight: i < 3 ? 700 : 400 }}>
+                        {i + 1}
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          fontSize: "0.9rem",
+                          fontWeight: i < 3 ? 600 : 400,
+                          maxWidth: 0,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {s.name}
+                        {dropped && (
+                          <Typography component="span" variant="caption" color="text.disabled" sx={{ ml: 0.5 }}>
+                            (dropped)
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ textAlign: "right", color: "text.secondary", fontSize: "0.85rem" }}>
+                        {s.wins}-{s.losses}-{s.draws}
+                      </TableCell>
+                      <TableCell sx={{ textAlign: "right", fontWeight: 700, fontSize: "0.9rem" }}>
+                        {s.matchPoints}
+                      </TableCell>
+                      <TableCell sx={{ textAlign: "right", color: "text.secondary", fontSize: "0.85rem" }}>
+                        {omw}%
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+        {footer}
+      </Box>
+    );
+  }
 
   // ── PRE-ROUND: large card grid ──────────────────────────────────────────────
   if (isPreRound) {
