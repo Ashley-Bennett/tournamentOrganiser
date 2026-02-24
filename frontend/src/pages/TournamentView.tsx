@@ -27,10 +27,8 @@ import {
   TableRow,
 } from "@mui/material";
 import SeatIcon from "@mui/icons-material/EventSeat";
-import LockIcon from "@mui/icons-material/Lock";
 import { PlayArrow as PlayArrowIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import PushPinIcon from "@mui/icons-material/PushPin";
 import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
