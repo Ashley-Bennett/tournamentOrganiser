@@ -60,9 +60,9 @@ const Players: React.FC = () => {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  const fetchPlayers = useCallback(async () => {
+  const fetchPlayers = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const response = await apiCall("/api/players");
       if (response.ok) {
         const data = await response.json();
@@ -100,7 +100,7 @@ const Players: React.FC = () => {
         await response.json();
         setOpenDialog(false);
         setFormData({ name: "", static_seating: false });
-        fetchPlayers(); // Refresh the list
+        fetchPlayers(false); // Refresh without full-page loading
       } else {
         if (handleUnauthorized(response)) return;
         await handleApiError(response);
@@ -174,7 +174,7 @@ const Players: React.FC = () => {
           trainer_id: "",
           birth_year: "",
         });
-        fetchPlayers();
+        fetchPlayers(false);
         setSuccess("Player updated successfully.");
       } else {
         if (handleUnauthorized(response)) return;
