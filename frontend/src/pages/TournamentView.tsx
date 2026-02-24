@@ -19,7 +19,15 @@ import {
   DialogActions,
   Switch,
   Tooltip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from "@mui/material";
+import SeatIcon from "@mui/icons-material/EventSeat";
+import LockIcon from "@mui/icons-material/Lock";
 import { PlayArrow as PlayArrowIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PushPinIcon from "@mui/icons-material/PushPin";
@@ -61,7 +69,9 @@ const TournamentView: React.FC = () => {
   const [bulkNames, setBulkNames] = useState("");
   const [addingBulk, setAddingBulk] = useState(false);
   const [deletingPlayerId, setDeletingPlayerId] = useState<string | null>(null);
-  const [confirmDeletePlayerId, setConfirmDeletePlayerId] = useState<string | null>(null);
+  const [confirmDeletePlayerId, setConfirmDeletePlayerId] = useState<
+    string | null
+  >(null);
   const [startingTournament, setStartingTournament] = useState(false);
   const [numRounds, setNumRounds] = useState<number | null>(null);
   const [useSuggestedRounds, setUseSuggestedRounds] = useState(true);
@@ -255,7 +265,9 @@ const TournamentView: React.FC = () => {
         ),
       );
     } catch (e: unknown) {
-      setPlayersError(e instanceof Error ? e.message : "Failed to update seating");
+      setPlayersError(
+        e instanceof Error ? e.message : "Failed to update seating",
+      );
     } finally {
       setSavingSeat(null);
     }
@@ -649,110 +661,109 @@ const TournamentView: React.FC = () => {
             No players added yet. Add your first player above.
           </Typography>
         ) : (
-          <Box display="flex" flexDirection="column" gap={1}>
-            {players.map((player) => {
-              const isSavingSeat = savingSeat === player.id;
-              return (
-                <Box
-                  key={player.id}
-                  py={0.5}
-                  borderBottom="1px solid"
-                  borderColor="divider"
-                >
-                  {/* Top row: name + pin chip + date + delete */}
-                  <Box
-                    display="flex"
-                    justifyContent="space-between"
-                    alignItems="center"
-                  >
-                    <Box display="flex" alignItems="center" gap={0.75}>
-                      <Typography variant="body2">{player.name}</Typography>
-                      {player.has_static_seating && (
-                        <Tooltip
-                          title={
-                            player.static_seat_number != null
-                              ? `Static seat: table ${player.static_seat_number}`
-                              : "Static seating"
-                          }
-                        >
-                          <Box display="flex" alignItems="center" gap={0.25}>
-                            <PushPinIcon sx={{ fontSize: 13, color: "text.secondary" }} />
-                            {player.static_seat_number != null && (
-                              <Typography variant="caption" color="text.secondary">
-                                T{player.static_seat_number}
-                              </Typography>
-                            )}
-                          </Box>
-                        </Tooltip>
-                      )}
-                    </Box>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <Typography variant="caption" color="text.secondary">
-                        Joined {formatDateTime(player.created_at)}
-                      </Typography>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Joined</TableCell>
+                  <TableCell>Static Seating</TableCell>
+                  {tournament.status === "draft" && (
+                    <TableCell align="right">Remove</TableCell>
+                  )}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {players.map((player) => {
+                  const isSavingSeat = savingSeat === player.id;
+                  return (
+                    <TableRow key={player.id}>
+                      <TableCell>
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          {player.name}
+                          {player.has_static_seating && (
+                            <Tooltip
+                              title={
+                                player.static_seat_number != null
+                                  ? `Fixed at table ${player.static_seat_number}`
+                                  : "Static seating (no table number)"
+                              }
+                            >
+                              <SeatIcon />
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" color="text.secondary">
+                          {formatDateTime(player.created_at)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Switch
+                            size="small"
+                            checked={player.has_static_seating ?? false}
+                            disabled={isSavingSeat}
+                            onChange={(e) =>
+                              void handleUpdateStaticSeat(
+                                player.id,
+                                e.target.checked,
+                                player.static_seat_number ?? null,
+                              )
+                            }
+                          />
+                          {player.has_static_seating && (
+                            <TextField
+                              size="small"
+                              placeholder="Table #"
+                              type="number"
+                              disabled={isSavingSeat}
+                              value={player.static_seat_number ?? ""}
+                              onChange={(e) => {
+                                const val =
+                                  e.target.value === ""
+                                    ? null
+                                    : parseInt(e.target.value, 10);
+                                void handleUpdateStaticSeat(
+                                  player.id,
+                                  true,
+                                  val,
+                                );
+                              }}
+                              inputProps={{ min: 1 }}
+                              sx={{ width: 90 }}
+                            />
+                          )}
+                          {isSavingSeat && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Saving…
+                            </Typography>
+                          )}
+                        </Box>
+                      </TableCell>
                       {tournament.status === "draft" && (
-                        <IconButton
-                          size="small"
-                          color="error"
-                          aria-label="Remove player"
-                          onClick={() => handleDeletePlayer(player.id)}
-                          disabled={deletingPlayerId === player.id}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        <TableCell align="right">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            aria-label="Remove player"
+                            onClick={() => handleDeletePlayer(player.id)}
+                            disabled={deletingPlayerId === player.id}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
                       )}
-                    </Box>
-                  </Box>
-                  {/* Bottom row: static seating controls */}
-                  <Box display="flex" alignItems="center" gap={1} mt={0.25}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          size="small"
-                          checked={player.has_static_seating ?? false}
-                          disabled={isSavingSeat}
-                          onChange={(e) =>
-                            void handleUpdateStaticSeat(
-                              player.id,
-                              e.target.checked,
-                              player.static_seat_number ?? null,
-                            )
-                          }
-                        />
-                      }
-                      label={
-                        <Typography variant="caption">Static seating</Typography>
-                      }
-                      sx={{ mr: 0 }}
-                    />
-                    {player.has_static_seating && (
-                      <TextField
-                        size="small"
-                        label="Table #"
-                        type="number"
-                        disabled={isSavingSeat}
-                        value={player.static_seat_number ?? ""}
-                        onChange={(e) => {
-                          const val =
-                            e.target.value === ""
-                              ? null
-                              : parseInt(e.target.value, 10);
-                          void handleUpdateStaticSeat(player.id, true, val);
-                        }}
-                        inputProps={{ min: 1, style: { width: 60 } }}
-                        sx={{ width: 90 }}
-                      />
-                    )}
-                    {isSavingSeat && (
-                      <Typography variant="caption" color="text.secondary">
-                        Saving…
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
-              );
-            })}
-          </Box>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
         )}
       </Paper>
 
@@ -764,7 +775,9 @@ const TournamentView: React.FC = () => {
         <DialogContent>
           <DialogContentText>
             {(() => {
-              const player = players.find((p) => p.id === confirmDeletePlayerId);
+              const player = players.find(
+                (p) => p.id === confirmDeletePlayerId,
+              );
               return player
                 ? `Remove "${player.name}" from the tournament? This cannot be undone.`
                 : "Remove this player from the tournament? This cannot be undone.";
@@ -773,7 +786,10 @@ const TournamentView: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDeletePlayerId(null)}>Cancel</Button>
-          <Button color="error" onClick={() => void handleConfirmDeletePlayer()}>
+          <Button
+            color="error"
+            onClick={() => void handleConfirmDeletePlayer()}
+          >
             Remove
           </Button>
         </DialogActions>
