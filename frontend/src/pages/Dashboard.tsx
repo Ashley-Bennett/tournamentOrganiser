@@ -34,12 +34,10 @@ const Dashboard: React.FC = () => {
     completedTournaments: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const fetchDashboardStats = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
 
       // Fetch tournaments
       const tournamentsResponse = await apiCall("/api/tournaments");
@@ -75,11 +73,6 @@ const Dashboard: React.FC = () => {
         completedTournaments,
       });
     } catch (error: unknown) {
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to load dashboard statistics",
-      );
       console.error("Error fetching dashboard stats:", error);
     } finally {
       setLoading(false);
@@ -99,13 +92,6 @@ const Dashboard: React.FC = () => {
       <Typography variant="h4" component="h1" gutterBottom>
         Dashboard
       </Typography>
-
-      {error && (
-        <Box sx={{ mb: 3 }}>
-          <Typography color="error">{error}</Typography>
-        </Box>
-      )}
-
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
           <Card>
