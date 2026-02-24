@@ -1638,17 +1638,28 @@ const TournamentMatches: React.FC = () => {
 
   return (
     <Box>
-      <Box display="flex" alignItems="center" mb={3}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(`/tournaments/${tournament.id}`)}
-          sx={{ mr: 2 }}
-        >
-          Back to tournament
-        </Button>
-        <Typography variant="h4" component="h1">
-          {tournament.name} - Matches
-        </Typography>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+        <Box display="flex" alignItems="center">
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate(`/tournaments/${tournament.id}`)}
+            sx={{ mr: 2 }}
+          >
+            Back to tournament
+          </Button>
+          <Typography variant="h4" component="h1">
+            {tournament.name} - Matches
+          </Typography>
+        </Box>
+        {tournament.status === "active" && (
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => setDropDialogOpen(true)}
+          >
+            Manage Players
+          </Button>
+        )}
       </Box>
 
       {error && (
@@ -2354,7 +2365,7 @@ const TournamentMatches: React.FC = () => {
                                     color="warning"
                                     onClick={() => setDropDialogOpen(true)}
                                   >
-                                    Manage Drops
+                                    Manage Players
                                   </Button>
                                 )}
                                 {canShowNextRound &&
