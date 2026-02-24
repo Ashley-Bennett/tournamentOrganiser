@@ -2450,8 +2450,7 @@ const TournamentMatches: React.FC = () => {
                                     >
                                       Edit Pairings
                                     </Button>
-                                    {tournament.is_public && (
-                                      <Button
+                                    <Button
                                         variant="outlined"
                                         startIcon={<OpenInNewIcon />}
                                         onClick={() =>
@@ -2463,7 +2462,6 @@ const TournamentMatches: React.FC = () => {
                                       >
                                         View Pairings
                                       </Button>
-                                    )}
                                     <Button
                                       variant="contained"
                                       color="primary"
@@ -2478,8 +2476,7 @@ const TournamentMatches: React.FC = () => {
                                 {/* Phase 2: round active — greyed until all results entered */}
                                 {hasPendingMatches && !allCompletedInDB && (
                                   <>
-                                    {tournament.is_public && (
-                                      <Button
+                                    <Button
                                         variant="outlined"
                                         startIcon={<OpenInNewIcon />}
                                         onClick={() =>
@@ -2491,7 +2488,6 @@ const TournamentMatches: React.FC = () => {
                                       >
                                         View Pairings
                                       </Button>
-                                    )}
                                     <Tooltip
                                       title={
                                         !allResultsEntered

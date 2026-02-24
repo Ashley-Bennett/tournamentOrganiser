@@ -81,14 +81,8 @@ const TournamentPairings: React.FC = () => {
 
       if (tErr || !tData) {
         setError(
-          "This tournament is not available. It may be private or may not exist.",
+          "This tournament is not available. It may be private or you may need to log in.",
         );
-        setLoading(false);
-        return;
-      }
-
-      if (!tData.is_public) {
-        setError("This tournament is private.");
         setLoading(false);
         return;
       }
