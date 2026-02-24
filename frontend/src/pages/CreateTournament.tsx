@@ -13,6 +13,8 @@ import {
   MenuItem,
   Alert,
   Tooltip,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material/Select";
 import {
@@ -30,6 +32,7 @@ const CreateTournament: React.FC = () => {
   const [formData, setFormData] = useState({
     name: "",
     tournament_type: "swiss",
+    is_public: false,
   });
 
   const handleChange =
@@ -67,6 +70,7 @@ const CreateTournament: React.FC = () => {
           created_by: user.id,
           status: "draft",
           tournament_type: formData.tournament_type,
+          is_public: formData.is_public,
         })
         .select("id")
         .single();
@@ -145,6 +149,28 @@ const CreateTournament: React.FC = () => {
                   <MenuItem value="swiss">Swiss</MenuItem>
                 </Select>
               </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.is_public}
+                    onChange={(e) =>
+                      setFormData({ ...formData, is_public: e.target.checked })
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body1">Public tournament</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Allows anyone with the link to view pairings and standings
+                      without logging in
+                    </Typography>
+                  </Box>
+                }
+              />
             </Grid>
 
             <Grid item xs={12}>

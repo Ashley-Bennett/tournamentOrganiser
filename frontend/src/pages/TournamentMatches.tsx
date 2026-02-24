@@ -44,6 +44,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import EditIcon from "@mui/icons-material/Edit";
 import CloseIcon from "@mui/icons-material/Close";
 import PushPinIcon from "@mui/icons-material/PushPin";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
 import {
@@ -72,6 +73,7 @@ interface TournamentSummary {
   num_rounds: number | null;
   created_at: string;
   created_by: string;
+  is_public: boolean;
 }
 
 interface Match {
@@ -297,7 +299,7 @@ const TournamentMatches: React.FC = () => {
         const { data, error } = await supabase
           .from("tournaments")
           .select(
-            "id, name, status, tournament_type, num_rounds, created_at, created_by",
+            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public",
           )
           .eq("id", id)
           .eq("created_by", user.id)
@@ -2382,27 +2384,43 @@ const TournamentMatches: React.FC = () => {
                                 )}
                                 {/* Phase 2: round active — greyed until all results entered */}
                                 {hasPendingMatches && !allCompletedInDB && (
-                                  <Tooltip
-                                    title={
-                                      !allResultsEntered
-                                        ? "Enter all match results to submit"
-                                        : ""
-                                    }
-                                    arrow
-                                  >
-                                    <span>
+                                  <>
+                                    {tournament.is_public && (
                                       <Button
-                                        variant="contained"
-                                        color="success"
-                                        disabled={!allResultsEntered || updatingMatch}
-                                        onClick={() => void savePendingResults()}
+                                        variant="outlined"
+                                        startIcon={<OpenInNewIcon />}
+                                        onClick={() =>
+                                          window.open(
+                                            `/tournaments/${tournament.id}/pairings`,
+                                            "_blank",
+                                          )
+                                        }
                                       >
-                                        {updatingMatch
-                                          ? "Saving…"
-                                          : `Submit Results (${currentRoundPendingCount})`}
+                                        View Pairings
                                       </Button>
-                                    </span>
-                                  </Tooltip>
+                                    )}
+                                    <Tooltip
+                                      title={
+                                        !allResultsEntered
+                                          ? "Enter all match results to submit"
+                                          : ""
+                                      }
+                                      arrow
+                                    >
+                                      <span>
+                                        <Button
+                                          variant="contained"
+                                          color="success"
+                                          disabled={!allResultsEntered || updatingMatch}
+                                          onClick={() => void savePendingResults()}
+                                        >
+                                          {updatingMatch
+                                            ? "Saving…"
+                                            : `Submit Results (${currentRoundPendingCount})`}
+                                        </Button>
+                                      </span>
+                                    </Tooltip>
+                                  </>
                                 )}
                                 {/* Phase 3 (non-final): results in DB */}
                                 {canShowNextRound &&
