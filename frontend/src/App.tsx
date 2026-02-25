@@ -15,6 +15,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Welcome from "./pages/Welcome";
 import Me from "./pages/Me";
+import CreateWorkspace from "./pages/CreateWorkspace";
+import WorkspaceSettings from "./pages/WorkspaceSettings";
 import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 
@@ -71,6 +73,24 @@ function App() {
               element={
                 <RequireAuth>
                   <Me />
+                </RequireAuth>
+              }
+            />
+
+            {/* ── Workspace management ─────────────────────────── */}
+            <Route
+              path="/workspaces/new"
+              element={
+                <RequireAuth>
+                  <CreateWorkspace />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/w/:workspaceSlug/settings"
+              element={
+                <RequireAuth>
+                  <WorkspaceSettings />
                 </RequireAuth>
               }
             />

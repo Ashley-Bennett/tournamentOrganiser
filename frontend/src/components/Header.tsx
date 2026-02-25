@@ -87,11 +87,7 @@ const Header: React.FC = () => {
             >
               Tournaments
             </Button>
-            <Button
-              color="inherit"
-              component={RouterLink}
-              to="/me"
-            >
+            <Button color="inherit" component={RouterLink} to="/me">
               My Profile
             </Button>
             <Tooltip title="Coming soon">
@@ -110,6 +106,14 @@ const Header: React.FC = () => {
                 </Button>
               </span>
             </Tooltip>
+
+            <Button
+              color="inherit"
+              component={RouterLink}
+              to={wPath("/settings")}
+            >
+              Settings
+            </Button>
             <Button
               color="inherit"
               component={RouterLink}

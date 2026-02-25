@@ -30,12 +30,16 @@ interface WorkspaceContextType {
   workspaceId: string | null;
   /** All workspaces the user is a member of */
   workspaces: Workspace[];
+  /** Current user's role in the active workspace (null if not in a workspace) */
+  currentRole: "owner" | "admin" | "judge" | "staff" | null;
   loading: boolean;
   error: string | null;
   /** Navigate to a workspace-prefixed path within the current workspace */
   wPath: (path: string) => string;
   /** Redirect to the user's first workspace dashboard after login */
   redirectToDefaultWorkspace: () => void;
+  /** Re-fetch workspace memberships (call after creating or modifying a workspace) */
+  refreshWorkspaces: () => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
@@ -49,7 +53,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [memberships, setMemberships] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,39 +63,44 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     return match?.[1] ?? null;
   }, [location.pathname]);
 
-  useEffect(() => {
-    if (authLoading) return;
+  const fetchWorkspaces = useCallback(async () => {
     if (!user) {
-      setWorkspaces([]);
+      setMemberships([]);
       setLoading(false);
       return;
     }
 
-    const fetchWorkspaces = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      const { data, error: fetchError } = await supabase
-        .from("workspace_memberships")
-        .select("role, workspaces(id, name, slug, type, created_by, created_at)")
-        .eq("user_id", user.id);
+    const { data, error: fetchError } = await supabase
+      .from("workspace_memberships")
+      .select(
+        "role, workspaces(id, name, slug, type, timezone, created_by, created_at)",
+      )
+      .eq("user_id", user.id);
 
-      if (fetchError) {
-        setError(fetchError.message);
-        setLoading(false);
-        return;
-      }
-
-      const resolved = (data as unknown as WorkspaceMember[])
-        .map((m) => m.workspaces)
-        .filter(Boolean);
-
-      setWorkspaces(resolved);
+    if (fetchError) {
+      setError(fetchError.message);
       setLoading(false);
-    };
+      return;
+    }
 
+    setMemberships(
+      (data as unknown as WorkspaceMember[]).filter((m) => m.workspaces),
+    );
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    if (authLoading) return;
     void fetchWorkspaces();
-  }, [user, authLoading]);
+  }, [user, authLoading, fetchWorkspaces]);
+
+  const workspaces = useMemo(
+    () => memberships.map((m) => m.workspaces),
+    [memberships],
+  );
 
   const workspace = useMemo(() => {
     if (!currentSlug || workspaces.length === 0) return null;
@@ -99,6 +108,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [currentSlug, workspaces]);
 
   const workspaceId = workspace?.id ?? null;
+
+  const currentRole = useMemo(() => {
+    if (!workspace) return null;
+    return (
+      memberships.find((m) => m.workspaces.id === workspace.id)?.role ?? null
+    );
+  }, [workspace, memberships]);
 
   const wPath = useCallback(
     (path: string) => {
@@ -114,16 +130,22 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [workspaces, navigate]);
 
+  const refreshWorkspaces = useCallback(() => {
+    void fetchWorkspaces();
+  }, [fetchWorkspaces]);
+
   return (
     <WorkspaceContext.Provider
       value={{
         workspace,
         workspaceId,
         workspaces,
+        currentRole,
         loading,
         error,
         wPath,
         redirectToDefaultWorkspace,
+        refreshWorkspaces,
       }}
     >
       {children}
