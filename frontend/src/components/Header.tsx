@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   AppBar,
@@ -9,18 +9,24 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Menu,
+  MenuItem,
+  Divider,
 } from "@mui/material";
 import {
   SportsEsports as TournamentIcon,
   WorkspacesOutlined as WorkspaceIcon,
+  ArrowDropDown as ArrowDropDownIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 
 const Header: React.FC = () => {
   const { user, logout, displayName } = useAuth();
-  const { workspace, wPath } = useWorkspace();
+  const { workspace, workspaces, wPath } = useWorkspace();
   const navigate = useNavigate();
+
+  const [wsMenuAnchor, setWsMenuAnchor] = useState<null | HTMLElement>(null);
 
   const handleLogout = () => {
     logout();
@@ -32,6 +38,7 @@ const Header: React.FC = () => {
   return (
     <AppBar position="static">
       <Toolbar>
+        {/* ── Logo ──────────────────────────────────────────────── */}
         <Box
           component={RouterLink}
           to={homeHref}
@@ -40,8 +47,7 @@ const Header: React.FC = () => {
             alignItems: "center",
             textDecoration: "none",
             color: "inherit",
-            mr: 2,
-            flexGrow: 1,
+            mr: 1,
           }}
         >
           <IconButton
@@ -55,22 +61,64 @@ const Header: React.FC = () => {
           <Typography variant="h6" component="div">
             Matchamp
           </Typography>
-          {workspace && (
+        </Box>
+
+        {/* ── Workspace switcher chip ────────────────────────────── */}
+        {workspace && (
+          <>
             <Chip
               icon={<WorkspaceIcon />}
               label={workspace.name}
+              deleteIcon={<ArrowDropDownIcon />}
+              onDelete={(e) => setWsMenuAnchor(e.currentTarget as HTMLElement)}
+              onClick={(e) => setWsMenuAnchor(e.currentTarget)}
               size="small"
               sx={{
-                ml: 2,
+                ml: 1,
                 color: "inherit",
                 borderColor: "rgba(255,255,255,0.5)",
+                cursor: "pointer",
                 "& .MuiChip-icon": { color: "inherit" },
+                "& .MuiChip-deleteIcon": { color: "rgba(255,255,255,0.7)" },
               }}
               variant="outlined"
             />
-          )}
-        </Box>
+            <Menu
+              anchorEl={wsMenuAnchor}
+              open={Boolean(wsMenuAnchor)}
+              onClose={() => setWsMenuAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+              transformOrigin={{ vertical: "top", horizontal: "left" }}
+            >
+              {workspaces.map((ws) => (
+                <MenuItem
+                  key={ws.id}
+                  selected={ws.id === workspace.id}
+                  onClick={() => {
+                    navigate(`/w/${ws.slug}/tournaments`);
+                    setWsMenuAnchor(null);
+                  }}
+                >
+                  {ws.name}
+                </MenuItem>
+              ))}
+              <Divider />
+              <MenuItem
+                onClick={() => {
+                  navigate("/workspaces/new");
+                  setWsMenuAnchor(null);
+                }}
+              >
+                + New workspace
+              </MenuItem>
+            </Menu>
+          </>
+        )}
 
+        {/* Spacer */}
+        <Box flexGrow={1} />
+
+        {/* ── Nav ───────────────────────────────────────────────── */}
         {user ? (
           <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
             <Button
