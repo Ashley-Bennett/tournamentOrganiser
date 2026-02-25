@@ -23,10 +23,12 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
+import { useWorkspace } from "../WorkspaceContext";
 
 const CreateTournament: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { workspaceId, wPath } = useWorkspace();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -63,11 +65,16 @@ const CreateTournament: React.FC = () => {
         return;
       }
 
+      if (!workspaceId) {
+        throw new Error("No workspace selected");
+      }
+
       const { data, error: insertError } = await supabase
         .from("tournaments")
         .insert({
           name: formData.name,
           created_by: user.id,
+          workspace_id: workspaceId,
           status: "draft",
           tournament_type: formData.tournament_type,
           is_public: formData.is_public,
@@ -80,9 +87,9 @@ const CreateTournament: React.FC = () => {
       }
 
       if (data?.id) {
-        navigate(`/tournaments/${data.id}`);
+        navigate(wPath(`/tournaments/${data.id}`));
       } else {
-        navigate("/tournaments");
+        navigate(wPath("/tournaments"));
       }
     } catch (error: unknown) {
       setError(
@@ -100,7 +107,7 @@ const CreateTournament: React.FC = () => {
       <Box display="flex" alignItems="center" mb={3}>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate("/tournaments")}
+          onClick={() => navigate(wPath("/tournaments"))}
           sx={{ mr: 2 }}
         >
           Back
@@ -177,7 +184,7 @@ const CreateTournament: React.FC = () => {
               <Box display="flex" gap={2} justifyContent="flex-end">
                 <Button
                   variant="outlined"
-                  onClick={() => navigate("/tournaments")}
+                  onClick={() => navigate(wPath("/tournaments"))}
                   disabled={loading}
                 >
                   Cancel

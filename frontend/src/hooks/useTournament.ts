@@ -7,6 +7,7 @@ export function useTournament(
   id: string | undefined,
   user: User | null,
   authLoading: boolean,
+  workspaceId: string | null = null,
 ) {
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,14 +19,19 @@ export function useTournament(
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from("tournaments")
         .select(
           "id, name, status, tournament_type, num_rounds, created_at, created_by",
         )
-        .eq("id", id)
-        .eq("created_by", user.id)
-        .maybeSingle();
+        .eq("id", id);
+
+      // Scope to workspace when available (defence-in-depth on top of RLS)
+      if (workspaceId) {
+        query = query.eq("workspace_id", workspaceId);
+      }
+
+      const { data, error: fetchError } = await query.maybeSingle();
 
       if (fetchError) {
         throw new Error(fetchError.message || "Failed to load tournament");
@@ -42,7 +48,7 @@ export function useTournament(
     } finally {
       setLoading(false);
     }
-  }, [id, user]);
+  }, [id, user, workspaceId]);
 
   useEffect(() => {
     if (!id) {

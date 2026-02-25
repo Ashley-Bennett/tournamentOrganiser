@@ -5,20 +5,9 @@ import {
   People as PeopleIcon,
   EmojiEvents as TrophyIcon,
 } from "@mui/icons-material";
-import { apiCall, handleApiError } from "../utils/api";
-import { useAuthRedirect } from "../hooks/useAuthRedirect";
+import { supabase } from "../supabaseClient";
+import { useWorkspace } from "../WorkspaceContext";
 import PageLoading from "../components/PageLoading";
-
-interface Tournament {
-  id: number;
-  name: string;
-  date: string;
-  league_name?: string;
-  bracket_type: string;
-  status: "new" | "active" | "completed";
-  created_at: string;
-  updated_at?: string;
-}
 
 interface DashboardStats {
   activeTournaments: number;
@@ -27,7 +16,7 @@ interface DashboardStats {
 }
 
 const Dashboard: React.FC = () => {
-  const handleUnauthorized = useAuthRedirect();
+  const { workspaceId, loading: workspaceLoading } = useWorkspace();
   const [stats, setStats] = useState<DashboardStats>({
     activeTournaments: 0,
     totalParticipants: 0,
@@ -36,40 +25,34 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchDashboardStats = useCallback(async () => {
+    if (!workspaceId) return;
     try {
       setLoading(true);
 
-      // Fetch tournaments
-      const tournamentsResponse = await apiCall("/api/tournaments");
-      if (handleUnauthorized(tournamentsResponse)) return;
-      if (!tournamentsResponse.ok) {
-        await handleApiError(tournamentsResponse);
-      }
-      const tournaments: Tournament[] = await tournamentsResponse.json();
+      const { data: tournaments, error: tErr } = await supabase
+        .from("tournaments")
+        .select("id, status")
+        .eq("workspace_id", workspaceId);
 
-      // Calculate statistics
-      const activeTournaments = tournaments.filter(
+      if (tErr) throw tErr;
+
+      const activeTournaments = (tournaments ?? []).filter(
         (t) => t.status === "active",
       ).length;
-      const completedTournaments = tournaments.filter(
+      const completedTournaments = (tournaments ?? []).filter(
         (t) => t.status === "completed",
       ).length;
 
-      // Fetch total participants (players across all tournaments)
-      let totalParticipants = 0;
-      for (const tournament of tournaments) {
-        const playersResponse = await apiCall(
-          `/api/tournaments/${tournament.id}/players`,
-        );
-        if (playersResponse.ok) {
-          const players = await playersResponse.json();
-          totalParticipants += players.length;
-        }
-      }
+      const { count: totalParticipants, error: pErr } = await supabase
+        .from("tournament_players")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId);
+
+      if (pErr) throw pErr;
 
       setStats({
         activeTournaments,
-        totalParticipants,
+        totalParticipants: totalParticipants ?? 0,
         completedTournaments,
       });
     } catch (error: unknown) {
@@ -77,13 +60,15 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [handleUnauthorized]);
+  }, [workspaceId]);
 
   useEffect(() => {
-    fetchDashboardStats();
-  }, [fetchDashboardStats]);
+    if (!workspaceLoading) {
+      void fetchDashboardStats();
+    }
+  }, [workspaceLoading, fetchDashboardStats]);
 
-  if (loading) {
+  if (workspaceLoading || loading) {
     return <PageLoading />;
   }
 

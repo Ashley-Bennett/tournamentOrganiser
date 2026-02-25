@@ -31,6 +31,7 @@ import { Add as AddIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
+import { useWorkspace } from "../WorkspaceContext";
 
 interface Tournament {
   id: string;
@@ -44,6 +45,7 @@ interface Tournament {
 const Tournaments: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { workspaceId, wPath } = useWorkspace();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,11 +69,12 @@ const Tournaments: React.FC = () => {
         navigate("/login");
         return;
       }
+      if (!workspaceId) return;
 
       const { data, error } = await supabase
         .from("tournaments")
         .select("id, name, status, tournament_type, created_at, created_by")
-        .eq("created_by", user.id)
+        .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -88,12 +91,12 @@ const Tournaments: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, logout, navigate]);
+  }, [user, logout, navigate, workspaceId]);
 
   useEffect(() => {
-    if (!user) return;
-    fetchTournaments();
-  }, [user, fetchTournaments]);
+    if (!user || !workspaceId) return;
+    void fetchTournaments();
+  }, [user, workspaceId, fetchTournaments]);
 
   const handleDeleteTournament = (id: string) => {
     setConfirmDeleteId(id);
@@ -111,7 +114,7 @@ const Tournaments: React.FC = () => {
         .from("tournaments")
         .delete()
         .eq("id", id)
-        .eq("created_by", user?.id || "");
+        .eq("workspace_id", workspaceId ?? "");
 
       if (error) {
         throw new Error(error.message || "Failed to delete tournament.");
@@ -187,7 +190,7 @@ const Tournaments: React.FC = () => {
           variant="contained"
           startIcon={<AddIcon />}
           component={RouterLink}
-          to="/tournaments/create"
+          to={wPath("/tournaments/create")}
         >
           Create Tournament
         </Button>
@@ -269,7 +272,7 @@ const Tournaments: React.FC = () => {
                         variant="contained"
                         color="primary"
                         onClick={() =>
-                          navigate(`/tournaments/${tournament.id}`)
+                          navigate(wPath(`/tournaments/${tournament.id}`))
                         }
                         sx={{ mr: 1 }}
                       >

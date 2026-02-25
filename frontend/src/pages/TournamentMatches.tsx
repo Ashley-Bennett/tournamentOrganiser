@@ -47,6 +47,7 @@ import PushPinIcon from "@mui/icons-material/PushPin";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
+import { useWorkspace } from "../WorkspaceContext";
 import {
   generateSwissPairings,
   calculateMatchPoints,
@@ -78,6 +79,7 @@ interface TournamentSummary {
   created_at: string;
   created_by: string;
   is_public: boolean;
+  public_slug: string | null;
 }
 
 interface Match {
@@ -125,6 +127,7 @@ const TournamentMatches: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { workspaceId, wPath } = useWorkspace();
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [matches, setMatches] = useState<MatchWithPlayers[]>([]);
   const [loading, setLoading] = useState(true);
@@ -302,10 +305,10 @@ const TournamentMatches: React.FC = () => {
         const { data, error } = await supabase
           .from("tournaments")
           .select(
-            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public",
+            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug",
           )
           .eq("id", id)
-          .eq("created_by", user.id)
+          .eq("workspace_id", workspaceId ?? "")
           .maybeSingle();
 
         if (error) {
@@ -326,7 +329,7 @@ const TournamentMatches: React.FC = () => {
     };
 
     void fetchTournament();
-  }, [id, user, authLoading, navigate]);
+  }, [id, user, authLoading, navigate, workspaceId]);
 
   // Restore pending results from DB temp columns when matches first load
   useEffect(() => {
@@ -1072,6 +1075,7 @@ const TournamentMatches: React.FC = () => {
 
         const rowsToInsert = changedMatches.map(({ match, edited }) => ({
           tournament_id: match.tournament_id,
+          workspace_id: workspaceId,
           round_number: match.round_number,
           match_number: match.match_number,
           player1_id: edited.player1Id,
@@ -1197,7 +1201,7 @@ const TournamentMatches: React.FC = () => {
         .from("tournaments")
         .update({ status: "completed" })
         .eq("id", tournament.id)
-        .eq("created_by", user.id);
+        .eq("workspace_id", workspaceId ?? "");
 
       if (updateError) {
         throw new Error(updateError.message || "Failed to complete tournament");
@@ -1298,6 +1302,7 @@ const TournamentMatches: React.FC = () => {
 
       const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
+        workspace_id: workspaceId,
         round_number: 1,
         match_number: seatAssignmentsR1[index].matchNumber,
         player1_id: pairing.player1Id,
@@ -1592,6 +1597,7 @@ const TournamentMatches: React.FC = () => {
 
       const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
+        workspace_id: workspaceId,
         round_number: nextRoundNumber,
         match_number: seatAssignments[index].matchNumber,
         player1_id: pairing.player1Id,
@@ -1710,7 +1716,7 @@ const TournamentMatches: React.FC = () => {
         <Box display="flex" alignItems="center" mb={3}>
           <Button
             startIcon={<ArrowBackIcon />}
-            onClick={() => navigate(`/tournaments/${id}`)}
+            onClick={() => navigate(wPath(`/tournaments/${id ?? ""}`))}
             sx={{ mr: 2 }}
           >
             Back to tournament
@@ -1739,7 +1745,7 @@ const TournamentMatches: React.FC = () => {
         <Box display="flex" alignItems="center">
           <Button
             startIcon={<ArrowBackIcon />}
-            onClick={() => navigate(`/tournaments/${tournament.id}`)}
+            onClick={() => navigate(wPath(`/tournaments/${tournament.id}`))}
             sx={{ mr: 2 }}
           >
             Back to tournament
@@ -2539,7 +2545,9 @@ const TournamentMatches: React.FC = () => {
                                       startIcon={<OpenInNewIcon />}
                                       onClick={() =>
                                         window.open(
-                                          `/tournaments/${tournament.id}/pairings`,
+                                          tournament.is_public && tournament.public_slug
+                                            ? `/public/t/${tournament.public_slug}`
+                                            : wPath(`/tournaments/${tournament.id}/pairings`),
                                           "_blank",
                                         )
                                       }
@@ -2565,7 +2573,9 @@ const TournamentMatches: React.FC = () => {
                                       startIcon={<OpenInNewIcon />}
                                       onClick={() =>
                                         window.open(
-                                          `/tournaments/${tournament.id}/pairings`,
+                                          tournament.is_public && tournament.public_slug
+                                            ? `/public/t/${tournament.public_slug}`
+                                            : wPath(`/tournaments/${tournament.id}/pairings`),
                                           "_blank",
                                         )
                                       }
@@ -2598,6 +2608,23 @@ const TournamentMatches: React.FC = () => {
                                       </span>
                                     </Tooltip>
                                   </>
+                                )}
+                                {/* Phase 3: round complete — keep View Pairings visible */}
+                                {allCompletedInDB && (
+                                  <Button
+                                    variant="outlined"
+                                    startIcon={<OpenInNewIcon />}
+                                    onClick={() =>
+                                      window.open(
+                                        tournament.is_public && tournament.public_slug
+                                          ? `/public/t/${tournament.public_slug}`
+                                          : wPath(`/tournaments/${tournament.id}/pairings`),
+                                        "_blank",
+                                      )
+                                    }
+                                  >
+                                    View Pairings
+                                  </Button>
                                 )}
                                 {/* Phase 3 (non-final): results in DB */}
                                 {canShowNextRound &&

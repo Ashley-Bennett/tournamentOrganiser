@@ -34,6 +34,7 @@ import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
 import TournamentPageHeader from "../components/TournamentPageHeader";
 import { useTournament } from "../hooks/useTournament";
+import { useWorkspace } from "../WorkspaceContext";
 import { useTournamentPlayers } from "../hooks/useTournamentPlayers";
 import type { TournamentSummary, TournamentPlayer } from "../types/tournament";
 import { formatDateTime } from "../utils/format";
@@ -48,10 +49,12 @@ const TournamentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { workspaceId, wPath } = useWorkspace();
   const { tournament, setTournament, loading, error, setError } = useTournament(
     id,
     user,
     authLoading,
+    workspaceId,
   );
   const {
     players,
@@ -119,6 +122,7 @@ const TournamentView: React.FC = () => {
           name: newPlayerName.trim(),
           tournament_id: tournament.id,
           created_by: user.id,
+          workspace_id: workspaceId,
         })
         .select("id, name, created_at")
         .single();
@@ -152,6 +156,7 @@ const TournamentView: React.FC = () => {
         name,
         tournament_id: tournament.id,
         created_by: user.id,
+        workspace_id: workspaceId,
       }));
       const { data, error } = await supabase
         .from("tournament_players")
@@ -181,7 +186,7 @@ const TournamentView: React.FC = () => {
         .from("tournaments")
         .update({ num_rounds: numRounds })
         .eq("id", tournament.id)
-        .eq("created_by", user.id)
+        .eq("workspace_id", workspaceId ?? "")
         .select(
           "id, name, status, tournament_type, num_rounds, created_at, created_by",
         )
@@ -218,7 +223,7 @@ const TournamentView: React.FC = () => {
         .delete()
         .eq("id", playerId)
         .eq("tournament_id", tournament.id)
-        .eq("created_by", user.id);
+        .eq("workspace_id", workspaceId ?? "");
 
       if (error) {
         throw new Error(error.message || "Failed to delete player");
@@ -284,7 +289,7 @@ const TournamentView: React.FC = () => {
         .from("tournaments")
         .update({ status: "active", num_rounds: numRounds })
         .eq("id", tournament.id)
-        .eq("created_by", user.id)
+        .eq("workspace_id", workspaceId ?? "")
         .select(
           "id, name, status, tournament_type, num_rounds, created_at, created_by",
         )
@@ -322,6 +327,7 @@ const TournamentView: React.FC = () => {
 
       const matchesToInsert = pairings.map((pairing, index) => ({
         tournament_id: tournament.id,
+        workspace_id: workspaceId,
         round_number: 1,
         match_number: seatAssignments[index].matchNumber,
         player1_id: pairing.player1Id,
@@ -357,7 +363,7 @@ const TournamentView: React.FC = () => {
       }
 
       setTournament(tournamentData as TournamentSummary);
-      navigate(`/tournaments/${tournamentData.id}/matches`);
+      navigate(wPath(`/tournaments/${tournamentData.id}/matches`));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to start tournament");
     } finally {
@@ -374,7 +380,7 @@ const TournamentView: React.FC = () => {
       <Box>
         <TournamentPageHeader
           title="Tournament"
-          onBack={() => navigate("/tournaments")}
+          onBack={() => navigate(wPath("/tournaments"))}
         />
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -389,7 +395,7 @@ const TournamentView: React.FC = () => {
     <Box>
       <TournamentPageHeader
         title={tournament.name}
-        onBack={() => navigate("/tournaments")}
+        onBack={() => navigate(wPath("/tournaments"))}
       />
 
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -406,7 +412,7 @@ const TournamentView: React.FC = () => {
             <Button
               size="small"
               variant="outlined"
-              onClick={() => navigate(`/tournaments/${tournament.id}/matches`)}
+              onClick={() => navigate(wPath(`/tournaments/${tournament.id}/matches`))}
             >
               View matches
             </Button>

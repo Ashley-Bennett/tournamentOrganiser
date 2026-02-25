@@ -19,6 +19,7 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
 import { useAuth } from "../AuthContext";
+import { useWorkspace } from "../WorkspaceContext";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 
@@ -61,6 +62,7 @@ const TournamentLeaderboard: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { workspaceId, wPath } = useWorkspace();
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [matches, setMatches] = useState<MatchWithPlayers[]>([]);
   const [players, setPlayers] = useState<LeaderboardPlayer[]>([]);
@@ -91,7 +93,7 @@ const TournamentLeaderboard: React.FC = () => {
             "id, name, status, tournament_type, num_rounds, created_at, created_by",
           )
           .eq("id", id)
-          .eq("created_by", user.id)
+          .eq("workspace_id", workspaceId ?? "")
           .maybeSingle();
 
         if (tournamentError) {
@@ -183,7 +185,7 @@ const TournamentLeaderboard: React.FC = () => {
     };
 
     void fetchData();
-  }, [id, user, authLoading, navigate]);
+  }, [id, user, authLoading, navigate, workspaceId]);
 
   const finalStandings = useMemo(() => {
     if (!matches.length) return [];
@@ -208,7 +210,7 @@ const TournamentLeaderboard: React.FC = () => {
         <Box display="flex" alignItems="center" mb={3}>
           <Button
             startIcon={<ArrowBackIcon />}
-            onClick={() => navigate("/tournaments")}
+            onClick={() => navigate(wPath("/tournaments"))}
             sx={{ mr: 2 }}
           >
             Back to tournaments
@@ -238,7 +240,7 @@ const TournamentLeaderboard: React.FC = () => {
       <Box display="flex" alignItems="center" mb={3}>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(`/tournaments/${id}`)}
+          onClick={() => navigate(wPath(`/tournaments/${id ?? ""}`))}
           sx={{ mr: 2 }}
         >
           Back to tournament

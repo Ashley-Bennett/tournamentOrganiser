@@ -6,25 +6,35 @@ import {
   Typography,
   Button,
   Box,
+  Chip,
   IconButton,
   Tooltip,
 } from "@mui/material";
-import { SportsEsports as TournamentIcon } from "@mui/icons-material";
+import {
+  SportsEsports as TournamentIcon,
+  WorkspacesOutlined as WorkspaceIcon,
+} from "@mui/icons-material";
 import { useAuth } from "../AuthContext";
+import { useWorkspace } from "../WorkspaceContext";
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
+  const { workspace, wPath } = useWorkspace();
   const navigate = useNavigate();
+
   const handleLogout = () => {
     logout();
     navigate("/");
   };
+
+  const homeHref = workspace ? wPath("/tournaments") : "/dashboard";
+
   return (
     <AppBar position="static">
       <Toolbar>
         <Box
           component={RouterLink}
-          to="/dashboard"
+          to={homeHref}
           sx={{
             display: "flex",
             alignItems: "center",
@@ -45,13 +55,36 @@ const Header: React.FC = () => {
           <Typography variant="h6" component="div">
             Matchamp
           </Typography>
+          {workspace && (
+            <Chip
+              icon={<WorkspaceIcon />}
+              label={workspace.name}
+              size="small"
+              sx={{
+                ml: 2,
+                color: "inherit",
+                borderColor: "rgba(255,255,255,0.5)",
+                "& .MuiChip-icon": { color: "inherit" },
+              }}
+              variant="outlined"
+            />
+          )}
         </Box>
+
         {user ? (
           <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-            <Button color="inherit" component={RouterLink} to="/dashboard">
+            <Button
+              color="inherit"
+              component={RouterLink}
+              to={workspace ? wPath("/dashboard") : "/dashboard"}
+            >
               Dashboard
             </Button>
-            <Button color="inherit" component={RouterLink} to="/tournaments">
+            <Button
+              color="inherit"
+              component={RouterLink}
+              to={workspace ? wPath("/tournaments") : "/dashboard"}
+            >
               Tournaments
             </Button>
             <Tooltip title="Coming soon">
@@ -89,7 +122,7 @@ const Header: React.FC = () => {
             <Button
               color="inherit"
               component={RouterLink}
-              to="/tournaments/create"
+              to={workspace ? wPath("/tournaments/create") : "/dashboard"}
               variant="outlined"
               sx={{ color: "white", borderColor: "white" }}
             >

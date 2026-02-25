@@ -56,7 +56,10 @@ interface MatchWithPlayers extends Match {
 }
 
 const TournamentPairings: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  // Handles two routes:
+  //   /public/t/:publicSlug           — unauthenticated, is_public required
+  //   /w/:workspaceSlug/tournaments/:id/pairings — authenticated workspace member
+  const { publicSlug, id } = useParams<{ publicSlug?: string; id?: string }>();
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<MatchWithPlayers[]>([]);
@@ -65,35 +68,56 @@ const TournamentPairings: React.FC = () => {
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
 
   useEffect(() => {
-    if (!id) {
-      setError("Missing tournament ID.");
+    if (!publicSlug && !id) {
+      setError("Missing tournament link.");
       setLoading(false);
       return;
     }
 
     const load = async () => {
-      // Fetch tournament (only succeeds if is_public = true due to RLS)
-      const { data: tData, error: tErr } = await supabase
-        .from("tournaments")
-        .select("id, name, status, num_rounds, is_public")
-        .eq("id", id)
-        .single();
+      let tData: Tournament | null = null;
 
-      if (tErr || !tData) {
-        setError(
-          "This tournament is not available. It may be private or you may need to log in.",
-        );
-        setLoading(false);
-        return;
+      if (id) {
+        // Authenticated route — workspace membership RLS handles access (any privacy)
+        const { data, error: tErr } = await supabase
+          .from("tournaments")
+          .select("id, name, status, num_rounds, is_public")
+          .eq("id", id)
+          .single();
+        if (tErr || !data) {
+          setError("Tournament not found or you do not have access.");
+          setLoading(false);
+          return;
+        }
+        tData = data;
+      } else {
+        // Public route — fetch by public_slug, is_public = true required
+        const { data, error: tErr } = await supabase
+          .from("tournaments")
+          .select("id, name, status, num_rounds, is_public")
+          .eq("public_slug", publicSlug!)
+          .eq("is_public", true)
+          .single();
+        if (tErr || !data) {
+          setError(
+            "This tournament is not available. It may be private or the link may be invalid.",
+          );
+          setLoading(false);
+          return;
+        }
+        tData = data;
       }
 
       setTournament(tData);
+
+      // Use the resolved tournament.id for child queries
+      const tournamentId = tData.id;
 
       // Fetch players
       const { data: pData, error: pErr } = await supabase
         .from("tournament_players")
         .select("id, name, dropped")
-        .eq("tournament_id", id);
+        .eq("tournament_id", tournamentId);
 
       if (pErr) {
         setError("Failed to load players.");
@@ -110,7 +134,7 @@ const TournamentPairings: React.FC = () => {
         .select(
           "id, tournament_id, round_number, match_number, player1_id, player2_id, winner_id, result, temp_winner_id, temp_result, pairings_published, status",
         )
-        .eq("tournament_id", id)
+        .eq("tournament_id", tournamentId)
         .order("round_number", { ascending: true })
         .order("match_number", { ascending: true });
 
@@ -160,7 +184,7 @@ const TournamentPairings: React.FC = () => {
     // Auto-refresh every 30 seconds
     const interval = setInterval(() => void load(), 30_000);
     return () => clearInterval(interval);
-  }, [id]);
+  }, [publicSlug, id]);
 
   const rounds = useMemo(
     () =>
@@ -212,9 +236,12 @@ const TournamentPairings: React.FC = () => {
   ).length;
   const totalMatchCount = roundMatches.length;
 
-  // Pre-round: all visible matches for this round are still "ready" (published but not started)
+  // Pre-round: show large card grid when no real match activity has started yet.
+  // Byes are auto-completed the moment the round begins, so we exclude them from this
+  // check — a round with only byes should still show the large pairings board.
   const isPreRound =
-    roundMatches.length > 0 && roundMatches.every((m) => m.status === "ready");
+    roundMatches.length > 0 &&
+    !roundMatches.some((m) => m.status === "pending" || m.status === "completed");
 
   const isStandings = selectedRound === "standings";
 
