@@ -26,7 +26,7 @@ const ClaimPlayer = () => {
     setStatus("claiming");
 
     void (async () => {
-      const { data, error } = await supabase.rpc("accept_player_claim_link", {
+      const { error } = await supabase.rpc("accept_player_claim_link", {
         p_token: token,
       });
 
@@ -38,15 +38,9 @@ const ClaimPlayer = () => {
 
       setStatus("done");
 
-      // Redirect to the tournament's public page or /me after a short pause
-      const row = Array.isArray(data) ? data[0] : data;
-      if (row?.workspace_slug && row?.tournament_id) {
-        navigate(`/w/${row.workspace_slug as string}/tournaments/${row.tournament_id as string}`, {
-          replace: true,
-        });
-      } else {
-        navigate("/me", { replace: true });
-      }
+      // Always redirect to /me — the player isn't a workspace member
+      // and cannot view the tournament page directly.
+      navigate("/me", { replace: true });
     })();
   }, [user, token, status, navigate]);
 

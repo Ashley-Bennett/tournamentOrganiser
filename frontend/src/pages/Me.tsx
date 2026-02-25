@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -31,6 +31,18 @@ import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 import { supabase } from "../supabaseClient";
+
+interface PlayerEntry {
+  tournament_player_id: string;
+  tournament_id: string;
+  tournament_name: string;
+  tournament_status: string;
+  workspace_id: string;
+  workspace_name: string;
+  workspace_slug: string;
+  player_name: string;
+  joined_at: string;
+}
 
 interface MemberRow {
   user_id: string;
@@ -76,6 +88,18 @@ const Me = () => {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+
+  // Player entries (tournaments I'm linked to as a player)
+  const [playerEntries, setPlayerEntries] = useState<PlayerEntry[]>([]);
+  const [playerEntriesLoading, setPlayerEntriesLoading] = useState(true);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase.rpc("get_my_player_entries");
+      setPlayerEntries((data as PlayerEntry[]) ?? []);
+      setPlayerEntriesLoading(false);
+    })();
+  }, []);
 
   // Members panel state — keyed by workspace id
   const [membersOpen, setMembersOpen] = useState<Record<string, boolean>>({});
@@ -606,19 +630,47 @@ const Me = () => {
         <Typography variant="h6">My Tournaments</Typography>
       </Stack>
 
-      <Paper
-        variant="outlined"
-        sx={{ p: 4, textAlign: "center", backgroundColor: "action.hover" }}
-      >
-        <Typography variant="body1" color="text.secondary" gutterBottom>
-          No tournament history yet.
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Your match history will appear here once your entries are linked to
-          your account. Ask the tournament organiser to link you, or claim
-          entries from a past event.
-        </Typography>
-      </Paper>
+      {playerEntriesLoading ? (
+        <Box display="flex" justifyContent="center" py={3}>
+          <CircularProgress size={24} />
+        </Box>
+      ) : playerEntries.length === 0 ? (
+        <Paper
+          variant="outlined"
+          sx={{ p: 4, textAlign: "center", backgroundColor: "action.hover" }}
+        >
+          <Typography variant="body1" color="text.secondary" gutterBottom>
+            No tournament history yet.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Your entries will appear here once an organiser links you, or you
+            claim an entry from a link they send you.
+          </Typography>
+        </Paper>
+      ) : (
+        <Stack spacing={1.5} mb={3}>
+          {playerEntries.map((entry) => (
+            <Paper key={entry.tournament_player_id} variant="outlined" sx={{ p: 2 }}>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Box flexGrow={1}>
+                  <Typography variant="subtitle2" fontWeight={500}>
+                    {entry.tournament_name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {entry.workspace_name}
+                  </Typography>
+                </Box>
+                <Chip label="Player" size="small" color="info" />
+                <Chip
+                  label={entry.tournament_status}
+                  size="small"
+                  variant="outlined"
+                />
+              </Stack>
+            </Paper>
+          ))}
+        </Stack>
+      )}
 
       {/* ── Delete confirmation dialog ───────────────────────── */}
       <Dialog
