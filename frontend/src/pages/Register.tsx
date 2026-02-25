@@ -7,7 +7,7 @@ import {
   Alert,
   Stack,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 
 const Register = () => {
@@ -18,18 +18,25 @@ const Register = () => {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { register, user } = useAuth();
+
+  // If we came from an invite (or any other page), go back there after login.
+  // Otherwise fall through to the normal welcome/onboarding flow.
+  const from = (location.state as { from?: Location } | null)?.from;
+  const afterAuthPath = from
+    ? `${from.pathname}${from.search}${from.hash}`
+    : "/welcome";
 
   // Redirect if user becomes logged in
   useEffect(() => {
     if (user && success) {
-      // New user: send them to the intent/welcome screen
       const timer = setTimeout(() => {
-        navigate("/welcome");
+        navigate(afterAuthPath);
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [user, success, navigate]);
+  }, [user, success, navigate, afterAuthPath]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +55,7 @@ const Register = () => {
         setSuccess(
           "Registration successful! Please check your email to confirm your account, then log in.",
         );
-        setTimeout(() => navigate("/login"), 3000);
+        setTimeout(() => navigate("/login", { state: { from } }), 3000);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");

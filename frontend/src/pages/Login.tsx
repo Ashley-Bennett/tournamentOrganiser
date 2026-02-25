@@ -7,7 +7,7 @@ import {
   Alert,
   Stack,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 
 const Login = () => {
@@ -16,6 +16,7 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,7 +25,8 @@ const Login = () => {
     setError("");
     try {
       await login(email, password);
-      navigate("/dashboard");
+      const from = (location.state as { from?: Location } | null)?.from;
+      navigate(from ? `${from.pathname}${from.search}${from.hash}` : "/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

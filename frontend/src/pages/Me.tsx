@@ -16,17 +16,37 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  CircularProgress,
 } from "@mui/material";
 import {
   PersonOutline as PersonIcon,
   EmojiEventsOutlined as TrophyIcon,
   WorkspacesOutlined as WorkspaceIcon,
   DeleteOutlined as DeleteIcon,
+  PeopleOutlined as PeopleIcon,
+  ContentCopy as CopyIcon,
+  PersonRemoveOutlined as RemovePersonIcon,
 } from "@mui/icons-material";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 import { supabase } from "../supabaseClient";
+
+interface MemberRow {
+  user_id: string;
+  role: string;
+  display_name: string | null;
+  created_at: string;
+}
+
+interface InviteRow {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  token: string;
+  expires_at: string;
+}
 
 type Role = "owner" | "admin" | "judge" | "staff";
 const ROLE_COLOR: Record<Role, "primary" | "secondary" | "info" | "default"> = {
@@ -56,6 +76,18 @@ const Me = () => {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+
+  // Members panel state — keyed by workspace id
+  const [membersOpen, setMembersOpen] = useState<Record<string, boolean>>({});
+  const [members, setMembers] = useState<Record<string, MemberRow[]>>({});
+  const [invites, setInvites] = useState<Record<string, InviteRow[]>>({});
+  const [membersLoading, setMembersLoading] = useState<Record<string, boolean>>({});
+  const [memberError, setMemberError] = useState<Record<string, string>>({});
+  const [inviteEmail, setInviteEmail] = useState<Record<string, string>>({});
+  const [inviteLoading, setInviteLoading] = useState<Record<string, boolean>>({});
+  const [inviteError, setInviteError] = useState<Record<string, string>>({});
+  const [inviteSuccess, setInviteSuccess] = useState<Record<string, string>>({});
+  const [copySuccess, setCopySuccess] = useState<Record<string, boolean>>({});
 
   const handleNameSave = async () => {
     if (editName === null) return;
@@ -104,6 +136,86 @@ const Me = () => {
       return next;
     });
     setWsSuccess((prev) => ({ ...prev, [workspaceId]: "Saved." }));
+  };
+
+  // ── Members panel helpers ─────────────────────────────────────
+  const loadMembers = async (workspaceId: string) => {
+    setMembersLoading((prev) => ({ ...prev, [workspaceId]: true }));
+    setMemberError((prev) => ({ ...prev, [workspaceId]: "" }));
+    const [{ data: memberData, error: memberErr }, { data: inviteData }] =
+      await Promise.all([
+        supabase.rpc("get_workspace_members", { p_workspace_id: workspaceId }),
+        supabase
+          .from("workspace_invites")
+          .select("*")
+          .eq("workspace_id", workspaceId)
+          .eq("status", "pending"),
+      ]);
+    setMembersLoading((prev) => ({ ...prev, [workspaceId]: false }));
+    if (memberErr) {
+      setMemberError((prev) => ({ ...prev, [workspaceId]: memberErr.message }));
+      return;
+    }
+    setMembers((prev) => ({ ...prev, [workspaceId]: (memberData as MemberRow[]) ?? [] }));
+    setInvites((prev) => ({ ...prev, [workspaceId]: (inviteData as InviteRow[]) ?? [] }));
+  };
+
+  const toggleMembers = (workspaceId: string) => {
+    const nowOpen = !membersOpen[workspaceId];
+    setMembersOpen((prev) => ({ ...prev, [workspaceId]: nowOpen }));
+    if (nowOpen && !members[workspaceId]) {
+      void loadMembers(workspaceId);
+    }
+  };
+
+  const handleInvite = async (workspaceId: string) => {
+    const email = inviteEmail[workspaceId]?.trim();
+    if (!email) {
+      setInviteError((prev) => ({ ...prev, [workspaceId]: "Email is required." }));
+      return;
+    }
+    setInviteLoading((prev) => ({ ...prev, [workspaceId]: true }));
+    setInviteError((prev) => ({ ...prev, [workspaceId]: "" }));
+    setInviteSuccess((prev) => ({ ...prev, [workspaceId]: "" }));
+    const { error } = await supabase.rpc("create_workspace_invite", {
+      p_workspace_id: workspaceId,
+      p_email: email,
+      p_role: "admin",
+    });
+    setInviteLoading((prev) => ({ ...prev, [workspaceId]: false }));
+    if (error) {
+      setInviteError((prev) => ({ ...prev, [workspaceId]: error.message }));
+      return;
+    }
+    setInviteEmail((prev) => ({ ...prev, [workspaceId]: "" }));
+    setInviteSuccess((prev) => ({ ...prev, [workspaceId]: "Invite created." }));
+    void loadMembers(workspaceId);
+  };
+
+  const handleRevoke = async (workspaceId: string, inviteId: string) => {
+    await supabase.rpc("revoke_workspace_invite", { p_invite_id: inviteId });
+    void loadMembers(workspaceId);
+  };
+
+  const handleRemoveMember = async (workspaceId: string, userId: string) => {
+    const { error } = await supabase.rpc("remove_workspace_member", {
+      p_workspace_id: workspaceId,
+      p_user_id: userId,
+    });
+    if (error) {
+      setMemberError((prev) => ({ ...prev, [workspaceId]: error.message }));
+      return;
+    }
+    void loadMembers(workspaceId);
+  };
+
+  const handleCopyLink = async (inviteId: string, token: string) => {
+    await navigator.clipboard.writeText(`${window.location.origin}/invite/${token}`);
+    setCopySuccess((prev) => ({ ...prev, [inviteId]: true }));
+    setTimeout(
+      () => setCopySuccess((prev) => ({ ...prev, [inviteId]: false })),
+      2000
+    );
   };
 
   const handleDeleteConfirm = async () => {
@@ -222,6 +334,18 @@ const Me = () => {
                 {role && (
                   <Chip label={role} size="small" color={ROLE_COLOR[role]} />
                 )}
+                {role && !isEditing && (
+                  <Tooltip title={membersOpen[ws.id] ? "Hide members" : "Manage members"}>
+                    <IconButton
+                      size="small"
+                      onClick={() => toggleMembers(ws.id)}
+                      aria-label="Toggle members panel"
+                      color={membersOpen[ws.id] ? "primary" : "default"}
+                    >
+                      <PeopleIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
                 {canManage && !isEditing && (
                   <Button
                     size="small"
@@ -301,6 +425,164 @@ const Me = () => {
                 <Alert severity="success" sx={{ mt: 1 }}>
                   {wsSuccess[ws.id]}
                 </Alert>
+              )}
+
+              {/* ── Members panel ────────────────────────────────── */}
+              {membersOpen[ws.id] && (
+                <Box mt={2}>
+                  <Divider sx={{ mb: 1.5 }} />
+
+                  {membersLoading[ws.id] ? (
+                    <Box display="flex" justifyContent="center" py={1}>
+                      <CircularProgress size={20} />
+                    </Box>
+                  ) : (
+                    <>
+                      {memberError[ws.id] && (
+                        <Alert severity="error" sx={{ mb: 1 }}>
+                          {memberError[ws.id]}
+                        </Alert>
+                      )}
+
+                      {/* Member list */}
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        MEMBERS
+                      </Typography>
+                      <Stack spacing={0.5} mt={0.5} mb={1.5}>
+                        {(members[ws.id] ?? []).map((m) => (
+                          <Stack
+                            key={m.user_id}
+                            direction="row"
+                            alignItems="center"
+                            spacing={1}
+                          >
+                            <Typography variant="body2" flexGrow={1}>
+                              {m.display_name ?? m.user_id.slice(0, 8) + "…"}
+                            </Typography>
+                            <Chip
+                              label={m.role}
+                              size="small"
+                              color={ROLE_COLOR[m.role as Role] ?? "default"}
+                            />
+                            {/* Only owner can remove; never show for the owner row */}
+                            {role === "owner" && m.role !== "owner" && (
+                              <Tooltip title="Remove member">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() =>
+                                    void handleRemoveMember(ws.id, m.user_id)
+                                  }
+                                  aria-label={`Remove ${m.display_name ?? m.user_id}`}
+                                >
+                                  <RemovePersonIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
+                        ))}
+                      </Stack>
+
+                      {/* Invite form — owner only for MVP */}
+                      {role === "owner" && (
+                        <>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            fontWeight={600}
+                          >
+                            INVITE AS ADMIN
+                          </Typography>
+                          <Stack direction="row" spacing={1} mt={0.5} mb={1.5}>
+                            <TextField
+                              size="small"
+                              label="Email address"
+                              type="email"
+                              value={inviteEmail[ws.id] ?? ""}
+                              onChange={(e) =>
+                                setInviteEmail((prev) => ({
+                                  ...prev,
+                                  [ws.id]: e.target.value,
+                                }))
+                              }
+                              sx={{ flexGrow: 1 }}
+                            />
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              disabled={!!inviteLoading[ws.id]}
+                              onClick={() => void handleInvite(ws.id)}
+                            >
+                              {inviteLoading[ws.id] ? "Sending…" : "Invite"}
+                            </Button>
+                          </Stack>
+                          {inviteError[ws.id] && (
+                            <Alert severity="error" sx={{ mb: 1 }}>
+                              {inviteError[ws.id]}
+                            </Alert>
+                          )}
+                          {inviteSuccess[ws.id] && (
+                            <Alert severity="success" sx={{ mb: 1 }}>
+                              {inviteSuccess[ws.id]}
+                            </Alert>
+                          )}
+                        </>
+                      )}
+
+                      {/* Pending invites — visible to managers (RLS gates this) */}
+                      {(invites[ws.id] ?? []).length > 0 && (
+                        <>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            fontWeight={600}
+                          >
+                            PENDING INVITES
+                          </Typography>
+                          <Stack spacing={0.5} mt={0.5}>
+                            {invites[ws.id].map((inv) => (
+                              <Stack
+                                key={inv.id}
+                                direction="row"
+                                alignItems="center"
+                                spacing={1}
+                              >
+                                <Typography variant="body2" flexGrow={1}>
+                                  {inv.email}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  expires{" "}
+                                  {new Date(inv.expires_at).toLocaleDateString()}
+                                </Typography>
+                                <Tooltip
+                                  title={copySuccess[inv.id] ? "Copied!" : "Copy invite link"}
+                                >
+                                  <IconButton
+                                    size="small"
+                                    onClick={() =>
+                                      void handleCopyLink(inv.id, inv.token)
+                                    }
+                                    color={copySuccess[inv.id] ? "success" : "default"}
+                                    aria-label="Copy invite link"
+                                  >
+                                    <CopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Button
+                                  size="small"
+                                  color="error"
+                                  onClick={() => void handleRevoke(ws.id, inv.id)}
+                                >
+                                  Revoke
+                                </Button>
+                              </Stack>
+                            ))}
+                          </Stack>
+                        </>
+                      )}
+                    </>
+                  )}
+                </Box>
               )}
             </Paper>
           );

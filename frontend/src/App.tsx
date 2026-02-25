@@ -16,6 +16,7 @@ import Register from "./pages/Register";
 import Welcome from "./pages/Welcome";
 import Me from "./pages/Me";
 import CreateWorkspace from "./pages/CreateWorkspace";
+import AcceptInvite from "./pages/AcceptInvite";
 import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 
@@ -89,6 +90,9 @@ function App() {
               path="/w/:workspaceSlug/settings"
               element={<Navigate to="/me" replace />}
             />
+
+            {/* ── Invite acceptance ────────────────────────────── */}
+            <Route path="/invite/:token" element={<AcceptInvite />} />
 
             {/* ── Redirect /dashboard → workspace home ─────────── */}
             <Route
