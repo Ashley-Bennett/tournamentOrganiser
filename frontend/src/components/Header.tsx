@@ -23,17 +23,20 @@ import { useWorkspace } from "../WorkspaceContext";
 
 const Header: React.FC = () => {
   const { user, logout, displayName } = useAuth();
-  const { workspace, workspaces, wPath } = useWorkspace();
+  const { workspace, workspaces, lastWorkspace, wPath } = useWorkspace();
   const navigate = useNavigate();
 
   const [wsMenuAnchor, setWsMenuAnchor] = useState<null | HTMLElement>(null);
+
+  // Use the last known workspace when not on a workspace-scoped URL (e.g. /me)
+  const activeWorkspace = workspace ?? lastWorkspace;
 
   const handleLogout = () => {
     logout();
     navigate("/");
   };
 
-  const homeHref = workspace ? wPath("/tournaments") : "/dashboard";
+  const homeHref = activeWorkspace ? wPath("/tournaments") : "/dashboard";
 
   return (
     <AppBar position="static">
@@ -64,11 +67,11 @@ const Header: React.FC = () => {
         </Box>
 
         {/* ── Workspace switcher chip ────────────────────────────── */}
-        {workspace && (
+        {activeWorkspace && (
           <>
             <Chip
               icon={<WorkspaceIcon />}
-              label={workspace.name}
+              label={activeWorkspace.name}
               deleteIcon={<ArrowDropDownIcon />}
               onDelete={(e) => setWsMenuAnchor(e.currentTarget as HTMLElement)}
               onClick={(e) => setWsMenuAnchor(e.currentTarget)}
@@ -93,7 +96,7 @@ const Header: React.FC = () => {
               {workspaces.map((ws) => (
                 <MenuItem
                   key={ws.id}
-                  selected={ws.id === workspace.id}
+                  selected={ws.id === activeWorkspace?.id}
                   onClick={() => {
                     navigate(`/w/${ws.slug}/tournaments`);
                     setWsMenuAnchor(null);
@@ -124,14 +127,14 @@ const Header: React.FC = () => {
             <Button
               color="inherit"
               component={RouterLink}
-              to={workspace ? wPath("/dashboard") : "/dashboard"}
+              to={wPath("/dashboard")}
             >
               Dashboard
             </Button>
             <Button
               color="inherit"
               component={RouterLink}
-              to={workspace ? wPath("/tournaments") : "/dashboard"}
+              to={wPath("/tournaments")}
             >
               Tournaments
             </Button>
@@ -158,7 +161,7 @@ const Header: React.FC = () => {
             <Button
               color="inherit"
               component={RouterLink}
-              to={workspace ? wPath("/tournaments/create") : "/dashboard"}
+              to={wPath("/tournaments/create")}
               variant="outlined"
               sx={{ color: "white", borderColor: "white" }}
             >

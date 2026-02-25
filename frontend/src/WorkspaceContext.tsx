@@ -36,7 +36,12 @@ interface WorkspaceContextType {
   roleFor: (workspaceId: string) => "owner" | "admin" | "judge" | "staff" | null;
   loading: boolean;
   error: string | null;
-  /** Navigate to a workspace-prefixed path within the current workspace */
+  /**
+   * The last workspace the user was actively in (persists across non-workspace
+   * pages like /me so the header chip and links remain meaningful).
+   */
+  lastWorkspace: Workspace | null;
+  /** Navigate to a workspace-prefixed path within the current (or last) workspace */
   wPath: (path: string) => string;
   /** Redirect to the user's first workspace dashboard after login */
   redirectToDefaultWorkspace: () => void;
@@ -58,6 +63,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const [memberships, setMemberships] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastWorkspace, setLastWorkspace] = useState<Workspace | null>(null);
 
   // Extract workspace slug from URL: /w/:workspaceSlug/...
   const currentSlug = useMemo(() => {
@@ -109,6 +115,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     return workspaces.find((w) => w.slug === currentSlug) ?? null;
   }, [currentSlug, workspaces]);
 
+  // Keep lastWorkspace up to date whenever the URL identifies a workspace
+  useEffect(() => {
+    if (workspace) setLastWorkspace(workspace);
+  }, [workspace]);
+
   const workspaceId = workspace?.id ?? null;
 
   const currentRole = useMemo(() => {
@@ -126,10 +137,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const wPath = useCallback(
     (path: string) => {
-      if (!workspace) return path;
-      return `/w/${workspace.slug}${path}`;
+      const ws = workspace ?? lastWorkspace;
+      if (!ws) return path;
+      return `/w/${ws.slug}${path}`;
     },
-    [workspace],
+    [workspace, lastWorkspace],
   );
 
   const redirectToDefaultWorkspace = useCallback(() => {
@@ -152,6 +164,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         roleFor,
         loading,
         error,
+        lastWorkspace,
         wPath,
         redirectToDefaultWorkspace,
         refreshWorkspaces,
