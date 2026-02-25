@@ -7,13 +7,21 @@ import {
   Stack,
   TextField,
   Button,
+  IconButton,
   Chip,
   Alert,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import {
   PersonOutline as PersonIcon,
   EmojiEventsOutlined as TrophyIcon,
   WorkspacesOutlined as WorkspaceIcon,
+  DeleteOutlined as DeleteIcon,
 } from "@mui/icons-material";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../AuthContext";
@@ -43,6 +51,11 @@ const Me = () => {
   const [wsLoading, setWsLoading] = useState<Record<string, boolean>>({});
   const [wsError, setWsError] = useState<Record<string, string>>({});
   const [wsSuccess, setWsSuccess] = useState<Record<string, string>>({});
+
+  // Workspace delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const handleNameSave = async () => {
     if (editName === null) return;
@@ -91,6 +104,23 @@ const Me = () => {
       return next;
     });
     setWsSuccess((prev) => ({ ...prev, [workspaceId]: "Saved." }));
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    setDeleteError("");
+    const { error } = await supabase
+      .from("workspaces")
+      .delete()
+      .eq("id", deleteTarget.id);
+    setDeleteLoading(false);
+    if (error) {
+      setDeleteError(error.message);
+      return;
+    }
+    setDeleteTarget(null);
+    refreshWorkspaces();
   };
 
   return (
@@ -169,6 +199,8 @@ const Me = () => {
         {workspaces.map((ws) => {
           const role = roleFor(ws.id) as Role | null;
           const canManage = role === "owner" || role === "admin";
+          const canDelete = role === "owner";
+          const isOnlyWorkspace = workspaces.length === 1;
           const isEditing = ws.id in wsEdit;
 
           return (
@@ -188,11 +220,7 @@ const Me = () => {
                   </Typography>
                 </Box>
                 {role && (
-                  <Chip
-                    label={role}
-                    size="small"
-                    color={ROLE_COLOR[role]}
-                  />
+                  <Chip label={role} size="small" color={ROLE_COLOR[role]} />
                 )}
                 {canManage && !isEditing && (
                   <Button
@@ -203,6 +231,29 @@ const Me = () => {
                   >
                     Edit
                   </Button>
+                )}
+                {canDelete && (
+                  <Tooltip
+                    title={
+                      isOnlyWorkspace
+                        ? "You can't delete your only workspace"
+                        : "Delete workspace"
+                    }
+                  >
+                    <span>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        disabled={isOnlyWorkspace}
+                        onClick={() =>
+                          setDeleteTarget({ id: ws.id, name: ws.name })
+                        }
+                        aria-label={`Delete ${ws.name}`}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                 )}
               </Stack>
 
@@ -286,6 +337,50 @@ const Me = () => {
           entries from a past event.
         </Typography>
       </Paper>
+
+      {/* ── Delete confirmation dialog ───────────────────────── */}
+      <Dialog
+        open={!!deleteTarget}
+        onClose={() => {
+          if (!deleteLoading) {
+            setDeleteTarget(null);
+            setDeleteError("");
+          }
+        }}
+      >
+        <DialogTitle>Delete &ldquo;{deleteTarget?.name}&rdquo;?</DialogTitle>
+        <DialogContent>
+          {deleteError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {deleteError}
+            </Alert>
+          )}
+          <DialogContentText>
+            This will permanently delete the workspace and{" "}
+            <strong>all tournaments, matches, and player data</strong> inside
+            it. This cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setDeleteTarget(null);
+              setDeleteError("");
+            }}
+            disabled={deleteLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={deleteLoading}
+            onClick={() => void handleDeleteConfirm()}
+          >
+            {deleteLoading ? "Deleting…" : "Delete workspace"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
