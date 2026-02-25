@@ -17,6 +17,7 @@ import Welcome from "./pages/Welcome";
 import Me from "./pages/Me";
 import CreateWorkspace from "./pages/CreateWorkspace";
 import AcceptInvite from "./pages/AcceptInvite";
+import ClaimPlayer from "./pages/ClaimPlayer";
 import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 
@@ -93,6 +94,9 @@ function App() {
 
             {/* ── Invite acceptance ────────────────────────────── */}
             <Route path="/invite/:token" element={<AcceptInvite />} />
+
+            {/* ── Player claim link ─────────────────────────────── */}
+            <Route path="/claim/:token" element={<ClaimPlayer />} />
 
             {/* ── Redirect /dashboard → workspace home ─────────── */}
             <Route

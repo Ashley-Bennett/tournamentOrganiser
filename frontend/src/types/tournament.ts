@@ -18,4 +18,5 @@ export interface TournamentPlayer {
   created_at: string;
   has_static_seating?: boolean;
   static_seat_number?: number | null;
+  user_id?: string | null;
 }

@@ -25,10 +25,19 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemButton,
+  InputAdornment,
 } from "@mui/material";
 import SeatIcon from "@mui/icons-material/EventSeat";
 import { PlayArrow as PlayArrowIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import LinkIcon from "@mui/icons-material/Link";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import PeopleIcon from "@mui/icons-material/People";
+import SearchIcon from "@mui/icons-material/Search";
 import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
@@ -49,7 +58,8 @@ const TournamentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { workspaceId, wPath } = useWorkspace();
+  const { workspaceId, wPath, currentRole } = useWorkspace();
+  const isManager = currentRole === "owner" || currentRole === "admin";
   const { tournament, setTournament, loading, error, setError } = useTournament(
     id,
     user,
@@ -62,6 +72,7 @@ const TournamentView: React.FC = () => {
     loading: playersLoading,
     error: playersError,
     setError: setPlayersError,
+    refetch: refetchPlayers,
   } = useTournamentPlayers(tournament?.id);
 
   const [newPlayerName, setNewPlayerName] = useState("");
@@ -78,6 +89,28 @@ const TournamentView: React.FC = () => {
   const [useSuggestedRounds, setUseSuggestedRounds] = useState(true);
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
   const playerNameInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Claim links ──────────────────────────────────────────────────────────
+  // claimTokens: player.id → token string (once generated)
+  // claimIds:    player.id → claim row id (for revoke)
+  // copiedId:    player.id currently showing "Copied!" tooltip
+  const [claimTokens, setClaimTokens] = useState<Record<string, string>>({});
+  const [claimIds, setClaimIds] = useState<Record<string, string>>({});
+  const [generatingClaimId, setGeneratingClaimId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // ── Known Players dialog ─────────────────────────────────────────────────
+  interface WorkspacePlayer {
+    user_id: string;
+    preferred_name: string | null;
+    display_name: string | null;
+  }
+  const [knownPlayersOpen, setKnownPlayersOpen] = useState(false);
+  const [knownPlayers, setKnownPlayers] = useState<WorkspacePlayer[]>([]);
+  const [knownPlayersLoading, setKnownPlayersLoading] = useState(false);
+  const [knownPlayersSearch, setKnownPlayersSearch] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [addingKnown, setAddingKnown] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -273,6 +306,91 @@ const TournamentView: React.FC = () => {
       );
     } finally {
       setSavingSeat(null);
+    }
+  };
+
+  // ── Claim link handlers ──────────────────────────────────────────────────
+
+  const handleGenerateClaimLink = async (playerId: string) => {
+    if (!tournament) return;
+    setGeneratingClaimId(playerId);
+    try {
+      const { data, error } = await supabase.rpc("create_player_claim_link", {
+        p_tournament_player_id: playerId,
+      });
+      if (error) throw new Error(error.message);
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) {
+        setClaimTokens((prev) => ({ ...prev, [playerId]: row.token as string }));
+        setClaimIds((prev) => ({ ...prev, [playerId]: row.claim_id as string }));
+      }
+    } catch (e: unknown) {
+      setPlayersError(e instanceof Error ? e.message : "Failed to generate claim link");
+    } finally {
+      setGeneratingClaimId(null);
+    }
+  };
+
+  const handleCopyClaimLink = (playerId: string, token: string) => {
+    const url = `${window.location.origin}/claim/${token}`;
+    void navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(playerId);
+      setTimeout(() => setCopiedId((prev) => (prev === playerId ? null : prev)), 2000);
+    });
+  };
+
+  const handleRevokeClaimLink = async (playerId: string) => {
+    const claimId = claimIds[playerId];
+    if (!claimId) return;
+    try {
+      const { error } = await supabase.rpc("revoke_player_claim_link", {
+        p_claim_id: claimId,
+      });
+      if (error) throw new Error(error.message);
+      setClaimTokens((prev) => { const n = { ...prev }; delete n[playerId]; return n; });
+      setClaimIds((prev) => { const n = { ...prev }; delete n[playerId]; return n; });
+    } catch (e: unknown) {
+      setPlayersError(e instanceof Error ? e.message : "Failed to revoke claim link");
+    }
+  };
+
+  // ── Known Players handlers ───────────────────────────────────────────────
+
+  const handleOpenKnownPlayers = async () => {
+    if (!workspaceId) return;
+    setKnownPlayersOpen(true);
+    setKnownPlayersLoading(true);
+    setSelectedUserIds(new Set());
+    setKnownPlayersSearch("");
+    try {
+      const { data, error } = await supabase.rpc("list_workspace_players", {
+        p_workspace_id: workspaceId,
+      });
+      if (error) throw new Error(error.message);
+      setKnownPlayers((data as WorkspacePlayer[]) ?? []);
+    } catch (e: unknown) {
+      setPlayersError(e instanceof Error ? e.message : "Failed to load known players");
+      setKnownPlayersOpen(false);
+    } finally {
+      setKnownPlayersLoading(false);
+    }
+  };
+
+  const handleAddKnownPlayers = async () => {
+    if (!tournament || selectedUserIds.size === 0) return;
+    setAddingKnown(true);
+    try {
+      const { error } = await supabase.rpc("add_known_players_to_tournament", {
+        p_tournament_id: tournament.id,
+        p_user_ids: Array.from(selectedUserIds),
+      });
+      if (error) throw new Error(error.message);
+      setKnownPlayersOpen(false);
+      await refetchPlayers();
+    } catch (e: unknown) {
+      setPlayersError(e instanceof Error ? e.message : "Failed to add known players");
+    } finally {
+      setAddingKnown(false);
     }
   };
 
@@ -575,6 +693,21 @@ const TournamentView: React.FC = () => {
             {playersError}
           </Alert>
         )}
+
+        {/* ── Add from Known Players (draft + manager only) ──────────── */}
+        {tournament.status === "draft" && isManager && (
+          <Box mb={2} display="flex" alignItems="center" gap={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<PeopleIcon />}
+              onClick={() => void handleOpenKnownPlayers()}
+            >
+              Add from Known Players
+            </Button>
+          </Box>
+        )}
+
         {!bulkMode ? (
           <Box
             component="form"
@@ -672,6 +805,7 @@ const TournamentView: React.FC = () => {
                   <TableCell>Name</TableCell>
                   <TableCell>Joined</TableCell>
                   <TableCell>Static Seating</TableCell>
+                  {isManager && <TableCell>Account</TableCell>}
                   {tournament.status === "draft" && (
                     <TableCell align="right">Remove</TableCell>
                   )}
@@ -680,6 +814,9 @@ const TournamentView: React.FC = () => {
               <TableBody>
                 {players.map((player) => {
                   const isSavingSeat = savingSeat === player.id;
+                  const claimToken = claimTokens[player.id];
+                  const isGenerating = generatingClaimId === player.id;
+                  const wasCopied = copiedId === player.id;
                   return (
                     <TableRow key={player.id}>
                       <TableCell>
@@ -749,6 +886,57 @@ const TournamentView: React.FC = () => {
                           )}
                         </Box>
                       </TableCell>
+
+                      {/* ── Account / Link column ───────────────── */}
+                      {isManager && (
+                        <TableCell>
+                          {player.user_id ? (
+                            <Chip label="Linked" size="small" color="success" />
+                          ) : claimToken ? (
+                            <Box display="flex" alignItems="center" gap={0.5} flexWrap="wrap">
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  fontFamily: "monospace",
+                                  maxWidth: 140,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {`${window.location.origin}/claim/${claimToken}`}
+                              </Typography>
+                              <Tooltip title={wasCopied ? "Copied!" : "Copy link"}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleCopyClaimLink(player.id, claimToken)}
+                                >
+                                  <ContentCopyIcon fontSize="inherit" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Revoke">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => void handleRevokeClaimLink(player.id)}
+                                >
+                                  <DeleteIcon fontSize="inherit" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          ) : (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={isGenerating ? <CircularProgress size={12} /> : <LinkIcon />}
+                              disabled={isGenerating}
+                              onClick={() => void handleGenerateClaimLink(player.id)}
+                            >
+                              Link
+                            </Button>
+                          )}
+                        </TableCell>
+                      )}
+
                       {tournament.status === "draft" && (
                         <TableCell align="right">
                           <IconButton
@@ -770,6 +958,94 @@ const TournamentView: React.FC = () => {
           </TableContainer>
         )}
       </Paper>
+
+      {/* ── Known Players dialog ──────────────────────────────────────── */}
+      <Dialog
+        open={knownPlayersOpen}
+        onClose={() => setKnownPlayersOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Add from Known Players</DialogTitle>
+        <DialogContent>
+          <TextField
+            placeholder="Search by name…"
+            size="small"
+            fullWidth
+            value={knownPlayersSearch}
+            onChange={(e) => setKnownPlayersSearch(e.target.value)}
+            sx={{ mb: 1, mt: 0.5 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+          {knownPlayersLoading ? (
+            <Box display="flex" justifyContent="center" py={3}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : knownPlayers.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" py={2}>
+              No known players yet. Players appear here once they claim a link.
+            </Typography>
+          ) : (
+            <List dense disablePadding sx={{ maxHeight: 360, overflowY: "auto" }}>
+              {knownPlayers
+                .filter((kp) => {
+                  const label = (kp.preferred_name ?? kp.display_name ?? "").toLowerCase();
+                  return label.includes(knownPlayersSearch.toLowerCase());
+                })
+                .map((kp) => {
+                  const label = kp.preferred_name ?? kp.display_name ?? kp.user_id;
+                  const selected = selectedUserIds.has(kp.user_id);
+                  // Grey out if already in this tournament
+                  const alreadyAdded = players.some((p) => p.user_id === kp.user_id);
+                  return (
+                    <ListItem key={kp.user_id} disablePadding>
+                      <ListItemButton
+                        disabled={alreadyAdded}
+                        onClick={() => {
+                          setSelectedUserIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(kp.user_id)) next.delete(kp.user_id);
+                            else next.add(kp.user_id);
+                            return next;
+                          });
+                        }}
+                      >
+                        <Checkbox
+                          edge="start"
+                          checked={selected}
+                          disabled={alreadyAdded}
+                          tabIndex={-1}
+                          disableRipple
+                          size="small"
+                        />
+                        <ListItemText
+                          primary={label}
+                          secondary={alreadyAdded ? "Already in tournament" : undefined}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setKnownPlayersOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={selectedUserIds.size === 0 || addingKnown}
+            onClick={() => void handleAddKnownPlayers()}
+          >
+            {addingKnown ? "Adding…" : `Add ${selectedUserIds.size > 0 ? selectedUserIds.size : ""} Player${selectedUserIds.size === 1 ? "" : "s"}`}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={confirmDeletePlayerId !== null}
