@@ -8,9 +8,11 @@ import React, {
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
 
-interface Profile {
+export interface Profile {
   id: string;
   display_name: string | null;
+  onboarding_intent: "organiser" | "player" | null;
+  default_workspace_id: string | null;
 }
 
 interface AuthContextType {
@@ -26,6 +28,7 @@ interface AuthContextType {
     password: string,
   ) => Promise<{ session: Session | null }>;
   logout: () => void;
+  updateProfile: (updates: Partial<Pick<Profile, "display_name" | "onboarding_intent" | "default_workspace_id">>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,7 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, display_name")
+      .select("id, display_name, onboarding_intent, default_workspace_id")
       .eq("id", userId)
       .maybeSingle();
     setProfile(data ?? null);
@@ -139,12 +142,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.removeItem("token");
   }, []);
 
+  const updateProfile = useCallback(
+    async (updates: Partial<Pick<Profile, "display_name" | "onboarding_intent" | "default_workspace_id">>) => {
+      if (!user) return;
+      const { data, error } = await supabase
+        .from("profiles")
+        .update(updates)
+        .eq("id", user.id)
+        .select("id, display_name, onboarding_intent, default_workspace_id")
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (data) setProfile(data);
+    },
+    [user],
+  );
+
   const displayName =
     profile?.display_name || user?.email || "User";
 
   return (
     <AuthContext.Provider
-      value={{ user, session, profile, displayName, loading, login, register, logout }}
+      value={{ user, session, profile, displayName, loading, login, register, logout, updateProfile }}
     >
       {children}
     </AuthContext.Provider>

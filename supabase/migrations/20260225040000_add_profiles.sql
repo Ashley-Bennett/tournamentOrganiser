@@ -7,9 +7,11 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id           UUID        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  display_name TEXT,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  id                   UUID        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  display_name         TEXT,
+  onboarding_intent    TEXT        CHECK (onboarding_intent IN ('organiser', 'player')),
+  default_workspace_id UUID        REFERENCES public.workspaces(id) ON DELETE SET NULL,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -32,18 +34,34 @@ CREATE POLICY "profiles_update_own"
 
 -- ============================================================
 -- Trigger: auto-create profile row when a user signs up
+--
+-- NOTE: Postgres fires row triggers in alphabetical order by
+-- trigger name. "on_auth_user_created" (workspace trigger) sorts
+-- before "on_auth_user_created_profile", so the personal workspace
+-- row already exists when this trigger runs — allowing us to
+-- set default_workspace_id in the same transaction.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.handle_new_user_profile()
 RETURNS TRIGGER
 LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_workspace_id UUID;
 BEGIN
-  INSERT INTO public.profiles (id, display_name)
+  -- Personal workspace was just created by the workspace trigger
+  SELECT id INTO v_workspace_id
+  FROM public.workspaces
+  WHERE created_by = NEW.id AND type = 'personal'
+  LIMIT 1;
+
+  INSERT INTO public.profiles (id, display_name, default_workspace_id)
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'name', NEW.email)
+    COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
+    v_workspace_id
   )
   ON CONFLICT (id) DO NOTHING;
+
   RETURN NEW;
 END;
 $$;

@@ -16,7 +16,12 @@ import { useAuth } from "../AuthContext";
 
 const Welcome = () => {
   const navigate = useNavigate();
-  const { displayName } = useAuth();
+  const { displayName, updateProfile } = useAuth();
+
+  const handleChoice = async (intent: "organiser" | "player", destination: string) => {
+    await updateProfile({ onboarding_intent: intent });
+    navigate(destination);
+  };
 
   return (
     <Box maxWidth={600} mx="auto" mt={8} textAlign="center">
@@ -28,12 +33,9 @@ const Welcome = () => {
       </Typography>
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={3} justifyContent="center">
-        <Card
-          variant="outlined"
-          sx={{ flex: 1, cursor: "pointer" }}
-        >
+        <Card variant="outlined" sx={{ flex: 1, cursor: "pointer" }}>
           <CardActionArea
-            onClick={() => navigate("/dashboard")}
+            onClick={() => void handleChoice("organiser", "/dashboard")}
             sx={{ p: 3, height: "100%" }}
           >
             <CardContent>
@@ -48,12 +50,9 @@ const Welcome = () => {
           </CardActionArea>
         </Card>
 
-        <Card
-          variant="outlined"
-          sx={{ flex: 1, cursor: "pointer" }}
-        >
+        <Card variant="outlined" sx={{ flex: 1, cursor: "pointer" }}>
           <CardActionArea
-            onClick={() => navigate("/me")}
+            onClick={() => void handleChoice("player", "/me")}
             sx={{ p: 3, height: "100%" }}
           >
             <CardContent>
@@ -72,7 +71,6 @@ const Welcome = () => {
       <Box mt={4}>
         <Button
           variant="text"
-          color="inherit"
           onClick={() => navigate("/dashboard")}
           sx={{ color: "text.secondary" }}
         >
