@@ -8,9 +8,16 @@ import React, {
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
 
+interface Profile {
+  id: string;
+  display_name: string | null;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
+  profile: Profile | null;
+  displayName: string;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (
@@ -28,7 +35,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Fetch the public.profiles row for the current user
+  const fetchProfile = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .eq("id", userId)
+      .maybeSingle();
+    setProfile(data ?? null);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -46,6 +64,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!isMounted) return;
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      if (currentSession?.user) {
+        await fetchProfile(currentSession.user.id);
+      }
 
       const {
         data: { subscription },
@@ -53,6 +74,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         if (!isMounted) return;
         setSession(newSession);
         setUser(newSession?.user ?? null);
+        if (newSession?.user) {
+          void fetchProfile(newSession.user.id);
+        } else {
+          setProfile(null);
+        }
         // Mirror access token into localStorage so existing API helper can keep sending it if needed.
         if (newSession?.access_token) {
           localStorage.setItem("token", newSession.access_token);
@@ -74,7 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       isMounted = false;
       authSubscription?.unsubscribe();
     };
-  }, []);
+  }, [fetchProfile]);
 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -113,9 +139,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.removeItem("token");
   }, []);
 
+  const displayName =
+    profile?.display_name || user?.email || "User";
+
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, login, register, logout }}
+      value={{ user, session, profile, displayName, loading, login, register, logout }}
     >
       {children}
     </AuthContext.Provider>

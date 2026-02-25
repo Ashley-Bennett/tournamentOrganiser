@@ -13,6 +13,8 @@ import Leagues from "./pages/Leagues";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Welcome from "./pages/Welcome";
+import Me from "./pages/Me";
 import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 
@@ -52,6 +54,26 @@ function App() {
 
             {/* ── Public pairings page (no auth required) ─────── */}
             <Route path="/public/t/:publicSlug" element={<TournamentPairings />} />
+
+            {/* ── Post-signup intent screen ────────────────────── */}
+            <Route
+              path="/welcome"
+              element={
+                <RequireAuth>
+                  <Welcome />
+                </RequireAuth>
+              }
+            />
+
+            {/* ── Player profile ───────────────────────────────── */}
+            <Route
+              path="/me"
+              element={
+                <RequireAuth>
+                  <Me />
+                </RequireAuth>
+              }
+            />
 
             {/* ── Redirect /dashboard → workspace home ─────────── */}
             <Route

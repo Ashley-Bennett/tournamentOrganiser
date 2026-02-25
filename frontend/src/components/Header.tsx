@@ -18,7 +18,7 @@ import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 
 const Header: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, displayName } = useAuth();
   const { workspace, wPath } = useWorkspace();
   const navigate = useNavigate();
 
@@ -87,22 +87,13 @@ const Header: React.FC = () => {
             >
               Tournaments
             </Button>
-            <Tooltip title="Coming soon">
-              <span>
-                <Button
-                  color="inherit"
-                  disabled
-                  sx={{
-                    "&.Mui-disabled": {
-                      color: "rgba(255,255,255,0.85)",
-                      opacity: 1,
-                    },
-                  }}
-                >
-                  Players
-                </Button>
-              </span>
-            </Tooltip>
+            <Button
+              color="inherit"
+              component={RouterLink}
+              to="/me"
+            >
+              My Profile
+            </Button>
             <Tooltip title="Coming soon">
               <span>
                 <Button
@@ -129,7 +120,7 @@ const Header: React.FC = () => {
               Create Tournament
             </Button>
             <Typography variant="body1" sx={{ ml: 2 }}>
-              {(user.user_metadata?.name as string) || user.email || "User"}
+              {displayName}
             </Typography>
             <Button color="inherit" onClick={handleLogout}>
               Logout

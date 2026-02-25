@@ -10,7 +10,8 @@
       "mcp__claude_ai_Supabase__get_logs",
       "Bash(supabase.exe migration:*)",
       "Bash(supabase.exe db push:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(npx supabase db reset:*)"
     ]
   }
 }

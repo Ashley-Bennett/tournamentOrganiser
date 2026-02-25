@@ -23,9 +23,9 @@ const Register = () => {
   // Redirect if user becomes logged in
   useEffect(() => {
     if (user && success) {
-      // User was logged in after registration, redirect to dashboard
+      // New user: send them to the intent/welcome screen
       const timer = setTimeout(() => {
-        navigate("/dashboard");
+        navigate("/welcome");
       }, 1500);
       return () => clearTimeout(timer);
     }
@@ -42,7 +42,7 @@ const Register = () => {
       if (session) {
         // User is logged in immediately (auto-confirm enabled). Only set success;
         // the useEffect will handle the single redirect when user updates.
-        setSuccess("Registration successful! Redirecting to dashboard...");
+        setSuccess("Registration successful! Setting up your account…");
       } else {
         // Email confirmation required
         setSuccess(

@@ -41,7 +41,7 @@ BEGIN
   INSERT INTO public.profiles (id, display_name)
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.email)
+    COALESCE(NEW.raw_user_meta_data->>'name', NEW.email)
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
