@@ -110,13 +110,6 @@ const Header: React.FC = () => {
             <Button
               color="inherit"
               component={RouterLink}
-              to={wPath("/settings")}
-            >
-              Settings
-            </Button>
-            <Button
-              color="inherit"
-              component={RouterLink}
               to={workspace ? wPath("/tournaments/create") : "/dashboard"}
               variant="outlined"
               sx={{ color: "white", borderColor: "white" }}

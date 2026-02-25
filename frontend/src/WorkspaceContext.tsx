@@ -32,6 +32,8 @@ interface WorkspaceContextType {
   workspaces: Workspace[];
   /** Current user's role in the active workspace (null if not in a workspace) */
   currentRole: "owner" | "admin" | "judge" | "staff" | null;
+  /** Look up the user's role in any workspace by ID */
+  roleFor: (workspaceId: string) => "owner" | "admin" | "judge" | "staff" | null;
   loading: boolean;
   error: string | null;
   /** Navigate to a workspace-prefixed path within the current workspace */
@@ -116,6 +118,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   }, [workspace, memberships]);
 
+  const roleFor = useCallback(
+    (workspaceId: string) =>
+      memberships.find((m) => m.workspaces.id === workspaceId)?.role ?? null,
+    [memberships],
+  );
+
   const wPath = useCallback(
     (path: string) => {
       if (!workspace) return path;
@@ -141,6 +149,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         workspaceId,
         workspaces,
         currentRole,
+        roleFor,
         loading,
         error,
         wPath,
