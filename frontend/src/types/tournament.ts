@@ -10,6 +10,8 @@ export interface TournamentSummary {
   num_rounds: number | null;
   created_at: string;
   created_by: string;
+  is_public?: boolean;
+  public_slug?: string | null;
 }
 
 export interface TournamentPlayer {

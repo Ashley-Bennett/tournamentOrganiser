@@ -234,12 +234,16 @@ const Me = () => {
   };
 
   const handleCopyLink = async (inviteId: string, token: string) => {
-    await navigator.clipboard.writeText(`${window.location.origin}/invite/${token}`);
-    setCopySuccess((prev) => ({ ...prev, [inviteId]: true }));
-    setTimeout(
-      () => setCopySuccess((prev) => ({ ...prev, [inviteId]: false })),
-      2000
-    );
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/invite/${token}`);
+      setCopySuccess((prev) => ({ ...prev, [inviteId]: true }));
+      setTimeout(
+        () => setCopySuccess((prev) => ({ ...prev, [inviteId]: false })),
+        2000
+      );
+    } catch {
+      setInviteError((prev) => ({ ...prev, [inviteId]: "Failed to copy link." }));
+    }
   };
 
   const handleDeleteConfirm = async () => {

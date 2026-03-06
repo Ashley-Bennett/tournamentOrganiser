@@ -22,16 +22,7 @@ import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
-
-interface TournamentSummary {
-  id: string;
-  name: string;
-  status: string;
-  tournament_type: string;
-  num_rounds: number | null;
-  created_at: string;
-  created_by: string;
-}
+import { TournamentSummary } from "../types/tournament";
 
 interface Match {
   id: string;

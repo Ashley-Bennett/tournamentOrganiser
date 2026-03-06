@@ -331,12 +331,15 @@ const TournamentView: React.FC = () => {
     }
   };
 
-  const handleCopyClaimLink = (playerId: string, token: string) => {
+  const handleCopyClaimLink = async (playerId: string, token: string) => {
     const url = `${window.location.origin}/claim/${token}`;
-    void navigator.clipboard.writeText(url).then(() => {
+    try {
+      await navigator.clipboard.writeText(url);
       setCopiedId(playerId);
       setTimeout(() => setCopiedId((prev) => (prev === playerId ? null : prev)), 2000);
-    });
+    } catch {
+      setPlayersError("Failed to copy link.");
+    }
   };
 
   const handleRevokeClaimLink = async (playerId: string) => {

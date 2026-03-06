@@ -20,6 +20,9 @@
       "Bash(psql:*)",
       "Bash(npx supabase db execute:*)",
       "Bash(docker exec:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\ashle\\Code\\tournamentOrganiser\\frontend\\src\\pages"
     ]
   }
 }

@@ -60,6 +60,7 @@ import {
   assignMatchNumbers,
   type SeatConflict,
 } from "../utils/tournamentUtils";
+import { TournamentSummary } from "../types/tournament";
 
 interface TournamentPlayer {
   id: string;
@@ -68,18 +69,6 @@ interface TournamentPlayer {
   dropped_at_round: number | null;
   has_static_seating: boolean;
   static_seat_number: number | null;
-}
-
-interface TournamentSummary {
-  id: string;
-  name: string;
-  status: string;
-  tournament_type: string;
-  num_rounds: number | null;
-  created_at: string;
-  created_by: string;
-  is_public: boolean;
-  public_slug: string | null;
 }
 
 interface Match {

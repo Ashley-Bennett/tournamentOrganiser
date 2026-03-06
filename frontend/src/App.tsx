@@ -8,13 +8,12 @@ import TournamentView from "./pages/TournamentView";
 import TournamentMatches from "./pages/TournamentMatches";
 import TournamentLeaderboard from "./pages/TournamentLeaderboard";
 import TournamentPairings from "./pages/TournamentPairings";
-import Players from "./pages/Players";
-import Leagues from "./pages/Leagues";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Welcome from "./pages/Welcome";
 import Me from "./pages/Me";
+import WorkspaceSettings from "./pages/WorkspaceSettings";
 import CreateWorkspace from "./pages/CreateWorkspace";
 import AcceptInvite from "./pages/AcceptInvite";
 import ClaimPlayer from "./pages/ClaimPlayer";
@@ -89,7 +88,11 @@ function App() {
             />
             <Route
               path="/w/:workspaceSlug/settings"
-              element={<Navigate to="/me" replace />}
+              element={
+                <RequireAuth>
+                  <WorkspaceSettings />
+                </RequireAuth>
+              }
             />
 
             {/* ── Invite acceptance ────────────────────────────── */}
@@ -162,22 +165,6 @@ function App() {
               element={
                 <RequireAuth>
                   <TournamentLeaderboard />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/w/:workspaceSlug/players"
-              element={
-                <RequireAuth>
-                  <Players />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/w/:workspaceSlug/leagues"
-              element={
-                <RequireAuth>
-                  <Leagues />
                 </RequireAuth>
               }
             />
