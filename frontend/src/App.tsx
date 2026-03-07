@@ -6,7 +6,6 @@ import Tournaments from "./pages/Tournaments";
 import CreateTournament from "./pages/CreateTournament";
 import TournamentView from "./pages/TournamentView";
 import TournamentMatches from "./pages/TournamentMatches";
-import TournamentLeaderboard from "./pages/TournamentLeaderboard";
 import TournamentPairings from "./pages/TournamentPairings";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -53,9 +52,10 @@ function RootRoute() {
 function App() {
   return (
     <WorkspaceProvider>
-      <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
         <Header />
-        <Container component="main" sx={{ flexGrow: 1, py: 3 }}>
+        <Box sx={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+        <Container component="main" sx={{ py: 3, display: "flex", flexDirection: "column", minHeight: "100%" }}>
           <Routes>
             {/* ── Public ───────────────────────────────────────── */}
             <Route path="/" element={<RootRoute />} />
@@ -168,16 +168,9 @@ function App() {
                 </RequireAuth>
               }
             />
-            <Route
-              path="/w/:workspaceSlug/tournaments/:id/leaderboard"
-              element={
-                <RequireAuth>
-                  <TournamentLeaderboard />
-                </RequireAuth>
-              }
-            />
           </Routes>
         </Container>
+        </Box>
       </Box>
     </WorkspaceProvider>
   );

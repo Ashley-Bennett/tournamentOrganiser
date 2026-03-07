@@ -4,18 +4,10 @@ import {
   Box,
   Typography,
   Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Alert,
   Button,
-  Chip,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
 import { useAuth } from "../AuthContext";
@@ -23,6 +15,7 @@ import { useWorkspace } from "../WorkspaceContext";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { TournamentSummary } from "../types/tournament";
+import StandingsTable from "../components/StandingsTable";
 
 interface Match {
   id: string;
@@ -77,7 +70,6 @@ const TournamentLeaderboard: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Fetch tournament
         const { data: tournamentData, error: tournamentError } = await supabase
           .from("tournaments")
           .select(
@@ -101,7 +93,6 @@ const TournamentLeaderboard: React.FC = () => {
 
         setTournament(tournamentData as TournamentSummary);
 
-        // Fetch all matches
         const { data: matchesData, error: matchesError } = await supabase
           .from("tournament_matches")
           .select("*")
@@ -120,16 +111,11 @@ const TournamentLeaderboard: React.FC = () => {
           return;
         }
 
-        // Fetch player names
         const playerIds = new Set<string>();
         matchesData.forEach((match) => {
           playerIds.add(match.player1_id);
-          if (match.player2_id) {
-            playerIds.add(match.player2_id);
-          }
-          if (match.winner_id) {
-            playerIds.add(match.winner_id);
-          }
+          if (match.player2_id) playerIds.add(match.player2_id);
+          if (match.winner_id) playerIds.add(match.winner_id);
         });
 
         const { data: playersData, error: playersError } = await supabase
@@ -146,14 +132,12 @@ const TournamentLeaderboard: React.FC = () => {
           playersMap.set(player.id, player.name);
         });
 
-        // Load all tournament players with drop status
         const { data: allPlayersData } = await supabase
           .from("tournament_players")
           .select("id, name, dropped, dropped_at_round")
           .eq("tournament_id", id);
         setPlayers((allPlayersData as LeaderboardPlayer[]) ?? []);
 
-        // Combine matches with player names
         const matchesWithPlayers: MatchWithPlayers[] = matchesData.map(
           (match) => ({
             ...match,
@@ -191,9 +175,7 @@ const TournamentLeaderboard: React.FC = () => {
     return m;
   }, [players]);
 
-  if (authLoading || loading) {
-    return <PageLoading />;
-  }
+  if (authLoading || loading) return <PageLoading />;
 
   if (error || !tournament) {
     return (
@@ -219,15 +201,8 @@ const TournamentLeaderboard: React.FC = () => {
     );
   }
 
-  const getRankDisplay = (rank: number): string => {
-    if (rank === 1) return "🥇";
-    if (rank === 2) return "🥈";
-    if (rank === 3) return "🥉";
-    return `${rank}`;
-  };
-
   return (
-    <Box>
+    <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
       <Box display="flex" alignItems="center" mb={3}>
         <Button
           startIcon={<ArrowBackIcon />}
@@ -237,7 +212,7 @@ const TournamentLeaderboard: React.FC = () => {
           Back to tournament
         </Button>
         <Typography variant="h4" component="h1">
-          {tournament.name} - Final Standings
+          {tournament.name} — Final Standings
         </Typography>
       </Box>
 
@@ -247,141 +222,17 @@ const TournamentLeaderboard: React.FC = () => {
         </Alert>
       )}
 
-      <Paper sx={{ overflow: "hidden" }}>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: "bold" }}>Rank</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>Player</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }} align="right">
-                  Record
-                </TableCell>
-                <TableCell sx={{ fontWeight: "bold" }} align="right">
-                  Match Points
-                </TableCell>
-                <TableCell sx={{ fontWeight: "bold" }} align="right">
-                  OMW%
-                </TableCell>
-                <TableCell sx={{ fontWeight: "bold" }} align="right">
-                  OOMW%
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {finalStandings.map((player, index) => {
-                const rank = index + 1;
-                const isTopThree = rank <= 3;
-                const droppedRound = droppedMap.get(player.id);
-                const isDropped = droppedRound !== undefined;
-                return (
-                  <TableRow
-                    key={player.id}
-                    sx={{
-                      opacity: isDropped ? 0.65 : 1,
-                      backgroundColor: isDropped
-                        ? "action.hover"
-                        : isTopThree
-                          ? rank === 1
-                            ? "rgba(255, 215, 0, 0.1)"
-                            : rank === 2
-                              ? "rgba(192, 192, 192, 0.1)"
-                              : "rgba(205, 127, 50, 0.1)"
-                          : "transparent",
-                      "&:hover": {
-                        backgroundColor: isTopThree
-                          ? rank === 1
-                            ? "rgba(255, 215, 0, 0.15)"
-                            : rank === 2
-                              ? "rgba(192, 192, 192, 0.15)"
-                              : "rgba(205, 127, 50, 0.15)"
-                          : "rgba(0, 0, 0, 0.04)",
-                      },
-                    }}
-                  >
-                    <TableCell>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        {isTopThree && (
-                          <EmojiEventsIcon
-                            sx={{
-                              color:
-                                rank === 1
-                                  ? "gold"
-                                  : rank === 2
-                                    ? "silver"
-                                    : "#CD7F32",
-                            }}
-                          />
-                        )}
-                        <Typography
-                          variant="body1"
-                          sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
-                        >
-                          {getRankDisplay(rank)}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography
-                        variant="body1"
-                        sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
-                      >
-                        {player.name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Box
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="flex-end"
-                        gap={1}
-                        sx={{ flexWrap: "nowrap" }}
-                      >
-                        {isDropped && (
-                          <Chip
-                            label={`Dropped Rd ${droppedRound}`}
-                            size="small"
-                            variant="outlined"
-                            color="default"
-                            sx={{ whiteSpace: "nowrap" }}
-                          />
-                        )}
-                        <Typography
-                          variant="body2"
-                          sx={{ whiteSpace: "nowrap" }}
-                        >
-                          {player.wins}-{player.losses}-{player.draws}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography
-                        variant="body1"
-                        sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
-                      >
-                        {player.matchPoints}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2">
-                        {(player.opponentMatchWinPercentage * 100).toFixed(1)}%
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2">
-                        {(
-                          player.opponentOpponentMatchWinPercentage * 100
-                        ).toFixed(1)}
-                        %
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+      {finalStandings.length === 0 ? (
+        <Paper sx={{ p: 3 }}>
+          <Typography color="text.secondary">
+            No standings available yet.
+          </Typography>
+        </Paper>
+      ) : (
+        <Box sx={{ flex: 1, minHeight: 0 }}>
+          <StandingsTable standings={finalStandings} droppedMap={droppedMap} />
+        </Box>
+      )}
     </Box>
   );
 };

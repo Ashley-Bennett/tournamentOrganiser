@@ -37,7 +37,6 @@ import {
 } from "@mui/material";
 import PageLoading from "../components/PageLoading";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -62,6 +61,7 @@ import {
   type SeatConflict,
 } from "../utils/tournamentUtils";
 import { TournamentSummary } from "../types/tournament";
+import StandingsTable from "../components/StandingsTable";
 
 interface TournamentPlayer {
   id: string;
@@ -2191,196 +2191,30 @@ const TournamentMatches: React.FC = () => {
                   {((): ReactNode => {
                     // Standings tab
                     if (selectedRound === "standings") {
-                      const getRankDisplay = (rank: number): string => {
-                        if (rank === 1) return "🥇";
-                        if (rank === 2) return "🥈";
-                        if (rank === 3) return "🥉";
-                        return `${rank}`;
-                      };
-
                       return (
                         <Box>
-                          <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                            Final Standings
-                          </Typography>
+                          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                            <Typography variant="h6">
+                              Final Standings
+                            </Typography>
+                            <Button
+                              size="small"
+                              endIcon={<OpenInNewIcon />}
+                              onClick={() => navigate(wPath(`/tournaments/${tournament.id}/pairings`))}
+                            >
+                              View on pairings page
+                            </Button>
+                          </Box>
                           {finalStandings.length === 0 ? (
                             <Typography variant="body2" color="text.secondary">
                               No standings available yet. Complete some matches
                               to see standings.
                             </Typography>
                           ) : (
-                            <TableContainer>
-                              <Table>
-                                <TableHead>
-                                  <TableRow>
-                                    <TableCell sx={{ fontWeight: "bold" }}>
-                                      Rank
-                                    </TableCell>
-                                    <TableCell sx={{ fontWeight: "bold" }}>
-                                      Player
-                                    </TableCell>
-                                    <TableCell
-                                      sx={{ fontWeight: "bold" }}
-                                      align="right"
-                                    >
-                                      Record
-                                    </TableCell>
-                                    <TableCell
-                                      sx={{ fontWeight: "bold" }}
-                                      align="right"
-                                    >
-                                      Match Points
-                                    </TableCell>
-                                    <TableCell
-                                      sx={{ fontWeight: "bold" }}
-                                      align="right"
-                                    >
-                                      OMW%
-                                    </TableCell>
-                                    <TableCell
-                                      sx={{ fontWeight: "bold" }}
-                                      align="right"
-                                    >
-                                      OOMW%
-                                    </TableCell>
-                                  </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                  {finalStandings.map((player, index) => {
-                                    const rank = index + 1;
-                                    const isTopThree = rank <= 3;
-                                    const droppedAtRound =
-                                      droppedPlayersMap.get(player.id);
-                                    const isDropped = droppedPlayersMap.has(
-                                      player.id,
-                                    );
-                                    return (
-                                      <TableRow
-                                        key={player.id}
-                                        sx={{
-                                          opacity: isDropped ? 0.7 : 1,
-                                          backgroundColor: isTopThree
-                                            ? rank === 1
-                                              ? "rgba(255, 215, 0, 0.1)"
-                                              : rank === 2
-                                                ? "rgba(192, 192, 192, 0.1)"
-                                                : "rgba(205, 127, 50, 0.1)"
-                                            : "transparent",
-                                          "&:hover": {
-                                            backgroundColor: isTopThree
-                                              ? rank === 1
-                                                ? "rgba(255, 215, 0, 0.15)"
-                                                : rank === 2
-                                                  ? "rgba(192, 192, 192, 0.15)"
-                                                  : "rgba(205, 127, 50, 0.15)"
-                                              : "rgba(0, 0, 0, 0.04)",
-                                          },
-                                        }}
-                                      >
-                                        <TableCell>
-                                          <Box
-                                            display="flex"
-                                            alignItems="center"
-                                            gap={1}
-                                          >
-                                            {isTopThree && (
-                                              <EmojiEventsIcon
-                                                sx={{
-                                                  color:
-                                                    rank === 1
-                                                      ? "gold"
-                                                      : rank === 2
-                                                        ? "silver"
-                                                        : "#CD7F32",
-                                                }}
-                                              />
-                                            )}
-                                            <Typography
-                                              variant="body1"
-                                              sx={{
-                                                fontWeight: isTopThree
-                                                  ? "bold"
-                                                  : "normal",
-                                              }}
-                                            >
-                                              {getRankDisplay(rank)}
-                                            </Typography>
-                                          </Box>
-                                        </TableCell>
-                                        <TableCell>
-                                          <Typography
-                                            variant="body1"
-                                            sx={{
-                                              fontWeight: isTopThree
-                                                ? "bold"
-                                                : "normal",
-                                            }}
-                                          >
-                                            {player.name}
-                                          </Typography>
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          <Box
-                                            display="flex"
-                                            alignItems="center"
-                                            justifyContent="flex-end"
-                                            gap={1}
-                                            sx={{ flexWrap: "nowrap" }}
-                                          >
-                                            {isDropped && (
-                                              <Chip
-                                                label={`Dropped Rd ${droppedAtRound ?? "?"}`}
-                                                size="small"
-                                                variant="outlined"
-                                                color="default"
-                                                sx={{ whiteSpace: "nowrap" }}
-                                              />
-                                            )}
-                                            <Typography
-                                              variant="body2"
-                                              sx={{ whiteSpace: "nowrap" }}
-                                            >
-                                              {player.wins}-{player.losses}-
-                                              {player.draws}
-                                            </Typography>
-                                          </Box>
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          <Typography
-                                            variant="body1"
-                                            sx={{
-                                              fontWeight: isTopThree
-                                                ? "bold"
-                                                : "normal",
-                                            }}
-                                          >
-                                            {player.matchPoints}
-                                          </Typography>
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          <Typography variant="body2">
-                                            {(
-                                              player.opponentMatchWinPercentage *
-                                              100
-                                            ).toFixed(1)}
-                                            %
-                                          </Typography>
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          <Typography variant="body2">
-                                            {(
-                                              player.opponentOpponentMatchWinPercentage *
-                                              100
-                                            ).toFixed(1)}
-                                            %
-                                          </Typography>
-                                        </TableCell>
-                                      </TableRow>
-                                    );
-                                  })}
-                                </TableBody>
-                              </Table>
-                            </TableContainer>
+                            <StandingsTable
+                              standings={finalStandings}
+                              droppedMap={droppedPlayersMap}
+                            />
                           )}
                         </Box>
                       );

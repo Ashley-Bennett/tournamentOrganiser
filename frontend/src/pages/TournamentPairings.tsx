@@ -20,6 +20,7 @@ import {
 import { supabase } from "../supabaseClient";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
+import StandingsTable from "../components/StandingsTable";
 
 interface Tournament {
   id: string;
@@ -33,6 +34,7 @@ interface Player {
   id: string;
   name: string;
   dropped: boolean;
+  dropped_at_round: number | null;
 }
 
 interface Match {
@@ -116,7 +118,7 @@ const TournamentPairings: React.FC = () => {
       // Fetch players
       const { data: pData, error: pErr } = await supabase
         .from("tournament_players")
-        .select("id, name, dropped")
+        .select("id, name, dropped, dropped_at_round")
         .eq("tournament_id", tournamentId);
 
       if (pErr) {
@@ -213,6 +215,14 @@ const TournamentPairings: React.FC = () => {
     return sortByTieBreakers(raw);
   }, [matches, players]);
 
+  const droppedMap = useMemo(() => {
+    const m = new Map<string, number | null>();
+    players.forEach((p) => {
+      if (p.dropped) m.set(p.id, p.dropped_at_round);
+    });
+    return m;
+  }, [players]);
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" py={8}>
@@ -290,69 +300,12 @@ const TournamentPairings: React.FC = () => {
   // ── FINAL STANDINGS ─────────────────────────────────────────────────────────
   if (isStandings) {
     return (
-      <Box>
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
         {header}
         {roundTabs}
-        <Paper variant="outlined">
-          <Box px={2} py={1}>
-            <Typography variant="subtitle2" fontWeight={600}>
-              Final Standings
-            </Typography>
-          </Box>
-          <Divider />
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ width: 32, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>#</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>Player</TableCell>
-                  <TableCell sx={{ width: 60, textAlign: "right", fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>Record</TableCell>
-                  <TableCell sx={{ width: 44, textAlign: "right", fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>Pts</TableCell>
-                  <TableCell sx={{ width: 60, textAlign: "right", fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>OMW%</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {standings.map((s, i) => {
-                  const dropped = players.find((p) => p.id === s.id)?.dropped;
-                  const omw = Math.round(s.opponentMatchWinPercentage * 100);
-                  return (
-                    <TableRow key={s.id} hover sx={{ opacity: dropped ? 0.5 : 1 }}>
-                      <TableCell sx={{ color: "text.secondary", fontSize: "0.85rem", fontWeight: i < 3 ? 700 : 400 }}>
-                        {i + 1}
-                      </TableCell>
-                      <TableCell
-                        sx={{
-                          fontSize: "0.9rem",
-                          fontWeight: i < 3 ? 600 : 400,
-                          maxWidth: 0,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {s.name}
-                        {dropped && (
-                          <Typography component="span" variant="caption" color="text.disabled" sx={{ ml: 0.5 }}>
-                            (dropped)
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "right", color: "text.secondary", fontSize: "0.85rem" }}>
-                        {s.wins}-{s.losses}-{s.draws}
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "right", fontWeight: 700, fontSize: "0.9rem" }}>
-                        {s.matchPoints}
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "right", color: "text.secondary", fontSize: "0.85rem" }}>
-                        {omw}%
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
+        <Box sx={{ flex: 1, minHeight: 0 }}>
+          <StandingsTable standings={standings} droppedMap={droppedMap} />
+        </Box>
         {footer}
       </Box>
     );
