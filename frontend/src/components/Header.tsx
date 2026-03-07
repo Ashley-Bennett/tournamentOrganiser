@@ -12,11 +12,17 @@ import {
   Menu,
   MenuItem,
   Divider,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
 } from "@mui/material";
 import {
   SportsEsports as TournamentIcon,
   WorkspacesOutlined as WorkspaceIcon,
   ArrowDropDown as ArrowDropDownIcon,
+  Menu as MenuIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
@@ -25,8 +31,8 @@ const Header: React.FC = () => {
   const { user, logout, displayName } = useAuth();
   const { workspace, workspaces, lastWorkspace, wPath } = useWorkspace();
   const navigate = useNavigate();
-
   const [wsMenuAnchor, setWsMenuAnchor] = useState<null | HTMLElement>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Use the last known workspace when not on a workspace-scoped URL (e.g. /me)
   const activeWorkspace = workspace ?? lastWorkspace;
@@ -34,6 +40,11 @@ const Header: React.FC = () => {
   const handleLogout = () => {
     logout();
     navigate("/");
+  };
+
+  const handleNavClick = (to: string) => {
+    navigate(to);
+    setDrawerOpen(false);
   };
 
   const homeHref = activeWorkspace ? wPath("/tournaments") : "/dashboard";
@@ -123,57 +134,106 @@ const Header: React.FC = () => {
 
         {/* ── Nav ───────────────────────────────────────────────── */}
         {user ? (
-          <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-            <Button
-              color="inherit"
-              component={RouterLink}
-              to={wPath("/dashboard")}
-            >
-              Dashboard
-            </Button>
-            <Button
-              color="inherit"
-              component={RouterLink}
-              to={wPath("/tournaments")}
-            >
-              Tournaments
-            </Button>
-            <Button color="inherit" component={RouterLink} to="/me">
-              My Profile
-            </Button>
-            <Tooltip title="Coming soon">
-              <span>
-                <Button
-                  color="inherit"
-                  disabled
-                  sx={{
-                    "&.Mui-disabled": {
-                      color: "rgba(255,255,255,0.85)",
-                      opacity: 1,
-                    },
-                  }}
-                >
-                  Leagues
-                </Button>
-              </span>
-            </Tooltip>
+          <>
+            {/* Desktop nav */}
+            <Box sx={{ display: { xs: "none", sm: "flex" }, gap: 2, alignItems: "center" }}>
+              <Button color="inherit" component={RouterLink} to={wPath("/dashboard")}>
+                Dashboard
+              </Button>
+              <Button color="inherit" component={RouterLink} to={wPath("/tournaments")}>
+                Tournaments
+              </Button>
+              <Button color="inherit" component={RouterLink} to="/me">
+                My Profile
+              </Button>
+              <Tooltip title="Coming soon">
+                <span>
+                  <Button
+                    color="inherit"
+                    disabled
+                    sx={{ "&.Mui-disabled": { color: "rgba(255,255,255,0.85)", opacity: 1 } }}
+                  >
+                    Leagues
+                  </Button>
+                </span>
+              </Tooltip>
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to={wPath("/tournaments/create")}
+                variant="outlined"
+                sx={{ color: "white", borderColor: "white" }}
+              >
+                Create Tournament
+              </Button>
+              <Typography variant="body1" sx={{ ml: 2 }}>
+                {displayName}
+              </Typography>
+              <Button color="inherit" onClick={handleLogout}>
+                Logout
+              </Button>
+            </Box>
 
-            <Button
+            {/* Mobile hamburger */}
+            <IconButton
               color="inherit"
-              component={RouterLink}
-              to={wPath("/tournaments/create")}
-              variant="outlined"
-              sx={{ color: "white", borderColor: "white" }}
+              aria-label="Open navigation menu"
+              onClick={() => setDrawerOpen(true)}
+              sx={{ display: { xs: "flex", sm: "none" } }}
             >
-              Create Tournament
-            </Button>
-            <Typography variant="body1" sx={{ ml: 2 }}>
-              {displayName}
-            </Typography>
-            <Button color="inherit" onClick={handleLogout}>
-              Logout
-            </Button>
-          </Box>
+              <MenuIcon />
+            </IconButton>
+
+            {/* Mobile drawer */}
+            <Drawer
+              anchor="right"
+              open={drawerOpen}
+              onClose={() => setDrawerOpen(false)}
+            >
+              <Box sx={{ width: 260, pt: 2 }} role="navigation">
+                {displayName && (
+                  <Typography variant="body2" color="text.secondary" sx={{ px: 2, pb: 1 }}>
+                    {displayName}
+                  </Typography>
+                )}
+                <Divider />
+                <List disablePadding>
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={() => handleNavClick(wPath("/dashboard"))}>
+                      <ListItemText primary="Dashboard" />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={() => handleNavClick(wPath("/tournaments"))}>
+                      <ListItemText primary="Tournaments" />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={() => handleNavClick("/me")}>
+                      <ListItemText primary="My Profile" />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton disabled>
+                      <ListItemText primary="Leagues" secondary="Coming soon" />
+                    </ListItemButton>
+                  </ListItem>
+                  <Divider sx={{ my: 1 }} />
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={() => handleNavClick(wPath("/tournaments/create"))}>
+                      <ListItemText primary="Create Tournament" />
+                    </ListItemButton>
+                  </ListItem>
+                  <Divider sx={{ my: 1 }} />
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={() => { handleLogout(); setDrawerOpen(false); }}>
+                      <ListItemText primary="Logout" />
+                    </ListItemButton>
+                  </ListItem>
+                </List>
+              </Box>
+            </Drawer>
+          </>
         ) : (
           <Box sx={{ display: "flex", gap: 2 }}>
             <Button color="inherit" component={RouterLink} to="/login">

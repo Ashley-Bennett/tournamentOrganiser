@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -62,6 +62,7 @@ const TournamentPairings: React.FC = () => {
   //   /public/t/:publicSlug           — unauthenticated, is_public required
   //   /w/:workspaceSlug/tournaments/:id/pairings — authenticated workspace member
   const { publicSlug, id } = useParams<{ publicSlug?: string; id?: string }>();
+  const navigate = useNavigate();
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<MatchWithPlayers[]>([]);
@@ -80,12 +81,14 @@ const TournamentPairings: React.FC = () => {
       let tData: Tournament | null = null;
 
       if (id) {
-        // Authenticated route — workspace membership RLS handles access (any privacy)
+        // Authenticated route — workspace membership RLS handles access (any privacy).
+        // Use maybeSingle() so an expired JWT (which causes RLS to silently return 0 rows)
+        // yields null data rather than a 406 error.
         const { data, error: tErr } = await supabase
           .from("tournaments")
           .select("id, name, status, num_rounds, is_public")
           .eq("id", id)
-          .single();
+          .maybeSingle();
         if (tErr || !data) {
           setError("Tournament not found or you do not have access.");
           setLoading(false);
@@ -176,6 +179,8 @@ const TournamentPairings: React.FC = () => {
         setSelectedRound(active);
       }
 
+      // Clear any previous error now that we've successfully loaded
+      setError(null);
       setLoading(false);
     };
 
@@ -185,6 +190,23 @@ const TournamentPairings: React.FC = () => {
 
     // Auto-refresh every 5 seconds as a fallback
     const interval = setInterval(() => void load(), 5_000);
+
+    // Reload immediately when the tab becomes visible — browser timer throttling can
+    // delay Supabase's proactive token refresh, causing expired JWTs and silent RLS
+    // failures. Refreshing the session first ensures the next load() gets fresh data.
+    // On the authenticated route, redirect to login if there's no recoverable session.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void supabase.auth.refreshSession().then(({ data: { session } }) => {
+          if (!session && id) {
+            navigate("/login", { replace: true });
+            return;
+          }
+          void load();
+        });
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // Real-time subscription so the page updates immediately when matches change
     const channel = supabase
@@ -202,6 +224,7 @@ const TournamentPairings: React.FC = () => {
 
     return () => {
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       void supabase.removeChannel(channel);
     };
   }, [publicSlug, id]);
@@ -295,7 +318,8 @@ const TournamentPairings: React.FC = () => {
     <Tabs
       value={selectedRound}
       onChange={(_e, v: number | "standings") => setSelectedRound(v)}
-      centered
+      variant="scrollable"
+      scrollButtons="auto"
       sx={{ mb: isPreRound ? 2.5 : 1.5 }}
     >
       {rounds.map((r) => (
@@ -338,7 +362,7 @@ const TournamentPairings: React.FC = () => {
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
             gap: 2,
           }}
         >
@@ -435,7 +459,7 @@ const TournamentPairings: React.FC = () => {
           </Typography>
         </Box>
         <Divider />
-        <TableContainer>
+        <TableContainer sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
               <TableRow>

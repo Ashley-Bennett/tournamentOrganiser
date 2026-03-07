@@ -105,6 +105,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [fetchProfile]);
 
+  // Refresh session when the tab becomes visible again — browser timer throttling
+  // can prevent the Supabase client's built-in proactive refresh from firing on time,
+  // causing expired tokens and silent RLS failures on private resources.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void supabase.auth.refreshSession();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

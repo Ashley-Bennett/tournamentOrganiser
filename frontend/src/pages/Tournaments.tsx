@@ -24,8 +24,14 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Skeleton,
+  Card,
+  CardContent,
+  CardActions,
+  IconButton,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
-import PageLoading from "../components/PageLoading";
 import { formatDate } from "../utils/format";
 import { Add as AddIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -46,6 +52,8 @@ const Tournaments: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { workspaceId, wPath } = useWorkspace();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -169,10 +177,6 @@ const Tournaments: React.FC = () => {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
 
-  if (loading) {
-    return <PageLoading />;
-  }
-
   return (
     <Box>
       <Box
@@ -201,9 +205,9 @@ const Tournaments: React.FC = () => {
           value={searchName}
           onChange={(e) => setSearchName(e.target.value)}
           size="small"
-          sx={{ minWidth: 200 }}
+          sx={{ minWidth: { xs: "100%", sm: 200 } }}
         />
-        <FormControl size="small" sx={{ minWidth: 160 }}>
+        <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 160 } }}>
           <InputLabel id="status-filter-label">Status</InputLabel>
           <Select
             labelId="status-filter-label"
@@ -230,73 +234,142 @@ const Tournaments: React.FC = () => {
         </Alert>
       )}
 
-      <Paper>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Created</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredTournaments.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    <Typography variant="body2" color="text.secondary">
-                      No tournaments found. Create your first tournament!
+      {isMobile ? (
+        /* ── Mobile card list ─────────────────────────────────── */
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i} variant="outlined">
+                <CardContent>
+                  <Skeleton variant="text" width="60%" height={28} />
+                  <Skeleton variant="text" width="40%" />
+                  <Skeleton variant="rounded" width={60} height={22} sx={{ mt: 1 }} />
+                </CardContent>
+              </Card>
+            ))
+          ) : filteredTournaments.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+              No tournaments found. Create your first tournament!
+            </Typography>
+          ) : (
+            filteredTournaments.map((tournament) => (
+              <Card key={tournament.id} variant="outlined">
+                <CardContent sx={{ pb: 0 }}>
+                  <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                    <Typography variant="subtitle1" fontWeight="medium" sx={{ flex: 1, mr: 1 }}>
+                      {tournament.name}
                     </Typography>
-                  </TableCell>
+                    <Chip
+                      label={getStatusLabel(tournament.status)}
+                      color={getCompletionColor(tournament.status)}
+                      size="small"
+                    />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    {getTournamentTypeLabel(tournament.tournament_type)} · {formatDate(tournament.created_at)}
+                  </Typography>
+                </CardContent>
+                <CardActions sx={{ pt: 0.5, px: 2, pb: 1.5 }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => navigate(wPath(`/tournaments/${tournament.id}`))}
+                    sx={{ flex: 1 }}
+                  >
+                    View
+                  </Button>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => handleDeleteTournament(tournament.id)}
+                    disabled={deletingId === tournament.id}
+                    aria-label="Delete tournament"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </CardActions>
+              </Card>
+            ))
+          )}
+        </Box>
+      ) : (
+        /* ── Desktop table ────────────────────────────────────── */
+        <Paper>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Type</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Created</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
-              ) : (
-                filteredTournaments.map((tournament) => (
-                  <TableRow key={tournament.id}>
-                    <TableCell>{tournament.name}</TableCell>
-                    <TableCell>
-                      {getTournamentTypeLabel(tournament.tournament_type)}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={getStatusLabel(tournament.status)}
-                        color={getCompletionColor(tournament.status)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>{formatDate(tournament.created_at)}</TableCell>
-                    <TableCell>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="primary"
-                        onClick={() =>
-                          navigate(wPath(`/tournaments/${tournament.id}`))
-                        }
-                        sx={{ mr: 1 }}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        size="small"
-                        color="error"
-                        startIcon={<DeleteIcon />}
-                        onClick={() => handleDeleteTournament(tournament.id)}
-                        disabled={deletingId === tournament.id}
-                      >
-                        {deletingId === tournament.id
-                          ? "Deleting..."
-                          : "Delete"}
-                      </Button>
+              </TableHead>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton variant="text" width="60%" /></TableCell>
+                      <TableCell><Skeleton variant="text" width="80%" /></TableCell>
+                      <TableCell><Skeleton variant="rounded" width={60} height={22} /></TableCell>
+                      <TableCell><Skeleton variant="text" width="70%" /></TableCell>
+                      <TableCell><Skeleton variant="text" width={80} /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredTournaments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      <Typography variant="body2" color="text.secondary">
+                        No tournaments found. Create your first tournament!
+                      </Typography>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                ) : (
+                  filteredTournaments.map((tournament) => (
+                    <TableRow key={tournament.id}>
+                      <TableCell>{tournament.name}</TableCell>
+                      <TableCell>
+                        {getTournamentTypeLabel(tournament.tournament_type)}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={getStatusLabel(tournament.status)}
+                          color={getCompletionColor(tournament.status)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>{formatDate(tournament.created_at)}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="primary"
+                          onClick={() =>
+                            navigate(wPath(`/tournaments/${tournament.id}`))
+                          }
+                          sx={{ mr: 1 }}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          size="small"
+                          color="error"
+                          startIcon={<DeleteIcon />}
+                          onClick={() => handleDeleteTournament(tournament.id)}
+                          disabled={deletingId === tournament.id}
+                        >
+                          {deletingId === tournament.id ? "Deleting..." : "Delete"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
       <Dialog
         open={confirmDeleteId !== null}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Grid, Card, CardContent, Typography, Box, Paper } from "@mui/material";
+import { Grid, Card, CardContent, Typography, Box, Paper, Skeleton } from "@mui/material";
 import {
   SportsEsports as TournamentIcon,
   People as PeopleIcon,
@@ -7,7 +7,6 @@ import {
 } from "@mui/icons-material";
 import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
-import PageLoading from "../components/PageLoading";
 
 interface DashboardStats {
   activeTournaments: number;
@@ -68,9 +67,7 @@ const Dashboard: React.FC = () => {
     }
   }, [workspaceLoading, fetchDashboardStats]);
 
-  if (workspaceLoading || loading) {
-    return <PageLoading />;
-  }
+  const isLoading = workspaceLoading || loading;
 
   return (
     <Box>
@@ -85,15 +82,19 @@ const Dashboard: React.FC = () => {
                 <TournamentIcon color="primary" sx={{ mr: 1 }} />
                 <Typography variant="h6">Active Tournaments</Typography>
               </Box>
-              <Typography variant="h3" color="primary">
-                {stats.activeTournaments}
-              </Typography>
+              {isLoading ? <Skeleton variant="text" width={60} height={60} /> : (
+                <Typography variant="h3" color="primary">
+                  {stats.activeTournaments}
+                </Typography>
+              )}
               <Typography variant="body2" color="text.secondary">
-                {stats.activeTournaments === 0
-                  ? "No tournaments currently active"
-                  : `${stats.activeTournaments} tournament${
-                      stats.activeTournaments === 1 ? "" : "s"
-                    } in progress`}
+                {isLoading ? <Skeleton variant="text" width="80%" /> : (
+                  stats.activeTournaments === 0
+                    ? "No tournaments currently active"
+                    : `${stats.activeTournaments} tournament${
+                        stats.activeTournaments === 1 ? "" : "s"
+                      } in progress`
+                )}
               </Typography>
             </CardContent>
           </Card>
@@ -106,15 +107,19 @@ const Dashboard: React.FC = () => {
                 <PeopleIcon color="secondary" sx={{ mr: 1 }} />
                 <Typography variant="h6">Total Participants</Typography>
               </Box>
-              <Typography variant="h3" color="secondary">
-                {stats.totalParticipants}
-              </Typography>
+              {isLoading ? <Skeleton variant="text" width={60} height={60} /> : (
+                <Typography variant="h3" color="secondary">
+                  {stats.totalParticipants}
+                </Typography>
+              )}
               <Typography variant="body2" color="text.secondary">
-                {stats.totalParticipants === 0
-                  ? "No participants registered"
-                  : `${stats.totalParticipants} participant${
-                      stats.totalParticipants === 1 ? "" : "s"
-                    } across all tournaments`}
+                {isLoading ? <Skeleton variant="text" width="80%" /> : (
+                  stats.totalParticipants === 0
+                    ? "No participants registered"
+                    : `${stats.totalParticipants} participant${
+                        stats.totalParticipants === 1 ? "" : "s"
+                      } across all tournaments`
+                )}
               </Typography>
             </CardContent>
           </Card>
@@ -127,15 +132,19 @@ const Dashboard: React.FC = () => {
                 <TrophyIcon color="warning" sx={{ mr: 1 }} />
                 <Typography variant="h6">Completed Tournaments</Typography>
               </Box>
-              <Typography variant="h3" color="warning.main">
-                {stats.completedTournaments}
-              </Typography>
+              {isLoading ? <Skeleton variant="text" width={60} height={60} /> : (
+                <Typography variant="h3" color="warning.main">
+                  {stats.completedTournaments}
+                </Typography>
+              )}
               <Typography variant="body2" color="text.secondary">
-                {stats.completedTournaments === 0
-                  ? "No tournaments completed yet"
-                  : `${stats.completedTournaments} tournament${
-                      stats.completedTournaments === 1 ? "" : "s"
-                    } completed`}
+                {isLoading ? <Skeleton variant="text" width="80%" /> : (
+                  stats.completedTournaments === 0
+                    ? "No tournaments completed yet"
+                    : `${stats.completedTournaments} tournament${
+                        stats.completedTournaments === 1 ? "" : "s"
+                      } completed`
+                )}
               </Typography>
             </CardContent>
           </Card>

@@ -55,7 +55,7 @@ function App() {
       <Box sx={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
         <Header />
         <Box sx={{ flex: 1, overflow: "auto", minHeight: 0 }}>
-        <Container component="main" sx={{ py: 3, display: "flex", flexDirection: "column", minHeight: "100%" }}>
+        <Container component="main" sx={{ py: { xs: 1, sm: 2, md: 3 }, px: { xs: 1, sm: 2 }, display: "flex", flexDirection: "column", minHeight: "100%" }}>
           <Routes>
             {/* ── Public ───────────────────────────────────────── */}
             <Route path="/" element={<RootRoute />} />
