@@ -43,6 +43,7 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import EditIcon from "@mui/icons-material/Edit";
 import CloseIcon from "@mui/icons-material/Close";
+import AddIcon from "@mui/icons-material/Add";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { supabase } from "../supabaseClient";
@@ -153,6 +154,8 @@ const TournamentMatches: React.FC = () => {
   const [dropDialogOpen, setDropDialogOpen] = useState(false);
   const [togglingDrop, setTogglingDrop] = useState<string | null>(null);
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
+  const [hoveredRound, setHoveredRound] = useState<number | null>(null);
+  const [deleteRoundConfirmRound, setDeleteRoundConfirmRound] = useState<number | null>(null);
   const [lateEntryDialogOpen, setLateEntryDialogOpen] = useState(false);
   const [lateEntryName, setLateEntryName] = useState("");
   const [addingLateEntry, setAddingLateEntry] = useState(false);
@@ -1580,6 +1583,46 @@ const TournamentMatches: React.FC = () => {
     }
   };
 
+  const handleAddRound = async () => {
+    if (!tournament || !user) return;
+    const current = tournament.num_rounds ?? 0;
+    if (current >= 20) return;
+    const next = current + 1;
+    const { data, error } = await supabase
+      .from("tournaments")
+      .update({ num_rounds: next })
+      .eq("id", tournament.id)
+      .eq("workspace_id", workspaceId ?? "")
+      .select(
+        "id, name, status, tournament_type, num_rounds, created_at, created_by",
+      )
+      .maybeSingle();
+    if (!error && data) setTournament(data as TournamentSummary);
+  };
+
+  const handleDeleteRound = async (roundNumber: number) => {
+    if (!tournament || !user) return;
+    if (roundNumber !== tournament.num_rounds) return; // only last round
+    if (matches.some((m) => m.round_number === roundNumber)) return; // has matches
+    const newCount = roundNumber - 1;
+    if (newCount < 1) return;
+    const { data, error } = await supabase
+      .from("tournaments")
+      .update({ num_rounds: newCount })
+      .eq("id", tournament.id)
+      .eq("workspace_id", workspaceId ?? "")
+      .select(
+        "id, name, status, tournament_type, num_rounds, created_at, created_by",
+      )
+      .maybeSingle();
+    if (!error && data) {
+      setTournament(data as TournamentSummary);
+      if (typeof selectedRound === "number" && selectedRound > newCount) {
+        setSelectedRound(newCount);
+      }
+    }
+  };
+
   const handleNextRound = async () => {
     if (!tournament || !user) return;
 
@@ -1989,6 +2032,10 @@ const TournamentMatches: React.FC = () => {
                 <Tabs
                   value={tabValue}
                   onChange={(_, value: number | string) => {
+                    if (value === "add") {
+                      handleAddRound();
+                      return;
+                    }
                     setSelectedRound(
                       value === "standings" ? "standings" : (value as number),
                     );
@@ -2071,28 +2118,61 @@ const TournamentMatches: React.FC = () => {
                       }
                     }
 
+                    const isLastRound = roundNumber === totalRounds;
+                    const canDelete = !hasMatches && isLastRound && tournament.status === "active";
+
                     return (
                       <Tab
                         key={roundNumber}
                         label={
-                          <Box display="flex" alignItems="center">
+                          <Box
+                            display="flex"
+                            alignItems="center"
+                            onMouseEnter={() => canDelete && setHoveredRound(roundNumber)}
+                            onMouseLeave={() => setHoveredRound(null)}
+                          >
                             {`Round ${roundNumber}`}
                             {indicator}
+                            {canDelete && (
+                              <CloseIcon
+                                fontSize="inherit"
+                                sx={{
+                                  ml: 0.75,
+                                  fontSize: 14,
+                                  cursor: "pointer",
+                                  opacity: hoveredRound === roundNumber ? 1 : 0.3,
+                                  color: hoveredRound === roundNumber ? "error.main" : "text.secondary",
+                                  transition: "opacity 0.15s, color 0.15s",
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteRoundConfirmRound(roundNumber);
+                                }}
+                              />
+                            )}
                           </Box>
                         }
                         value={roundNumber}
-                        disabled={!hasMatches}
                         sx={
                           hasMatches
                             ? {}
                             : {
                                 color: "text.secondary",
                                 fontWeight: 500,
+                                opacity: 0.5,
                               }
                         }
                       />
                     );
                   })}
+                  {tournament.status === "active" && (tournament.num_rounds ?? 0) < 20 && (
+                    <Tab
+                      icon={<AddIcon fontSize="small" />}
+                      value="add"
+                      title="Add round"
+                      sx={{ minWidth: 44, px: 1 }}
+                    />
+                  )}
                   <Tab
                     label="Final Standings"
                     value="standings"
@@ -3585,6 +3665,20 @@ const TournamentMatches: React.FC = () => {
                                 : "Generate Round 1 Pairings"}
                             </Button>
                           )}
+                        {tournament.status === "active" &&
+                          typeof selectedRound === "number" &&
+                          selectedRound === tournament.num_rounds &&
+                          selectedRound > 1 && (
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              size="small"
+                              startIcon={<CloseIcon fontSize="small" />}
+                              onClick={() => setDeleteRoundConfirmRound(selectedRound)}
+                            >
+                              Remove this round
+                            </Button>
+                          )}
                       </Box>
                     );
                   })()}
@@ -3911,6 +4005,7 @@ const TournamentMatches: React.FC = () => {
         }
 
         return (
+          <>
           <Dialog
             open={lateEntryDialogOpen}
             onClose={() => {
@@ -3956,6 +4051,39 @@ const TournamentMatches: React.FC = () => {
               </Button>
             </DialogActions>
           </Dialog>
+
+          {/* Delete round confirmation */}
+          <Dialog
+            open={deleteRoundConfirmRound !== null}
+            onClose={() => setDeleteRoundConfirmRound(null)}
+          >
+            <DialogTitle>Remove Round {deleteRoundConfirmRound}?</DialogTitle>
+            <DialogContent>
+              <Typography>
+                This will permanently remove Round {deleteRoundConfirmRound}{" "}
+                from the tournament. The tournament will end after Round{" "}
+                {(deleteRoundConfirmRound ?? 1) - 1}.
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setDeleteRoundConfirmRound(null)}>
+                Cancel
+              </Button>
+              <Button
+                color="error"
+                variant="contained"
+                onClick={() => {
+                  if (deleteRoundConfirmRound !== null) {
+                    handleDeleteRound(deleteRoundConfirmRound);
+                    setDeleteRoundConfirmRound(null);
+                  }
+                }}
+              >
+                Remove Round
+              </Button>
+            </DialogActions>
+          </Dialog>
+          </>
         );
       })()}
     </Box>

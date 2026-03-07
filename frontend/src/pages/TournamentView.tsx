@@ -8,7 +8,6 @@ import {
   Chip,
   Alert,
   TextField,
-  FormControlLabel,
   Checkbox,
   IconButton,
   CircularProgress,
@@ -87,7 +86,7 @@ const TournamentView: React.FC = () => {
   >(null);
   const [startingTournament, setStartingTournament] = useState(false);
   const [numRounds, setNumRounds] = useState<number | null>(null);
-  const [useSuggestedRounds, setUseSuggestedRounds] = useState(true);
+  const [isFollowingSuggested, setIsFollowingSuggested] = useState(true);
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
   const playerNameInputRef = useRef<HTMLInputElement>(null);
 
@@ -128,7 +127,7 @@ const TournamentView: React.FC = () => {
   useEffect(() => {
     if (tournament) {
       setNumRounds(tournament.num_rounds);
-      setUseSuggestedRounds(tournament.num_rounds === null);
+      setIsFollowingSuggested(tournament.num_rounds === null);
     }
   }, [tournament]);
 
@@ -152,7 +151,7 @@ const TournamentView: React.FC = () => {
   }, [players, playerSearch, playerSort, playerSortDir]);
 
   useEffect(() => {
-    if (useSuggestedRounds && tournament && players.length >= 2) {
+    if (isFollowingSuggested && tournament && players.length >= 2) {
       const suggested = calculateSuggestedRounds(
         players.length,
         tournament.tournament_type,
@@ -161,7 +160,7 @@ const TournamentView: React.FC = () => {
         setNumRounds(suggested);
       }
     }
-  }, [useSuggestedRounds, players.length, tournament, numRounds]);
+  }, [isFollowingSuggested, players.length, tournament, numRounds]);
 
   // Fetch current round matches and update pairings to account for a newly added
   // late-entry player. Returns the current max round number.
@@ -425,33 +424,40 @@ const TournamentView: React.FC = () => {
     }
   };
 
-  const handleSaveRounds = async () => {
+  const handleRoundStep = async (delta: number) => {
     if (!tournament || tournament.status !== "draft" || !user) return;
-    if (!numRounds || numRounds < 1) return;
+    const current = numRounds ?? suggestedRounds;
+    const next = Math.min(20, Math.max(1, current + delta));
+    if (next === current) return;
+    setNumRounds(next);
+    setIsFollowingSuggested(false);
+    const { data, error } = await supabase
+      .from("tournaments")
+      .update({ num_rounds: next })
+      .eq("id", tournament.id)
+      .eq("workspace_id", workspaceId ?? "")
+      .select(
+        "id, name, status, tournament_type, num_rounds, created_at, created_by",
+      )
+      .maybeSingle();
+    if (!error && data) setTournament(data as TournamentSummary);
+  };
 
-    try {
-      setError(null);
-
-      const { data, error } = await supabase
-        .from("tournaments")
-        .update({ num_rounds: numRounds })
-        .eq("id", tournament.id)
-        .eq("workspace_id", workspaceId ?? "")
-        .select(
-          "id, name, status, tournament_type, num_rounds, created_at, created_by",
-        )
-        .maybeSingle();
-
-      if (error) {
-        throw new Error(error.message || "Failed to save rounds");
-      }
-
-      if (data) {
-        setTournament(data as TournamentSummary);
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save rounds");
-    }
+  const handleResetToSuggested = async () => {
+    if (!tournament || tournament.status !== "draft" || !user) return;
+    if (!suggestedRounds) return;
+    setNumRounds(suggestedRounds);
+    setIsFollowingSuggested(true);
+    const { data, error } = await supabase
+      .from("tournaments")
+      .update({ num_rounds: suggestedRounds })
+      .eq("id", tournament.id)
+      .eq("workspace_id", workspaceId ?? "")
+      .select(
+        "id, name, status, tournament_type, num_rounds, created_at, created_by",
+      )
+      .maybeSingle();
+    if (!error && data) setTournament(data as TournamentSummary);
   };
 
   const handleDeletePlayer = (playerId: string) => {
@@ -791,93 +797,51 @@ const TournamentView: React.FC = () => {
         {tournament.status === "draft" && (
           <Box mt={2} display="flex" flexDirection="column" gap={2}>
             <Box display="flex" flexDirection="column" gap={1}>
-              <Typography variant="subtitle2" gutterBottom>
+              <Typography variant="subtitle2">
                 Number of Rounds
               </Typography>
-              {tournament.num_rounds && (
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Currently set to: {tournament.num_rounds} rounds
+              <Box display="flex" alignItems="center" gap={1}>
+                <IconButton
+                  size="small"
+                  onClick={() => handleRoundStep(-1)}
+                  disabled={!numRounds || numRounds <= 1}
+                  aria-label="Decrease rounds"
+                >
+                  −
+                </IconButton>
+                <Typography
+                  variant="h6"
+                  component="span"
+                  sx={{ minWidth: 32, textAlign: "center" }}
+                >
+                  {numRounds ?? "—"}
                 </Typography>
-              )}
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={useSuggestedRounds}
-                    onChange={async (e) => {
-                      const checked = e.target.checked;
-                      setUseSuggestedRounds(checked);
-                      if (
-                        checked &&
-                        tournament &&
-                        players.length >= 2 &&
-                        user
-                      ) {
-                        const suggested = calculateSuggestedRounds(
-                          players.length,
-                          tournament.tournament_type,
-                        );
-                        if (suggested > 0) {
-                          setNumRounds(suggested);
-                          const { data, error } = await supabase
-                            .from("tournaments")
-                            .update({ num_rounds: suggested })
-                            .eq("id", tournament.id)
-                            .eq("created_by", user.id)
-                            .select(
-                              "id, name, status, tournament_type, num_rounds, created_at, created_by",
-                            )
-                            .maybeSingle();
-                          if (!error && data) {
-                            setTournament(data as TournamentSummary);
-                          }
-                        }
-                      }
-                    }}
-                  />
-                }
-                label={
-                  players.length >= 2
-                    ? `Use suggested rounds (${suggestedRounds} rounds for ${players.length} players)`
-                    : "Use suggested rounds (add players to see suggestion)"
-                }
-              />
-              {!useSuggestedRounds && (
-                <Box display="flex" gap={1} alignItems="flex-start">
-                  <TextField
-                    type="number"
-                    label="Number of Rounds"
-                    value={numRounds || ""}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value, 10);
-                      setNumRounds(isNaN(value) ? null : Math.max(1, value));
-                    }}
-                    inputProps={{ min: 1, max: 20 }}
-                    size="small"
-                    sx={{ maxWidth: 200 }}
-                    helperText={
-                      players.length >= 2
-                        ? `Suggested: ${suggestedRounds} rounds`
-                        : "Add at least 2 players to see suggested rounds"
-                    }
-                  />
+                <IconButton
+                  size="small"
+                  onClick={() => handleRoundStep(1)}
+                  disabled={!!numRounds && numRounds >= 20}
+                  aria-label="Increase rounds"
+                >
+                  +
+                </IconButton>
+                {players.length >= 2 && !isFollowingSuggested && numRounds !== suggestedRounds && (
                   <Button
-                    variant="outlined"
                     size="small"
-                    onClick={handleSaveRounds}
-                    disabled={!numRounds || numRounds < 1}
-                    sx={{ mt: 0.5 }}
+                    variant="text"
+                    onClick={handleResetToSuggested}
+                    sx={{ ml: 0.5, textTransform: "none", fontSize: "0.75rem" }}
                   >
-                    Save
+                    Reset to suggested ({suggestedRounds})
                   </Button>
-                </Box>
-              )}
-              {useSuggestedRounds && players.length >= 2 && (
-                <Typography variant="body2" color="text.secondary">
-                  {tournament.tournament_type === "single_elimination"
-                    ? `Single elimination requires ${suggestedRounds} rounds for ${players.length} players.`
-                    : `Swiss tournament typically uses ${suggestedRounds} rounds for ${players.length} players.`}
-                </Typography>
-              )}
+                )}
+              </Box>
+              <Typography variant="caption" color="text.secondary">
+                {players.length < 2
+                  ? "Add players to see a suggestion."
+                  : isFollowingSuggested || numRounds === suggestedRounds
+                    ? `Suggested for ${players.length} players`
+                    : `Suggested: ${suggestedRounds} for ${players.length} players`}
+              </Typography>
             </Box>
             <Button
               variant="contained"
