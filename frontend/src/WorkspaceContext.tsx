@@ -62,6 +62,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const [memberships, setMemberships] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchedForUserId, setFetchedForUserId] = useState<string | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [lastWorkspace, setLastWorkspace] = useState<Workspace | null>(null);
 
@@ -74,6 +75,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const fetchWorkspaces = useCallback(async () => {
     if (!user) {
       setMemberships([]);
+      setFetchedForUserId(null);
       setLoading(false);
       return;
     }
@@ -90,6 +92,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
     if (fetchError) {
       setError(fetchError.message);
+      setFetchedForUserId(user.id);
       setLoading(false);
       return;
     }
@@ -97,6 +100,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     setMemberships(
       (data as unknown as WorkspaceMember[]).filter((m) => m.workspaces),
     );
+    setFetchedForUserId(user.id);
     setLoading(false);
   }, [user]);
 
@@ -154,6 +158,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     void fetchWorkspaces();
   }, [fetchWorkspaces]);
 
+  // Stay "loading" until the fetch has completed for the current user,
+  // preventing a false-empty flash between login and the first fetch.
+  const isLoading = authLoading || loading || fetchedForUserId !== (user?.id ?? null);
+
   return (
     <WorkspaceContext.Provider
       value={{
@@ -162,7 +170,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         workspaces,
         currentRole,
         roleFor,
-        loading,
+        loading: isLoading,
         error,
         lastWorkspace,
         wPath,

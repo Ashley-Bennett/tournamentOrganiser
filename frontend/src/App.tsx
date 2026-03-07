@@ -39,7 +39,15 @@ function RedirectToWorkspace() {
   if (workspaces.length > 0) {
     return <Navigate to={`/w/${workspaces[0].slug}/tournaments`} replace />;
   }
-  return <Navigate to="/" replace />;
+  return <Navigate to="/workspaces/new" replace />;
+}
+
+/** Show Landing to guests; redirect authenticated users to the dashboard. */
+function RootRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user) return <Navigate to="/dashboard" replace />;
+  return <Landing />;
 }
 
 function App() {
@@ -50,7 +58,7 @@ function App() {
         <Container component="main" sx={{ flexGrow: 1, py: 3 }}>
           <Routes>
             {/* ── Public ───────────────────────────────────────── */}
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<RootRoute />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
