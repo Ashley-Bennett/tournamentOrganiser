@@ -58,7 +58,15 @@ export function buildStandingsFromMatches(
   }
 
   for (const match of matches) {
-    const isBye = match.status === "bye" || !match.player2_id;
+    // A "late entry loss" is a synthetic no-opponent match (player2_id = null)
+    // with result = 'loss', inserted when a player joins after a round completed.
+    const isLateEntryLoss =
+      !match.player2_id &&
+      match.result === "loss" &&
+      match.status === "completed";
+    // Regular byes have player2_id = null but result is NOT 'loss'
+    const isBye =
+      !isLateEntryLoss && (match.status === "bye" || !match.player2_id);
     const isDraw =
       match.status === "completed" &&
       match.winner_id === null &&
@@ -68,7 +76,7 @@ export function buildStandingsFromMatches(
       match.winner_id !== null &&
       match.result !== "Draw";
 
-    if (!isBye && !isDraw && !isCompletedWin) continue;
+    if (!isBye && !isDraw && !isCompletedWin && !isLateEntryLoss) continue;
 
     const p1 = standingsMap.get(match.player1_id);
     const p2 = match.player2_id ? standingsMap.get(match.player2_id) : null;
@@ -80,7 +88,9 @@ export function buildStandingsFromMatches(
 
     if (p1) {
       p1.matchesPlayed++;
-      if (isBye) {
+      if (isLateEntryLoss) {
+        p1.losses++;
+      } else if (isBye) {
         p1.byesReceived++;
         p1.wins++;
       } else if (isDraw) {

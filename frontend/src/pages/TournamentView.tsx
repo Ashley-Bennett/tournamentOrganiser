@@ -141,6 +141,130 @@ const TournamentView: React.FC = () => {
     }
   }, [useSuggestedRounds, players.length, tournament, numRounds]);
 
+  // Fetch current round matches and update pairings to account for a newly added
+  // late-entry player. Returns the current max round number.
+  const applyLateEntryPairing = async (
+    newPlayerId: string,
+    currentMatches: Array<{
+      id: string;
+      round_number: number;
+      player1_id: string;
+      player2_id: string | null;
+      status: string;
+      match_number: number | null;
+    }>,
+    maxRound: number,
+  ) => {
+    const currentRoundMatches = currentMatches.filter(
+      (m) => m.round_number === maxRound,
+    );
+
+    // "Round has begun" = Begin Round was pressed (real matches move to 'pending').
+    // Initial byes created as 'bye' at tournament start do NOT count as begun.
+    const roundHasBegun = currentRoundMatches.some(
+      (m) =>
+        m.status === "pending" ||
+        (m.status === "completed" && m.player2_id !== null),
+    );
+    const roundComplete =
+      currentRoundMatches.length > 0 &&
+      currentRoundMatches.every(
+        (m) => m.status === "completed" || m.status === "bye",
+      );
+    const preBeginRound =
+      currentRoundMatches.length > 0 && !roundHasBegun && !roundComplete;
+
+    const maxMatchNum = currentRoundMatches.reduce(
+      (max, m) => Math.max(max, m.match_number ?? 0),
+      0,
+    );
+
+    // Create a loss record for every completed round the player missed.
+    // Rounds 1..(maxRound-1) are always complete; maxRound is complete only
+    // when roundComplete is true.
+    const missedRounds = roundComplete ? maxRound : maxRound - 1;
+    if (missedRounds > 0) {
+      const lossMatches = Array.from({ length: missedRounds }, (_, i) => ({
+        tournament_id: tournament!.id,
+        workspace_id: workspaceId,
+        round_number: i + 1,
+        match_number: null,
+        player1_id: newPlayerId,
+        player2_id: null,
+        status: "completed",
+        result: "loss",
+        winner_id: null,
+      }));
+      const { error } = await supabase
+        .from("tournament_matches")
+        .insert(lossMatches);
+      if (error) throw new Error(error.message);
+    }
+
+    if (preBeginRound) {
+      // Find any existing bye (player2_id = null), regardless of 'ready'/'bye' status
+      const existingBye = currentRoundMatches.find((m) => !m.player2_id);
+      if (existingBye) {
+        // Convert the bye into a real match with the new player
+        const { error } = await supabase
+          .from("tournament_matches")
+          .update({
+            player2_id: newPlayerId,
+            status: "ready",
+            result: null,
+            winner_id: null,
+          })
+          .eq("id", existingBye.id);
+        if (error) throw new Error(error.message);
+      } else {
+        // No existing bye: new player becomes the bye for this round
+        const { error } = await supabase.from("tournament_matches").insert({
+          tournament_id: tournament!.id,
+          workspace_id: workspaceId,
+          round_number: maxRound,
+          match_number: maxMatchNum + 1,
+          player1_id: newPlayerId,
+          player2_id: null,
+          status: "ready",
+          result: null,
+          winner_id: null,
+        });
+        if (error) throw new Error(error.message);
+      }
+    } else if (roundHasBegun && !roundComplete) {
+      // Round in progress: absorb an existing bye if one exists, otherwise
+      // give the late entry their own bye.
+      const existingBye = currentRoundMatches.find((m) => !m.player2_id);
+      if (existingBye) {
+        // Convert the bye into a real in-progress match
+        const { error } = await supabase
+          .from("tournament_matches")
+          .update({
+            player2_id: newPlayerId,
+            status: "pending",
+            result: null,
+            winner_id: null,
+          })
+          .eq("id", existingBye.id);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await supabase.from("tournament_matches").insert({
+          tournament_id: tournament!.id,
+          workspace_id: workspaceId,
+          round_number: maxRound,
+          match_number: maxMatchNum + 1,
+          player1_id: newPlayerId,
+          player2_id: null,
+          status: "bye",
+          result: "bye",
+          winner_id: newPlayerId,
+        });
+        if (error) throw new Error(error.message);
+      }
+    }
+    // roundComplete: player enters next round, no match needed for current round
+  };
+
   const handleAddPlayer = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!newPlayerName.trim() || !tournament || !user) return;
@@ -149,6 +273,27 @@ const TournamentView: React.FC = () => {
       setAddingPlayer(true);
       setPlayersError(null);
 
+      // For active tournaments, fetch current matches upfront so we can update pairings
+      let currentMatches: Array<{
+        id: string;
+        round_number: number;
+        player1_id: string;
+        player2_id: string | null;
+        status: string;
+        match_number: number | null;
+      }> = [];
+      let maxRound = 1;
+      if (tournament.status === "active") {
+        const { data: matchData } = await supabase
+          .from("tournament_matches")
+          .select("id, round_number, player1_id, player2_id, status, match_number")
+          .eq("tournament_id", tournament.id);
+        currentMatches = matchData ?? [];
+        if (currentMatches.length > 0) {
+          maxRound = Math.max(...currentMatches.map((m) => m.round_number));
+        }
+      }
+
       const { data, error } = await supabase
         .from("tournament_players")
         .insert({
@@ -156,12 +301,20 @@ const TournamentView: React.FC = () => {
           tournament_id: tournament.id,
           created_by: user.id,
           workspace_id: workspaceId,
+          ...(tournament.status === "active" && {
+            is_late_entry: true,
+            late_entry_round: maxRound,
+          }),
         })
         .select("id, name, created_at")
         .single();
 
       if (error) {
         throw new Error(error.message || "Failed to add player");
+      }
+
+      if (tournament.status === "active" && data) {
+        await applyLateEntryPairing(data.id, currentMatches, maxRound);
       }
 
       setPlayers((prev) => [...prev, data as TournamentPlayer]);
@@ -185,20 +338,62 @@ const TournamentView: React.FC = () => {
     setAddingBulk(true);
     setPlayersError(null);
     try {
-      const inserts = names.map((name) => ({
-        name,
-        tournament_id: tournament.id,
-        created_by: user.id,
-        workspace_id: workspaceId,
-      }));
-      const { data, error } = await supabase
-        .from("tournament_players")
-        .insert(inserts)
-        .select("id, name, created_at");
+      if (tournament.status !== "active") {
+        // Draft: simple bulk insert
+        const inserts = names.map((name) => ({
+          name,
+          tournament_id: tournament.id,
+          created_by: user.id,
+          workspace_id: workspaceId,
+        }));
+        const { data, error } = await supabase
+          .from("tournament_players")
+          .insert(inserts)
+          .select("id, name, created_at");
+        if (error) throw new Error(error.message || "Failed to add players");
+        setPlayers((prev) => [...prev, ...(data as TournamentPlayer[])]);
+      } else {
+        // Active tournament: add one at a time so each pairing update sees the
+        // current state of the matches (e.g. odd→even→odd alternation with byes)
+        const { data: matchData } = await supabase
+          .from("tournament_matches")
+          .select("id, round_number, player1_id, player2_id, status, match_number")
+          .eq("tournament_id", tournament.id);
+        let currentMatches = matchData ?? [];
+        const maxRound =
+          currentMatches.length > 0
+            ? Math.max(...currentMatches.map((m) => m.round_number))
+            : 1;
 
-      if (error) throw new Error(error.message || "Failed to add players");
+        const addedPlayers: TournamentPlayer[] = [];
+        for (const name of names) {
+          const { data, error } = await supabase
+            .from("tournament_players")
+            .insert({
+              name,
+              tournament_id: tournament.id,
+              created_by: user.id,
+              workspace_id: workspaceId,
+              is_late_entry: true,
+              late_entry_round: maxRound,
+            })
+            .select("id, name, created_at")
+            .single();
+          if (error) throw new Error(error.message || `Failed to add ${name}`);
+          addedPlayers.push(data as TournamentPlayer);
 
-      setPlayers((prev) => [...prev, ...(data as TournamentPlayer[])]);
+          await applyLateEntryPairing(data.id, currentMatches, maxRound);
+
+          // Re-fetch matches so the next iteration sees up-to-date bye state
+          const { data: refreshed } = await supabase
+            .from("tournament_matches")
+            .select("id, round_number, player1_id, player2_id, status, match_number")
+            .eq("tournament_id", tournament.id);
+          currentMatches = refreshed ?? [];
+        }
+        setPlayers((prev) => [...prev, ...addedPlayers]);
+      }
+
       setBulkNames("");
       setBulkMode(false);
     } catch (e: unknown) {

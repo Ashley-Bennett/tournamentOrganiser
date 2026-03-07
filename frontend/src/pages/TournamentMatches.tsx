@@ -69,6 +69,8 @@ interface TournamentPlayer {
   dropped_at_round: number | null;
   has_static_seating: boolean;
   static_seat_number: number | null;
+  is_late_entry: boolean;
+  late_entry_round: number | null;
 }
 
 interface Match {
@@ -151,6 +153,9 @@ const TournamentMatches: React.FC = () => {
   const [dropDialogOpen, setDropDialogOpen] = useState(false);
   const [togglingDrop, setTogglingDrop] = useState<string | null>(null);
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
+  const [lateEntryDialogOpen, setLateEntryDialogOpen] = useState(false);
+  const [lateEntryName, setLateEntryName] = useState("");
+  const [addingLateEntry, setAddingLateEntry] = useState(false);
   const didRestoreRef = useRef(false);
 
   const standingsByPlayerId = useMemo(() => {
@@ -204,13 +209,20 @@ const TournamentMatches: React.FC = () => {
       const p2 = m.player2_id ? map.get(m.player2_id) : null;
       if (!p1) continue;
 
-      const isBye = m.status === "bye" || m.player2_id === null;
+      const isLateEntryLoss =
+        m.player2_id === null &&
+        m.result === "loss" &&
+        m.status === "completed";
+      const isBye =
+        !isLateEntryLoss && (m.status === "bye" || m.player2_id === null);
       const isDraw =
         m.status === "completed" && m.winner_id === null && m.result === "Draw";
       const isCompletedWin =
         m.status === "completed" && m.winner_id !== null && m.result !== "Draw";
 
-      if (isBye) {
+      if (isLateEntryLoss) {
+        p1.losses += 1;
+      } else if (isBye) {
         p1.wins += 1;
         p1.byesReceived += 1;
       } else if (isDraw) {
@@ -420,7 +432,7 @@ const TournamentMatches: React.FC = () => {
         const { data: allPlayersData } = await supabase
           .from("tournament_players")
           .select(
-            "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number",
+            "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round",
           )
           .eq("tournament_id", tournament.id)
           .order("name");
@@ -894,11 +906,175 @@ const TournamentMatches: React.FC = () => {
     const { data: freshPlayers } = await supabase
       .from("tournament_players")
       .select(
-        "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number",
+        "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round",
       )
       .eq("tournament_id", tournament.id)
       .order("name");
     setPlayers((freshPlayers as TournamentPlayer[]) ?? []);
+  };
+
+  // ── Late entry ───────────────────────────────────────────────────────────────
+
+  const handleAddLateEntry = async () => {
+    if (!tournament || !user || !workspaceId || !lateEntryName.trim()) return;
+    try {
+      setAddingLateEntry(true);
+      setError(null);
+
+      const maxRound =
+        matches.length > 0
+          ? Math.max(...matches.map((m) => m.round_number))
+          : 1;
+
+      const currentRoundMatches = matches.filter(
+        (m) => m.round_number === maxRound,
+      );
+
+      // Determine round state based on match statuses.
+      // Initial tournament start creates byes as 'bye' immediately, but real matches
+      // are 'ready' until Begin Round is pressed (which moves them to 'pending').
+      // So "round has begun" = any real match is 'pending', or any non-bye match
+      // has been completed. A lone 'bye' status match does NOT mean the round began.
+      const roundHasBegun = currentRoundMatches.some(
+        (m) =>
+          m.status === MATCH_STATUS.PENDING ||
+          (m.status === MATCH_STATUS.COMPLETED && m.player2_id !== null),
+      );
+      const roundComplete =
+        currentRoundMatches.length > 0 &&
+        currentRoundMatches.every(
+          (m) =>
+            m.status === MATCH_STATUS.COMPLETED ||
+            m.status === MATCH_STATUS.BYE,
+        );
+      const preBeginRound =
+        currentRoundMatches.length > 0 && !roundHasBegun && !roundComplete;
+
+      // Insert the late entry player
+      const { data: newPlayer, error: playerError } = await supabase
+        .from("tournament_players")
+        .insert({
+          name: lateEntryName.trim(),
+          tournament_id: tournament.id,
+          created_by: user.id,
+          workspace_id: workspaceId,
+          is_late_entry: true,
+          late_entry_round: maxRound,
+        })
+        .select("id, name")
+        .single();
+
+      if (playerError) throw new Error(playerError.message);
+
+      // Create a loss record for every completed round the player missed.
+      // Rounds 1..(maxRound-1) are always complete; maxRound is complete only
+      // when roundComplete is true.
+      if (newPlayer) {
+        const missedRounds = roundComplete ? maxRound : maxRound - 1;
+        if (missedRounds > 0) {
+          const lossMatches = Array.from({ length: missedRounds }, (_, i) => ({
+            tournament_id: tournament.id,
+            workspace_id: workspaceId,
+            round_number: i + 1,
+            match_number: null,
+            player1_id: newPlayer.id,
+            player2_id: null,
+            status: MATCH_STATUS.COMPLETED,
+            result: "loss",
+            winner_id: null,
+          }));
+          const { error: lossError } = await supabase
+            .from("tournament_matches")
+            .insert(lossMatches);
+          if (lossError) throw new Error(lossError.message);
+        }
+      }
+
+      if (preBeginRound && newPlayer) {
+        // Round not yet begun: slot the new player into the existing bye, or
+        // create a new 'ready' bye for them. All other pairings are untouched.
+        // A bye can be 'ready' (from regenerate) or 'bye' (from initial start).
+        const existingBye = currentRoundMatches.find((m) => !m.player2_id);
+        if (existingBye) {
+          // Pair the waiting bye player with the new player; convert back to a real match
+          const { error: updateError } = await supabase
+            .from("tournament_matches")
+            .update({
+              player2_id: newPlayer.id,
+              status: MATCH_STATUS.READY,
+              result: null,
+              winner_id: null,
+            })
+            .eq("id", existingBye.id);
+          if (updateError) throw new Error(updateError.message);
+        } else {
+          // No existing bye: new player waits as the bye for this round
+          const maxMatchNum = currentRoundMatches.reduce(
+            (max, m) => Math.max(max, m.match_number ?? 0),
+            0,
+          );
+          const { error: matchError } = await supabase
+            .from("tournament_matches")
+            .insert({
+              tournament_id: tournament.id,
+              workspace_id: workspaceId,
+              round_number: maxRound,
+              match_number: maxMatchNum + 1,
+              player1_id: newPlayer.id,
+              player2_id: null,
+              status: MATCH_STATUS.READY,
+              result: null,
+              winner_id: null,
+            });
+          if (matchError) throw new Error(matchError.message);
+        }
+      } else if (roundHasBegun && !roundComplete && newPlayer) {
+        // Round in progress: absorb an existing bye if one exists, otherwise
+        // give the late entry their own bye.
+        const existingBye = currentRoundMatches.find((m) => !m.player2_id);
+        if (existingBye) {
+          // Convert the bye into a real in-progress match
+          const { error: updateError } = await supabase
+            .from("tournament_matches")
+            .update({
+              player2_id: newPlayer.id,
+              status: MATCH_STATUS.PENDING,
+              result: null,
+              winner_id: null,
+            })
+            .eq("id", existingBye.id);
+          if (updateError) throw new Error(updateError.message);
+        } else {
+          const maxMatchNum = currentRoundMatches.reduce(
+            (max, m) => Math.max(max, m.match_number ?? 0),
+            0,
+          );
+          const { error: matchError } = await supabase
+            .from("tournament_matches")
+            .insert({
+              tournament_id: tournament.id,
+              workspace_id: workspaceId,
+              round_number: maxRound,
+              match_number: maxMatchNum + 1,
+              player1_id: newPlayer.id,
+              player2_id: null,
+              status: MATCH_STATUS.BYE,
+              result: "bye",
+              winner_id: newPlayer.id,
+            });
+          if (matchError) throw new Error(matchError.message);
+        }
+      }
+      // If roundComplete: player is simply added; they'll appear in next round's pairing
+
+      setLateEntryName("");
+      setLateEntryDialogOpen(false);
+      await refreshMatches();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to add late entry");
+    } finally {
+      setAddingLateEntry(false);
+    }
   };
 
   // ── Drop manager ─────────────────────────────────────────────────────────────
@@ -1744,13 +1920,22 @@ const TournamentMatches: React.FC = () => {
           </Typography>
         </Box>
         {tournament.status === "active" && (
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => setDropDialogOpen(true)}
-          >
-            Manage Players
-          </Button>
+          <Box display="flex" gap={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setLateEntryDialogOpen(true)}
+            >
+              Add Late Entry
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setDropDialogOpen(true)}
+            >
+              Manage Players
+            </Button>
+          </Box>
         )}
       </Box>
 
@@ -1821,7 +2006,13 @@ const TournamentMatches: React.FC = () => {
                 >
                   {roundNumbers.map((roundNumber) => {
                     const roundMatches = matches.filter(
-                      (m) => m.round_number === roundNumber,
+                      (m) =>
+                        m.round_number === roundNumber &&
+                        !(
+                          m.player2_id === null &&
+                          m.result === "loss" &&
+                          m.status === "completed"
+                        ),
                     );
                     const hasMatches = roundMatches.length > 0;
                     const completedCount = roundMatches.filter(
@@ -2124,10 +2315,17 @@ const TournamentMatches: React.FC = () => {
                     // Preserve DB order (created_at then id) so match numbers follow pairing order:
                     // highest tables first, and byes at the end.
                     // Note: matches are already fetched ordered by round_number, created_at, id.
+                    const isLateEntryLossRecord = (m: Match) =>
+                      m.player2_id === null &&
+                      m.result === "loss" &&
+                      m.status === "completed";
+
                     const baseMatches =
                       typeof selectedRound === "number"
                         ? matches.filter(
-                            (m) => m.round_number === selectedRound,
+                            (m) =>
+                              m.round_number === selectedRound &&
+                              !isLateEntryLossRecord(m),
                           )
                         : [];
 
@@ -2135,7 +2333,9 @@ const TournamentMatches: React.FC = () => {
                     const roundMatchesForState =
                       typeof selectedRound === "number"
                         ? matches.filter(
-                            (m) => m.round_number === selectedRound,
+                            (m) =>
+                              m.round_number === selectedRound &&
+                              !isLateEntryLossRecord(m),
                           )
                         : [];
                     const currentRoundPendingCount =
@@ -3579,7 +3779,17 @@ const TournamentMatches: React.FC = () => {
                   justifyContent="space-between"
                 >
                   <Box>
-                    <Typography variant="body1">{player.name}</Typography>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <Typography variant="body1">{player.name}</Typography>
+                      {player.is_late_entry && (
+                        <Chip
+                          label="Late Entry"
+                          size="small"
+                          color="info"
+                          variant="outlined"
+                        />
+                      )}
+                    </Box>
                     <Typography variant="caption" color="text.secondary">
                       {player.dropped
                         ? `Dropped after Round ${player.dropped_at_round}`
@@ -3655,6 +3865,99 @@ const TournamentMatches: React.FC = () => {
           <Button onClick={() => setDropDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Late entry dialog */}
+      {(() => {
+        const maxRound =
+          matches.length > 0
+            ? Math.max(...matches.map((m) => m.round_number))
+            : 1;
+        const currentRoundMs = matches.filter(
+          (m) => m.round_number === maxRound,
+        );
+        const roundHasBegun = currentRoundMs.some(
+          (m) =>
+            m.status === MATCH_STATUS.PENDING ||
+            (m.status === MATCH_STATUS.COMPLETED && m.player2_id !== null),
+        );
+        const roundComplete =
+          currentRoundMs.length > 0 &&
+          currentRoundMs.every(
+            (m) =>
+              m.status === MATCH_STATUS.COMPLETED ||
+              m.status === MATCH_STATUS.BYE,
+          );
+        const preBeginRound =
+          currentRoundMs.length > 0 && !roundHasBegun && !roundComplete;
+        const existingByeInRound = !roundComplete
+          ? currentRoundMs.find((m) => !m.player2_id)
+          : null;
+
+        let infoMessage: string;
+        if (preBeginRound) {
+          if (existingByeInRound) {
+            infoMessage = `Round ${maxRound} hasn't started yet. The player will be paired with ${existingByeInRound.player1_name}, who currently has a bye.`;
+          } else {
+            infoMessage = `Round ${maxRound} hasn't started yet. The player will be added as the bye for this round and enter the bracket from round ${maxRound + 1} onward.`;
+          }
+        } else if (roundHasBegun && !roundComplete) {
+          if (existingByeInRound) {
+            infoMessage = `Round ${maxRound} is in progress. The player will be paired with ${existingByeInRound.player1_name}, who currently has a bye.`;
+          } else {
+            infoMessage = `Round ${maxRound} is in progress. This player will receive a bye for round ${maxRound} and enter the bracket from round ${maxRound + 1} onward.`;
+          }
+        } else {
+          infoMessage = `This player will join with 0 points and be included in the next round's pairings.`;
+        }
+
+        return (
+          <Dialog
+            open={lateEntryDialogOpen}
+            onClose={() => {
+              setLateEntryDialogOpen(false);
+              setLateEntryName("");
+            }}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle>Add Late Entry</DialogTitle>
+            <DialogContent>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                {infoMessage}
+              </Alert>
+              <TextField
+                autoFocus
+                fullWidth
+                label="Player Name"
+                value={lateEntryName}
+                onChange={(e) => setLateEntryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && lateEntryName.trim()) {
+                    void handleAddLateEntry();
+                  }
+                }}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => {
+                  setLateEntryDialogOpen(false);
+                  setLateEntryName("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => void handleAddLateEntry()}
+                disabled={!lateEntryName.trim() || addingLateEntry}
+              >
+                {addingLateEntry ? "Adding…" : "Add Player"}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        );
+      })()}
     </Box>
   );
 };
