@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Typography,
@@ -25,6 +25,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   List,
   ListItem,
   ListItemText,
@@ -98,6 +99,12 @@ const TournamentView: React.FC = () => {
   const [claimIds, setClaimIds] = useState<Record<string, string>>({});
   const [generatingClaimId, setGeneratingClaimId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedPlayerList, setCopiedPlayerList] = useState(false);
+
+  // ── Player list search/sort ───────────────────────────────────────────────
+  const [playerSearch, setPlayerSearch] = useState("");
+  const [playerSort, setPlayerSort] = useState<"name" | "joined">("joined");
+  const [playerSortDir, setPlayerSortDir] = useState<"asc" | "desc">("asc");
 
   // ── Known Players dialog ─────────────────────────────────────────────────
   interface WorkspacePlayer {
@@ -128,6 +135,21 @@ const TournamentView: React.FC = () => {
   const suggestedRounds = tournament
     ? calculateSuggestedRounds(players.length, tournament.tournament_type)
     : 0;
+
+  const filteredPlayers = useMemo(() => {
+    let list = [...players];
+    if (playerSearch.trim()) {
+      const q = playerSearch.toLowerCase();
+      list = list.filter((p) => p.name.toLowerCase().includes(q));
+    }
+    list.sort((a, b) => {
+      let cmp = 0;
+      if (playerSort === "name") cmp = a.name.localeCompare(b.name);
+      else cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      return playerSortDir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [players, playerSearch, playerSort, playerSortDir]);
 
   useEffect(() => {
     if (useSuggestedRounds && tournament && players.length >= 2) {
@@ -883,9 +905,29 @@ const TournamentView: React.FC = () => {
       </Paper>
 
       <Paper sx={{ p: 3 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Players ({players.length})
-        </Typography>
+        <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+          <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
+            Players ({players.length})
+          </Typography>
+          {players.length > 0 && (
+            <Tooltip title={copiedPlayerList ? "Copied!" : "Copy player list to clipboard"}>
+              <Button
+                size="small"
+                variant="text"
+                startIcon={<ContentCopyIcon fontSize="inherit" />}
+                onClick={() => {
+                  const text = players.map((p) => p.name).join("\n");
+                  void navigator.clipboard.writeText(text).then(() => {
+                    setCopiedPlayerList(true);
+                    setTimeout(() => setCopiedPlayerList(false), 2000);
+                  });
+                }}
+              >
+                {copiedPlayerList ? "Copied!" : "Copy list"}
+              </Button>
+            </Tooltip>
+          )}
+        </Box>
         {playersError && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {playersError}
@@ -996,164 +1038,225 @@ const TournamentView: React.FC = () => {
             No players added yet. Add your first player above.
           </Typography>
         ) : (
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Joined</TableCell>
-                  <TableCell>Static Seating</TableCell>
-                  {isManager && <TableCell>Account</TableCell>}
-                  {tournament.status === "draft" && (
-                    <TableCell align="right">Remove</TableCell>
-                  )}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {players.map((player) => {
-                  const isSavingSeat = savingSeat === player.id;
-                  const claimToken = claimTokens[player.id];
-                  const isGenerating = generatingClaimId === player.id;
-                  const wasCopied = copiedId === player.id;
-                  return (
-                    <TableRow key={player.id}>
+          <>
+            <Box display="flex" alignItems="center" gap={1} mb={1}>
+              <TextField
+                size="small"
+                placeholder="Search players…"
+                value={playerSearch}
+                onChange={(e) => setPlayerSearch(e.target.value)}
+                sx={{ flexGrow: 1 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: playerSearch ? (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setPlayerSearch("")}>
+                        ✕
+                      </IconButton>
+                    </InputAdornment>
+                  ) : undefined,
+                }}
+              />
+              <Chip
+                size="small"
+                label={
+                  playerSearch.trim()
+                    ? `${filteredPlayers.length} of ${players.length}`
+                    : `${players.length} player${players.length === 1 ? "" : "s"}`
+                }
+              />
+            </Box>
+            {filteredPlayers.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" py={1}>
+                No players match your search.
+              </Typography>
+            ) : (
+              <TableContainer sx={{ maxHeight: 420 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
                       <TableCell>
-                        <Box display="flex" alignItems="center" gap={0.5}>
-                          {player.name}
-                          {player.has_static_seating && (
-                            <Tooltip
-                              title={
-                                player.static_seat_number != null
-                                  ? `Fixed at table ${player.static_seat_number}`
-                                  : "Static seating (no table number)"
-                              }
-                            >
-                              <SeatIcon />
-                            </Tooltip>
-                          )}
-                        </Box>
+                        <TableSortLabel
+                          active={playerSort === "name"}
+                          direction={playerSort === "name" ? playerSortDir : "asc"}
+                          onClick={() => {
+                            if (playerSort === "name") setPlayerSortDir((d) => d === "asc" ? "desc" : "asc");
+                            else { setPlayerSort("name"); setPlayerSortDir("asc"); }
+                          }}
+                        >
+                          Name
+                        </TableSortLabel>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="caption" color="text.secondary">
-                          {formatDateTime(player.created_at)}
-                        </Typography>
+                        <TableSortLabel
+                          active={playerSort === "joined"}
+                          direction={playerSort === "joined" ? playerSortDir : "asc"}
+                          onClick={() => {
+                            if (playerSort === "joined") setPlayerSortDir((d) => d === "asc" ? "desc" : "asc");
+                            else { setPlayerSort("joined"); setPlayerSortDir("asc"); }
+                          }}
+                        >
+                          Joined
+                        </TableSortLabel>
                       </TableCell>
-                      <TableCell>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <Switch
-                            size="small"
-                            checked={player.has_static_seating ?? false}
-                            disabled={isSavingSeat}
-                            onChange={(e) =>
-                              void handleUpdateStaticSeat(
-                                player.id,
-                                e.target.checked,
-                                player.static_seat_number ?? null,
-                              )
-                            }
-                          />
-                          {player.has_static_seating && (
-                            <TextField
-                              size="small"
-                              placeholder="Table #"
-                              type="number"
-                              disabled={isSavingSeat}
-                              value={player.static_seat_number ?? ""}
-                              onChange={(e) => {
-                                const val =
-                                  e.target.value === ""
-                                    ? null
-                                    : parseInt(e.target.value, 10);
-                                void handleUpdateStaticSeat(
-                                  player.id,
-                                  true,
-                                  val,
-                                );
-                              }}
-                              inputProps={{ min: 1 }}
-                              sx={{ width: 90 }}
-                            />
-                          )}
-                          {isSavingSeat && (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Saving…
-                            </Typography>
-                          )}
-                        </Box>
-                      </TableCell>
-
-                      {/* ── Account / Link column ───────────────── */}
-                      {isManager && (
-                        <TableCell>
-                          {player.user_id ? (
-                            <Chip label="Linked" size="small" color="success" />
-                          ) : claimToken ? (
-                            <Box display="flex" alignItems="center" gap={0.5} flexWrap="wrap">
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  fontFamily: "monospace",
-                                  maxWidth: 140,
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {`${window.location.origin}/claim/${claimToken}`}
-                              </Typography>
-                              <Tooltip title={wasCopied ? "Copied!" : "Copy link"}>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleCopyClaimLink(player.id, claimToken)}
-                                >
-                                  <ContentCopyIcon fontSize="inherit" />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Revoke">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => void handleRevokeClaimLink(player.id)}
-                                >
-                                  <DeleteIcon fontSize="inherit" />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          ) : (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={isGenerating ? <CircularProgress size={12} /> : <LinkIcon />}
-                              disabled={isGenerating}
-                              onClick={() => void handleGenerateClaimLink(player.id)}
-                            >
-                              Link
-                            </Button>
-                          )}
-                        </TableCell>
-                      )}
-
+                      <TableCell>Static Seating</TableCell>
+                      {isManager && <TableCell>Account</TableCell>}
                       {tournament.status === "draft" && (
-                        <TableCell align="right">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            aria-label="Remove player"
-                            onClick={() => handleDeletePlayer(player.id)}
-                            disabled={deletingPlayerId === player.id}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
+                        <TableCell align="right">Remove</TableCell>
                       )}
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {filteredPlayers.map((player) => {
+                      const isSavingSeat = savingSeat === player.id;
+                      const claimToken = claimTokens[player.id];
+                      const isGenerating = generatingClaimId === player.id;
+                      const wasCopied = copiedId === player.id;
+                      return (
+                        <TableRow key={player.id}>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={0.5}>
+                              {player.name}
+                              {player.has_static_seating && (
+                                <Tooltip
+                                  title={
+                                    player.static_seat_number != null
+                                      ? `Fixed at table ${player.static_seat_number}`
+                                      : "Static seating (no table number)"
+                                  }
+                                >
+                                  <SeatIcon />
+                                </Tooltip>
+                              )}
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatDateTime(player.created_at)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Switch
+                                size="small"
+                                checked={player.has_static_seating ?? false}
+                                disabled={isSavingSeat}
+                                onChange={(e) =>
+                                  void handleUpdateStaticSeat(
+                                    player.id,
+                                    e.target.checked,
+                                    player.static_seat_number ?? null,
+                                  )
+                                }
+                              />
+                              {player.has_static_seating && (
+                                <TextField
+                                  size="small"
+                                  placeholder="Table #"
+                                  type="number"
+                                  disabled={isSavingSeat}
+                                  value={player.static_seat_number ?? ""}
+                                  onChange={(e) => {
+                                    const val =
+                                      e.target.value === ""
+                                        ? null
+                                        : parseInt(e.target.value, 10);
+                                    void handleUpdateStaticSeat(
+                                      player.id,
+                                      true,
+                                      val,
+                                    );
+                                  }}
+                                  inputProps={{ min: 1 }}
+                                  sx={{ width: 90 }}
+                                />
+                              )}
+                              {isSavingSeat && (
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  Saving…
+                                </Typography>
+                              )}
+                            </Box>
+                          </TableCell>
+
+                          {/* ── Account / Link column ───────────────── */}
+                          {isManager && (
+                            <TableCell>
+                              {player.user_id ? (
+                                <Chip label="Linked" size="small" color="success" />
+                              ) : claimToken ? (
+                                <Box display="flex" alignItems="center" gap={0.5} flexWrap="wrap">
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      fontFamily: "monospace",
+                                      maxWidth: 140,
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {`${window.location.origin}/claim/${claimToken}`}
+                                  </Typography>
+                                  <Tooltip title={wasCopied ? "Copied!" : "Copy link"}>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleCopyClaimLink(player.id, claimToken)}
+                                    >
+                                      <ContentCopyIcon fontSize="inherit" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Revoke">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => void handleRevokeClaimLink(player.id)}
+                                    >
+                                      <DeleteIcon fontSize="inherit" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
+                              ) : (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  startIcon={isGenerating ? <CircularProgress size={12} /> : <LinkIcon />}
+                                  disabled={isGenerating}
+                                  onClick={() => void handleGenerateClaimLink(player.id)}
+                                >
+                                  Link
+                                </Button>
+                              )}
+                            </TableCell>
+                          )}
+
+                          {tournament.status === "draft" && (
+                            <TableCell align="right">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                aria-label="Remove player"
+                                onClick={() => handleDeletePlayer(player.id)}
+                                disabled={deletingPlayerId === player.id}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </>
         )}
       </Paper>
 
