@@ -183,9 +183,27 @@ const TournamentPairings: React.FC = () => {
     setError(null);
     void load();
 
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(() => void load(), 30_000);
-    return () => clearInterval(interval);
+    // Auto-refresh every 5 seconds as a fallback
+    const interval = setInterval(() => void load(), 5_000);
+
+    // Real-time subscription so the page updates immediately when matches change
+    const channel = supabase
+      .channel(`pairings-${publicSlug ?? id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "tournament_matches",
+        },
+        () => { void load(); },
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      void supabase.removeChannel(channel);
+    };
   }, [publicSlug, id]);
 
   const rounds = useMemo(
@@ -292,7 +310,7 @@ const TournamentPairings: React.FC = () => {
   const footer = (
     <Box textAlign="center" mt={2}>
       <Typography variant="caption" color="text.disabled">
-        Refreshes automatically every 30 seconds
+        Updates automatically
       </Typography>
     </Box>
   );
