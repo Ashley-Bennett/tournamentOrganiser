@@ -106,6 +106,23 @@ const MATCH_STATUS = {
   BYE: "bye",
 } as const;
 
+// Plain-English helpers for pairing decision log display
+const humanizeByeReason = (reason: string): string => {
+  if (reason.includes("dissolved rematch bracket"))
+    return "their score group had no valid pairings";
+  if (reason.includes("lowest bracket") || reason.includes("bye priority"))
+    return "lowest score with the fewest previous byes";
+  return reason;
+};
+
+const humanizeFloatReason = (reason: string): string => {
+  if (reason.includes("rematch-escape float"))
+    return "moved to a different score group to avoid a rematch";
+  if (reason.includes("odd mixed bracket") || reason.includes("odd bracket"))
+    return "their score group had an odd number of players, so they played someone from the next group down";
+  return reason;
+};
+
 // Helper to convert PairingDecisionLog for database storage (Map -> object)
 const serializeDecisionLog = (
   log: PairingDecisionLog | undefined,
@@ -2524,119 +2541,96 @@ const TournamentMatches: React.FC = () => {
                       <Box>
                         {decisionLog && (
                           <Alert severity="info" sx={{ mb: 2 }} icon={false}>
-                            <Typography variant="subtitle2" gutterBottom>
-                              <strong>
-                                Pairing Decisions (Round{" "}
-                                {typeof selectedRound === "number"
-                                  ? selectedRound
-                                  : "N/A"}
-                                )
-                              </strong>
+                            <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                              Pairing notes — Round{" "}
+                              {typeof selectedRound === "number" ? selectedRound : "N/A"}
                             </Typography>
-                            {decisionLog.byeReason && (
+
+                            {/* Bye */}
+                            {decisionLog.byeReason && decisionLog.byePlayerName && (
                               <Typography variant="body2" sx={{ mb: 1 }}>
-                                <strong>Bye:</strong>{" "}
-                                {decisionLog.byePlayerName &&
-                                decisionLog.byePlayerPoints !== undefined ? (
-                                  <>
-                                    <strong>
-                                      {decisionLog.byePlayerName} (
-                                      {decisionLog.byePlayerPoints} pts at time
-                                      of pairing)
-                                    </strong>
-                                    {" - "}
-                                    {decisionLog.byeReason}
-                                  </>
-                                ) : (
-                                  decisionLog.byeReason
-                                )}
+                                <strong>{decisionLog.byePlayerName}</strong> received a bye (free win) this round
+                                {decisionLog.byePlayerPoints !== undefined &&
+                                  ` · ${decisionLog.byePlayerPoints} pts`}
+                                {" — "}
+                                {humanizeByeReason(decisionLog.byeReason)}
                               </Typography>
                             )}
-                            {decisionLog.floatDetails &&
-                              decisionLog.floatDetails.length > 0 && (
+
+                            {/* Score group adjustments (floats) */}
+                            {(() => {
+                              const visibleFloats = (decisionLog.floatDetails ?? []).filter(
+                                (d) =>
+                                  !d.reason.startsWith("DISSOLVE:") &&
+                                  !d.reason.includes("bye (last bracket"),
+                              );
+                              return visibleFloats.length > 0 ? (
                                 <Box sx={{ mb: 1 }}>
-                                  <Typography
-                                    variant="body2"
-                                    component="span"
-                                    sx={{ fontWeight: "bold" }}
-                                  >
-                                    Floats:
+                                  <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                                    Score group adjustments:
                                   </Typography>
-                                  <Box
-                                    component="ul"
-                                    sx={{ mt: 0.5, mb: 0, pl: 2 }}
-                                  >
-                                    {decisionLog.floatDetails.map((detail) => (
+                                  <Box component="ul" sx={{ mt: 0.5, mb: 0, pl: 2 }}>
+                                    {visibleFloats.map((detail) => (
                                       <li key={detail.playerId}>
-                                        <Typography
-                                          variant="body2"
-                                          component="span"
-                                        >
-                                          <strong>
-                                            {detail.playerName} (
-                                            {detail.playerPoints} pts):
-                                          </strong>{" "}
-                                          {detail.reason}
+                                        <Typography variant="body2" component="span">
+                                          <strong>{detail.playerName}</strong>{" "}
+                                          ({detail.playerPoints} pts) —{" "}
+                                          {humanizeFloatReason(detail.reason)}
                                         </Typography>
                                       </li>
                                     ))}
                                   </Box>
                                 </Box>
-                              )}
+                              ) : null;
+                            })()}
+
+                            {/* Table assignment adjustments */}
                             {decisionLog.seatConflicts &&
                               decisionLog.seatConflicts.length > 0 && (
                                 <Box sx={{ mb: 1 }}>
-                                  <Typography
-                                    variant="body2"
-                                    component="span"
-                                    sx={{ fontWeight: "bold" }}
-                                  >
-                                    Seat conflicts:
+                                  <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                                    Table assignments adjusted:
                                   </Typography>
-                                  <Box
-                                    component="ul"
-                                    sx={{ mt: 0.5, mb: 0, pl: 2 }}
-                                  >
+                                  <Box component="ul" sx={{ mt: 0.5, mb: 0, pl: 2 }}>
                                     {decisionLog.seatConflicts.map((sc, i) => (
                                       <li key={i}>
-                                        <Typography
-                                          variant="body2"
-                                          component="span"
-                                        >
-                                          <strong>{sc.movedPlayerName}</strong>{" "}
-                                          moved from table{" "}
-                                          {sc.movedPlayerOriginalSeat} to table{" "}
-                                          {sc.resolvedSeat} — paired against{" "}
-                                          <strong>{sc.opponentName}</strong> who
-                                          has static seating at table{" "}
-                                          {sc.opponentSeat} (lower seat wins)
+                                        <Typography variant="body2" component="span">
+                                          <strong>{sc.movedPlayerName}</strong> moved to
+                                          table {sc.resolvedSeat} (was table{" "}
+                                          {sc.movedPlayerOriginalSeat}) to avoid a table
+                                          conflict with{" "}
+                                          <strong>{sc.opponentName}</strong>
                                         </Typography>
                                       </li>
                                     ))}
                                   </Box>
                                 </Box>
                               )}
-                            <Typography
-                              variant="body2"
-                              sx={{ mb: decisionLog.rematchCount > 0 ? 1 : 0 }}
-                            >
-                              <strong>Max float distance:</strong>{" "}
-                              {decisionLog.maxFloatDistance} point
-                              {decisionLog.maxFloatDistance !== 1 ? "s" : ""}
-                              {decisionLog.maxFloatDistance > 1
-                                ? " (multi-step)"
-                                : ""}
-                            </Typography>
+
+                            {/* Rematches */}
                             {decisionLog.rematchCount > 0 && (
-                              <Typography variant="body2">
-                                <strong>Rematches:</strong> Occurred in this
-                                round (pairing minimizes rematches within
-                                bracket-first rules)
+                              <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                ⚠ {decisionLog.rematchCount} rematch
+                                {decisionLog.rematchCount !== 1 ? "es" : ""} this round
+                                — unavoidable given current standings
                               </Typography>
                             )}
                             {decisionLog.rematchCount === 0 && (
                               <Typography variant="body2" color="success.main">
-                                ✓ No rematches required
+                                ✓ No player faced the same opponent twice
+                              </Typography>
+                            )}
+
+                            {/* Largest score gap — only show if non-zero */}
+                            {decisionLog.maxFloatDistance > 0 && (
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ mt: 0.5, fontSize: "0.78rem" }}
+                              >
+                                Largest score gap between paired players:{" "}
+                                {decisionLog.maxFloatDistance} pt
+                                {decisionLog.maxFloatDistance !== 1 ? "s" : ""}
                               </Typography>
                             )}
                           </Alert>
