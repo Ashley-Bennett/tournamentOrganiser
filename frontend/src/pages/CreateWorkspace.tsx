@@ -7,6 +7,7 @@ import {
   Alert,
   Stack,
   MenuItem,
+  ListItemText,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
@@ -14,9 +15,9 @@ import { useWorkspace } from "../WorkspaceContext";
 import { slugify, randomSuffix } from "../utils/slugify";
 
 const WORKSPACE_TYPES = [
-  { value: "personal", label: "Personal" },
-  { value: "club", label: "Club" },
-  { value: "store", label: "Store" },
+  { value: "personal", label: "Personal", description: "Just for you — running your own events" },
+  { value: "club", label: "Club", description: "A regular group, team, or league" },
+  { value: "store", label: "Store", description: "A game store or venue hosting events" },
 ];
 
 const CreateWorkspace = () => {
@@ -114,7 +115,7 @@ const CreateWorkspace = () => {
           >
             {WORKSPACE_TYPES.map((t) => (
               <MenuItem key={t.value} value={t.value}>
-                {t.label}
+                <ListItemText primary={t.label} secondary={t.description} />
               </MenuItem>
             ))}
           </TextField>

@@ -85,6 +85,7 @@ const TournamentView: React.FC = () => {
     string | null
   >(null);
   const [startingTournament, setStartingTournament] = useState(false);
+  const [confirmStartOpen, setConfirmStartOpen] = useState(false);
   const [numRounds, setNumRounds] = useState<number | null>(null);
   const [isFollowingSuggested, setIsFollowingSuggested] = useState(true);
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
@@ -860,12 +861,17 @@ const TournamentView: React.FC = () => {
                     ? `Suggested for ${players.length} players`
                     : `Suggested: ${suggestedRounds} for ${players.length} players`}
               </Typography>
+              {players.length >= 2 && players.length % 2 !== 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  With {players.length} players (odd number), one player will receive a bye each round.
+                </Typography>
+              )}
             </Box>
             <Button
               variant="contained"
               color="primary"
               startIcon={<PlayArrowIcon />}
-              onClick={handleStartTournament}
+              onClick={() => setConfirmStartOpen(true)}
               disabled={
                 startingTournament ||
                 players.length < 2 ||
@@ -959,11 +965,11 @@ const TournamentView: React.FC = () => {
             </Button>
             <Button
               size="small"
-              variant="text"
+              variant="outlined"
               onClick={() => setBulkMode(true)}
               sx={{ alignSelf: "center" }}
             >
-              Bulk add
+              Bulk add (multiple)
             </Button>
           </Box>
         ) : (
@@ -1328,6 +1334,37 @@ const TournamentView: React.FC = () => {
             onClick={() => void handleAddKnownPlayers()}
           >
             {addingKnown ? "Adding…" : `Add ${selectedUserIds.size > 0 ? selectedUserIds.size : ""} Player${selectedUserIds.size === 1 ? "" : "s"}`}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={confirmStartOpen} onClose={() => setConfirmStartOpen(false)}>
+        <DialogTitle>Start tournament?</DialogTitle>
+        <DialogContent>
+          <DialogContentText component="div">
+            <Typography variant="body1" gutterBottom>
+              This will generate Round 1 pairings for{" "}
+              <strong>{players.length} player{players.length !== 1 ? "s" : ""}</strong>{" "}
+              across{" "}
+              <strong>{numRounds} round{numRounds !== 1 ? "s" : ""}</strong>.
+              {players.length % 2 !== 0 && " One player will receive a bye each round."}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Players cannot be removed once the tournament has started.
+            </Typography>
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmStartOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={startingTournament}
+            onClick={() => {
+              setConfirmStartOpen(false);
+              void handleStartTournament();
+            }}
+          >
+            Start tournament
           </Button>
         </DialogActions>
       </Dialog>
