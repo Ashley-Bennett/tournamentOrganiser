@@ -1656,6 +1656,14 @@ const TournamentMatches: React.FC = () => {
     if (!tournament || !user) return;
     const current = tournament.num_rounds ?? 0;
     if (current >= 20) return;
+    const finalRoundMatches = matches.filter((m) => m.round_number === current);
+    if (
+      finalRoundMatches.length > 0 &&
+      finalRoundMatches.every(
+        (m) => m.status === "completed" || m.status === "bye",
+      )
+    )
+      return;
     const next = current + 1;
     const { data, error } = await supabase
       .from("tournaments")
@@ -2118,6 +2126,23 @@ const TournamentMatches: React.FC = () => {
             );
 
             const hasMatchesForStandings = matches.length > 0;
+            const finalRoundNum = tournament.num_rounds;
+            const finalRoundMatches = finalRoundNum
+              ? matches.filter(
+                  (m) =>
+                    m.round_number === finalRoundNum &&
+                    !(
+                      m.player2_id === null &&
+                      m.result === "loss" &&
+                      m.status === "completed"
+                    ),
+                )
+              : [];
+            const finalRoundComplete =
+              finalRoundMatches.length > 0 &&
+              finalRoundMatches.every(
+                (m) => m.status === "completed" || m.status === "bye",
+              );
             const tabValue =
               selectedRound === "standings"
                 ? "standings"
@@ -2264,7 +2289,7 @@ const TournamentMatches: React.FC = () => {
                       />
                     );
                   })}
-                  {tournament.status === "active" && (tournament.num_rounds ?? 0) < 20 && (
+                  {tournament.status === "active" && (tournament.num_rounds ?? 0) < 20 && !finalRoundComplete && (
                     <Tab
                       icon={<AddIcon fontSize="small" />}
                       value="add"

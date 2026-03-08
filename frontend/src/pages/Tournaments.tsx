@@ -60,7 +60,8 @@ const Tournaments: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [selectedStatus, setSelectedStatus] = useState(
     (location.state as { filterStatus?: string } | null)?.filterStatus ?? "all",
@@ -119,13 +120,17 @@ const Tournaments: React.FC = () => {
   }, [user, workspaceId, fetchTournaments]);
 
   const handleDeleteTournament = (id: string) => {
-    setConfirmDeleteId(id);
+    const t = tournaments.find((t) => t.id === id);
+    if (t) {
+      setPendingDelete({ id: t.id, name: t.name });
+      setDeleteDialogOpen(true);
+    }
   };
 
   const handleConfirmDeleteTournament = async () => {
-    const id = confirmDeleteId;
+    const id = pendingDelete?.id;
     if (!id) return;
-    setConfirmDeleteId(null);
+    setDeleteDialogOpen(false);
     setDeletingId(id);
     setError(null);
     setSuccess(null);
@@ -448,22 +453,20 @@ const Tournaments: React.FC = () => {
       </Dialog>
 
       <Dialog
-        open={confirmDeleteId !== null}
-        onClose={() => setConfirmDeleteId(null)}
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        TransitionProps={{ onExited: () => setPendingDelete(null) }}
       >
         <DialogTitle>Delete tournament?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {(() => {
-              const t = tournaments.find((t) => t.id === confirmDeleteId);
-              return t
-                ? `Delete "${t.name}"? This cannot be undone.`
-                : "Are you sure you want to delete this tournament? This cannot be undone.";
-            })()}
+            {pendingDelete
+              ? `Delete "${pendingDelete.name}"? This cannot be undone.`
+              : ""}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
           <Button color="error" onClick={() => void handleConfirmDeleteTournament()}>
             Delete
           </Button>
