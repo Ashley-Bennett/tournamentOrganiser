@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -69,6 +69,7 @@ const TournamentPairings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
+  const didInitRoundRef = useRef(false);
 
   useEffect(() => {
     if (!publicSlug && !id) {
@@ -164,19 +165,24 @@ const TournamentPairings: React.FC = () => {
 
       setMatches(enriched);
 
-      // Auto-select: standings tab for completed tournaments, otherwise current active round
-      if (tData.status === "completed") {
-        setSelectedRound("standings");
-      } else if (enriched.length > 0) {
-        const pendingRounds = enriched
-          .filter((m) => m.status === "pending" || (m.status === "ready" && m.pairings_published))
-          .map((m) => m.round_number);
-        const allRounds = enriched.map((m) => m.round_number);
-        const active =
-          pendingRounds.length > 0
-            ? Math.max(...pendingRounds)
-            : Math.max(...allRounds);
-        setSelectedRound(active);
+      // Auto-select on first load only: standings for completed tournaments,
+      // otherwise the current active round. Subsequent refreshes preserve the
+      // user's manual selection.
+      if (!didInitRoundRef.current) {
+        didInitRoundRef.current = true;
+        if (tData.status === "completed") {
+          setSelectedRound("standings");
+        } else if (enriched.length > 0) {
+          const pendingRounds = enriched
+            .filter((m) => m.status === "pending" || (m.status === "ready" && m.pairings_published))
+            .map((m) => m.round_number);
+          const allRounds = enriched.map((m) => m.round_number);
+          const active =
+            pendingRounds.length > 0
+              ? Math.max(...pendingRounds)
+              : Math.max(...allRounds);
+          setSelectedRound(active);
+        }
       }
 
       // Clear any previous error now that we've successfully loaded
@@ -301,16 +307,11 @@ const TournamentPairings: React.FC = () => {
       <Typography variant={isPreRound ? "h4" : "h5"} fontWeight={700}>
         {tournament.name}
       </Typography>
-      {!isStandings && (
-        <Typography variant="body1" color="text.secondary">
-          {tournament.num_rounds
-            ? `Round ${selectedRound} of ${tournament.num_rounds}`
-            : `Round ${selectedRound}`}
-          {!isPreRound &&
-            totalMatchCount > 0 &&
-            ` · ${completedMatchCount}/${totalMatchCount} complete`}
-        </Typography>
-      )}
+      <Typography variant="body1" color="text.secondary">
+        {isStandings
+          ? "Final Standings"
+          : `${tournament.num_rounds ? `Round ${selectedRound} of ${tournament.num_rounds}` : `Round ${selectedRound}`}${!isPreRound && totalMatchCount > 0 ? ` · ${completedMatchCount}/${totalMatchCount} complete` : ""}`}
+      </Typography>
     </Box>
   );
 
