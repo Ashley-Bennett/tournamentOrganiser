@@ -23,7 +23,7 @@ const Welcome = () => {
   const handleOrganiserChoice = async () => {
     await updateProfile({ onboarding_intent: "organiser" });
     if (workspaces.length > 0) {
-      navigate(`/w/${workspaces[0].slug}/tournaments/create`);
+      navigate(`/w/${workspaces[0].slug}/tournaments`, { state: { openCreate: true } });
     } else {
       navigate("/workspaces/new");
     }

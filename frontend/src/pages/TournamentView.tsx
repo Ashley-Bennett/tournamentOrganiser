@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Typography,
   Button,
@@ -17,6 +17,7 @@ import {
   DialogContentText,
   DialogActions,
   Switch,
+  FormControlLabel,
   Tooltip,
   Table,
   TableBody,
@@ -57,6 +58,8 @@ import { generateRound1Pairings } from "../utils/tournamentPairing";
 const TournamentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isNewTournament = !!(location.state as { new?: boolean } | null)?.new;
   const { user, loading: authLoading } = useAuth();
   const { workspaceId, wPath, currentRole } = useWorkspace();
   const isManager = currentRole === "owner" || currentRole === "admin";
@@ -86,6 +89,7 @@ const TournamentView: React.FC = () => {
   >(null);
   const [startingTournament, setStartingTournament] = useState(false);
   const [confirmStartOpen, setConfirmStartOpen] = useState(false);
+  const [savingPublic, setSavingPublic] = useState(false);
   const [numRounds, setNumRounds] = useState<number | null>(null);
   const [isFollowingSuggested, setIsFollowingSuggested] = useState(true);
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
@@ -459,6 +463,18 @@ const TournamentView: React.FC = () => {
       )
       .maybeSingle();
     if (!error && data) setTournament(data as TournamentSummary);
+  };
+
+  const handleTogglePublic = async (value: boolean) => {
+    if (!tournament || !workspaceId) return;
+    setSavingPublic(true);
+    const { error } = await supabase
+      .from("tournaments")
+      .update({ is_public: value })
+      .eq("id", tournament.id)
+      .eq("workspace_id", workspaceId);
+    setSavingPublic(false);
+    if (!error) setTournament({ ...tournament, is_public: value });
   };
 
   const handleDeletePlayer = (playerId: string) => {
@@ -869,6 +885,24 @@ const TournamentView: React.FC = () => {
                 </Typography>
               )}
             </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={!!tournament.is_public}
+                  onChange={(e) => void handleTogglePublic(e.target.checked)}
+                  disabled={savingPublic}
+                  size="small"
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body2">Public tournament</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Anyone with the link can view pairings without logging in
+                  </Typography>
+                </Box>
+              }
+            />
             <Button
               variant="contained"
               color="primary"
@@ -895,6 +929,11 @@ const TournamentView: React.FC = () => {
       </Paper>
 
       <Paper sx={{ p: 3 }}>
+        {isNewTournament && players.length === 0 && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Tournament created! Now add your players below — use <strong>Bulk add</strong> to add them all at once.
+          </Alert>
+        )}
         <Box display="flex" alignItems="center" gap={1} mb={0.5}>
           <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
             Players ({players.length})

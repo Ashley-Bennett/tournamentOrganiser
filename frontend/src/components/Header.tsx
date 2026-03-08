@@ -147,10 +147,9 @@ const Header: React.FC = () => {
               </Button>
               <Button
                 color="inherit"
-                component={RouterLink}
-                to={wPath("/tournaments/create")}
                 variant="outlined"
                 sx={{ color: "white", borderColor: "white" }}
+                onClick={() => navigate(wPath("/tournaments"), { state: { openCreate: true } })}
               >
                 Create Tournament
               </Button>
@@ -203,7 +202,7 @@ const Header: React.FC = () => {
                   </ListItem>
                   <Divider sx={{ my: 1 }} />
                   <ListItem disablePadding>
-                    <ListItemButton onClick={() => handleNavClick(wPath("/tournaments/create"))}>
+                    <ListItemButton onClick={() => { setDrawerOpen(false); navigate(wPath("/tournaments"), { state: { openCreate: true } }); }}>
                       <ListItemText primary="Create Tournament" />
                     </ListItemButton>
                   </ListItem>

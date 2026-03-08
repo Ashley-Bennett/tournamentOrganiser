@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Typography,
   Button,
@@ -50,6 +50,7 @@ interface Tournament {
 
 const Tournaments: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
   const { workspaceId, wPath } = useWorkspace();
   const theme = useTheme();
@@ -61,7 +62,18 @@ const Tournaments: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [searchName, setSearchName] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState(
+    (location.state as { filterStatus?: string } | null)?.filterStatus ?? "all",
+  );
+
+  // ── Create tournament dialog ─────────────────────────────────────────────
+  const [createOpen, setCreateOpen] = useState(
+    !!(location.state as { openCreate?: boolean } | null)?.openCreate,
+  );
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const createNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!success) return;
@@ -137,6 +149,31 @@ const Tournaments: React.FC = () => {
     }
   };
 
+  const handleCreateTournament = async () => {
+    const name = newName.trim();
+    if (!name) { setCreateError("Please enter a tournament name."); return; }
+    if (!user || !workspaceId) return;
+    setCreating(true);
+    setCreateError("");
+    const { data, error: insertError } = await supabase
+      .from("tournaments")
+      .insert({
+        name,
+        created_by: user.id,
+        workspace_id: workspaceId,
+        status: "draft",
+        tournament_type: "swiss",
+        is_public: false,
+      })
+      .select("id")
+      .single();
+    setCreating(false);
+    if (insertError) { setCreateError(insertError.message); return; }
+    setCreateOpen(false);
+    setNewName("");
+    navigate(wPath(`/tournaments/${data.id}`), { state: { new: true } });
+  };
+
   const getCompletionColor = (status: string): ChipProps["color"] => {
     switch (status) {
       case "completed":
@@ -193,8 +230,7 @@ const Tournaments: React.FC = () => {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          component={RouterLink}
-          to={wPath("/tournaments/create")}
+          onClick={() => { setCreateError(""); setCreateOpen(true); }}
         >
           Create Tournament
         </Button>
@@ -370,6 +406,46 @@ const Tournaments: React.FC = () => {
           </TableContainer>
         </Paper>
       )}
+
+      <Dialog
+        open={createOpen}
+        onClose={() => { setCreateOpen(false); setNewName(""); setCreateError(""); }}
+        fullWidth
+        maxWidth="xs"
+        TransitionProps={{ onEntered: () => createNameRef.current?.focus() }}
+      >
+        <DialogTitle>Create tournament</DialogTitle>
+        <DialogContent>
+          {createError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {createError}
+            </Alert>
+          )}
+          <TextField
+            inputRef={createNameRef}
+            label="Tournament name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void handleCreateTournament(); }}
+            fullWidth
+            required
+            autoComplete="off"
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setCreateOpen(false); setNewName(""); setCreateError(""); }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={creating || !newName.trim()}
+            onClick={() => void handleCreateTournament()}
+          >
+            {creating ? "Creating…" : "Create"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={confirmDeleteId !== null}

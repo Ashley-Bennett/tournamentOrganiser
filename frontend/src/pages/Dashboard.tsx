@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Grid, Card, CardContent, Typography, Box, Paper, Skeleton, Alert, Button } from "@mui/material";
+import { Grid, Card, CardActionArea, CardContent, Typography, Box, Paper, Skeleton, Alert, Button } from "@mui/material";
 import {
   SportsEsports as TournamentIcon,
   People as PeopleIcon,
@@ -14,6 +14,7 @@ interface DashboardStats {
   activeTournaments: number;
   totalParticipants: number;
   completedTournaments: number;
+  totalTournaments: number;
 }
 
 const Dashboard: React.FC = () => {
@@ -23,6 +24,7 @@ const Dashboard: React.FC = () => {
     activeTournaments: 0,
     totalParticipants: 0,
     completedTournaments: 0,
+    totalTournaments: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +60,7 @@ const Dashboard: React.FC = () => {
         activeTournaments,
         totalParticipants: totalParticipants ?? 0,
         completedTournaments,
+        totalTournaments: (tournaments ?? []).length,
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard stats");
@@ -87,80 +90,86 @@ const Dashboard: React.FC = () => {
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
           <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" mb={2}>
-                <TournamentIcon color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6">Active Tournaments</Typography>
-              </Box>
-              {isLoading ? <Skeleton variant="text" width={60} height={60} /> : (
-                <Typography variant="h3" color="primary">
-                  {stats.activeTournaments}
-                </Typography>
-              )}
-              <Typography variant="body2" color="text.secondary">
-                {isLoading ? <Skeleton variant="text" width="80%" /> : (
-                  stats.activeTournaments === 0
-                    ? "No tournaments currently active"
-                    : `${stats.activeTournaments} tournament${
-                        stats.activeTournaments === 1 ? "" : "s"
-                      } in progress`
+            <CardActionArea onClick={() => navigate(wPath("/tournaments"), { state: { filterStatus: "active" } })}>
+              <CardContent>
+                <Box display="flex" alignItems="center" mb={2}>
+                  <TournamentIcon color="primary" sx={{ mr: 1 }} />
+                  <Typography variant="h6">Active Tournaments</Typography>
+                </Box>
+                {isLoading ? <Skeleton variant="text" width={60} height={60} /> : (
+                  <Typography variant="h3" color="primary">
+                    {stats.activeTournaments}
+                  </Typography>
                 )}
-              </Typography>
-            </CardContent>
+                <Typography variant="body2" color="text.secondary">
+                  {isLoading ? <Skeleton variant="text" width="80%" /> : (
+                    stats.activeTournaments === 0
+                      ? "No tournaments currently active"
+                      : `${stats.activeTournaments} tournament${
+                          stats.activeTournaments === 1 ? "" : "s"
+                        } in progress`
+                  )}
+                </Typography>
+              </CardContent>
+            </CardActionArea>
           </Card>
         </Grid>
 
         <Grid item xs={12} md={4}>
           <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" mb={2}>
-                <PeopleIcon color="secondary" sx={{ mr: 1 }} />
-                <Typography variant="h6">Total Participants</Typography>
-              </Box>
-              {isLoading ? <Skeleton variant="text" width={60} height={60} /> : (
-                <Typography variant="h3" color="secondary">
-                  {stats.totalParticipants}
-                </Typography>
-              )}
-              <Typography variant="body2" color="text.secondary">
-                {isLoading ? <Skeleton variant="text" width="80%" /> : (
-                  stats.totalParticipants === 0
-                    ? "No participants registered"
-                    : `${stats.totalParticipants} participant${
-                        stats.totalParticipants === 1 ? "" : "s"
-                      } across all tournaments`
+            <CardActionArea onClick={() => navigate(wPath("/tournaments"))}>
+              <CardContent>
+                <Box display="flex" alignItems="center" mb={2}>
+                  <PeopleIcon color="secondary" sx={{ mr: 1 }} />
+                  <Typography variant="h6">Total Participants</Typography>
+                </Box>
+                {isLoading ? <Skeleton variant="text" width={60} height={60} /> : (
+                  <Typography variant="h3" color="secondary">
+                    {stats.totalParticipants}
+                  </Typography>
                 )}
-              </Typography>
-            </CardContent>
+                <Typography variant="body2" color="text.secondary">
+                  {isLoading ? <Skeleton variant="text" width="80%" /> : (
+                    stats.totalParticipants === 0
+                      ? "No participants registered"
+                      : `${stats.totalParticipants} participant${
+                          stats.totalParticipants === 1 ? "" : "s"
+                        } across all tournaments`
+                  )}
+                </Typography>
+              </CardContent>
+            </CardActionArea>
           </Card>
         </Grid>
 
         <Grid item xs={12} md={4}>
           <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" mb={2}>
-                <TrophyIcon color="warning" sx={{ mr: 1 }} />
-                <Typography variant="h6">Completed Tournaments</Typography>
-              </Box>
-              {isLoading ? <Skeleton variant="text" width={60} height={60} /> : (
-                <Typography variant="h3" color="warning.main">
-                  {stats.completedTournaments}
-                </Typography>
-              )}
-              <Typography variant="body2" color="text.secondary">
-                {isLoading ? <Skeleton variant="text" width="80%" /> : (
-                  stats.completedTournaments === 0
-                    ? "No tournaments completed yet"
-                    : `${stats.completedTournaments} tournament${
-                        stats.completedTournaments === 1 ? "" : "s"
-                      } completed`
+            <CardActionArea onClick={() => navigate(wPath("/tournaments"), { state: { filterStatus: "completed" } })}>
+              <CardContent>
+                <Box display="flex" alignItems="center" mb={2}>
+                  <TrophyIcon color="warning" sx={{ mr: 1 }} />
+                  <Typography variant="h6">Completed Tournaments</Typography>
+                </Box>
+                {isLoading ? <Skeleton variant="text" width={60} height={60} /> : (
+                  <Typography variant="h3" color="warning.main">
+                    {stats.completedTournaments}
+                  </Typography>
                 )}
-              </Typography>
-            </CardContent>
+                <Typography variant="body2" color="text.secondary">
+                  {isLoading ? <Skeleton variant="text" width="80%" /> : (
+                    stats.completedTournaments === 0
+                      ? "No tournaments completed yet"
+                      : `${stats.completedTournaments} tournament${
+                          stats.completedTournaments === 1 ? "" : "s"
+                        } completed`
+                  )}
+                </Typography>
+              </CardContent>
+            </CardActionArea>
           </Card>
         </Grid>
 
-        {!isLoading && stats.activeTournaments === 0 && stats.completedTournaments === 0 && (
+        {!isLoading && stats.totalTournaments === 0 && (
           <Grid item xs={12}>
             <Paper sx={{ p: 4, textAlign: "center" }}>
               <TrophyIcon sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
@@ -174,7 +183,7 @@ const Dashboard: React.FC = () => {
                 variant="contained"
                 size="large"
                 startIcon={<AddIcon />}
-                onClick={() => navigate(wPath("/tournaments/create"))}
+                onClick={() => navigate(wPath("/tournaments"), { state: { openCreate: true } })}
               >
                 Create your first tournament
               </Button>
