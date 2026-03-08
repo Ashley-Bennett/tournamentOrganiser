@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Grid, Card, CardContent, Typography, Box, Paper, Skeleton } from "@mui/material";
+import { Grid, Card, CardContent, Typography, Box, Paper, Skeleton, Alert } from "@mui/material";
 import {
   SportsEsports as TournamentIcon,
   People as PeopleIcon,
@@ -22,11 +22,13 @@ const Dashboard: React.FC = () => {
     completedTournaments: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchDashboardStats = useCallback(async () => {
     if (!workspaceId) return;
     try {
       setLoading(true);
+      setError(null);
 
       const { data: tournaments, error: tErr } = await supabase
         .from("tournaments")
@@ -54,8 +56,8 @@ const Dashboard: React.FC = () => {
         totalParticipants: totalParticipants ?? 0,
         completedTournaments,
       });
-    } catch (error: unknown) {
-      console.error("Error fetching dashboard stats:", error);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load dashboard stats");
     } finally {
       setLoading(false);
     }
@@ -74,6 +76,11 @@ const Dashboard: React.FC = () => {
       <Typography variant="h4" component="h1" gutterBottom>
         Dashboard
       </Typography>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
           <Card>

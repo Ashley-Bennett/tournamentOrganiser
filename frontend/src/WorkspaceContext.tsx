@@ -86,7 +86,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     const { data, error: fetchError } = await supabase
       .from("workspace_memberships")
       .select(
-        "role, workspaces(id, name, slug, type, timezone, created_by, created_at)",
+        "role, workspaces(id, name, slug, type, created_by, created_at)",
       )
       .eq("user_id", user.id);
 

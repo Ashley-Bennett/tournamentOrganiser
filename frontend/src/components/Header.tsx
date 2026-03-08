@@ -8,7 +8,6 @@ import {
   Box,
   Chip,
   IconButton,
-  Tooltip,
   Menu,
   MenuItem,
   Divider,
@@ -146,17 +145,6 @@ const Header: React.FC = () => {
               <Button color="inherit" component={RouterLink} to="/me">
                 My Profile
               </Button>
-              <Tooltip title="Coming soon">
-                <span>
-                  <Button
-                    color="inherit"
-                    disabled
-                    sx={{ "&.Mui-disabled": { color: "rgba(255,255,255,0.85)", opacity: 1 } }}
-                  >
-                    Leagues
-                  </Button>
-                </span>
-              </Tooltip>
               <Button
                 color="inherit"
                 component={RouterLink}
@@ -211,11 +199,6 @@ const Header: React.FC = () => {
                   <ListItem disablePadding>
                     <ListItemButton onClick={() => handleNavClick("/me")}>
                       <ListItemText primary="My Profile" />
-                    </ListItemButton>
-                  </ListItem>
-                  <ListItem disablePadding>
-                    <ListItemButton disabled>
-                      <ListItemText primary="Leagues" secondary="Coming soon" />
                     </ListItemButton>
                   </ListItem>
                   <Divider sx={{ my: 1 }} />

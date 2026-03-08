@@ -35,6 +35,7 @@ import {
   Switch,
   TextField,
   Skeleton,
+  Snackbar,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
@@ -146,6 +147,7 @@ const TournamentMatches: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoSaveWarning, setAutoSaveWarning] = useState(false);
   const [seatWarnings, setSeatWarnings] = useState<string[]>([]);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [sortBy, setSortBy] = useState<"match" | "status" | "record">("record");
@@ -722,7 +724,7 @@ const TournamentMatches: React.FC = () => {
       .update({ temp_winner_id: winnerId, temp_result: resultString })
       .eq("id", match.id);
     if (error) {
-      console.error("Failed to auto-save temp result:", error.message);
+      setAutoSaveWarning(true);
     }
   };
 
@@ -4088,6 +4090,16 @@ const TournamentMatches: React.FC = () => {
           </>
         );
       })()}
+      <Snackbar
+        open={autoSaveWarning}
+        autoHideDuration={5000}
+        onClose={() => setAutoSaveWarning(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert severity="warning" onClose={() => setAutoSaveWarning(false)}>
+          Auto-save failed — your result may not persist if you navigate away.
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

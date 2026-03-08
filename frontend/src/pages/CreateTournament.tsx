@@ -12,7 +12,6 @@ import {
   Select,
   MenuItem,
   Alert,
-  Tooltip,
   FormControlLabel,
   Switch,
 } from "@mui/material";
@@ -146,13 +145,6 @@ const CreateTournament: React.FC = () => {
                   label="Tournament Type"
                   variant="outlined"
                 >
-                  <Tooltip title="Coming soon">
-                    <span>
-                      <MenuItem value="single_elimination" disabled>
-                        Single Elimination
-                      </MenuItem>
-                    </span>
-                  </Tooltip>
                   <MenuItem value="swiss">Swiss</MenuItem>
                 </Select>
               </FormControl>
