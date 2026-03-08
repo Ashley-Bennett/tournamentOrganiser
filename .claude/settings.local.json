@@ -29,7 +29,9 @@
       "Bash(python3:*)",
       "Bash(node:*)",
       "Bash(npm run test:*)",
-      "Bash(npm run build:frontend:*)"
+      "Bash(npm run build:frontend:*)",
+      "mcp__claude_ai_Supabase__search_docs",
+      "Bash(supabase migration:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ashle\\Code\\tournamentOrganiser\\frontend\\src\\pages"
