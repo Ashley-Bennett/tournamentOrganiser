@@ -6,8 +6,9 @@ import {
   Typography,
   Alert,
   Stack,
+  Link,
 } from "@mui/material";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 
 const Login = () => {
@@ -18,6 +19,7 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
+  const passwordReset = (location.state as { passwordReset?: boolean } | null)?.passwordReset;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +41,11 @@ const Login = () => {
       <Typography variant="h4" gutterBottom>
         Login
       </Typography>
+      {passwordReset && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          Password updated. You can now log in with your new password.
+        </Alert>
+      )}
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -62,6 +69,11 @@ const Login = () => {
             required
             fullWidth
           />
+          <Box textAlign="right" mt={-1}>
+            <Link component={RouterLink} to="/forgot-password" variant="body2">
+              Forgot password?
+            </Link>
+          </Box>
           <Button
             type="submit"
             variant="contained"

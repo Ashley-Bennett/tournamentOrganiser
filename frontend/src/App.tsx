@@ -10,6 +10,8 @@ import TournamentPairings from "./pages/TournamentPairings";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Welcome from "./pages/Welcome";
 import Me from "./pages/Me";
 import WorkspaceSettings from "./pages/WorkspaceSettings";
@@ -61,6 +63,8 @@ function App() {
             <Route path="/" element={<RootRoute />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* ── Public pairings page (no auth required) ─────── */}
             <Route path="/public/t/:publicSlug" element={<TournamentPairings />} />

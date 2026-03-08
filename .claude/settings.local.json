@@ -28,7 +28,8 @@
       "Bash(npm install:*)",
       "Bash(python3:*)",
       "Bash(node:*)",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "Bash(npm run build:frontend:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ashle\\Code\\tournamentOrganiser\\frontend\\src\\pages"

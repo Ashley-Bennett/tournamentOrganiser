@@ -13,14 +13,25 @@ import {
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
+import { useWorkspace } from "../WorkspaceContext";
 
 const Welcome = () => {
   const navigate = useNavigate();
   const { displayName, updateProfile } = useAuth();
+  const { workspaces } = useWorkspace();
 
-  const handleChoice = async (intent: "organiser" | "player", destination: string) => {
-    await updateProfile({ onboarding_intent: intent });
-    navigate(destination);
+  const handleOrganiserChoice = async () => {
+    await updateProfile({ onboarding_intent: "organiser" });
+    if (workspaces.length > 0) {
+      navigate(`/w/${workspaces[0].slug}/tournaments/create`);
+    } else {
+      navigate("/workspaces/new");
+    }
+  };
+
+  const handlePlayerChoice = async () => {
+    await updateProfile({ onboarding_intent: "player" });
+    navigate("/me");
   };
 
   return (
@@ -35,7 +46,7 @@ const Welcome = () => {
       <Stack direction={{ xs: "column", sm: "row" }} spacing={3} justifyContent="center">
         <Card variant="outlined" sx={{ flex: 1, cursor: "pointer" }}>
           <CardActionArea
-            onClick={() => void handleChoice("organiser", "/dashboard")}
+            onClick={() => void handleOrganiserChoice()}
             sx={{ p: 3, height: "100%" }}
           >
             <CardContent>
@@ -52,7 +63,7 @@ const Welcome = () => {
 
         <Card variant="outlined" sx={{ flex: 1, cursor: "pointer" }}>
           <CardActionArea
-            onClick={() => void handleChoice("player", "/me")}
+            onClick={() => void handlePlayerChoice()}
             sx={{ p: 3, height: "100%" }}
           >
             <CardContent>
