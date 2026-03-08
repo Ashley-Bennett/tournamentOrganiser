@@ -31,33 +31,41 @@ const AcceptInvite = () => {
 
     setStatus("accepting");
 
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Request timed out. Please try again.")), 30_000),
+    );
+
     void (async () => {
-      const { data: workspaceId, error } = await supabase.rpc(
-        "accept_workspace_invite",
-        { p_token: token }
-      );
+      try {
+        const { data: workspaceId, error } = await Promise.race([
+          supabase.rpc("accept_workspace_invite", { p_token: token }),
+          timeout,
+        ]);
 
-      if (error) {
-        setErrorMessage(error.message);
+        if (error) {
+          setErrorMessage(error.message);
+          setStatus("error");
+          return;
+        }
+
+        const { data: ws, error: wsError } = await Promise.race([
+          supabase.from("workspaces").select("slug").eq("id", workspaceId as string).single(),
+          timeout,
+        ]);
+
+        if (wsError || !ws) {
+          setErrorMessage("Joined workspace but could not determine its URL.");
+          setStatus("error");
+          return;
+        }
+
+        refreshWorkspaces();
+        setStatus("done");
+        navigate(`/w/${ws.slug}/tournaments`, { replace: true });
+      } catch (e: unknown) {
+        setErrorMessage(e instanceof Error ? e.message : "Something went wrong.");
         setStatus("error");
-        return;
       }
-
-      const { data: ws, error: wsError } = await supabase
-        .from("workspaces")
-        .select("slug")
-        .eq("id", workspaceId as string)
-        .single();
-
-      if (wsError || !ws) {
-        setErrorMessage("Joined workspace but could not determine its URL.");
-        setStatus("error");
-        return;
-      }
-
-      refreshWorkspaces();
-      setStatus("done");
-      navigate(`/w/${ws.slug}/tournaments`, { replace: true });
     })();
   }, [user, token, status, navigate, refreshWorkspaces]);
 

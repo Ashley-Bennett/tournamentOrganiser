@@ -21,4 +21,8 @@ export interface TournamentPlayer {
   has_static_seating?: boolean;
   static_seat_number?: number | null;
   user_id?: string | null;
+  dropped?: boolean;
+  dropped_at_round?: number | null;
+  is_late_entry?: boolean;
+  late_entry_round?: number | null;
 }

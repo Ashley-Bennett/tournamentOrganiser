@@ -468,6 +468,11 @@ const TournamentView: React.FC = () => {
   const handleConfirmDeletePlayer = async () => {
     const playerId = confirmDeletePlayerId;
     if (!playerId || !tournament || !user) return;
+    if (!workspaceId) {
+      setPlayersError("Workspace not loaded — cannot delete player");
+      setConfirmDeletePlayerId(null);
+      return;
+    }
     setConfirmDeletePlayerId(null);
 
     try {
@@ -479,7 +484,7 @@ const TournamentView: React.FC = () => {
         .delete()
         .eq("id", playerId)
         .eq("tournament_id", tournament.id)
-        .eq("workspace_id", workspaceId ?? "");
+        .eq("workspace_id", workspaceId);
 
       if (error) {
         throw new Error(error.message || "Failed to delete player");
@@ -558,10 +563,12 @@ const TournamentView: React.FC = () => {
     const url = `${window.location.origin}/claim/${token}`;
     try {
       await navigator.clipboard.writeText(url);
+      setPlayersError(null);
       setCopiedId(playerId);
       setTimeout(() => setCopiedId((prev) => (prev === playerId ? null : prev)), 2000);
     } catch {
-      setPlayersError("Failed to copy link.");
+      setCopiedId(null);
+      setPlayersError("Failed to copy link to clipboard.");
     }
   };
 
@@ -622,6 +629,7 @@ const TournamentView: React.FC = () => {
 
   const handleStartTournament = async () => {
     if (!tournament || tournament.status !== "draft" || !user) return;
+    if (!workspaceId) { setError("Workspace not loaded — cannot start tournament"); return; }
     if (players.length < 2) return;
     if (!numRounds || numRounds < 1) return;
 
@@ -633,7 +641,7 @@ const TournamentView: React.FC = () => {
         .from("tournaments")
         .update({ status: "active", num_rounds: numRounds })
         .eq("id", tournament.id)
-        .eq("workspace_id", workspaceId ?? "")
+        .eq("workspace_id", workspaceId)
         .select(
           "id, name, status, tournament_type, num_rounds, created_at, created_by",
         )
@@ -687,20 +695,30 @@ const TournamentView: React.FC = () => {
         .select();
 
       if (matchesError) {
-        await supabase
+        const { error: rollbackError } = await supabase
           .from("tournaments")
           .update({ status: "draft" })
           .eq("id", tournament.id);
+        if (rollbackError) {
+          throw new Error(
+            `Failed to create round 1 matches: ${matchesError.message}. Tournament status could not be reverted: ${rollbackError.message}`,
+          );
+        }
         throw new Error(
           `Failed to create round 1 matches: ${matchesError.message}`,
         );
       }
 
       if (!insertedMatches || insertedMatches.length === 0) {
-        await supabase
+        const { error: rollbackError } = await supabase
           .from("tournaments")
           .update({ status: "draft" })
           .eq("id", tournament.id);
+        if (rollbackError) {
+          throw new Error(
+            `Failed to create matches and tournament status could not be reverted: ${rollbackError.message}`,
+          );
+        }
         throw new Error(
           `Failed to create matches - expected ${matchesToInsert.length} matches but got ${insertedMatches?.length ?? 0}`,
         );
@@ -884,6 +902,8 @@ const TournamentView: React.FC = () => {
                   void navigator.clipboard.writeText(text).then(() => {
                     setCopiedPlayerList(true);
                     setTimeout(() => setCopiedPlayerList(false), 2000);
+                  }).catch(() => {
+                    setPlayersError("Failed to copy player list to clipboard.");
                   });
                 }}
               >

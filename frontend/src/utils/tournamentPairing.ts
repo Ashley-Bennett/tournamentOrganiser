@@ -1114,7 +1114,7 @@ export function generateSwissPairings(
   // FIX 6: stageUsed: 1 = clean (no floats), 2 = single floats, 3 = cascading multi-step floats
   const stageUsed = hasMultiStepFloat ? 3 : floatReasons.size > 0 ? 2 : 1;
 
-  if (roundNumber >= 4) {
+  if (import.meta.env.DEV && roundNumber >= 4) {
     console.group(`[Round ${roundNumber}] Pairing Decisions`);
     if (byePlayer)
       console.log(

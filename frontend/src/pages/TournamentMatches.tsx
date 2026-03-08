@@ -184,17 +184,19 @@ const TournamentMatches: React.FC = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // When the tab becomes visible after being backgrounded, force a re-fetch.
-  // Browser timer throttling can delay Supabase's built-in token refresh, causing
-  // the JWT to expire and RLS to silently filter out private tournament rows.
+  // AuthContext also fires refreshSession() on visibilitychange, so we delay
+  // slightly to let the token refresh complete before re-fetching data.
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        setRefreshTrigger((t) => t + 1);
+        timer = setTimeout(() => setRefreshTrigger((t) => t + 1), 500);
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearTimeout(timer);
     };
   }, []);
 
@@ -494,13 +496,16 @@ const TournamentMatches: React.FC = () => {
         });
 
         // Load all tournament players (with drop status) for the drop manager
-        const { data: allPlayersData } = await supabase
+        const { data: allPlayersData, error: allPlayersError } = await supabase
           .from("tournament_players")
           .select(
             "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round",
           )
           .eq("tournament_id", tournament.id)
           .order("name");
+        if (allPlayersError) {
+          throw new Error(allPlayersError.message || "Failed to load players");
+        }
         setPlayers((allPlayersData as TournamentPlayer[]) ?? []);
 
         // Combine matches with player names
@@ -556,7 +561,7 @@ const TournamentMatches: React.FC = () => {
     };
 
     void fetchMatches();
-  }, [tournament?.id, user]);
+  }, [tournament?.id, user, refreshTrigger]);
 
   // Calculate final standings for leaderboard
   const finalStandings = useMemo(() => {

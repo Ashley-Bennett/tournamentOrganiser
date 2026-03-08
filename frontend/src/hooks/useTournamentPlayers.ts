@@ -15,7 +15,7 @@ export function useTournamentPlayers(tournamentId: string | undefined) {
 
       const { data, error: fetchError } = await supabase
         .from("tournament_players")
-        .select("id, name, created_at, has_static_seating, static_seat_number, user_id")
+        .select("id, name, created_at, has_static_seating, static_seat_number, user_id, dropped, dropped_at_round, is_late_entry, late_entry_round")
         .eq("tournament_id", tournamentId)
         .order("created_at", { ascending: true });
 
