@@ -182,6 +182,7 @@ const TournamentMatches: React.FC = () => {
   const [lateEntryDialogOpen, setLateEntryDialogOpen] = useState(false);
   const [lateEntryName, setLateEntryName] = useState("");
   const [addingLateEntry, setAddingLateEntry] = useState(false);
+  const [seatInputs, setSeatInputs] = useState<Map<string, string>>(new Map());
   const didRestoreRef = useRef(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -3962,14 +3963,31 @@ const TournamentMatches: React.FC = () => {
                       label="Table #"
                       type="number"
                       disabled={isSaving}
-                      value={player.static_seat_number ?? ""}
+                      value={
+                        seatInputs.has(player.id)
+                          ? seatInputs.get(player.id)!
+                          : (player.static_seat_number?.toString() ?? "")
+                      }
                       onChange={(e) => {
+                        setSeatInputs((prev) =>
+                          new Map(prev).set(player.id, e.target.value),
+                        );
+                      }}
+                      onBlur={(e) => {
                         const val =
                           e.target.value === ""
                             ? null
                             : parseInt(e.target.value, 10);
-                        handleUpdateStaticSeat(player.id, true, val);
+                        setSeatInputs((prev) => {
+                          const next = new Map(prev);
+                          next.delete(player.id);
+                          return next;
+                        });
+                        if (val !== player.static_seat_number) {
+                          handleUpdateStaticSeat(player.id, true, val);
+                        }
                       }}
+                      onWheel={(e) => e.currentTarget.blur()}
                       inputProps={{ min: 1, style: { width: 60 } }}
                       sx={{ width: 90 }}
                     />
