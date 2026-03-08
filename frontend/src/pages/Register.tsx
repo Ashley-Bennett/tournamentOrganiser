@@ -6,6 +6,7 @@ import {
   Typography,
   Alert,
   Stack,
+  LinearProgress,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../AuthContext";
@@ -79,10 +80,11 @@ const Register = () => {
         </Alert>
       )}
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <Alert severity="success" sx={{ mb: user ? 0 : 2 }}>
           {success}
         </Alert>
       )}
+      {success && user && <LinearProgress sx={{ mb: 2 }} />}
       <form onSubmit={handleSubmit}>
         <Stack spacing={2}>
           <TextField

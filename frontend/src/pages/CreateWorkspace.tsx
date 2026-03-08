@@ -22,7 +22,8 @@ const WORKSPACE_TYPES = [
 
 const CreateWorkspace = () => {
   const navigate = useNavigate();
-  const { refreshWorkspaces } = useWorkspace();
+  const { workspaces, refreshWorkspaces } = useWorkspace();
+  const hasExistingWorkspace = workspaces.length > 0;
 
   const [name, setName] = useState("");
   const [type, setType] = useState<"personal" | "club" | "store">("club");
@@ -128,13 +129,15 @@ const CreateWorkspace = () => {
           >
             {loading ? "Creating…" : "Create workspace"}
           </Button>
-          <Button
-            variant="text"
-            onClick={() => navigate(-1)}
-            sx={{ color: "text.secondary" }}
-          >
-            Cancel
-          </Button>
+          {hasExistingWorkspace && (
+            <Button
+              variant="text"
+              onClick={() => navigate(-1)}
+              sx={{ color: "text.secondary" }}
+            >
+              Cancel
+            </Button>
+          )}
         </Stack>
       </form>
     </Box>

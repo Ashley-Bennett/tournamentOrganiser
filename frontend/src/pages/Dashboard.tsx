@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Grid, Card, CardContent, Typography, Box, Paper, Skeleton, Alert } from "@mui/material";
+import { Grid, Card, CardContent, Typography, Box, Paper, Skeleton, Alert, Button } from "@mui/material";
 import {
   SportsEsports as TournamentIcon,
   People as PeopleIcon,
   EmojiEvents as TrophyIcon,
+  Add as AddIcon,
 } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
 
@@ -15,7 +17,8 @@ interface DashboardStats {
 }
 
 const Dashboard: React.FC = () => {
-  const { workspaceId, loading: workspaceLoading } = useWorkspace();
+  const { workspaceId, wPath, loading: workspaceLoading } = useWorkspace();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     activeTournaments: 0,
     totalParticipants: 0,
@@ -157,30 +160,27 @@ const Dashboard: React.FC = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>
-              Welcome to Matchamp
-            </Typography>
-            <Typography variant="body1" paragraph>
-              This is your tournament management dashboard. Here you can:
-            </Typography>
-            <Box component="ul" sx={{ pl: 2 }}>
-              <Typography component="li" variant="body1">
-                Create and manage tournaments
+        {!isLoading && stats.activeTournaments === 0 && stats.completedTournaments === 0 && (
+          <Grid item xs={12}>
+            <Paper sx={{ p: 4, textAlign: "center" }}>
+              <TrophyIcon sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                No tournaments yet
               </Typography>
-              <Typography component="li" variant="body1">
-                Register participants
+              <Typography variant="body2" color="text.secondary" mb={3}>
+                Create your first tournament to get started. Add players, generate Swiss pairings, and track results.
               </Typography>
-              <Typography component="li" variant="body1">
-                Track matches and results
-              </Typography>
-              <Typography component="li" variant="body1">
-                Generate brackets and schedules
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<AddIcon />}
+                onClick={() => navigate(wPath("/tournaments/create"))}
+              >
+                Create your first tournament
+              </Button>
+            </Paper>
+          </Grid>
+        )}
       </Grid>
     </Box>
   );
