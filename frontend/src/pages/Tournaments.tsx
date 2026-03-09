@@ -82,6 +82,15 @@ const Tournaments: React.FC = () => {
     return () => clearTimeout(timer);
   }, [success]);
 
+  // Header "Create Tournament" button navigates to this page with openCreate state,
+  // even when already here. useState only runs once so we need an effect to respond.
+  useEffect(() => {
+    if ((location.state as { openCreate?: boolean } | null)?.openCreate) {
+      setCreateError("");
+      setCreateOpen(true);
+    }
+  }, [location.state]);
+
   const fetchTournaments = useCallback(async () => {
     try {
       setLoading(true);
@@ -417,7 +426,6 @@ const Tournaments: React.FC = () => {
         onClose={() => { setCreateOpen(false); setNewName(""); setCreateError(""); }}
         fullWidth
         maxWidth="xs"
-        TransitionProps={{ onEntered: () => createNameRef.current?.focus() }}
       >
         <DialogTitle>Create tournament</DialogTitle>
         <DialogContent>
@@ -435,6 +443,7 @@ const Tournaments: React.FC = () => {
             fullWidth
             required
             autoComplete="off"
+            autoFocus
             sx={{ mt: 1 }}
           />
         </DialogContent>

@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
@@ -120,7 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -132,9 +133,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     if (data.session?.access_token) {
       localStorage.setItem("token", data.session.access_token);
     }
-  };
+  }, []);
 
-  const register = async (
+  const register = useCallback(async (
     name: string,
     email: string,
     password: string,
@@ -150,7 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       throw new Error(error.message || "Registration failed");
     }
     return { session: data.session };
-  };
+  }, []);
 
   const logout = useCallback(() => {
     void supabase.auth.signOut();
@@ -175,10 +176,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const displayName =
     profile?.display_name || user?.email || "User";
 
+  const contextValue = useMemo(
+    () => ({ user, session, profile, displayName, loading, login, register, logout, updateProfile }),
+    [user, session, profile, displayName, loading, login, register, logout, updateProfile],
+  );
+
   return (
-    <AuthContext.Provider
-      value={{ user, session, profile, displayName, loading, login, register, logout, updateProfile }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -27,10 +27,7 @@ export default function RoundTimer({
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    // Poll at 250 ms so we never visually skip a second even if a tick fires slightly late.
-    // The displayed value is always derived from the absolute wall-clock difference,
-    // so accuracy is unaffected by the polling interval.
-    const id = setInterval(() => setNow(Date.now()), 250);
+    const id = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(id);
   }, []);
 

@@ -78,6 +78,9 @@ const TournamentPairings: React.FC = () => {
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [timerExpanded, setTimerExpanded] = useState(false);
   const didInitRoundRef = useRef(false);
+  // Stores the resolved tournament ID so the realtime callback can ignore events
+  // for other tournaments (the subscription has no server-side filter on public routes).
+  const resolvedTournamentIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!publicSlug && !id) {
@@ -123,6 +126,7 @@ const TournamentPairings: React.FC = () => {
       }
 
       setTournament(tData);
+      resolvedTournamentIdRef.current = tData.id;
 
       // Use the resolved tournament.id for child queries
       const tournamentId = tData.id;
@@ -202,9 +206,6 @@ const TournamentPairings: React.FC = () => {
     setError(null);
     void load();
 
-    // Auto-refresh every 5 seconds as a fallback
-    const interval = setInterval(() => void load(), 5_000);
-
     // Reload immediately when the tab becomes visible — browser timer throttling can
     // delay Supabase's proactive token refresh, causing expired JWTs and silent RLS
     // failures. Refreshing the session first ensures the next load() gets fresh data.
@@ -222,7 +223,10 @@ const TournamentPairings: React.FC = () => {
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // Real-time subscription so the page updates immediately when matches change
+    // Real-time subscription so the page updates immediately when matches change.
+    // Authenticated route: server-side filter keeps traffic minimal.
+    // Public route: filter client-side via resolvedTournamentIdRef so we ignore
+    // events from unrelated tournaments.
     const channel = supabase
       .channel(`pairings-${publicSlug ?? id}`)
       .on(
@@ -231,13 +235,19 @@ const TournamentPairings: React.FC = () => {
           event: "*",
           schema: "public",
           table: "tournament_matches",
+          ...(id ? { filter: `tournament_id=eq.${id}` } : {}),
         },
-        () => { void load(); },
+        (payload) => {
+          if (!id && resolvedTournamentIdRef.current) {
+            const row = (payload.new ?? payload.old) as { tournament_id?: string } | null;
+            if (row?.tournament_id !== resolvedTournamentIdRef.current) return;
+          }
+          void load();
+        },
       )
       .subscribe();
 
     return () => {
-      clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       void supabase.removeChannel(channel);
     };

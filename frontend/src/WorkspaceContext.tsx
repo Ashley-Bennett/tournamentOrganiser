@@ -162,22 +162,25 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   // preventing a false-empty flash between login and the first fetch.
   const isLoading = authLoading || loading || fetchedForUserId !== (user?.id ?? null);
 
+  const contextValue = useMemo(
+    () => ({
+      workspace,
+      workspaceId,
+      workspaces,
+      currentRole,
+      roleFor,
+      loading: isLoading,
+      error,
+      lastWorkspace,
+      wPath,
+      redirectToDefaultWorkspace,
+      refreshWorkspaces,
+    }),
+    [workspace, workspaceId, workspaces, currentRole, roleFor, isLoading, error, lastWorkspace, wPath, redirectToDefaultWorkspace, refreshWorkspaces],
+  );
+
   return (
-    <WorkspaceContext.Provider
-      value={{
-        workspace,
-        workspaceId,
-        workspaces,
-        currentRole,
-        roleFor,
-        loading: isLoading,
-        error,
-        lastWorkspace,
-        wPath,
-        redirectToDefaultWorkspace,
-        refreshWorkspaces,
-      }}
-    >
+    <WorkspaceContext.Provider value={contextValue}>
       {children}
     </WorkspaceContext.Provider>
   );

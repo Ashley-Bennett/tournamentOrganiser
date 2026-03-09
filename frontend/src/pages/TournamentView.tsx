@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, startTransition } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Typography,
@@ -55,6 +55,64 @@ import {
 } from "../utils/tournamentUtils";
 import { generateRound1Pairings } from "../utils/tournamentPairing";
 
+// Isolated component so typing only re-renders this small subtree, not the whole page.
+interface AddPlayerInputProps {
+  onAdd: (name: string) => Promise<void>;
+  disabled: boolean;
+  inputRef: React.RefObject<HTMLInputElement>;
+  onBulkMode: () => void;
+}
+
+const AddPlayerInput: React.FC<AddPlayerInputProps> = ({ onAdd, disabled, inputRef, onBulkMode }) => {
+  const [name, setName] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed || disabled) return;
+    await onAdd(trimmed);
+    setName("");
+    inputRef.current?.focus();
+  };
+
+  return (
+    <Box
+      component="form"
+      onSubmit={(e) => { void handleSubmit(e); }}
+      display="flex"
+      gap={2}
+      mb={2}
+      flexWrap="wrap"
+      alignItems="flex-start"
+    >
+      <TextField
+        label="Player name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        size="small"
+        autoComplete="off"
+        sx={{ minWidth: 240 }}
+        inputRef={inputRef}
+      />
+      <Button
+        type="submit"
+        variant="contained"
+        disabled={disabled || !name.trim()}
+      >
+        Add Player
+      </Button>
+      <Button
+        size="small"
+        variant="outlined"
+        onClick={onBulkMode}
+        sx={{ alignSelf: "center" }}
+      >
+        Bulk add (multiple)
+      </Button>
+    </Box>
+  );
+};
+
 const TournamentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -78,7 +136,6 @@ const TournamentView: React.FC = () => {
     refetch: refetchPlayers,
   } = useTournamentPlayers(tournament?.id);
 
-  const [newPlayerName, setNewPlayerName] = useState("");
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkNames, setBulkNames] = useState("");
@@ -93,7 +150,6 @@ const TournamentView: React.FC = () => {
   const [savingTimer, setSavingTimer] = useState(false);
   const [timerDurationInput, setTimerDurationInput] = useState<string | null>(null);
   const [numRounds, setNumRounds] = useState<number | null>(null);
-  const [isFollowingSuggested, setIsFollowingSuggested] = useState(true);
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
   const playerNameInputRef = useRef<HTMLInputElement>(null);
 
@@ -133,14 +189,14 @@ const TournamentView: React.FC = () => {
 
   useEffect(() => {
     if (tournament) {
-      setNumRounds(tournament.num_rounds);
-      setIsFollowingSuggested(tournament.num_rounds === null);
+      setNumRounds(tournament.num_rounds ?? 3);
     }
   }, [tournament]);
 
-  const suggestedRounds = tournament
-    ? calculateSuggestedRounds(players.length, tournament.tournament_type)
-    : 0;
+  const suggestedRounds = useMemo(
+    () => (tournament ? calculateSuggestedRounds(players.length, tournament.tournament_type) : 0),
+    [players.length, tournament],
+  );
 
   const filteredPlayers = useMemo(() => {
     let list = [...players];
@@ -156,18 +212,6 @@ const TournamentView: React.FC = () => {
     });
     return list;
   }, [players, playerSearch, playerSort, playerSortDir]);
-
-  useEffect(() => {
-    if (isFollowingSuggested && tournament && players.length >= 2) {
-      const suggested = calculateSuggestedRounds(
-        players.length,
-        tournament.tournament_type,
-      );
-      if (suggested !== numRounds) {
-        setNumRounds(suggested);
-      }
-    }
-  }, [isFollowingSuggested, players.length, tournament, numRounds]);
 
   // Fetch current round matches and update pairings to account for a newly added
   // late-entry player. Returns the current max round number.
@@ -293,9 +337,8 @@ const TournamentView: React.FC = () => {
     // roundComplete: player enters next round, no match needed for current round
   };
 
-  const handleAddPlayer = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!newPlayerName.trim() || !tournament || !user) return;
+  const handleAddPlayer = async (playerName: string) => {
+    if (!tournament || !user) return;
 
     try {
       setAddingPlayer(true);
@@ -325,7 +368,7 @@ const TournamentView: React.FC = () => {
       const { data, error } = await supabase
         .from("tournament_players")
         .insert({
-          name: newPlayerName.trim(),
+          name: playerName,
           tournament_id: tournament.id,
           created_by: user.id,
           workspace_id: workspaceId,
@@ -345,9 +388,9 @@ const TournamentView: React.FC = () => {
         await applyLateEntryPairing(data.id, currentMatches, maxRound);
       }
 
-      setPlayers((prev) => [...prev, data as TournamentPlayer]);
-      setNewPlayerName("");
-      playerNameInputRef.current?.focus();
+      startTransition(() => {
+        setPlayers((prev) => [...prev, data as TournamentPlayer]);
+      });
     } catch (e: unknown) {
       setPlayersError(e instanceof Error ? e.message : "Failed to add player");
     } finally {
@@ -433,11 +476,10 @@ const TournamentView: React.FC = () => {
 
   const handleRoundStep = async (delta: number) => {
     if (!tournament || tournament.status !== "draft" || !user) return;
-    const current = numRounds ?? suggestedRounds;
+    const current = numRounds ?? 3;
     const next = Math.min(20, Math.max(1, current + delta));
     if (next === current) return;
     setNumRounds(next);
-    setIsFollowingSuggested(false);
     const { data, error } = await supabase
       .from("tournaments")
       .update({ num_rounds: next })
@@ -454,7 +496,6 @@ const TournamentView: React.FC = () => {
     if (!tournament || tournament.status !== "draft" || !user) return;
     if (!suggestedRounds) return;
     setNumRounds(suggestedRounds);
-    setIsFollowingSuggested(true);
     const { data, error } = await supabase
       .from("tournaments")
       .update({ num_rounds: suggestedRounds })
@@ -873,14 +914,14 @@ const TournamentView: React.FC = () => {
                 >
                   +
                 </IconButton>
-                {players.length >= 2 && !isFollowingSuggested && numRounds !== suggestedRounds && (
+                {players.length >= 2 && numRounds !== suggestedRounds && (
                   <Button
                     size="small"
                     variant="text"
                     onClick={handleResetToSuggested}
                     sx={{ ml: 0.5, textTransform: "none", fontSize: "0.75rem" }}
                   >
-                    Reset to suggested ({suggestedRounds})
+                    Use suggested ({suggestedRounds})
                   </Button>
                 )}
               </Box>
@@ -888,7 +929,7 @@ const TournamentView: React.FC = () => {
                 <Typography variant="caption" color="text.secondary" sx={{ cursor: "help", textDecoration: "underline dotted" }}>
                   {players.length < 2
                     ? "Add players to see a suggestion."
-                    : isFollowingSuggested || numRounds === suggestedRounds
+                    : numRounds === suggestedRounds
                       ? `Suggested for ${players.length} players (Swiss standard)`
                       : `Suggested: ${suggestedRounds} for ${players.length} players (Swiss standard)`}
                 </Typography>
@@ -1042,39 +1083,12 @@ const TournamentView: React.FC = () => {
         )}
 
         {!bulkMode ? (
-          <Box
-            component="form"
-            onSubmit={handleAddPlayer}
-            display="flex"
-            gap={2}
-            mb={2}
-            flexWrap="wrap"
-            alignItems="flex-start"
-          >
-            <TextField
-              label="Player name"
-              value={newPlayerName}
-              onChange={(e) => setNewPlayerName(e.target.value)}
-              size="small"
-              sx={{ minWidth: 240 }}
-              inputRef={playerNameInputRef}
-            />
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={addingPlayer || !newPlayerName.trim()}
-            >
-              Add Player
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => setBulkMode(true)}
-              sx={{ alignSelf: "center" }}
-            >
-              Bulk add (multiple)
-            </Button>
-          </Box>
+          <AddPlayerInput
+            onAdd={handleAddPlayer}
+            disabled={addingPlayer}
+            inputRef={playerNameInputRef}
+            onBulkMode={() => setBulkMode(true)}
+          />
         ) : (
           <Box display="flex" flexDirection="column" gap={1} mb={2}>
             <TextField

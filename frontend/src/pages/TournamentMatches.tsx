@@ -1432,7 +1432,17 @@ const TournamentMatches: React.FC = () => {
         .eq("status", MATCH_STATUS.READY);
       if (updateError)
         throw new Error(updateError.message || "Failed to publish pairings");
-      await refreshMatches();
+      // Optimistically mark the published matches in local state so the Begin Round
+      // button appears immediately, without waiting for the refreshMatches round-trip.
+      setMatches((prev) =>
+        prev.map((m) =>
+          m.round_number === selectedRound && m.status === MATCH_STATUS.READY
+            ? { ...m, pairings_published: true }
+            : m,
+        ),
+      );
+      setProcessingRound(false);
+      void refreshMatches();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to publish pairings");
     } finally {
