@@ -145,6 +145,9 @@ const Header: React.FC = () => {
               <Button color="inherit" component={RouterLink} to="/me">
                 My Profile
               </Button>
+              <Button color="inherit" component={RouterLink} to="/whats-new">
+                What's New
+              </Button>
               <Button
                 color="inherit"
                 variant="outlined"
@@ -198,6 +201,11 @@ const Header: React.FC = () => {
                   <ListItem disablePadding>
                     <ListItemButton onClick={() => handleNavClick("/me")}>
                       <ListItemText primary="My Profile" />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={() => handleNavClick("/whats-new")}>
+                      <ListItemText primary="What's New" />
                     </ListItemButton>
                   </ListItem>
                   <Divider sx={{ my: 1 }} />

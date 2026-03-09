@@ -18,6 +18,7 @@ import WorkspaceSettings from "./pages/WorkspaceSettings";
 import CreateWorkspace from "./pages/CreateWorkspace";
 import AcceptInvite from "./pages/AcceptInvite";
 import ClaimPlayer from "./pages/ClaimPlayer";
+import WhatsNew from "./pages/WhatsNew";
 import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 
@@ -112,6 +113,9 @@ function App() {
 
             {/* ── Player claim link ─────────────────────────────── */}
             <Route path="/claim/:token" element={<ClaimPlayer />} />
+
+            {/* ── What's New ───────────────────────────────────── */}
+            <Route path="/whats-new" element={<WhatsNew />} />
 
             {/* ── Redirect /dashboard → workspace home ─────────── */}
             <Route

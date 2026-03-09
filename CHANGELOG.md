@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.1] - 2026-03-09
+
+### Added
+- `CHANGELOG.md` — developer-facing release history (Keep a Changelog format)
+- `CLAUDE.md` — instructions for Claude to maintain changelogs and commit messages going forward
+- `frontend/src/data/patchNotes.ts` — structured user-facing patch notes data file
+- `frontend/src/pages/WhatsNew.tsx` — in-app What's New page at `/whats-new`
+- "What's New" link added to header (desktop nav and mobile drawer)
+
+---
+
 ## [0.2.0] - 2026-03-09
 
 ### Added

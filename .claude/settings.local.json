@@ -34,10 +34,12 @@
       "Bash(supabase migration:*)",
       "Bash(supabase db push:*)",
       "Bash(npx supabase status:*)",
-      "Bash(PGPASSWORD=postgres psql:*)"
+      "Bash(PGPASSWORD=postgres psql:*)",
+      "Read(//c/Users/ashle/.claude/projects/c--Users-ashle-Code-tournamentOrganiser/memory/**)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\ashle\\Code\\tournamentOrganiser\\frontend\\src\\pages"
+      "c:\\Users\\ashle\\Code\\tournamentOrganiser\\frontend\\src\\pages",
+      "c:\\Users\\ashle\\.claude\\projects\\c--Users-ashle-Code-tournamentOrganiser\\memory"
     ]
   }
 }
