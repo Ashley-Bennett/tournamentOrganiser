@@ -65,6 +65,7 @@ import {
 } from "../utils/tournamentUtils";
 import { TournamentSummary } from "../types/tournament";
 import StandingsTable from "../components/StandingsTable";
+import RoundTimer from "../components/RoundTimer";
 
 interface TournamentPlayer {
   id: string;
@@ -351,7 +352,7 @@ const TournamentMatches: React.FC = () => {
         const { data, error } = await supabase
           .from("tournaments")
           .select(
-            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug",
+            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at",
           )
           .eq("id", id)
           .eq("workspace_id", workspaceId ?? "")
@@ -375,7 +376,7 @@ const TournamentMatches: React.FC = () => {
           const { data: retryData, error: retryError } = await supabase
             .from("tournaments")
             .select(
-              "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug",
+              "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at",
             )
             .eq("id", id)
             .maybeSingle();
@@ -1355,6 +1356,8 @@ const TournamentMatches: React.FC = () => {
 
   const handleBeginRound = async () => {
     if (!tournament || !user) return;
+    // Guard against double-click: if the timer is already running, do nothing
+    if (tournament.current_round_started_at) return;
 
     try {
       setProcessingRound(true);
@@ -1393,6 +1396,19 @@ const TournamentMatches: React.FC = () => {
 
       if (updateError) {
         throw new Error(updateError.message || "Failed to begin round");
+      }
+
+      // Record the absolute start time on the tournament so both pages can compute
+      // remaining time without drift, regardless of when they load.
+      if (tournament.round_duration_minutes) {
+        const startedAt = new Date().toISOString();
+        const { error: timerError } = await supabase
+          .from("tournaments")
+          .update({ current_round_started_at: startedAt })
+          .eq("id", tournament.id);
+        if (!timerError) {
+          setTournament({ ...tournament, current_round_started_at: startedAt });
+        }
       }
 
       await refreshMatches();
@@ -1434,10 +1450,10 @@ const TournamentMatches: React.FC = () => {
       // Save all pending results first
       await savePendingResults();
 
-      // Update tournament status to completed
+      // Update tournament status to completed, and clear any active round timer
       const { error: updateError } = await supabase
         .from("tournaments")
-        .update({ status: "completed" })
+        .update({ status: "completed", current_round_started_at: null })
         .eq("id", tournament.id)
         .eq("workspace_id", workspaceId ?? "");
 
@@ -1445,6 +1461,7 @@ const TournamentMatches: React.FC = () => {
         throw new Error(updateError.message || "Failed to complete tournament");
       }
 
+      setTournament({ ...tournament, status: "completed", current_round_started_at: null });
       // Switch to standings tab
       setSelectedRound("standings");
     } catch (e: unknown) {
@@ -1902,6 +1919,13 @@ const TournamentMatches: React.FC = () => {
       if (insertError) {
         throw new Error(insertError.message || "Failed to create next round");
       }
+
+      // Clear the round timer so the new round starts without a running clock
+      await supabase
+        .from("tournaments")
+        .update({ current_round_started_at: null })
+        .eq("id", tournament.id);
+      setTournament((prev) => prev ? { ...prev, current_round_started_at: null } : prev);
 
       // Refresh matches
       const { data: matchesData, error: matchesError } = await supabase
@@ -2812,6 +2836,14 @@ const TournamentMatches: React.FC = () => {
                                         </Button>
                                       </span>
                                     </Tooltip>
+                                    {tournament.round_duration_minutes &&
+                                      tournament.current_round_started_at && (
+                                        <RoundTimer
+                                          startedAt={tournament.current_round_started_at}
+                                          durationMinutes={tournament.round_duration_minutes}
+                                          size="small"
+                                        />
+                                      )}
                                   </>
                                 )}
                                 {/* Phase 3: round complete — keep View Pairings visible */}

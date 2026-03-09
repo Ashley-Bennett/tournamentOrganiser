@@ -16,11 +16,16 @@ import {
   Tab,
   Divider,
   CircularProgress,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import { supabase } from "../supabaseClient";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import StandingsTable from "../components/StandingsTable";
+import RoundTimer from "../components/RoundTimer";
 
 interface Tournament {
   id: string;
@@ -28,6 +33,8 @@ interface Tournament {
   status: string;
   num_rounds: number | null;
   is_public: boolean;
+  round_duration_minutes?: number | null;
+  current_round_started_at?: string | null;
 }
 
 interface Player {
@@ -69,6 +76,7 @@ const TournamentPairings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
+  const [timerExpanded, setTimerExpanded] = useState(false);
   const didInitRoundRef = useRef(false);
 
   useEffect(() => {
@@ -87,7 +95,7 @@ const TournamentPairings: React.FC = () => {
         // yields null data rather than a 406 error.
         const { data, error: tErr } = await supabase
           .from("tournaments")
-          .select("id, name, status, num_rounds, is_public")
+          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at")
           .eq("id", id)
           .maybeSingle();
         if (tErr || !data) {
@@ -100,7 +108,7 @@ const TournamentPairings: React.FC = () => {
         // Public route — fetch by public_slug, is_public = true required
         const { data, error: tErr } = await supabase
           .from("tournaments")
-          .select("id, name, status, num_rounds, is_public")
+          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at")
           .eq("public_slug", publicSlug!)
           .eq("is_public", true)
           .single();
@@ -302,6 +310,14 @@ const TournamentPairings: React.FC = () => {
 
   const isStandings = selectedRound === "standings";
 
+  // Show the round timer when the round is actively in progress and a timer is configured
+  const showTimer =
+    !isPreRound &&
+    !isStandings &&
+    !!tournament.round_duration_minutes &&
+    !!tournament.current_round_started_at &&
+    roundMatches.some((m) => m.status === "pending");
+
   const header = (
     <Box mb={isPreRound ? 2 : 1.5} textAlign="center">
       <Typography variant={isPreRound ? "h4" : "h5"} fontWeight={700}>
@@ -448,116 +464,180 @@ const TournamentPairings: React.FC = () => {
   }
 
   // ── ROUND ACTIVE / COMPLETE: compact table ──────────────────────────────────
+  const pairingsTable = (
+    <Paper variant="outlined" sx={{ flex: timerExpanded && showTimer ? 1 : undefined, minWidth: 0 }}>
+      <Box px={2} py={1}>
+        <Typography variant="subtitle2" fontWeight={600}>
+          Pairings — Round {selectedRound}
+        </Typography>
+      </Box>
+      <Divider />
+      <TableContainer sx={{ overflowX: "auto" }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ width: 36, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+                Table
+              </TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+                Player 1
+              </TableCell>
+              <TableCell sx={{ width: 24, textAlign: "center", fontSize: "0.75rem", color: "text.secondary", px: 0 }}>
+                vs
+              </TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+                Player 2
+              </TableCell>
+              <TableCell sx={{ width: 68, textAlign: "right", fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+                Result
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {roundMatches.map((m) => {
+              const isBye = m.status === "bye" || m.player2_id === null;
+              const isCompleted = m.status === "completed";
+              const isPending = m.status === "pending";
+              const displayWinnerId = m.winner_id ?? m.temp_winner_id;
+              const displayResult = m.result ?? m.temp_result;
+              const hasTempResult = isPending && !!m.temp_result;
+              const p1Won = displayWinnerId === m.player1_id;
+              const p2Won = displayWinnerId === m.player2_id;
+
+              return (
+                <TableRow key={m.id} hover>
+                  <TableCell sx={{ color: "text.secondary", fontSize: "0.85rem", fontWeight: 500 }}>
+                    {m.match_number ?? "—"}
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontSize: "0.9rem",
+                      fontWeight: p1Won ? 700 : 400,
+                      bgcolor: p1Won ? "rgba(76, 175, 80, 0.1)" : "inherit",
+                      maxWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {m.player1_name}
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center", color: "text.disabled", fontSize: "0.75rem", px: 0 }}>
+                    vs
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontSize: "0.9rem",
+                      fontWeight: p2Won ? 700 : 400,
+                      color: isBye ? "text.disabled" : "inherit",
+                      fontStyle: isBye ? "italic" : "normal",
+                      bgcolor: p2Won ? "rgba(76, 175, 80, 0.1)" : "inherit",
+                      maxWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {isBye ? "Bye" : m.player2_name}
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "right" }}>
+                    {isBye ? (
+                      <Chip label="BYE" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                    ) : isCompleted || hasTempResult ? (
+                      <Typography
+                        variant="caption"
+                        sx={{ fontWeight: 600, fontSize: "0.82rem", opacity: hasTempResult ? 0.6 : 1 }}
+                      >
+                        {displayResult ?? "—"}
+                      </Typography>
+                    ) : isPending ? (
+                      <Chip label="Playing" color="primary" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                    ) : (
+                      <Chip label="Waiting" size="small" variant="outlined" sx={{ fontSize: "0.65rem", height: 20 }} />
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {roundMatches.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} sx={{ textAlign: "center", color: "text.disabled", py: 3 }}>
+                  No pairings for this round yet.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Paper>
+  );
+
   return (
     <Box>
       {header}
       {roundTabs}
 
-      <Paper variant="outlined">
-        <Box px={2} py={1}>
-          <Typography variant="subtitle2" fontWeight={600}>
-            Pairings — Round {selectedRound}
-          </Typography>
+      {/* Expanded layout: pairings and large timer side by side */}
+      {showTimer && timerExpanded ? (
+        <Box sx={{ display: "flex", gap: 2, alignItems: "stretch" }}>
+          {pairingsTable}
+          <Paper
+            variant="outlined"
+            sx={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+              p: 1,
+            }}
+          >
+            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+              <Tooltip title="Collapse timer">
+                <IconButton size="small" onClick={() => setTimerExpanded(false)}>
+                  <FullscreenExitIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Box sx={{ flex: 1, display: "flex" }}>
+              <RoundTimer
+                startedAt={tournament.current_round_started_at!}
+                durationMinutes={tournament.round_duration_minutes!}
+                size="large"
+              />
+            </Box>
+          </Paper>
         </Box>
-        <Divider />
-        <TableContainer sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ width: 36, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
-                  Table
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
-                  Player 1
-                </TableCell>
-                <TableCell sx={{ width: 24, textAlign: "center", fontSize: "0.75rem", color: "text.secondary", px: 0 }}>
-                  vs
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
-                  Player 2
-                </TableCell>
-                <TableCell sx={{ width: 68, textAlign: "right", fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
-                  Result
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {roundMatches.map((m) => {
-                const isBye = m.status === "bye" || m.player2_id === null;
-                const isCompleted = m.status === "completed";
-                const isPending = m.status === "pending";
-                const displayWinnerId = m.winner_id ?? m.temp_winner_id;
-                const displayResult = m.result ?? m.temp_result;
-                const hasTempResult = isPending && !!m.temp_result;
-                const p1Won = displayWinnerId === m.player1_id;
-                const p2Won = displayWinnerId === m.player2_id;
+      ) : (
+        <>
+          {pairingsTable}
 
-                return (
-                  <TableRow key={m.id} hover>
-                    <TableCell sx={{ color: "text.secondary", fontSize: "0.85rem", fontWeight: 500 }}>
-                      {m.match_number ?? "—"}
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontSize: "0.9rem",
-                        fontWeight: p1Won ? 700 : 400,
-                        bgcolor: p1Won ? "rgba(76, 175, 80, 0.1)" : "inherit",
-                        maxWidth: 0,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {m.player1_name}
-                    </TableCell>
-                    <TableCell sx={{ textAlign: "center", color: "text.disabled", fontSize: "0.75rem", px: 0 }}>
-                      vs
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontSize: "0.9rem",
-                        fontWeight: p2Won ? 700 : 400,
-                        color: isBye ? "text.disabled" : "inherit",
-                        fontStyle: isBye ? "italic" : "normal",
-                        bgcolor: p2Won ? "rgba(76, 175, 80, 0.1)" : "inherit",
-                        maxWidth: 0,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {isBye ? "Bye" : m.player2_name}
-                    </TableCell>
-                    <TableCell sx={{ textAlign: "right" }}>
-                      {isBye ? (
-                        <Chip label="BYE" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
-                      ) : isCompleted || hasTempResult ? (
-                        <Typography
-                          variant="caption"
-                          sx={{ fontWeight: 600, fontSize: "0.82rem", opacity: hasTempResult ? 0.6 : 1 }}
-                        >
-                          {displayResult ?? "—"}
-                        </Typography>
-                      ) : isPending ? (
-                        <Chip label="Playing" color="primary" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
-                      ) : (
-                        <Chip label="Waiting" size="small" variant="outlined" sx={{ fontSize: "0.65rem", height: 20 }} />
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {roundMatches.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} sx={{ textAlign: "center", color: "text.disabled", py: 3 }}>
-                    No pairings for this round yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+          {/* Collapsed timer strip */}
+          {showTimer && (
+            <Paper
+              variant="outlined"
+              sx={{
+                mt: 1,
+                px: 2,
+                py: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <RoundTimer
+                startedAt={tournament.current_round_started_at!}
+                durationMinutes={tournament.round_duration_minutes!}
+                size="small"
+              />
+              <Tooltip title="Expand timer">
+                <IconButton size="small" onClick={() => setTimerExpanded(true)}>
+                  <FullscreenIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Paper>
+          )}
+        </>
+      )}
 
       {footer}
     </Box>

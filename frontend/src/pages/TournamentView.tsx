@@ -90,6 +90,8 @@ const TournamentView: React.FC = () => {
   const [startingTournament, setStartingTournament] = useState(false);
   const [confirmStartOpen, setConfirmStartOpen] = useState(false);
   const [savingPublic, setSavingPublic] = useState(false);
+  const [savingTimer, setSavingTimer] = useState(false);
+  const [timerDurationInput, setTimerDurationInput] = useState<string | null>(null);
   const [numRounds, setNumRounds] = useState<number | null>(null);
   const [isFollowingSuggested, setIsFollowingSuggested] = useState(true);
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
@@ -475,6 +477,18 @@ const TournamentView: React.FC = () => {
       .eq("workspace_id", workspaceId);
     setSavingPublic(false);
     if (!error) setTournament({ ...tournament, is_public: value });
+  };
+
+  const handleSetRoundDuration = async (minutes: number | null) => {
+    if (!tournament || !workspaceId) return;
+    setSavingTimer(true);
+    const { error } = await supabase
+      .from("tournaments")
+      .update({ round_duration_minutes: minutes })
+      .eq("id", tournament.id)
+      .eq("workspace_id", workspaceId);
+    setSavingTimer(false);
+    if (!error) setTournament({ ...tournament, round_duration_minutes: minutes });
   };
 
   const handleDeletePlayer = (playerId: string) => {
@@ -903,6 +917,54 @@ const TournamentView: React.FC = () => {
                 </Box>
               }
             />
+            <Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={!!tournament.round_duration_minutes}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        void handleSetRoundDuration(50);
+                      } else {
+                        void handleSetRoundDuration(null);
+                      }
+                    }}
+                    disabled={savingTimer}
+                    size="small"
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body2">Round timer</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Countdown shown on the matches and pairings pages
+                    </Typography>
+                  </Box>
+                }
+              />
+              {!!tournament.round_duration_minutes && (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1, ml: 4 }}>
+                  <TextField
+                    type="number"
+                    size="small"
+                    label="Duration (minutes)"
+                    value={timerDurationInput ?? tournament.round_duration_minutes.toString()}
+                    onChange={(e) => setTimerDurationInput(e.target.value)}
+                    onBlur={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      setTimerDurationInput(null);
+                      if (!isNaN(v) && v >= 1 && v <= 180 && v !== tournament.round_duration_minutes) {
+                        void handleSetRoundDuration(v);
+                      }
+                    }}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    inputProps={{ min: 1, max: 180, step: 1 }}
+                    sx={{ width: 160 }}
+                    disabled={savingTimer}
+                  />
+                </Box>
+              )}
+            </Box>
             <Button
               variant="contained"
               color="primary"

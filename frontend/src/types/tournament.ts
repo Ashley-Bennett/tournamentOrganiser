@@ -12,6 +12,8 @@ export interface TournamentSummary {
   created_by: string;
   is_public?: boolean;
   public_slug?: string | null;
+  round_duration_minutes?: number | null;
+  current_round_started_at?: string | null;
 }
 
 export interface TournamentPlayer {

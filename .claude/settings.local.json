@@ -31,7 +31,10 @@
       "Bash(npm run test:*)",
       "Bash(npm run build:frontend:*)",
       "mcp__claude_ai_Supabase__search_docs",
-      "Bash(supabase migration:*)"
+      "Bash(supabase migration:*)",
+      "Bash(supabase db push:*)",
+      "Bash(npx supabase status:*)",
+      "Bash(PGPASSWORD=postgres psql:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ashle\\Code\\tournamentOrganiser\\frontend\\src\\pages"
