@@ -50,7 +50,7 @@ function mockSupabaseResponse(response: {
   chain.maybeSingle = vi.fn().mockResolvedValue(response);
 
   vi.mocked(supabase.from).mockReturnValue(
-    chain as ReturnType<typeof supabase.from>,
+    chain as unknown as ReturnType<typeof supabase.from>,
   );
 }
 
@@ -165,7 +165,7 @@ describe("useTournament", () => {
     chain.maybeSingle = vi.fn().mockRejectedValue(new Error("Network timeout"));
 
     vi.mocked(supabase.from).mockReturnValue(
-      chain as ReturnType<typeof supabase.from>,
+      chain as unknown as ReturnType<typeof supabase.from>,
     );
 
     const { result } = renderHook(() =>
@@ -189,7 +189,7 @@ describe("useTournament", () => {
     chain.maybeSingle = vi.fn().mockResolvedValue({ data: MOCK_TOURNAMENT, error: null });
 
     vi.mocked(supabase.from).mockReturnValue(
-      chain as ReturnType<typeof supabase.from>,
+      chain as unknown as ReturnType<typeof supabase.from>,
     );
 
     const { result } = renderHook(() =>
@@ -211,7 +211,7 @@ describe("useTournament", () => {
     chain.maybeSingle = vi.fn().mockResolvedValue({ data: MOCK_TOURNAMENT, error: null });
 
     vi.mocked(supabase.from).mockReturnValue(
-      chain as ReturnType<typeof supabase.from>,
+      chain as unknown as ReturnType<typeof supabase.from>,
     );
 
     const { result } = renderHook(() =>

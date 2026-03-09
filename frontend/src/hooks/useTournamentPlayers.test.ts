@@ -39,7 +39,7 @@ function mockSupabaseResponse(response: {
         order: vi.fn().mockResolvedValue(response),
       }),
     }),
-  } as ReturnType<typeof supabase.from>);
+  } as unknown as ReturnType<typeof supabase.from>);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ describe("useTournamentPlayers", () => {
           order: vi.fn().mockRejectedValue(new Error("Network error")),
         }),
       }),
-    } as ReturnType<typeof supabase.from>);
+    } as unknown as ReturnType<typeof supabase.from>);
 
     const { result } = renderHook(() => useTournamentPlayers(TOURNAMENT_ID));
 
