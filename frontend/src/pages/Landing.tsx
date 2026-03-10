@@ -181,7 +181,7 @@ export default function Landing() {
                   py: 0.75,
                 }}
               >
-                Sign up free
+                Sign up
               </Button>
             </Stack>
           </Stack>
@@ -218,7 +218,7 @@ export default function Landing() {
 
         <Container maxWidth="md" sx={{ position: "relative" }}>
           <Chip
-            label="Free to use · No credit card required"
+            label="Swiss · Single Elimination · Live Standings"
             size="small"
             sx={{
               mb: 3,
@@ -285,7 +285,7 @@ export default function Landing() {
                 boxShadow: "0 0 30px rgba(220,0,78,0.3)",
               }}
             >
-              Get started — it&apos;s free
+              Get started
             </Button>
             <Button
               component={Link}
@@ -555,7 +555,7 @@ export default function Landing() {
                   "Tournament running in under a minute",
                   "Works for card games, board games, anything competitive",
                   "No tech knowledge required",
-                  "Free, forever",
+                  "Works for any competitive format",
                 ],
               },
               {
@@ -644,7 +644,7 @@ export default function Landing() {
             Ready to run your first tournament?
           </Typography>
           <Typography sx={{ color: TEXT_MUTED, mb: 5, fontSize: "1.05rem", lineHeight: 1.7 }}>
-            Sign up free. No credit card. Your first tournament starts in minutes.
+            Sign up and run your first tournament in minutes.
           </Typography>
           <Button
             component={Link}
@@ -663,7 +663,7 @@ export default function Landing() {
               boxShadow: "0 0 40px rgba(220,0,78,0.3)",
             }}
           >
-            Create your free account
+            Create your account
           </Button>
         </Container>
       </Box>
