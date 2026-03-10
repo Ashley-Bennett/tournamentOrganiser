@@ -9,6 +9,18 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.3.0",
+    date: "2026-03-10",
+    entries: [
+      {
+        category: "New Features",
+        items: [
+          "Matchamp now has a proper landing page! If you share the link with someone who hasn't signed up, they'll see a full overview of what Matchamp does, how it works, and a sign-up button. First impressions matter.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.2.4",
     date: "2026-03-10",
     entries: [

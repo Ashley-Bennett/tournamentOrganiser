@@ -1,3 +1,4 @@
+import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Box, Container } from "@mui/material";
 import Header from "./components/Header";
@@ -52,134 +53,160 @@ function RootRoute() {
   return <Landing />;
 }
 
+/** Wrapper that provides the app chrome (header + scrollable container). */
+function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
+      <Header />
+      <Box sx={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+        <Container
+          component="main"
+          sx={{
+            py: { xs: 1, sm: 2, md: 3 },
+            px: { xs: 1, sm: 2 },
+            display: "flex",
+            flexDirection: "column",
+            minHeight: "100%",
+          }}
+        >
+          {children}
+        </Container>
+      </Box>
+    </Box>
+  );
+}
+
 function App() {
   return (
     <WorkspaceProvider>
-      <Box sx={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
-        <Header />
-        <Box sx={{ flex: 1, overflow: "auto", minHeight: 0 }}>
-        <Container component="main" sx={{ py: { xs: 1, sm: 2, md: 3 }, px: { xs: 1, sm: 2 }, display: "flex", flexDirection: "column", minHeight: "100%" }}>
-          <Routes>
-            {/* ── Public ───────────────────────────────────────── */}
-            <Route path="/" element={<RootRoute />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
+      <Routes>
+        {/* ── Full-screen public routes (no app header/container) ── */}
+        <Route path="/" element={<RootRoute />} />
 
-            {/* ── Public pairings page (no auth required) ─────── */}
-            <Route path="/public/t/:publicSlug" element={<TournamentPairings />} />
+        {/* ── All other routes wrapped in the app layout ─────────── */}
+        <Route
+          path="/*"
+          element={
+            <AppLayout>
+              <Routes>
+                {/* ── Public ──────────────────────────────────── */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* ── Post-signup intent screen ────────────────────── */}
-            <Route
-              path="/welcome"
-              element={
-                <RequireAuth>
-                  <Welcome />
-                </RequireAuth>
-              }
-            />
+                {/* ── Public pairings (no auth required) ──────── */}
+                <Route path="/public/t/:publicSlug" element={<TournamentPairings />} />
 
-            {/* ── Player profile ───────────────────────────────── */}
-            <Route
-              path="/me"
-              element={
-                <RequireAuth>
-                  <Me />
-                </RequireAuth>
-              }
-            />
+                {/* ── Invite & claim links ─────────────────────── */}
+                <Route path="/invite/:token" element={<AcceptInvite />} />
+                <Route path="/claim/:token" element={<ClaimPlayer />} />
 
-            {/* ── Workspace management ─────────────────────────── */}
-            <Route
-              path="/workspaces/new"
-              element={
-                <RequireAuth>
-                  <CreateWorkspace />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/w/:workspaceSlug/settings"
-              element={
-                <RequireAuth>
-                  <WorkspaceSettings />
-                </RequireAuth>
-              }
-            />
+                {/* ── What's New ───────────────────────────────── */}
+                <Route path="/whats-new" element={<WhatsNew />} />
 
-            {/* ── Invite acceptance ────────────────────────────── */}
-            <Route path="/invite/:token" element={<AcceptInvite />} />
+                {/* ── Post-signup onboarding ───────────────────── */}
+                <Route
+                  path="/welcome"
+                  element={
+                    <RequireAuth>
+                      <Welcome />
+                    </RequireAuth>
+                  }
+                />
 
-            {/* ── Player claim link ─────────────────────────────── */}
-            <Route path="/claim/:token" element={<ClaimPlayer />} />
+                {/* ── Player profile ───────────────────────────── */}
+                <Route
+                  path="/me"
+                  element={
+                    <RequireAuth>
+                      <Me />
+                    </RequireAuth>
+                  }
+                />
 
-            {/* ── What's New ───────────────────────────────────── */}
-            <Route path="/whats-new" element={<WhatsNew />} />
+                {/* ── Workspace management ─────────────────────── */}
+                <Route
+                  path="/workspaces/new"
+                  element={
+                    <RequireAuth>
+                      <CreateWorkspace />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/w/:workspaceSlug/settings"
+                  element={
+                    <RequireAuth>
+                      <WorkspaceSettings />
+                    </RequireAuth>
+                  }
+                />
 
-            {/* ── Redirect /dashboard → workspace home ─────────── */}
-            <Route
-              path="/dashboard"
-              element={
-                <RequireAuth>
-                  <RedirectToWorkspace />
-                </RequireAuth>
-              }
-            />
+                {/* ── Redirect /dashboard → workspace home ─────── */}
+                <Route
+                  path="/dashboard"
+                  element={
+                    <RequireAuth>
+                      <RedirectToWorkspace />
+                    </RequireAuth>
+                  }
+                />
 
-            {/* ── Workspace-scoped routes ──────────────────────── */}
-            <Route
-              path="/w/:workspaceSlug/dashboard"
-              element={
-                <RequireAuth>
-                  <Dashboard />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/w/:workspaceSlug/tournaments"
-              element={
-                <RequireAuth>
-                  <Tournaments />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/w/:workspaceSlug/tournaments/create"
-              element={
-                <RequireAuth>
-                  <CreateTournament />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/w/:workspaceSlug/tournaments/:id"
-              element={
-                <RequireAuth>
-                  <TournamentView />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/w/:workspaceSlug/tournaments/:id/matches"
-              element={
-                <RequireAuth>
-                  <TournamentMatches />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/w/:workspaceSlug/tournaments/:id/pairings"
-              element={
-                <RequireAuth>
-                  <TournamentPairings />
-                </RequireAuth>
-              }
-            />
-          </Routes>
-        </Container>
-        </Box>
-      </Box>
+                {/* ── Workspace-scoped routes ───────────────────── */}
+                <Route
+                  path="/w/:workspaceSlug/dashboard"
+                  element={
+                    <RequireAuth>
+                      <Dashboard />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/w/:workspaceSlug/tournaments"
+                  element={
+                    <RequireAuth>
+                      <Tournaments />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/w/:workspaceSlug/tournaments/create"
+                  element={
+                    <RequireAuth>
+                      <CreateTournament />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/w/:workspaceSlug/tournaments/:id"
+                  element={
+                    <RequireAuth>
+                      <TournamentView />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/w/:workspaceSlug/tournaments/:id/matches"
+                  element={
+                    <RequireAuth>
+                      <TournamentMatches />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/w/:workspaceSlug/tournaments/:id/pairings"
+                  element={
+                    <RequireAuth>
+                      <TournamentPairings />
+                    </RequireAuth>
+                  }
+                />
+              </Routes>
+            </AppLayout>
+          }
+        />
+      </Routes>
     </WorkspaceProvider>
   );
 }

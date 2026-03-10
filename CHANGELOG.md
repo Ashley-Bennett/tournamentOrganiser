@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.0] - 2026-03-10
+
+### Added
+- Full marketing landing page replacing the old placeholder at `/`. Dark-themed, full-screen layout with
+  hero, features grid, how-it-works steps, standings showcase, audience sections, and final CTA.
+- `ScreenshotFrame` component inside Landing for browser-chrome screenshot embeds.
+- Screenshots served from `frontend/public/screenshots/` (matches, setup, standings, dashboard).
+
+### Changed
+- `App.tsx` refactored: extracted `AppLayout` component (Header + Container wrapper). The root route `/`
+  now renders outside `AppLayout` so Landing gets full-viewport width and no app header.
+
+---
+
 ## [0.2.4] - 2026-03-10
 
 ### Added
