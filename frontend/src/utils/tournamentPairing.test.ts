@@ -427,7 +427,52 @@ describe("generateSwissPairings — score-bracket pairing", () => {
 // ---------------------------------------------------------------------------
 
 describe("generateSwissPairings — bye priority", () => {
-  it("bye goes to a 0-pt player, not a player who already has a bye", () => {
+  it("bye is given to a higher-score player to avoid a rematch among the remainder", () => {
+    // A and B are both at 1pt and have already played each other.
+    // C is at 0pt and has not played A or B.
+    // Normal bye priority would give C the bye (lowest score), forcing A vs B — a rematch.
+    // The fix: give the bye to A or B instead, so C plays the other.
+    const standings: PlayerStanding[] = [
+      {
+        ...freshPlayer("A"),
+        draws: 1,
+        matchPoints: 1,
+        matchesPlayed: 1,
+        opponents: ["B"],
+      },
+      {
+        ...freshPlayer("B"),
+        draws: 1,
+        matchPoints: 1,
+        matchesPlayed: 1,
+        opponents: ["A"],
+      },
+      { ...freshPlayer("C") }, // 0pts, no prior matches tracked in this tournament
+    ];
+    const prev: Pairing[] = [makePairing("A", "B", 1)];
+
+    const { pairings } = generateSwissPairings(standings, 2, prev);
+    assertInvariants(pairings, standings, 2);
+
+    // Must be rematch-free
+    expect(
+      pairings.some(
+        (p) => p.player2Id && havePlayedBefore(p.player1Id, p.player2Id, prev),
+      ),
+    ).toBe(false);
+
+    // C must NOT receive the bye (that would force A vs B rematch)
+    const byePairing = pairings.find((p) => p.player2Id === null)!;
+    expect(byePairing.player1Id).not.toBe("C");
+
+    // C must be in a real match
+    const cPairing = pairings.find(
+      (p) => p.player1Id === "C" || p.player2Id === "C",
+    );
+    expect(cPairing?.player2Id).not.toBeNull();
+  });
+
+  it("bye still goes to lowest-score player when no rematch risk exists", () => {
     // After round 1 (5 players): A and C won, B and D lost, E got a bye
     const standings: PlayerStanding[] = [
       { ...freshPlayer("A"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["B"] },
@@ -579,5 +624,59 @@ describe("generateSwissPairings — multi-round simulation", () => {
       );
       sim = applyResults(sim, pairings, results);
     }
+  });
+
+  it("11-player round-3: no rematch when last two 1pt players drew each other in round 2", () => {
+    // Reproduces the reported bug (11 players, 4 rounds):
+    //   After round 2: 3 × 6pts | 5 × 3pts | 2 × 1pt (who drew each other) | 1 × 0pts
+    // Without the fix: 0pt player gets the bye, last two 1pt players rematch.
+    // With the fix: a 1pt player takes the bye; 0pt player plays the other 1pt player.
+    //
+    // Round 1 (11 players, 1 bye):
+    //   p0>p8, p1>p9, p2>p10, p3>p4, p5>p6, p7=bye
+    // Round 2 (11 players, 1 bye):
+    //   p0>p3, p1>p5, p2>p7, p8 draws p9, p6>p10, p4=bye
+    // → After r2: p0/p1/p2=6pts, p3/p4/p5/p6/p7=3pts, p8/p9=1pt, p10=0pts
+    const players = ["p0","p1","p2","p3","p4","p5","p6","p7","p8","p9","p10"];
+    let sim = freshTournament(players);
+
+    const r1: Pairing[] = [
+      makePairing("p0","p8",1), makePairing("p1","p9",1), makePairing("p2","p10",1),
+      makePairing("p3","p4",1), makePairing("p5","p6",1), makePairing("p7",null,1),
+    ];
+    sim = applyResults(sim, r1, ["p1wins","p1wins","p1wins","p1wins","p1wins"]);
+
+    const r2: Pairing[] = [
+      makePairing("p0","p3",2), makePairing("p1","p5",2), makePairing("p2","p7",2),
+      makePairing("p8","p9",2), makePairing("p6","p10",2), makePairing("p4",null,2),
+    ];
+    sim = applyResults(sim, r2, ["p1wins","p1wins","p1wins","draw","p1wins"]);
+
+    // Confirm expected score distribution
+    const byPts = (pts: number) => sim.standings.filter((s) => s.matchPoints === pts);
+    expect(byPts(6)).toHaveLength(3);
+    expect(byPts(3)).toHaveLength(5);
+    expect(byPts(1)).toHaveLength(2);
+    expect(byPts(0)).toHaveLength(1);
+
+    // Generate round 3
+    const { pairings } = generateSwissPairings(sim.standings, 3, sim.previousPairings);
+    assertInvariants(pairings, sim.standings, 3);
+
+    // No rematches anywhere
+    expect(
+      pairings.some(
+        (p) => p.player2Id && havePlayedBefore(p.player1Id, p.player2Id, sim.previousPairings),
+      ),
+    ).toBe(false);
+
+    // The 0pt player (p10) must NOT get the bye — they should play a 1pt player
+    const byePairing = pairings.find((p) => p.player2Id === null)!;
+    expect(byePairing.player1Id).not.toBe("p10");
+
+    const p10Pairing = pairings.find(
+      (p) => p.player1Id === "p10" || p.player2Id === "p10",
+    );
+    expect(p10Pairing?.player2Id).not.toBeNull();
   });
 });

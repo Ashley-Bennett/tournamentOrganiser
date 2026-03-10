@@ -19,6 +19,10 @@
  * 6. stageUsed is computed meaningfully; rematchCount is now a real count.
  * 7. generateRound1Pairings delegates entirely to generateSwissPairings — no duplication.
  * 8. Input validation now cross-checks previousPairings against standings.opponents.
+ * 9. Rematch-escape floats: even brackets can float players to break up forced rematches.
+ * 10. Bye selection in odd last bracket now tries all candidates to find one that avoids
+ *     rematches among the remaining players, rather than always taking the lowest-score
+ *     player first (which can force a rematch when the last two have already played each other).
  */
 
 export interface PlayerStanding {
@@ -584,11 +588,49 @@ function processBracket(
     if (isLastBracket) {
       // FIX 1: Use byePriority among the actual pool members, not a global min-points check.
       const sorted = [...pool].sort(byePriority(`bye:r${roundNumber}`));
-      const byePlayer = sorted[0]!;
-      const toPair = sorted.slice(1);
 
-      // FIX 2: pairEvenPool handles mixed-points pools via compareForPairing.
-      const pairings = pairEvenPool(toPair, previousPairings, roundNumber, ctx);
+      // FIX 10: Try bye candidates in priority order; pick the first whose removal leaves a
+      // rematch-free pairing of the remaining players. This prevents the scenario where the
+      // default (lowest-score) bye recipient leaves behind two players who have already played
+      // each other — an avoidable rematch. There is no limit on float distance: if the natural
+      // bye pick forces a rematch, we simply walk down the priority list until we find a
+      // candidate that doesn't.
+      let selectedByeIdx = 0;
+      let selectedPairings: Pairing[] | null = null;
+
+      for (let i = 0; i < sorted.length; i++) {
+        const remaining = pool.filter((p) => p.id !== sorted[i]!.id);
+        if (remaining.length === 0) {
+          // Only one player in pool — they must take the bye.
+          selectedByeIdx = i;
+          selectedPairings = [];
+          break;
+        }
+        // remaining is guaranteed even (pool is odd, removing 1 gives even).
+        // FIX 2: pairEvenPool handles mixed-points pools via compareForPairing.
+        const candidate = pairEvenPool(remaining, previousPairings, roundNumber, ctx);
+        const hasRematch = candidate.some(
+          (p) =>
+            p.player2Id &&
+            havePlayedBefore(p.player1Id, p.player2Id, previousPairings),
+        );
+        if (!hasRematch) {
+          selectedByeIdx = i;
+          selectedPairings = candidate;
+          break;
+        }
+        // This candidate forces a rematch — try the next.
+      }
+
+      // If no candidate avoids rematches, the rematch is truly forced; fall back to normal priority.
+      const byePlayer = sorted[selectedByeIdx]!;
+      const toPair = pool.filter((p) => p.id !== byePlayer.id);
+      const pairings =
+        selectedPairings ??
+        (toPair.length > 0
+          ? pairEvenPool(toPair, previousPairings, roundNumber, ctx)
+          : []);
+
       assert(
         pairings.length === toPair.length / 2,
         `Bracket pairing incomplete: expected ${
@@ -596,10 +638,11 @@ function processBracket(
         } pairings, got ${pairings.length}`,
       );
 
-      floatReasons.set(
-        byePlayer.id,
-        `bye (last bracket, selected by bye priority: lowest pts then fewest byes)`,
-      );
+      const byeReason =
+        selectedByeIdx === 0
+          ? `bye (last bracket, selected by bye priority: lowest pts then fewest byes)`
+          : `bye (last bracket, adjusted to avoid rematch among remaining players)`;
+      floatReasons.set(byePlayer.id, byeReason);
 
       return { pairings, floatDown: byePlayer };
     }

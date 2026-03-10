@@ -9,6 +9,18 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.2.3",
+    date: "2026-03-10",
+    entries: [
+      {
+        category: "Fixes & Polish",
+        items: [
+          "Swiss pairings no longer create rematches when the bye can go elsewhere. Previously, giving the bye to the lowest-score player could strand two players who had already faced each other with no choice but to rematch. The algorithm now checks whether that would happen and gives the bye to a higher-score player instead.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.2.2",
     date: "2026-03-10",
     entries: [

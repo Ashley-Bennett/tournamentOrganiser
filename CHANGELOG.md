@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.3] - 2026-03-10
+
+### Fixed
+- Swiss pairing: bye selection in the last (odd) bracket now tries all bye candidates in
+  priority order to find one that avoids a rematch among the remaining players. Previously
+  the lowest-score player always received the bye, which could leave the last two players —
+  who had already played each other — with no option but a forced rematch. Fix: walk down the
+  candidate list until a zero-rematch remainder is found; only fall back to the default when
+  a rematch is truly unavoidable. No artificial limit on float distance is applied.
+  Reproduces and fixes the reported 11-player, 4-round scenario (two 1pt players forced into
+  a rematch in round 3 because the 0pt player received the bye by default).
+- Added FIX 10 note to algorithm header comment in `tournamentPairing.ts`.
+
+### Tests
+- New test: `bye is given to a higher-score player to avoid a rematch among the remainder`
+  (3-player focused unit test for the bye-rematch fix).
+- New test: `11-player round-3: no rematch when last two 1pt players drew each other in round 2`
+  (full simulation of the reported scenario).
+- Renamed existing bye-priority test to `bye still goes to lowest-score player when no rematch risk exists` for clarity.
+
+---
+
 ## [0.2.2] - 2026-03-10
 
 ### Fixed
