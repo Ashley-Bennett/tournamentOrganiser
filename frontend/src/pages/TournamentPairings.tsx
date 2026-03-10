@@ -225,6 +225,33 @@ const TournamentPairings: React.FC = () => {
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    // Lightweight fetch of just the three timer columns. Called by the realtime
+    // subscription and by the polling interval so the timer freezes quickly on pause.
+    const loadTimerState = async () => {
+      const tid = resolvedTournamentIdRef.current;
+      if (!tid) return;
+      const { data } = await supabase
+        .from("tournaments")
+        .select("current_round_started_at, round_elapsed_seconds, round_is_paused")
+        .eq("id", tid)
+        .maybeSingle();
+      if (!data) return;
+      setTournament((prev) =>
+        prev
+          ? {
+              ...prev,
+              current_round_started_at: data.current_round_started_at ?? null,
+              round_elapsed_seconds: data.round_elapsed_seconds ?? 0,
+              round_is_paused: data.round_is_paused ?? false,
+            }
+          : prev,
+      );
+    };
+
+    // Poll timer state every 2 s so pause/resume propagates even if the realtime
+    // event is delayed or the tournaments table isn't in the publication yet.
+    const pollId = setInterval(() => void loadTimerState(), 2_000);
+
     // Real-time subscription so the page updates immediately when matches change.
     // Authenticated route: server-side filter keeps traffic minimal.
     // Public route: filter client-side via resolvedTournamentIdRef so we ignore
@@ -247,8 +274,8 @@ const TournamentPairings: React.FC = () => {
           void load();
         },
       )
-      // Also watch the tournaments row itself so timer pause/resume appears instantly
-      // without waiting for a full page refresh.
+      // Also watch the tournaments row for instant pause/resume (requires tournaments
+      // table to be in the supabase_realtime publication — see migration 20260310010000).
       .on(
         "postgres_changes",
         {
@@ -258,30 +285,17 @@ const TournamentPairings: React.FC = () => {
           ...(id ? { filter: `id=eq.${id}` } : {}),
         },
         (payload) => {
-          const row = payload.new as {
-            id?: string;
-            current_round_started_at?: string | null;
-            round_elapsed_seconds?: number | null;
-            round_is_paused?: boolean | null;
-          } | null;
-          if (!row) return;
-          // For the public route, ignore events for other tournaments
-          if (!id && resolvedTournamentIdRef.current && row.id !== resolvedTournamentIdRef.current) return;
-          setTournament((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  current_round_started_at: row.current_round_started_at ?? null,
-                  round_elapsed_seconds: row.round_elapsed_seconds ?? 0,
-                  round_is_paused: row.round_is_paused ?? false,
-                }
-              : prev,
-          );
+          if (!id && resolvedTournamentIdRef.current) {
+            const row = payload.new as { id?: string } | null;
+            if (row?.id !== resolvedTournamentIdRef.current) return;
+          }
+          void loadTimerState();
         },
       )
       .subscribe();
 
     return () => {
+      clearInterval(pollId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       void supabase.removeChannel(channel);
     };
