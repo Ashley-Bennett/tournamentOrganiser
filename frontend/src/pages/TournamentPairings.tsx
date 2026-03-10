@@ -35,6 +35,8 @@ interface Tournament {
   is_public: boolean;
   round_duration_minutes?: number | null;
   current_round_started_at?: string | null;
+  round_elapsed_seconds?: number | null;
+  round_is_paused?: boolean | null;
 }
 
 interface Player {
@@ -98,7 +100,7 @@ const TournamentPairings: React.FC = () => {
         // yields null data rather than a 406 error.
         const { data, error: tErr } = await supabase
           .from("tournaments")
-          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at")
+          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused")
           .eq("id", id)
           .maybeSingle();
         if (tErr || !data) {
@@ -111,7 +113,7 @@ const TournamentPairings: React.FC = () => {
         // Public route — fetch by public_slug, is_public = true required
         const { data, error: tErr } = await supabase
           .from("tournaments")
-          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at")
+          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused")
           .eq("public_slug", publicSlug!)
           .eq("is_public", true)
           .single();
@@ -320,12 +322,13 @@ const TournamentPairings: React.FC = () => {
 
   const isStandings = selectedRound === "standings";
 
-  // Show the round timer when the round is actively in progress and a timer is configured
+  // Show the round timer when the round is actively in progress and a timer is configured.
+  // Also show when paused (current_round_started_at is null but round_is_paused is true).
   const showTimer =
     !isPreRound &&
     !isStandings &&
     !!tournament.round_duration_minutes &&
-    !!tournament.current_round_started_at &&
+    (!!tournament.current_round_started_at || !!tournament.round_is_paused) &&
     roundMatches.some((m) => m.status === "pending");
 
   const header = (
@@ -610,8 +613,10 @@ const TournamentPairings: React.FC = () => {
             </Box>
             <Box sx={{ flex: 1, display: "flex" }}>
               <RoundTimer
-                startedAt={tournament.current_round_started_at!}
+                startedAt={tournament.current_round_started_at ?? null}
                 durationMinutes={tournament.round_duration_minutes!}
+                elapsedSeconds={tournament.round_elapsed_seconds ?? 0}
+                isPaused={tournament.round_is_paused ?? false}
                 size="large"
               />
             </Box>
@@ -635,8 +640,10 @@ const TournamentPairings: React.FC = () => {
               }}
             >
               <RoundTimer
-                startedAt={tournament.current_round_started_at!}
+                startedAt={tournament.current_round_started_at ?? null}
                 durationMinutes={tournament.round_duration_minutes!}
+                elapsedSeconds={tournament.round_elapsed_seconds ?? 0}
+                isPaused={tournament.round_is_paused ?? false}
                 size="small"
               />
               <Tooltip title="Expand timer">

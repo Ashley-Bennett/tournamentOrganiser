@@ -41,6 +41,7 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PauseIcon from "@mui/icons-material/Pause";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import EditIcon from "@mui/icons-material/Edit";
@@ -352,7 +353,7 @@ const TournamentMatches: React.FC = () => {
         const { data, error } = await supabase
           .from("tournaments")
           .select(
-            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at",
+            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused",
           )
           .eq("id", id)
           .eq("workspace_id", workspaceId ?? "")
@@ -376,7 +377,7 @@ const TournamentMatches: React.FC = () => {
           const { data: retryData, error: retryError } = await supabase
             .from("tournaments")
             .select(
-              "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at",
+              "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused",
             )
             .eq("id", id)
             .maybeSingle();
@@ -1404,10 +1405,19 @@ const TournamentMatches: React.FC = () => {
         const startedAt = new Date().toISOString();
         const { error: timerError } = await supabase
           .from("tournaments")
-          .update({ current_round_started_at: startedAt })
+          .update({
+            current_round_started_at: startedAt,
+            round_elapsed_seconds: 0,
+            round_is_paused: false,
+          })
           .eq("id", tournament.id);
         if (!timerError) {
-          setTournament({ ...tournament, current_round_started_at: startedAt });
+          setTournament({
+            ...tournament,
+            current_round_started_at: startedAt,
+            round_elapsed_seconds: 0,
+            round_is_paused: false,
+          });
         }
       }
 
@@ -1416,6 +1426,43 @@ const TournamentMatches: React.FC = () => {
       setError(e instanceof Error ? e.message : "Failed to begin round");
     } finally {
       setProcessingRound(false);
+    }
+  };
+
+  const handlePauseTimer = async () => {
+    if (!tournament || !tournament.round_duration_minutes) return;
+    if (!tournament.current_round_started_at || tournament.round_is_paused) return;
+    const elapsed =
+      (tournament.round_elapsed_seconds ?? 0) +
+      Math.floor((Date.now() - new Date(tournament.current_round_started_at).getTime()) / 1_000);
+    const { error } = await supabase
+      .from("tournaments")
+      .update({ current_round_started_at: null, round_elapsed_seconds: elapsed, round_is_paused: true })
+      .eq("id", tournament.id);
+    if (!error) {
+      setTournament({
+        ...tournament,
+        current_round_started_at: null,
+        round_elapsed_seconds: elapsed,
+        round_is_paused: true,
+      });
+    }
+  };
+
+  const handleResumeTimer = async () => {
+    if (!tournament || !tournament.round_duration_minutes) return;
+    if (!tournament.round_is_paused) return;
+    const resumedAt = new Date().toISOString();
+    const { error } = await supabase
+      .from("tournaments")
+      .update({ current_round_started_at: resumedAt, round_is_paused: false })
+      .eq("id", tournament.id);
+    if (!error) {
+      setTournament({
+        ...tournament,
+        current_round_started_at: resumedAt,
+        round_is_paused: false,
+      });
     }
   };
 
@@ -1463,7 +1510,12 @@ const TournamentMatches: React.FC = () => {
       // Update tournament status to completed, and clear any active round timer
       const { error: updateError } = await supabase
         .from("tournaments")
-        .update({ status: "completed", current_round_started_at: null })
+        .update({
+          status: "completed",
+          current_round_started_at: null,
+          round_elapsed_seconds: 0,
+          round_is_paused: false,
+        })
         .eq("id", tournament.id)
         .eq("workspace_id", workspaceId ?? "");
 
@@ -1471,7 +1523,13 @@ const TournamentMatches: React.FC = () => {
         throw new Error(updateError.message || "Failed to complete tournament");
       }
 
-      setTournament({ ...tournament, status: "completed", current_round_started_at: null });
+      setTournament({
+        ...tournament,
+        status: "completed",
+        current_round_started_at: null,
+        round_elapsed_seconds: 0,
+        round_is_paused: false,
+      });
       // Switch to standings tab
       setSelectedRound("standings");
     } catch (e: unknown) {
@@ -1933,9 +1991,13 @@ const TournamentMatches: React.FC = () => {
       // Clear the round timer so the new round starts without a running clock
       await supabase
         .from("tournaments")
-        .update({ current_round_started_at: null })
+        .update({ current_round_started_at: null, round_elapsed_seconds: 0, round_is_paused: false })
         .eq("id", tournament.id);
-      setTournament((prev) => prev ? { ...prev, current_round_started_at: null } : prev);
+      setTournament((prev) =>
+        prev
+          ? { ...prev, current_round_started_at: null, round_elapsed_seconds: 0, round_is_paused: false }
+          : prev,
+      );
 
       // Refresh matches
       const { data: matchesData, error: matchesError } = await supabase
@@ -2847,12 +2909,35 @@ const TournamentMatches: React.FC = () => {
                                       </span>
                                     </Tooltip>
                                     {tournament.round_duration_minutes &&
-                                      tournament.current_round_started_at && (
-                                        <RoundTimer
-                                          startedAt={tournament.current_round_started_at}
-                                          durationMinutes={tournament.round_duration_minutes}
-                                          size="small"
-                                        />
+                                      (tournament.current_round_started_at ||
+                                        tournament.round_is_paused) && (
+                                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+                                          <RoundTimer
+                                            startedAt={tournament.current_round_started_at ?? null}
+                                            durationMinutes={tournament.round_duration_minutes}
+                                            elapsedSeconds={tournament.round_elapsed_seconds ?? 0}
+                                            isPaused={tournament.round_is_paused ?? false}
+                                            size="small"
+                                          />
+                                          <Tooltip
+                                            title={tournament.round_is_paused ? "Resume timer" : "Pause timer"}
+                                          >
+                                            <IconButton
+                                              size="small"
+                                              onClick={() =>
+                                                void (tournament.round_is_paused
+                                                  ? handleResumeTimer()
+                                                  : handlePauseTimer())
+                                              }
+                                            >
+                                              {tournament.round_is_paused ? (
+                                                <PlayArrowIcon sx={{ fontSize: "1rem" }} />
+                                              ) : (
+                                                <PauseIcon sx={{ fontSize: "1rem" }} />
+                                              )}
+                                            </IconButton>
+                                          </Tooltip>
+                                        </Box>
                                       )}
                                   </>
                                 )}

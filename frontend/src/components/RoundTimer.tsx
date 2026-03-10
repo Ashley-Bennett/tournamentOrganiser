@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
 import { Box, Typography } from "@mui/material";
 import TimerIcon from "@mui/icons-material/Timer";
+import PauseCircleIcon from "@mui/icons-material/PauseCircle";
 
 interface RoundTimerProps {
-  startedAt: string; // ISO timestamp from current_round_started_at
+  /** ISO timestamp from current_round_started_at (null when paused) */
+  startedAt: string | null;
   durationMinutes: number;
+  /** Accumulated elapsed seconds before the current segment (from round_elapsed_seconds) */
+  elapsedSeconds?: number;
+  /** Whether the timer is currently paused */
+  isPaused?: boolean;
   size?: "small" | "large";
 }
 
@@ -22,20 +28,28 @@ function formatTime(remainingMs: number): string {
 export default function RoundTimer({
   startedAt,
   durationMinutes,
+  elapsedSeconds = 0,
+  isPaused = false,
   size = "small",
 }: RoundTimerProps) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
+    if (isPaused) return; // no tick while paused
     const id = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(id);
-  }, []);
+  }, [isPaused]);
 
-  const elapsedMs = now - new Date(startedAt).getTime();
-  const remainingMs = durationMinutes * 60_000 - elapsedMs;
+  // Total elapsed ms: base offset + live segment (0 when paused since startedAt is null)
+  const baseMs = elapsedSeconds * 1_000;
+  const liveMs =
+    !isPaused && startedAt ? now - new Date(startedAt).getTime() : 0;
+  const totalElapsedMs = baseMs + liveMs;
+
+  const remainingMs = durationMinutes * 60_000 - totalElapsedMs;
   const isOvertime = remainingMs < 0;
-  const isRed = remainingMs <= 5 * 60_000; // red at ≤5 min remaining
-  const colour = isRed ? "error.main" : "text.primary";
+  const isRed = !isPaused && remainingMs <= 5 * 60_000;
+  const colour = isPaused ? "warning.main" : isRed ? "error.main" : "text.primary";
   const timeStr = formatTime(remainingMs);
 
   if (size === "large") {
@@ -61,7 +75,7 @@ export default function RoundTimer({
             fontSize: "1rem",
           }}
         >
-          {isOvertime ? "OVERTIME" : "Time Remaining"}
+          {isPaused ? "PAUSED" : isOvertime ? "OVERTIME" : "Time Remaining"}
         </Typography>
         <Typography
           component="div"
@@ -92,12 +106,20 @@ export default function RoundTimer({
         color: colour,
       }}
     >
-      <TimerIcon sx={{ fontSize: "1rem" }} />
+      {isPaused ? (
+        <PauseCircleIcon sx={{ fontSize: "1rem" }} />
+      ) : (
+        <TimerIcon sx={{ fontSize: "1rem" }} />
+      )}
       <Typography
         variant="body2"
         sx={{ fontFamily: "monospace", fontWeight: 600, color: colour }}
       >
-        {isOvertime ? `OVERTIME ${timeStr}` : timeStr}
+        {isPaused
+          ? `PAUSED ${timeStr}`
+          : isOvertime
+            ? `OVERTIME ${timeStr}`
+            : timeStr}
       </Typography>
     </Box>
   );

@@ -9,6 +9,18 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.2.4",
+    date: "2026-03-10",
+    entries: [
+      {
+        category: "Tournaments",
+        items: [
+          "You can now pause and resume the round timer. A pause/play button appears next to the timer once a round begins — useful if you accidentally started the clock too early. The timer freezes for everyone (including the public pairings view) until you resume it.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.2.3",
     date: "2026-03-10",
     entries: [

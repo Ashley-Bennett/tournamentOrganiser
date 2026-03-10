@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.4] - 2026-03-10
+
+### Added
+- Round timer pause/resume support. Two new columns on `tournaments`:
+  `round_elapsed_seconds INTEGER DEFAULT 0` and `round_is_paused BOOLEAN DEFAULT FALSE`
+  (migration `20260310000000_add_timer_pause.sql`).
+- `RoundTimer` component accepts `elapsedSeconds` and `isPaused` props. When paused, the
+  interval is cleared, the label changes to "PAUSED", and the colour switches to amber.
+  `startedAt` is now nullable so it can be null while the timer is frozen.
+- Pause/resume icon button rendered inline next to the timer in `TournamentMatches`.
+  Pressing pause freezes elapsed time in the DB; pressing resume sets a new `current_round_started_at`
+  and the countdown resumes from where it stopped.
+- `TournamentPairings` `showTimer` condition now also triggers when `round_is_paused` is true
+  so the frozen timer remains visible to players on the public/pairings view.
+- `handleBeginRound`, tournament-complete, and round-advance all reset the two new columns
+  to their defaults so each round starts clean.
+
+---
+
 ## [0.2.3] - 2026-03-10
 
 ### Fixed
