@@ -8,6 +8,7 @@ import {
   Chip,
 } from "@mui/material";
 import { Link } from "react-router-dom";
+// Nav is provided by the shared Header component (see App.tsx)
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import GroupsIcon from "@mui/icons-material/Groups";
 import ShareIcon from "@mui/icons-material/Share";
@@ -127,72 +128,13 @@ const steps = [
 
 export default function Landing() {
   return (
-    <Box sx={{ bgcolor: BG, minHeight: "100vh", color: "white" }}>
-
-      {/* ── Nav ─────────────────────────────────────────── */}
-      <Box
-        component="nav"
-        sx={{
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          backdropFilter: "blur(12px)",
-          bgcolor: "rgba(6,14,29,0.88)",
-          borderBottom: `1px solid ${BORDER}`,
-        }}
-      >
-        <Container maxWidth="lg">
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{ py: 1.5 }}
-          >
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 900, letterSpacing: "-0.02em", color: "white", fontSize: "1.2rem" }}
-            >
-              Matchamp
-            </Typography>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Button
-                component={Link}
-                to="/login"
-                sx={{
-                  color: TEXT_MUTED,
-                  textTransform: "none",
-                  fontWeight: 500,
-                  "&:hover": { color: "white", bgcolor: "transparent" },
-                }}
-              >
-                Log in
-              </Button>
-              <Button
-                component={Link}
-                to="/register"
-                variant="contained"
-                sx={{
-                  bgcolor: ACCENT,
-                  "&:hover": { bgcolor: "#b8003f" },
-                  textTransform: "none",
-                  fontWeight: 600,
-                  borderRadius: "8px",
-                  px: 2.5,
-                  py: 0.75,
-                }}
-              >
-                Sign up
-              </Button>
-            </Stack>
-          </Stack>
-        </Container>
-      </Box>
+    <Box sx={{ bgcolor: BG, minHeight: "100%", color: "white" }}>
 
       {/* ── Hero ────────────────────────────────────────── */}
       <Box
         sx={{
           background: `linear-gradient(160deg, #060e1d 0%, #0d2044 50%, #060e1d 100%)`,
-          pt: { xs: 8, md: 14 },
+          pt: { xs: 6, md: 10 },
           pb: { xs: 4, md: 6 },
           textAlign: "center",
           position: "relative",

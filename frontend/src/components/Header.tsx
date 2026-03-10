@@ -16,19 +16,24 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
+  Tooltip,
 } from "@mui/material";
 import {
   SportsEsports as TournamentIcon,
   WorkspacesOutlined as WorkspaceIcon,
   ArrowDropDown as ArrowDropDownIcon,
   Menu as MenuIcon,
+  LightMode as LightModeIcon,
+  DarkMode as DarkModeIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
+import { useThemeMode } from "../ThemeContext";
 
 const Header: React.FC = () => {
   const { user, logout, displayName } = useAuth();
   const { workspace, workspaces, lastWorkspace, wPath } = useWorkspace();
+  const { mode, toggleTheme } = useThemeMode();
   const navigate = useNavigate();
   const [wsMenuAnchor, setWsMenuAnchor] = useState<null | HTMLElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -47,13 +52,27 @@ const Header: React.FC = () => {
 
   const homeHref = activeWorkspace ? wPath("/tournaments") : "/dashboard";
 
+  const ThemeToggle = () => (
+    <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+      <IconButton
+        color="inherit"
+        onClick={toggleTheme}
+        aria-label="Toggle light/dark mode"
+        size="small"
+        sx={{ opacity: 0.7, "&:hover": { opacity: 1 } }}
+      >
+        {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+      </IconButton>
+    </Tooltip>
+  );
+
   return (
     <AppBar position="static">
       <Toolbar>
         {/* ── Logo ──────────────────────────────────────────────── */}
         <Box
           component={RouterLink}
-          to={homeHref}
+          to={user ? homeHref : "/"}
           sx={{
             display: "flex",
             alignItems: "center",
@@ -65,7 +84,7 @@ const Header: React.FC = () => {
           <IconButton
             edge="start"
             color="inherit"
-            aria-label="Go to dashboard"
+            aria-label="Go to home"
             sx={{ mr: 0.5 }}
           >
             <TournamentIcon />
@@ -186,6 +205,7 @@ const Header: React.FC = () => {
               >
                 {displayName}
               </Typography>
+              <ThemeToggle />
               <Button
                 color="inherit"
                 onClick={handleLogout}
@@ -196,14 +216,16 @@ const Header: React.FC = () => {
             </Box>
 
             {/* Mobile hamburger */}
-            <IconButton
-              color="inherit"
-              aria-label="Open navigation menu"
-              onClick={() => setDrawerOpen(true)}
-              sx={{ display: { xs: "flex", sm: "none" } }}
-            >
-              <MenuIcon />
-            </IconButton>
+            <Box sx={{ display: { xs: "flex", sm: "none" }, alignItems: "center", gap: 0.5 }}>
+              <ThemeToggle />
+              <IconButton
+                color="inherit"
+                aria-label="Open navigation menu"
+                onClick={() => setDrawerOpen(true)}
+              >
+                <MenuIcon />
+              </IconButton>
+            </Box>
 
             {/* Mobile drawer */}
             <Drawer
@@ -261,12 +283,14 @@ const Header: React.FC = () => {
             </Drawer>
           </>
         ) : (
-          <Box sx={{ display: "flex", gap: 1.5 }}>
+          /* Unauthenticated — shown on landing page and auth pages */
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            <ThemeToggle />
             <Button
               color="inherit"
               component={RouterLink}
               to="/login"
-              sx={{ textTransform: "none", opacity: 0.8 }}
+              sx={{ textTransform: "none", opacity: 0.8, "&:hover": { opacity: 1 } }}
             >
               Log in
             </Button>
