@@ -247,6 +247,38 @@ const TournamentPairings: React.FC = () => {
           void load();
         },
       )
+      // Also watch the tournaments row itself so timer pause/resume appears instantly
+      // without waiting for a full page refresh.
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "tournaments",
+          ...(id ? { filter: `id=eq.${id}` } : {}),
+        },
+        (payload) => {
+          const row = payload.new as {
+            id?: string;
+            current_round_started_at?: string | null;
+            round_elapsed_seconds?: number | null;
+            round_is_paused?: boolean | null;
+          } | null;
+          if (!row) return;
+          // For the public route, ignore events for other tournaments
+          if (!id && resolvedTournamentIdRef.current && row.id !== resolvedTournamentIdRef.current) return;
+          setTournament((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  current_round_started_at: row.current_round_started_at ?? null,
+                  round_elapsed_seconds: row.round_elapsed_seconds ?? 0,
+                  round_is_paused: row.round_is_paused ?? false,
+                }
+              : prev,
+          );
+        },
+      )
       .subscribe();
 
     return () => {
