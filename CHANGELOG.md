@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.2] - 2026-03-10
+
+### Fixed
+- Mobile pairing editor: the Edit Pairings mode was silently a no-op on mobile — the mobile card view had no `editingPairings` branch, while the desktop table (which has the X-to-remove and Select-to-assign controls) is hidden on `xs`. Added full editing mode support to the mobile card view: assigned slots show player name + remove (×) button; empty slots show a full-width dropdown to assign from the available pool. Result entry chips are suppressed while editing mode is active to avoid UI confusion.
+
+---
+
 ## [0.2.1] - 2026-03-09
 
 ### Added

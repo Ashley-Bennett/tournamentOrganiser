@@ -9,6 +9,18 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.2.2",
+    date: "2026-03-10",
+    entries: [
+      {
+        category: "Fixes & Polish",
+        items: [
+          "Edit Pairings now works on mobile — you can tap to remove a player from their slot and reassign them using a dropdown, just like on desktop.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.2.0",
     date: "2026-03-09",
     entries: [

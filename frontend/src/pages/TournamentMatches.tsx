@@ -2966,6 +2966,12 @@ const TournamentMatches: React.FC = () => {
                                 const s = standingsByPlayerId.get(pid);
                                 return `${s?.wins ?? 0}-${s?.losses ?? 0}-${s?.draws ?? 0} · ${s?.matchPoints ?? 0}pts`;
                               };
+                              const isEditableMatch = editingPairings && (match.status === MATCH_STATUS.READY || match.status === MATCH_STATUS.BYE);
+                              const ep = editedPairings.get(match.id);
+                              const p1EditId = ep?.player1Id ?? null;
+                              const p2EditId = ep?.player2Id ?? null;
+                              const p1EditName = p1EditId ? (roundPlayers.find((p) => p.id === p1EditId)?.name ?? "Unknown") : null;
+                              const p2EditName = p2EditId ? (roundPlayers.find((p) => p.id === p2EditId)?.name ?? "Unknown") : null;
                               return (
                                 <Box key={match.id} sx={{ borderBottom: "1px solid", borderColor: "divider", py: 1.5, px: 1 }}>
                                   <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
@@ -2985,16 +2991,64 @@ const TournamentMatches: React.FC = () => {
                                       color={match.status === "bye" ? "info" : match.status === "completed" ? "success" : match.status === "pending" ? "warning" : "default"}
                                     />
                                   </Box>
-                                  <Box display="flex" gap={1} mb={canEditCard && !isByeCard ? 1 : 0}>
-                                    <Box sx={{ flex: 1, p: 0.75, borderRadius: 1, backgroundColor: cardP1Bg, minWidth: 0 }}>
-                                      <Typography variant="body2" fontWeight="medium" noWrap>{match.player1_name}</Typography>
-                                      <Typography variant="caption" color="text.secondary">{getCardRecord(match.player1_id)}</Typography>
+                                  <Box display="flex" gap={1} mb={canEditCard && !isByeCard && !editingPairings ? 1 : 0}>
+                                    <Box sx={{ flex: 1, p: 0.75, borderRadius: 1, backgroundColor: isEditableMatch ? "transparent" : cardP1Bg, minWidth: 0 }}>
+                                      {isEditableMatch ? (
+                                        p1EditId ? (
+                                          <Box display="flex" alignItems="center" gap={0.5}>
+                                            <Typography variant="body2" noWrap sx={{ flex: 1 }}>{p1EditName}</Typography>
+                                            <IconButton size="small" onClick={() => removeFromSlot(match.id, "player1")}>
+                                              <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                          </Box>
+                                        ) : (
+                                          <Select
+                                            size="small"
+                                            displayEmpty
+                                            value=""
+                                            onChange={(e) => assignToSlot(match.id, "player1", e.target.value)}
+                                            renderValue={() => <em>Select player…</em>}
+                                            sx={{ width: "100%" }}
+                                          >
+                                            {[...availablePool.entries()].map(([id, name]) => (
+                                              <MenuItem key={id} value={id}>{name}</MenuItem>
+                                            ))}
+                                          </Select>
+                                        )
+                                      ) : (
+                                        <>
+                                          <Typography variant="body2" fontWeight="medium" noWrap>{match.player1_name}</Typography>
+                                          <Typography variant="caption" color="text.secondary">{getCardRecord(match.player1_id)}</Typography>
+                                        </>
+                                      )}
                                     </Box>
                                     <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                                       <Typography variant="caption" color="text.secondary">vs</Typography>
                                     </Box>
-                                    <Box sx={{ flex: 1, p: 0.75, borderRadius: 1, backgroundColor: cardP2Bg, minWidth: 0 }}>
-                                      {match.player2_name ? (
+                                    <Box sx={{ flex: 1, p: 0.75, borderRadius: 1, backgroundColor: isEditableMatch ? "transparent" : cardP2Bg, minWidth: 0 }}>
+                                      {isEditableMatch ? (
+                                        p2EditId ? (
+                                          <Box display="flex" alignItems="center" gap={0.5}>
+                                            <Typography variant="body2" noWrap sx={{ flex: 1 }}>{p2EditName}</Typography>
+                                            <IconButton size="small" onClick={() => removeFromSlot(match.id, "player2")}>
+                                              <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                          </Box>
+                                        ) : (
+                                          <Select
+                                            size="small"
+                                            displayEmpty
+                                            value=""
+                                            onChange={(e) => assignToSlot(match.id, "player2", e.target.value)}
+                                            renderValue={() => <em>Select player…</em>}
+                                            sx={{ width: "100%" }}
+                                          >
+                                            {[...availablePool.entries()].map(([id, name]) => (
+                                              <MenuItem key={id} value={id}>{name}</MenuItem>
+                                            ))}
+                                          </Select>
+                                        )
+                                      ) : match.player2_name ? (
                                         <>
                                           <Typography variant="body2" fontWeight="medium" noWrap>{match.player2_name}</Typography>
                                           <Typography variant="caption" color="text.secondary">{match.player2_id ? getCardRecord(match.player2_id) : ""}</Typography>
@@ -3004,7 +3058,7 @@ const TournamentMatches: React.FC = () => {
                                       )}
                                     </Box>
                                   </Box>
-                                  {canEditCard && match.player2_id && (
+                                  {canEditCard && match.player2_id && !editingPairings && (
                                     <Box display="flex" gap={0.5}>
                                       <Chip
                                         label="1-0"
