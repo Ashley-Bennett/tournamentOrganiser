@@ -33,7 +33,6 @@ const Header: React.FC = () => {
   const [wsMenuAnchor, setWsMenuAnchor] = useState<null | HTMLElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Use the last known workspace when not on a workspace-scoped URL (e.g. /me)
   const activeWorkspace = workspace ?? lastWorkspace;
 
   const handleLogout = () => {
@@ -67,11 +66,15 @@ const Header: React.FC = () => {
             edge="start"
             color="inherit"
             aria-label="Go to dashboard"
-            sx={{ mr: 1 }}
+            sx={{ mr: 0.5 }}
           >
             <TournamentIcon />
           </IconButton>
-          <Typography variant="h6" component="div">
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{ fontWeight: 800, letterSpacing: "-0.02em" }}
+          >
             Matchamp
           </Typography>
         </Box>
@@ -87,12 +90,13 @@ const Header: React.FC = () => {
               onClick={(e) => setWsMenuAnchor(e.currentTarget)}
               size="small"
               sx={{
-                ml: 1,
+                ml: 1.5,
                 color: "inherit",
-                borderColor: "rgba(255,255,255,0.5)",
+                borderColor: "rgba(255,255,255,0.25)",
                 cursor: "pointer",
-                "& .MuiChip-icon": { color: "inherit" },
-                "& .MuiChip-deleteIcon": { color: "rgba(255,255,255,0.7)" },
+                "& .MuiChip-icon": { color: "rgba(255,255,255,0.6)" },
+                "& .MuiChip-deleteIcon": { color: "rgba(255,255,255,0.5)" },
+                "&:hover": { borderColor: "rgba(255,255,255,0.5)" },
               }}
               variant="outlined"
             />
@@ -135,31 +139,58 @@ const Header: React.FC = () => {
         {user ? (
           <>
             {/* Desktop nav */}
-            <Box sx={{ display: { xs: "none", sm: "flex" }, gap: 2, alignItems: "center" }}>
-              <Button color="inherit" component={RouterLink} to={wPath("/dashboard")}>
+            <Box sx={{ display: { xs: "none", sm: "flex" }, gap: 1, alignItems: "center" }}>
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to={wPath("/dashboard")}
+                sx={{ textTransform: "none", opacity: 0.8, "&:hover": { opacity: 1 } }}
+              >
                 Dashboard
-              </Button>
-              <Button color="inherit" component={RouterLink} to={wPath("/tournaments")}>
-                Tournaments
-              </Button>
-              <Button color="inherit" component={RouterLink} to="/me">
-                My Profile
-              </Button>
-              <Button color="inherit" component={RouterLink} to="/whats-new">
-                What's New
               </Button>
               <Button
                 color="inherit"
-                variant="outlined"
-                sx={{ color: "white", borderColor: "white" }}
+                component={RouterLink}
+                to={wPath("/tournaments")}
+                sx={{ textTransform: "none", opacity: 0.8, "&:hover": { opacity: 1 } }}
+              >
+                Tournaments
+              </Button>
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to="/me"
+                sx={{ textTransform: "none", opacity: 0.8, "&:hover": { opacity: 1 } }}
+              >
+                My Profile
+              </Button>
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to="/whats-new"
+                sx={{ textTransform: "none", opacity: 0.8, "&:hover": { opacity: 1 } }}
+              >
+                What&apos;s New
+              </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                sx={{ textTransform: "none", fontWeight: 600, ml: 1, borderRadius: "8px" }}
                 onClick={() => navigate(wPath("/tournaments"), { state: { openCreate: true } })}
               >
                 Create Tournament
               </Button>
-              <Typography variant="body1" sx={{ ml: 2 }}>
+              <Typography
+                variant="body2"
+                sx={{ ml: 1.5, opacity: 0.6, fontSize: "0.85rem" }}
+              >
                 {displayName}
               </Typography>
-              <Button color="inherit" onClick={handleLogout}>
+              <Button
+                color="inherit"
+                onClick={handleLogout}
+                sx={{ textTransform: "none", opacity: 0.6, "&:hover": { opacity: 1 } }}
+              >
                 Logout
               </Button>
             </Box>
@@ -210,7 +241,12 @@ const Header: React.FC = () => {
                   </ListItem>
                   <Divider sx={{ my: 1 }} />
                   <ListItem disablePadding>
-                    <ListItemButton onClick={() => { setDrawerOpen(false); navigate(wPath("/tournaments"), { state: { openCreate: true } }); }}>
+                    <ListItemButton
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        navigate(wPath("/tournaments"), { state: { openCreate: true } });
+                      }}
+                    >
                       <ListItemText primary="Create Tournament" />
                     </ListItemButton>
                   </ListItem>
@@ -225,12 +261,23 @@ const Header: React.FC = () => {
             </Drawer>
           </>
         ) : (
-          <Box sx={{ display: "flex", gap: 2 }}>
-            <Button color="inherit" component={RouterLink} to="/login">
-              Login
+          <Box sx={{ display: "flex", gap: 1.5 }}>
+            <Button
+              color="inherit"
+              component={RouterLink}
+              to="/login"
+              sx={{ textTransform: "none", opacity: 0.8 }}
+            >
+              Log in
             </Button>
-            <Button color="inherit" component={RouterLink} to="/register">
-              Register
+            <Button
+              variant="contained"
+              color="primary"
+              component={RouterLink}
+              to="/register"
+              sx={{ textTransform: "none", fontWeight: 600, borderRadius: "8px" }}
+            >
+              Sign up
             </Button>
           </Box>
         )}
