@@ -9,7 +9,7 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
-    version: "0.4.0",
+    version: "0.3.0",
     date: "2026-03-23",
     entries: [
       {
