@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
   Box,
+  Button,
+  Container,
+  Typography,
+  Stack,
   Chip,
   IconButton,
   Menu,
@@ -19,7 +19,6 @@ import {
   Tooltip,
 } from "@mui/material";
 import {
-  SportsEsports as TournamentIcon,
   WorkspacesOutlined as WorkspaceIcon,
   ArrowDropDown as ArrowDropDownIcon,
   Menu as MenuIcon,
@@ -29,6 +28,10 @@ import {
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 import { useThemeMode } from "../ThemeContext";
+
+const BORDER = "rgba(255,255,255,0.08)";
+const TEXT_MUTED = "rgba(255,255,255,0.6)";
+const ACCENT = "#dc004e";
 
 const Header: React.FC = () => {
   const { user, logout, displayName } = useAuth();
@@ -52,261 +55,272 @@ const Header: React.FC = () => {
 
   const homeHref = activeWorkspace ? wPath("/tournaments") : "/dashboard";
 
-  const ThemeToggle = () => (
-    <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
-      <IconButton
-        color="inherit"
-        onClick={toggleTheme}
-        aria-label="Toggle light/dark mode"
-        size="small"
-        sx={{ opacity: 0.7, "&:hover": { opacity: 1 } }}
-      >
-        {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-      </IconButton>
-    </Tooltip>
-  );
+  const navBtnSx = {
+    color: TEXT_MUTED,
+    textTransform: "none" as const,
+    fontWeight: 500,
+    fontSize: "0.95rem",
+    "&:hover": { color: "white", bgcolor: "transparent" },
+  };
 
   return (
-    <AppBar position="static">
-      <Toolbar>
-        {/* ── Logo ──────────────────────────────────────────────── */}
-        <Box
-          component={RouterLink}
-          to={user ? homeHref : "/"}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            textDecoration: "none",
-            color: "inherit",
-            mr: 1,
-          }}
+    <Box
+      component="header"
+      sx={{
+        position: "sticky",
+        top: 0,
+        zIndex: 1100,
+        backdropFilter: "blur(12px)",
+        bgcolor: "rgba(6,14,29,0.88)",
+        borderBottom: `1px solid ${BORDER}`,
+      }}
+    >
+      <Container maxWidth="lg">
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ py: 1.5 }}
         >
-          <IconButton
-            edge="start"
-            color="inherit"
-            aria-label="Go to home"
-            sx={{ mr: 0.5 }}
-          >
-            <TournamentIcon />
-          </IconButton>
-          <Typography
-            variant="h6"
-            component="div"
-            sx={{ fontWeight: 800, letterSpacing: "-0.02em" }}
-          >
-            Matchamp
-          </Typography>
-        </Box>
-
-        {/* ── Workspace switcher chip ────────────────────────────── */}
-        {activeWorkspace && (
-          <>
-            <Chip
-              icon={<WorkspaceIcon />}
-              label={activeWorkspace.name}
-              deleteIcon={<ArrowDropDownIcon />}
-              onDelete={(e) => setWsMenuAnchor(e.currentTarget as HTMLElement)}
-              onClick={(e) => setWsMenuAnchor(e.currentTarget)}
-              size="small"
-              sx={{
-                ml: 1.5,
-                color: "inherit",
-                borderColor: "rgba(255,255,255,0.25)",
-                cursor: "pointer",
-                "& .MuiChip-icon": { color: "rgba(255,255,255,0.6)" },
-                "& .MuiChip-deleteIcon": { color: "rgba(255,255,255,0.5)" },
-                "&:hover": { borderColor: "rgba(255,255,255,0.5)" },
-              }}
-              variant="outlined"
-            />
-            <Menu
-              anchorEl={wsMenuAnchor}
-              open={Boolean(wsMenuAnchor)}
-              onClose={() => setWsMenuAnchor(null)}
-              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-              transformOrigin={{ vertical: "top", horizontal: "left" }}
+          {/* ── Logo ────────────────────────────────────── */}
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Box
+              component={RouterLink}
+              to={user ? homeHref : "/"}
+              sx={{ textDecoration: "none" }}
             >
-              {workspaces.map((ws) => (
-                <MenuItem
-                  key={ws.id}
-                  selected={ws.id === activeWorkspace?.id}
-                  onClick={() => {
-                    navigate(`/w/${ws.slug}/tournaments`);
-                    setWsMenuAnchor(null);
-                  }}
-                >
-                  {ws.name}
-                </MenuItem>
-              ))}
-              <Divider />
-              <MenuItem
-                onClick={() => {
-                  navigate("/workspaces/new");
-                  setWsMenuAnchor(null);
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 900,
+                  letterSpacing: "-0.02em",
+                  color: "white",
+                  fontSize: "1.2rem",
                 }}
               >
-                + New workspace
-              </MenuItem>
-            </Menu>
-          </>
-        )}
-
-        {/* Spacer */}
-        <Box flexGrow={1} />
-
-        {/* ── Nav ───────────────────────────────────────────────── */}
-        {user ? (
-          <>
-            {/* Desktop nav */}
-            <Box sx={{ display: { xs: "none", sm: "flex" }, gap: 1, alignItems: "center" }}>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to={wPath("/dashboard")}
-                sx={{ textTransform: "none", opacity: 0.8, "&:hover": { opacity: 1 } }}
-              >
-                Dashboard
-              </Button>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to={wPath("/tournaments")}
-                sx={{ textTransform: "none", opacity: 0.8, "&:hover": { opacity: 1 } }}
-              >
-                Tournaments
-              </Button>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to="/me"
-                sx={{ textTransform: "none", opacity: 0.8, "&:hover": { opacity: 1 } }}
-              >
-                My Profile
-              </Button>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to="/whats-new"
-                sx={{ textTransform: "none", opacity: 0.8, "&:hover": { opacity: 1 } }}
-              >
-                What&apos;s New
-              </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                sx={{ textTransform: "none", fontWeight: 600, ml: 1, borderRadius: "8px" }}
-                onClick={() => navigate(wPath("/tournaments"), { state: { openCreate: true } })}
-              >
-                Create Tournament
-              </Button>
-              <Typography
-                variant="body2"
-                sx={{ ml: 1.5, opacity: 0.6, fontSize: "0.85rem" }}
-              >
-                {displayName}
+                Matchamp
               </Typography>
-              <ThemeToggle />
-              <Button
-                color="inherit"
-                onClick={handleLogout}
-                sx={{ textTransform: "none", opacity: 0.6, "&:hover": { opacity: 1 } }}
-              >
-                Logout
-              </Button>
             </Box>
 
-            {/* Mobile hamburger */}
-            <Box sx={{ display: { xs: "flex", sm: "none" }, alignItems: "center", gap: 0.5 }}>
-              <ThemeToggle />
-              <IconButton
-                color="inherit"
-                aria-label="Open navigation menu"
-                onClick={() => setDrawerOpen(true)}
-              >
-                <MenuIcon />
-              </IconButton>
-            </Box>
-
-            {/* Mobile drawer */}
-            <Drawer
-              anchor="right"
-              open={drawerOpen}
-              onClose={() => setDrawerOpen(false)}
-            >
-              <Box sx={{ width: 260, pt: 2 }} role="navigation">
-                {displayName && (
-                  <Typography variant="body2" color="text.secondary" sx={{ px: 2, pb: 1 }}>
-                    {displayName}
-                  </Typography>
-                )}
-                <Divider />
-                <List disablePadding>
-                  <ListItem disablePadding>
-                    <ListItemButton onClick={() => handleNavClick(wPath("/dashboard"))}>
-                      <ListItemText primary="Dashboard" />
-                    </ListItemButton>
-                  </ListItem>
-                  <ListItem disablePadding>
-                    <ListItemButton onClick={() => handleNavClick(wPath("/tournaments"))}>
-                      <ListItemText primary="Tournaments" />
-                    </ListItemButton>
-                  </ListItem>
-                  <ListItem disablePadding>
-                    <ListItemButton onClick={() => handleNavClick("/me")}>
-                      <ListItemText primary="My Profile" />
-                    </ListItemButton>
-                  </ListItem>
-                  <ListItem disablePadding>
-                    <ListItemButton onClick={() => handleNavClick("/whats-new")}>
-                      <ListItemText primary="What's New" />
-                    </ListItemButton>
-                  </ListItem>
-                  <Divider sx={{ my: 1 }} />
-                  <ListItem disablePadding>
-                    <ListItemButton
+            {/* ── Workspace switcher ───────────────────── */}
+            {activeWorkspace && (
+              <>
+                <Chip
+                  icon={<WorkspaceIcon sx={{ fontSize: "0.95rem !important" }} />}
+                  label={activeWorkspace.name}
+                  deleteIcon={<ArrowDropDownIcon />}
+                  onDelete={(e) => setWsMenuAnchor(e.currentTarget as HTMLElement)}
+                  onClick={(e) => setWsMenuAnchor(e.currentTarget)}
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    color: TEXT_MUTED,
+                    borderColor: "rgba(255,255,255,0.2)",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    "& .MuiChip-icon": { color: TEXT_MUTED },
+                    "& .MuiChip-deleteIcon": { color: "rgba(255,255,255,0.4)" },
+                    "&:hover": { borderColor: "rgba(255,255,255,0.45)", color: "white" },
+                  }}
+                />
+                <Menu
+                  anchorEl={wsMenuAnchor}
+                  open={Boolean(wsMenuAnchor)}
+                  onClose={() => setWsMenuAnchor(null)}
+                  anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                  transformOrigin={{ vertical: "top", horizontal: "left" }}
+                >
+                  {workspaces.map((ws) => (
+                    <MenuItem
+                      key={ws.id}
+                      selected={ws.id === activeWorkspace?.id}
                       onClick={() => {
-                        setDrawerOpen(false);
-                        navigate(wPath("/tournaments"), { state: { openCreate: true } });
+                        navigate(`/w/${ws.slug}/tournaments`);
+                        setWsMenuAnchor(null);
                       }}
                     >
-                      <ListItemText primary="Create Tournament" />
-                    </ListItemButton>
-                  </ListItem>
-                  <Divider sx={{ my: 1 }} />
-                  <ListItem disablePadding>
-                    <ListItemButton onClick={() => { handleLogout(); setDrawerOpen(false); }}>
-                      <ListItemText primary="Logout" />
-                    </ListItemButton>
-                  </ListItem>
-                </List>
-              </Box>
-            </Drawer>
-          </>
-        ) : (
-          /* Unauthenticated — shown on landing page and auth pages */
-          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-            <ThemeToggle />
-            <Button
-              color="inherit"
-              component={RouterLink}
-              to="/login"
-              sx={{ textTransform: "none", opacity: 0.8, "&:hover": { opacity: 1 } }}
-            >
-              Log in
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              component={RouterLink}
-              to="/register"
-              sx={{ textTransform: "none", fontWeight: 600, borderRadius: "8px" }}
-            >
-              Sign up
-            </Button>
-          </Box>
-        )}
-      </Toolbar>
-    </AppBar>
+                      {ws.name}
+                    </MenuItem>
+                  ))}
+                  <Divider />
+                  <MenuItem
+                    onClick={() => {
+                      navigate("/workspaces/new");
+                      setWsMenuAnchor(null);
+                    }}
+                  >
+                    + New workspace
+                  </MenuItem>
+                </Menu>
+              </>
+            )}
+          </Stack>
+
+          {/* ── Right side ──────────────────────────────── */}
+          {user ? (
+            <>
+              {/* Desktop */}
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={0.5}
+                sx={{ display: { xs: "none", sm: "flex" } }}
+              >
+                <Button component={RouterLink} to={wPath("/dashboard")} sx={navBtnSx}>
+                  Dashboard
+                </Button>
+                <Button component={RouterLink} to={wPath("/tournaments")} sx={navBtnSx}>
+                  Tournaments
+                </Button>
+                <Button component={RouterLink} to="/me" sx={navBtnSx}>
+                  My Profile
+                </Button>
+                <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
+                  What&apos;s New
+                </Button>
+
+                <Button
+                  variant="contained"
+                  onClick={() => navigate(wPath("/tournaments"), { state: { openCreate: true } })}
+                  sx={{
+                    ml: 1,
+                    bgcolor: ACCENT,
+                    "&:hover": { bgcolor: "#b8003f" },
+                    textTransform: "none",
+                    fontWeight: 600,
+                    borderRadius: "8px",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  Create Tournament
+                </Button>
+
+                <Typography sx={{ ml: 1, color: TEXT_MUTED, fontSize: "0.82rem" }}>
+                  {displayName}
+                </Typography>
+
+                <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+                  <IconButton
+                    onClick={toggleTheme}
+                    size="small"
+                    sx={{ color: TEXT_MUTED, "&:hover": { color: "white" } }}
+                  >
+                    {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
+
+                <Button onClick={handleLogout} sx={navBtnSx}>
+                  Logout
+                </Button>
+              </Stack>
+
+              {/* Mobile */}
+              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ display: { xs: "flex", sm: "none" } }}>
+                <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
+                  <IconButton
+                    onClick={toggleTheme}
+                    size="small"
+                    sx={{ color: TEXT_MUTED, "&:hover": { color: "white" } }}
+                  >
+                    {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
+                <IconButton
+                  onClick={() => setDrawerOpen(true)}
+                  aria-label="Open navigation menu"
+                  sx={{ color: TEXT_MUTED, "&:hover": { color: "white" } }}
+                >
+                  <MenuIcon />
+                </IconButton>
+              </Stack>
+
+              {/* Mobile drawer */}
+              <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+                <Box sx={{ width: 260, pt: 2 }} role="navigation">
+                  {displayName && (
+                    <Typography variant="body2" color="text.secondary" sx={{ px: 2, pb: 1 }}>
+                      {displayName}
+                    </Typography>
+                  )}
+                  <Divider />
+                  <List disablePadding>
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => handleNavClick(wPath("/dashboard"))}>
+                        <ListItemText primary="Dashboard" />
+                      </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => handleNavClick(wPath("/tournaments"))}>
+                        <ListItemText primary="Tournaments" />
+                      </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => handleNavClick("/me")}>
+                        <ListItemText primary="My Profile" />
+                      </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => handleNavClick("/whats-new")}>
+                        <ListItemText primary="What's New" />
+                      </ListItemButton>
+                    </ListItem>
+                    <Divider sx={{ my: 1 }} />
+                    <ListItem disablePadding>
+                      <ListItemButton
+                        onClick={() => {
+                          setDrawerOpen(false);
+                          navigate(wPath("/tournaments"), { state: { openCreate: true } });
+                        }}
+                      >
+                        <ListItemText primary="Create Tournament" />
+                      </ListItemButton>
+                    </ListItem>
+                    <Divider sx={{ my: 1 }} />
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => { handleLogout(); setDrawerOpen(false); }}>
+                        <ListItemText primary="Logout" />
+                      </ListItemButton>
+                    </ListItem>
+                  </List>
+                </Box>
+              </Drawer>
+            </>
+          ) : (
+            /* Unauthenticated — shown on auth pages (/login, /register, etc.) */
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+                <IconButton
+                  onClick={toggleTheme}
+                  size="small"
+                  sx={{ color: TEXT_MUTED, "&:hover": { color: "white" } }}
+                >
+                  {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+              <Button component={RouterLink} to="/login" sx={navBtnSx}>
+                Log in
+              </Button>
+              <Button
+                component={RouterLink}
+                to="/register"
+                variant="contained"
+                sx={{
+                  bgcolor: ACCENT,
+                  "&:hover": { bgcolor: "#b8003f" },
+                  textTransform: "none",
+                  fontWeight: 600,
+                  borderRadius: "8px",
+                  px: 2.5,
+                  py: 0.75,
+                }}
+              >
+                Sign up
+              </Button>
+            </Stack>
+          )}
+        </Stack>
+      </Container>
+    </Box>
   );
 };
 

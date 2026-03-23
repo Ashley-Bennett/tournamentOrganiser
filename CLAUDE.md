@@ -2,13 +2,13 @@
 
 ## Changelog & Patch Notes Maintenance
 
-After completing any meaningful feature, fix, or change, always update **both** of the following:
+Update **both** of the following **only when the user is ready to push a batch of commits** — not after every individual task or commit.
 
 1. **`CHANGELOG.md`** (repo root) — developer-facing. Use [Keep a Changelog](https://keepachangelog.com) format. Include technical detail: migrations, refactors, removed code, test changes, etc.
 
 2. **`frontend/src/data/patchNotes.ts`** — user-facing. Plain language only. No mention of migrations, tests, types, or internal refactors. Focus on what the user can see or do. Add new releases as a new object at the **top** of the array.
 
-Both files should be updated in the same commit as the work they describe.
+Both files should be updated together in a single changelog commit that covers the whole batch. Use today's actual date.
 
 ### Categories for patchNotes.ts
 - `"New Features"` — brand new functionality

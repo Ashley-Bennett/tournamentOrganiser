@@ -29,16 +29,6 @@ function buildTheme(mode: Mode) {
         : { default: "#f0f2f5", paper: "#ffffff" },
     },
     components: {
-      // AppBar is always dark — brand consistency on both landing and app
-      MuiAppBar: {
-        styleOverrides: {
-          root: {
-            backgroundColor: isDark ? "#060e1d" : "#061732",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "none",
-          },
-        },
-      },
       MuiPaper: {
         styleOverrides: {
           // Remove MUI dark-mode white elevation overlay

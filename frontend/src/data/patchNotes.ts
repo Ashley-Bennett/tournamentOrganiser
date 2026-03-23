@@ -9,6 +9,19 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.4.0",
+    date: "2026-03-23",
+    entries: [
+      {
+        category: "New Features",
+        items: [
+          "Dark mode is here. Switch between light and dark using the toggle in the header — your preference is saved across sessions.",
+          "The header is now consistent across every page, so navigation and the theme toggle are always where you expect them.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.3.0",
     date: "2026-03-10",
     entries: [
