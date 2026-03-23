@@ -17,54 +17,15 @@ const patchNotes: PatchNote[] = [
         items: [
           "Dark mode is here. Switch between light and dark using the toggle in the header — your preference is saved across sessions.",
           "The header is now consistent across every page, so navigation and the theme toggle are always where you expect them.",
+          "Matchamp now has a proper landing page. If you share the link with someone who hasn't signed up, they'll see a full overview of what Matchamp does, how it works, and a sign-up button.",
+          "You can now pause and resume the round timer. A pause/play button appears next to the timer once a round begins — the timer freezes for everyone including the public pairings view until you resume it.",
         ],
       },
-    ],
-  },
-  {
-    version: "0.3.0",
-    date: "2026-03-10",
-    entries: [
-      {
-        category: "New Features",
-        items: [
-          "Matchamp now has a proper landing page! If you share the link with someone who hasn't signed up, they'll see a full overview of what Matchamp does, how it works, and a sign-up button. First impressions matter.",
-        ],
-      },
-    ],
-  },
-  {
-    version: "0.2.4",
-    date: "2026-03-10",
-    entries: [
       {
         category: "Tournaments",
         items: [
-          "You can now pause and resume the round timer. A pause/play button appears next to the timer once a round begins — useful if you accidentally started the clock too early. The timer freezes for everyone (including the public pairings view) until you resume it.",
-        ],
-      },
-    ],
-  },
-  {
-    version: "0.2.3",
-    date: "2026-03-10",
-    entries: [
-      {
-        category: "Fixes & Polish",
-        items: [
-          "Swiss pairings no longer create rematches when the bye can go elsewhere. Previously, giving the bye to the lowest-score player could strand two players who had already faced each other with no choice but to rematch. The algorithm now checks whether that would happen and gives the bye to a higher-score player instead.",
-        ],
-      },
-    ],
-  },
-  {
-    version: "0.2.2",
-    date: "2026-03-10",
-    entries: [
-      {
-        category: "Fixes & Polish",
-        items: [
-          "Edit Pairings now works on mobile — you can tap to remove a player from their slot and reassign them using a dropdown, just like on desktop.",
+          "Edit Pairings now works on mobile — tap to remove a player from their slot and reassign them using a dropdown.",
+          "Swiss pairings no longer create rematches when the bye can go elsewhere.",
         ],
       },
     ],
