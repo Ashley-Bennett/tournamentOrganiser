@@ -19,6 +19,8 @@ import WorkspaceSettings from "./pages/WorkspaceSettings";
 import CreateWorkspace from "./pages/CreateWorkspace";
 import AcceptInvite from "./pages/AcceptInvite";
 import ClaimPlayer from "./pages/ClaimPlayer";
+import TournamentJoin from "./pages/TournamentJoin";
+import TournamentJoinDisplay from "./pages/TournamentJoinDisplay";
 import WhatsNew from "./pages/WhatsNew";
 import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
@@ -99,6 +101,7 @@ function App() {
                 {/* ── Invite & claim links ─────────────────────── */}
                 <Route path="/invite/:token" element={<AcceptInvite />} />
                 <Route path="/claim/:token" element={<ClaimPlayer />} />
+                <Route path="/join/:tournamentId" element={<TournamentJoin />} />
 
                 {/* ── What's New ───────────────────────────────── */}
                 <Route path="/whats-new" element={<WhatsNew />} />
@@ -197,6 +200,14 @@ function App() {
                   element={
                     <RequireAuth>
                       <TournamentPairings />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/w/:workspaceSlug/tournaments/:id/join-display"
+                  element={
+                    <RequireAuth>
+                      <TournamentJoinDisplay />
                     </RequireAuth>
                   }
                 />

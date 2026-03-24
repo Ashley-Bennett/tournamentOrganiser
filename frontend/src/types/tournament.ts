@@ -17,6 +17,7 @@ export interface TournamentSummary {
   round_elapsed_seconds?: number | null;
   round_is_paused?: boolean | null;
   round_note?: string | null;
+  join_enabled?: boolean;
 }
 
 export interface TournamentPlayer {
@@ -30,4 +31,6 @@ export interface TournamentPlayer {
   dropped_at_round?: number | null;
   is_late_entry?: boolean;
   late_entry_round?: number | null;
+  device_token?: string | null;
+  device_id?: string | null;
 }

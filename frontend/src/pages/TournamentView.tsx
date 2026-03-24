@@ -39,6 +39,8 @@ import LinkIcon from "@mui/icons-material/Link";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import PeopleIcon from "@mui/icons-material/People";
 import SearchIcon from "@mui/icons-material/Search";
+import EditIcon from "@mui/icons-material/Edit";
+import QrCode2Icon from "@mui/icons-material/QrCode2";
 import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
@@ -162,6 +164,27 @@ const TournamentView: React.FC = () => {
   const [generatingClaimId, setGeneratingClaimId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedPlayerList, setCopiedPlayerList] = useState(false);
+
+  // ── Self-registration toggle ─────────────────────────────────────────────
+  const [copiedJoinLink, setCopiedJoinLink] = useState(false);
+
+  const handleToggleJoinEnabled = async (enabled: boolean) => {
+    if (!tournament || !workspaceId) return;
+    setTournament({ ...tournament, join_enabled: enabled });
+    const { error } = await supabase
+      .from("tournaments")
+      .update({ join_enabled: enabled })
+      .eq("id", tournament.id)
+      .eq("workspace_id", workspaceId);
+    if (error) {
+      setTournament({ ...tournament, join_enabled: !enabled });
+      setError(error.message);
+    }
+  };
+
+  // ── Inline name editing ───────────────────────────────────────────────────
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState("");
 
   // ── Player list search/sort ───────────────────────────────────────────────
   const [playerSearch, setPlayerSearch] = useState("");
@@ -659,6 +682,30 @@ const TournamentView: React.FC = () => {
     }
   };
 
+  // ── Rename player ────────────────────────────────────────────────────────
+
+  const handleRenamePlayer = async (playerId: string, newName: string) => {
+    const trimmed = newName.trim();
+    const original = players.find((p) => p.id === playerId)?.name;
+    setEditingNameId(null);
+    if (!trimmed || trimmed === original) return;
+    setPlayers((prev) =>
+      prev.map((p) => (p.id === playerId ? { ...p, name: trimmed } : p)),
+    );
+    const { error } = await supabase
+      .from("tournament_players")
+      .update({ name: trimmed })
+      .eq("id", playerId);
+    if (error) {
+      setPlayers((prev) =>
+        prev.map((p) =>
+          p.id === playerId ? { ...p, name: original ?? p.name } : p,
+        ),
+      );
+      setPlayersError(error.message);
+    }
+  };
+
   // ── Known Players handlers ───────────────────────────────────────────────
 
   const handleOpenKnownPlayers = async () => {
@@ -711,7 +758,7 @@ const TournamentView: React.FC = () => {
 
       const { data: tournamentData, error: tournamentError } = await supabase
         .from("tournaments")
-        .update({ status: "active", num_rounds: numRounds })
+        .update({ status: "active", num_rounds: numRounds, join_enabled: false })
         .eq("id", tournament.id)
         .eq("workspace_id", workspaceId)
         .select(
@@ -1100,6 +1147,55 @@ const TournamentView: React.FC = () => {
           </Box>
         )}
 
+        {/* ── Self-registration (draft + manager only) ──────────────── */}
+        {tournament.status === "draft" && isManager && (
+          <Box mb={2}>
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={tournament.join_enabled ?? false}
+                  onChange={(e) => void handleToggleJoinEnabled(e.target.checked)}
+                />
+              }
+              label="Allow self-registration"
+            />
+            {tournament.join_enabled && (
+              <Box display="flex" alignItems="center" gap={1} mt={0.5} flexWrap="wrap">
+                <Typography
+                  variant="caption"
+                  sx={{ fontFamily: "monospace", color: "text.secondary" }}
+                >
+                  {`${window.location.origin}/join/${tournament.id}`}
+                </Typography>
+                <Tooltip title={copiedJoinLink ? "Copied!" : "Copy link"}>
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(
+                        `${window.location.origin}/join/${tournament.id}`,
+                      ).then(() => {
+                        setCopiedJoinLink(true);
+                        setTimeout(() => setCopiedJoinLink(false), 2000);
+                      });
+                    }}
+                  >
+                    <ContentCopyIcon fontSize="inherit" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Display QR code">
+                  <IconButton
+                    size="small"
+                    onClick={() => navigate(wPath(`/tournaments/${tournament.id}/join-display`))}
+                  >
+                    <QrCode2Icon fontSize="inherit" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            )}
+          </Box>
+        )}
+
         {!bulkMode ? (
           <AddPlayerInput
             onAdd={handleAddPlayer}
@@ -1245,7 +1341,37 @@ const TournamentView: React.FC = () => {
                         <TableRow key={player.id}>
                           <TableCell>
                             <Box display="flex" alignItems="center" gap={0.5}>
-                              {player.name}
+                              {isManager && editingNameId === player.id ? (
+                                <TextField
+                                  size="small"
+                                  autoFocus
+                                  value={editingNameValue}
+                                  onChange={(e) => setEditingNameValue(e.target.value)}
+                                  onBlur={() => void handleRenamePlayer(player.id, editingNameValue)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") void handleRenamePlayer(player.id, editingNameValue);
+                                    if (e.key === "Escape") setEditingNameId(null);
+                                  }}
+                                  sx={{ width: 160 }}
+                                />
+                              ) : (
+                                <>
+                                  {player.name}
+                                  {isManager && (
+                                    <Tooltip title="Edit name">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          setEditingNameId(player.id);
+                                          setEditingNameValue(player.name);
+                                        }}
+                                      >
+                                        <EditIcon fontSize="inherit" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  )}
+                                </>
+                              )}
                               {player.has_static_seating && (
                                 <Tooltip
                                   title={
