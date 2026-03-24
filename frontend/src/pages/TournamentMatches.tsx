@@ -1475,6 +1475,13 @@ const TournamentMatches: React.FC = () => {
   const handleSetRoundDuration = async (minutes: number | null) => {
     if (!tournament || !workspaceId) return;
     setSavingTimer(true);
+    // If enabling a timer on an active round that never had one, start it paused
+    // so the organiser can resume when ready rather than counting from an unknown point.
+    const addingToActiveRound =
+      minutes !== null &&
+      tournament.status === "active" &&
+      !tournament.current_round_started_at &&
+      !tournament.round_is_paused;
     const payload =
       minutes === null
         ? {
@@ -1483,7 +1490,12 @@ const TournamentMatches: React.FC = () => {
             round_elapsed_seconds: 0,
             round_is_paused: false,
           }
-        : { round_duration_minutes: minutes };
+        : {
+            round_duration_minutes: minutes,
+            ...(addingToActiveRound
+              ? { current_round_started_at: null as string | null, round_elapsed_seconds: 0, round_is_paused: true }
+              : {}),
+          };
     const { error } = await supabase
       .from("tournaments")
       .update(payload)
@@ -1496,7 +1508,9 @@ const TournamentMatches: React.FC = () => {
         round_duration_minutes: minutes,
         ...(minutes === null
           ? { current_round_started_at: null, round_elapsed_seconds: 0, round_is_paused: false }
-          : {}),
+          : addingToActiveRound
+            ? { current_round_started_at: null, round_elapsed_seconds: 0, round_is_paused: true }
+            : {}),
       });
       if (minutes === null) setTimerEditorOpen(false);
     }
