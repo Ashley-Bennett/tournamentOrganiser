@@ -5,7 +5,21 @@
       "Bash(git add frontend/src/pages/TournamentMatches.tsx)",
       "Bash(git commit:*)",
       "Bash(npm list qrcode.react)",
-      "Bash(supabase db reset)"
+      "Bash(supabase db reset*)",
+      "Bash(printf 'y\\\\n')"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "mcp__claude_ai_Supabase__apply_migration",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /c/Users/ashle/Code/tournamentOrganiser && printf 'y\\n' | npx supabase db reset"
+          }
+        ]
+      }
     ]
   }
 }
