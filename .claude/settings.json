@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(file /c/Users/ashle/Code/tournamentOrganiser/frontend/public/screenshots/*)"
+      "Bash(file /c/Users/ashle/Code/tournamentOrganiser/frontend/public/screenshots/*)",
+      "Bash(git add frontend/src/pages/TournamentMatches.tsx)",
+      "Bash(git commit:*)"
     ]
   }
 }
