@@ -8,10 +8,10 @@ import { useTournament } from "../hooks/useTournament";
 export default function TournamentJoinDisplay() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { wPath, currentWorkspace } = useWorkspace();
+  const { wPath, workspace } = useWorkspace();
   const { user, loading: authLoading } = useAuth();
 
-  const { tournament } = useTournament(id, user, authLoading, currentWorkspace?.id ?? null);
+  const { tournament } = useTournament(id, user, authLoading, workspace?.id ?? null);
 
   const joinUrl = `${window.location.origin}/join`;
 

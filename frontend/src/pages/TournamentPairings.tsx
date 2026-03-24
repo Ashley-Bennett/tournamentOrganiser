@@ -345,7 +345,7 @@ const TournamentPairings: React.FC = () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       void supabase.removeChannel(channel);
     };
-  }, [publicSlug, id]);
+  }, [publicSlug, id, navigate]);
 
   const rounds = useMemo(
     () =>

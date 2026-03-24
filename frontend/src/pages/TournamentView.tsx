@@ -35,7 +35,6 @@ import {
 import SeatIcon from "@mui/icons-material/EventSeat";
 import { PlayArrow as PlayArrowIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import LinkIcon from "@mui/icons-material/Link";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import PeopleIcon from "@mui/icons-material/People";
 import SearchIcon from "@mui/icons-material/Search";
@@ -155,14 +154,6 @@ const TournamentView: React.FC = () => {
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
   const playerNameInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Claim links ──────────────────────────────────────────────────────────
-  // claimTokens: player.id → token string (once generated)
-  // claimIds:    player.id → claim row id (for revoke)
-  // copiedId:    player.id currently showing "Copied!" tooltip
-  const [claimTokens, setClaimTokens] = useState<Record<string, string>>({});
-  const [claimIds, setClaimIds] = useState<Record<string, string>>({});
-  const [generatingClaimId, setGeneratingClaimId] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedPlayerList, setCopiedPlayerList] = useState(false);
 
   // ── Self-registration toggle ─────────────────────────────────────────────
@@ -632,56 +623,6 @@ const TournamentView: React.FC = () => {
       );
     } finally {
       setSavingSeat(null);
-    }
-  };
-
-  // ── Claim link handlers ──────────────────────────────────────────────────
-
-  const handleGenerateClaimLink = async (playerId: string) => {
-    if (!tournament) return;
-    setGeneratingClaimId(playerId);
-    try {
-      const { data, error } = await supabase.rpc("create_player_claim_link", {
-        p_tournament_player_id: playerId,
-      });
-      if (error) throw new Error(error.message);
-      const row = Array.isArray(data) ? data[0] : data;
-      if (row) {
-        setClaimTokens((prev) => ({ ...prev, [playerId]: row.token as string }));
-        setClaimIds((prev) => ({ ...prev, [playerId]: row.claim_id as string }));
-      }
-    } catch (e: unknown) {
-      setPlayersError(e instanceof Error ? e.message : "Failed to generate claim link");
-    } finally {
-      setGeneratingClaimId(null);
-    }
-  };
-
-  const handleCopyClaimLink = async (playerId: string, token: string) => {
-    const url = `${window.location.origin}/claim/${token}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setPlayersError(null);
-      setCopiedId(playerId);
-      setTimeout(() => setCopiedId((prev) => (prev === playerId ? null : prev)), 2000);
-    } catch {
-      setCopiedId(null);
-      setPlayersError("Failed to copy link to clipboard.");
-    }
-  };
-
-  const handleRevokeClaimLink = async (playerId: string) => {
-    const claimId = claimIds[playerId];
-    if (!claimId) return;
-    try {
-      const { error } = await supabase.rpc("revoke_player_claim_link", {
-        p_claim_id: claimId,
-      });
-      if (error) throw new Error(error.message);
-      setClaimTokens((prev) => { const n = { ...prev }; delete n[playerId]; return n; });
-      setClaimIds((prev) => { const n = { ...prev }; delete n[playerId]; return n; });
-    } catch (e: unknown) {
-      setPlayersError(e instanceof Error ? e.message : "Failed to revoke claim link");
     }
   };
 

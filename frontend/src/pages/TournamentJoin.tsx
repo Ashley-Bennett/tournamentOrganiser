@@ -34,7 +34,9 @@ function getProfile(): TjProfile {
   try {
     const raw = localStorage.getItem(PROFILE_KEY);
     if (raw) return JSON.parse(raw) as TjProfile;
-  } catch {}
+  } catch {
+    // ignore parse errors
+  }
   // First visit: generate a stable deviceId
   const newProfile: TjProfile = {
     name: "",
@@ -57,7 +59,9 @@ function getEntry(tournamentId: string): TjEntry | null {
       .split("; ")
       .find((c) => c.startsWith(`${entryKey(tournamentId)}=`));
     if (cookie) return JSON.parse(decodeURIComponent(cookie.split("=")[1])) as TjEntry;
-  } catch {}
+  } catch {
+    // ignore parse errors
+  }
   return null;
 }
 
