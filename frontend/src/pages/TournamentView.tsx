@@ -1325,7 +1325,6 @@ const TournamentView: React.FC = () => {
                         </TableSortLabel>
                       </TableCell>
                       <TableCell>Static Seating</TableCell>
-                      {isManager && <TableCell>Account</TableCell>}
                       {tournament.status === "draft" && (
                         <TableCell align="right">Remove</TableCell>
                       )}
@@ -1334,9 +1333,6 @@ const TournamentView: React.FC = () => {
                   <TableBody>
                     {filteredPlayers.map((player) => {
                       const isSavingSeat = savingSeat === player.id;
-                      const claimToken = claimTokens[player.id];
-                      const isGenerating = generatingClaimId === player.id;
-                      const wasCopied = copiedId === player.id;
                       return (
                         <TableRow key={player.id}>
                           <TableCell>
@@ -1371,6 +1367,11 @@ const TournamentView: React.FC = () => {
                                     </Tooltip>
                                   )}
                                 </>
+                              )}
+                              {player.device_token && (
+                                <Tooltip title="Self-registered via join link">
+                                  <Chip label="Self-reg" size="small" variant="outlined" sx={{ fontSize: "0.65rem", height: 18 }} />
+                                </Tooltip>
                               )}
                               {player.has_static_seating && (
                                 <Tooltip
@@ -1436,56 +1437,6 @@ const TournamentView: React.FC = () => {
                               )}
                             </Box>
                           </TableCell>
-
-                          {/* ── Account / Link column ───────────────── */}
-                          {isManager && (
-                            <TableCell>
-                              {player.user_id ? (
-                                <Chip label="Linked" size="small" color="success" />
-                              ) : claimToken ? (
-                                <Box display="flex" alignItems="center" gap={0.5} flexWrap="wrap">
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      fontFamily: "monospace",
-                                      maxWidth: 140,
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    {`${window.location.origin}/claim/${claimToken}`}
-                                  </Typography>
-                                  <Tooltip title={wasCopied ? "Copied!" : "Copy link"}>
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => handleCopyClaimLink(player.id, claimToken)}
-                                    >
-                                      <ContentCopyIcon fontSize="inherit" />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip title="Revoke">
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => void handleRevokeClaimLink(player.id)}
-                                    >
-                                      <DeleteIcon fontSize="inherit" />
-                                    </IconButton>
-                                  </Tooltip>
-                                </Box>
-                              ) : (
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  startIcon={isGenerating ? <CircularProgress size={12} /> : <LinkIcon />}
-                                  disabled={isGenerating}
-                                  onClick={() => void handleGenerateClaimLink(player.id)}
-                                >
-                                  Link
-                                </Button>
-                              )}
-                            </TableCell>
-                          )}
 
                           {tournament.status === "draft" && (
                             <TableCell align="right">
