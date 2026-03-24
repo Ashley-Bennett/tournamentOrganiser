@@ -36,6 +36,52 @@ export function useTournamentPlayers(tournamentId: string | undefined) {
     void fetchPlayers();
   }, [tournamentId, fetchPlayers]);
 
+  // Realtime: pick up self-registrations and any external player changes
+  useEffect(() => {
+    if (!tournamentId) return;
+
+    const channel = supabase
+      .channel(`tournament_players:${tournamentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "tournament_players",
+          filter: `tournament_id=eq.${tournamentId}`,
+        },
+        (payload) => {
+          setPlayers((prev) => {
+            if (prev.some((p) => p.id === (payload.new as TournamentPlayer).id)) return prev;
+            return [...prev, payload.new as TournamentPlayer];
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "tournament_players",
+          filter: `tournament_id=eq.${tournamentId}`,
+        },
+        (payload) => {
+          setPlayers((prev) =>
+            prev.map((p) =>
+              p.id === (payload.new as TournamentPlayer).id
+                ? (payload.new as TournamentPlayer)
+                : p,
+            ),
+          );
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [tournamentId]);
+
   return {
     players,
     setPlayers,

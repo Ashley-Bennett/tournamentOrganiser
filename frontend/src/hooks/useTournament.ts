@@ -22,7 +22,7 @@ export function useTournament(
       let query = supabase
         .from("tournaments")
         .select(
-          "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused",
+          "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, join_enabled",
         )
         .eq("id", id);
 
