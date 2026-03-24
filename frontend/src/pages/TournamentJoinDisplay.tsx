@@ -3,13 +3,17 @@ import { Box, IconButton, Typography, Tooltip } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { QRCodeSVG } from "qrcode.react";
 import { useWorkspace } from "../WorkspaceContext";
-
+import { useAuth } from "../AuthContext";
+import { useTournament } from "../hooks/useTournament";
 export default function TournamentJoinDisplay() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { wPath } = useWorkspace();
+  const { wPath, currentWorkspace } = useWorkspace();
+  const { user, loading: authLoading } = useAuth();
 
-  const joinUrl = `${window.location.origin}/join/${id ?? ""}`;
+  const { tournament } = useTournament(id, user, authLoading, currentWorkspace?.id ?? null);
+
+  const joinUrl = `${window.location.origin}/join`;
 
   return (
     <Box
@@ -33,7 +37,8 @@ export default function TournamentJoinDisplay() {
       </Tooltip>
 
       <Typography variant="h4" fontWeight={700} textAlign="center">
-        Scan to join the tournament
+        Scan to join
+        {tournament?.name ? `: ${tournament.name}` : ""}
       </Typography>
 
       <Box
@@ -44,12 +49,27 @@ export default function TournamentJoinDisplay() {
         alignItems="center"
         justifyContent="center"
       >
-        <QRCodeSVG value={joinUrl} size={280} />
+        <QRCodeSVG value={joinUrl} size={260} />
       </Box>
 
+      {tournament?.join_code && (
+        <Box textAlign="center">
+          <Typography variant="caption" sx={{ opacity: 0.5, letterSpacing: 1 }}>
+            ROOM CODE
+          </Typography>
+          <Typography
+            variant="h2"
+            fontWeight={800}
+            sx={{ fontFamily: "monospace", letterSpacing: 6, lineHeight: 1.1 }}
+          >
+            {tournament.join_code}
+          </Typography>
+        </Box>
+      )}
+
       <Typography
-        variant="body1"
-        sx={{ fontFamily: "monospace", opacity: 0.7, wordBreak: "break-all", textAlign: "center" }}
+        variant="body2"
+        sx={{ fontFamily: "monospace", opacity: 0.45, textAlign: "center" }}
       >
         {joinUrl}
       </Typography>

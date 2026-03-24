@@ -169,16 +169,19 @@ const TournamentView: React.FC = () => {
   const [copiedJoinLink, setCopiedJoinLink] = useState(false);
 
   const handleToggleJoinEnabled = async (enabled: boolean) => {
-    if (!tournament || !workspaceId) return;
+    if (!tournament) return;
+    const prev = { ...tournament };
     setTournament({ ...tournament, join_enabled: enabled });
-    const { error } = await supabase
-      .from("tournaments")
-      .update({ join_enabled: enabled })
-      .eq("id", tournament.id)
-      .eq("workspace_id", workspaceId);
+    const { data, error } = await supabase
+      .rpc("set_tournament_join_enabled", {
+        p_tournament_id: tournament.id,
+        p_enabled: enabled,
+      });
     if (error) {
-      setTournament({ ...tournament, join_enabled: !enabled });
+      setTournament(prev);
       setError(error.message);
+    } else if (data && data.length > 0) {
+      setTournament((t) => t ? { ...t, join_enabled: enabled, join_code: (data[0] as { join_code: string }).join_code } : t);
     }
   };
 
@@ -1160,37 +1163,49 @@ const TournamentView: React.FC = () => {
               }
               label="Allow self-registration"
             />
-            {tournament.join_enabled && (
-              <Box display="flex" alignItems="center" gap={1} mt={0.5} flexWrap="wrap">
+            {tournament.join_enabled && tournament.join_code && (
+              <Box mt={1}>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    Room code
+                  </Typography>
+                  <Typography
+                    variant="h6"
+                    fontWeight={700}
+                    sx={{ letterSpacing: 2, fontFamily: "monospace" }}
+                  >
+                    {tournament.join_code}
+                  </Typography>
+                  <Tooltip title={copiedJoinLink ? "Copied!" : "Copy link"}>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(
+                          `${window.location.origin}/join`,
+                        ).then(() => {
+                          setCopiedJoinLink(true);
+                          setTimeout(() => setCopiedJoinLink(false), 2000);
+                        });
+                      }}
+                    >
+                      <ContentCopyIcon fontSize="inherit" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Display QR code">
+                    <IconButton
+                      size="small"
+                      onClick={() => navigate(wPath(`/tournaments/${tournament.id}/join-display`))}
+                    >
+                      <QrCode2Icon fontSize="inherit" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
                 <Typography
                   variant="caption"
-                  sx={{ fontFamily: "monospace", color: "text.secondary" }}
+                  sx={{ fontFamily: "monospace", color: "text.secondary", display: "block", mt: 0.5 }}
                 >
-                  {`${window.location.origin}/join/${tournament.id}`}
+                  {`${window.location.origin}/join`}
                 </Typography>
-                <Tooltip title={copiedJoinLink ? "Copied!" : "Copy link"}>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      void navigator.clipboard.writeText(
-                        `${window.location.origin}/join/${tournament.id}`,
-                      ).then(() => {
-                        setCopiedJoinLink(true);
-                        setTimeout(() => setCopiedJoinLink(false), 2000);
-                      });
-                    }}
-                  >
-                    <ContentCopyIcon fontSize="inherit" />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Display QR code">
-                  <IconButton
-                    size="small"
-                    onClick={() => navigate(wPath(`/tournaments/${tournament.id}/join-display`))}
-                  >
-                    <QrCode2Icon fontSize="inherit" />
-                  </IconButton>
-                </Tooltip>
               </Box>
             )}
           </Box>

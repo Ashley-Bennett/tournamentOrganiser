@@ -18,6 +18,7 @@ export interface TournamentSummary {
   round_is_paused?: boolean | null;
   round_note?: string | null;
   join_enabled?: boolean;
+  join_code?: string | null;
 }
 
 export interface TournamentPlayer {
