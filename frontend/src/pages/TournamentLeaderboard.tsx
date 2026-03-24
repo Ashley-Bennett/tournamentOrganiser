@@ -162,11 +162,6 @@ const TournamentLeaderboard: React.FC = () => {
     void fetchData();
   }, [id, user, authLoading, navigate, workspaceId]);
 
-  const finalStandings = useMemo(() => {
-    if (!matches.length) return [];
-    return sortByTieBreakers(buildStandingsFromMatches(matches));
-  }, [matches]);
-
   const droppedMap = useMemo(() => {
     const m = new Map<string, number | null>();
     players.forEach((p) => {
@@ -174,6 +169,14 @@ const TournamentLeaderboard: React.FC = () => {
     });
     return m;
   }, [players]);
+
+  const finalStandings = useMemo(() => {
+    if (!matches.length) return [];
+    return sortByTieBreakers(
+      buildStandingsFromMatches(matches),
+      new Set(droppedMap.keys()),
+    );
+  }, [matches, droppedMap]);
 
   if (authLoading || loading) return <PageLoading />;
 

@@ -364,6 +364,14 @@ const TournamentPairings: React.FC = () => {
     [matches, selectedRound],
   );
 
+  const droppedMap = useMemo(() => {
+    const m = new Map<string, number | null>();
+    players.forEach((p) => {
+      if (p.dropped) m.set(p.id, p.dropped_at_round);
+    });
+    return m;
+  }, [players]);
+
   const standings = useMemo(() => {
     const completed = matches.filter(
       (m) => m.status === "completed" || m.status === "bye",
@@ -372,16 +380,8 @@ const TournamentPairings: React.FC = () => {
       completed,
       players.map((p) => ({ id: p.id, name: p.name })),
     );
-    return sortByTieBreakers(raw);
-  }, [matches, players]);
-
-  const droppedMap = useMemo(() => {
-    const m = new Map<string, number | null>();
-    players.forEach((p) => {
-      if (p.dropped) m.set(p.id, p.dropped_at_round);
-    });
-    return m;
-  }, [players]);
+    return sortByTieBreakers(raw, new Set(droppedMap.keys()));
+  }, [matches, players, droppedMap]);
 
   if (loading) {
     return (

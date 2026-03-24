@@ -110,19 +110,27 @@ export function addTieBreakers(
 
 /**
  * Sort players according to Pokemon tournament tie-breaking rules:
- * 1. Match Points (descending)
- * 2. Opponent's Match Win Percentage (descending)
- * 3. Opponent's Opponent's Match Win Percentage (descending)
- * 4. Head-to-Head record (if the two players faced each other directly)
- * 5. Game Win Percentage (descending)
- * 6. Name alphabetical (stable deterministic fallback)
+ * 1. Dropped players always go to the bottom (regardless of score)
+ * 2. Match Points (descending)
+ * 3. Opponent's Match Win Percentage (descending)
+ * 4. Opponent's Opponent's Match Win Percentage (descending)
+ * 5. Head-to-Head record (if the two players faced each other directly)
+ * 6. Game Win Percentage (descending)
+ * 7. Name alphabetical (stable deterministic fallback)
  */
 export function sortByTieBreakers(
   standings: PlayerStanding[],
+  droppedIds?: Set<string>,
 ): PlayerWithTieBreakers[] {
   const withTieBreakers = addTieBreakers(standings);
 
   return withTieBreakers.sort((a, b) => {
+    // Dropped players always sort below active players
+    const aDropped = droppedIds?.has(a.id) ?? false;
+    const bDropped = droppedIds?.has(b.id) ?? false;
+    if (aDropped !== bDropped) return aDropped ? 1 : -1;
+
+
     // 1. Match Points (primary)
     if (b.matchPoints !== a.matchPoints) {
       return b.matchPoints - a.matchPoints;
