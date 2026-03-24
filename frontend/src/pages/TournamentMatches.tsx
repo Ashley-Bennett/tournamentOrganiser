@@ -4155,10 +4155,11 @@ const TournamentMatches: React.FC = () => {
                         );
                       }}
                       onBlur={(e) => {
+                        const parsed = parseInt(e.target.value, 10);
                         const val =
-                          e.target.value === ""
+                          e.target.value === "" || isNaN(parsed)
                             ? null
-                            : parseInt(e.target.value, 10);
+                            : parsed;
                         setSeatInputs((prev) => {
                           const next = new Map(prev);
                           next.delete(player.id);
