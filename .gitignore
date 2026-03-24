@@ -10,6 +10,8 @@ node_modules/
 .env.production.local
 backend/.env
 backend/.env.production
+frontend/.env.development
+frontend/.env.production
 
 # Build outputs
 dist/
