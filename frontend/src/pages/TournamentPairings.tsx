@@ -104,7 +104,9 @@ const TournamentPairings: React.FC = () => {
         // yields null data rather than a 406 error.
         const { data, error: tErr } = await supabase
           .from("tournaments")
-          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note")
+          .select(
+            "id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
+          )
           .eq("id", id)
           .maybeSingle();
         if (tErr || !data) {
@@ -117,7 +119,9 @@ const TournamentPairings: React.FC = () => {
         // Public route — fetch by public_slug, is_public = true required
         const { data, error: tErr } = await supabase
           .from("tournaments")
-          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note")
+          .select(
+            "id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
+          )
           .eq("public_slug", publicSlug!)
           .eq("is_public", true)
           .single();
@@ -192,7 +196,11 @@ const TournamentPairings: React.FC = () => {
           setSelectedRound("standings");
         } else if (enriched.length > 0) {
           const pendingRounds = enriched
-            .filter((m) => m.status === "pending" || (m.status === "ready" && m.pairings_published))
+            .filter(
+              (m) =>
+                m.status === "pending" ||
+                (m.status === "ready" && m.pairings_published),
+            )
             .map((m) => m.round_number);
           const allRounds = enriched.map((m) => m.round_number);
           const active =
@@ -236,7 +244,9 @@ const TournamentPairings: React.FC = () => {
       if (!tid) return;
       const { data } = await supabase
         .from("tournaments")
-        .select("current_round_started_at, round_elapsed_seconds, round_is_paused")
+        .select(
+          "current_round_started_at, round_elapsed_seconds, round_is_paused",
+        )
         .eq("id", tid)
         .maybeSingle();
       if (!data) return;
@@ -277,7 +287,9 @@ const TournamentPairings: React.FC = () => {
         },
         (payload) => {
           if (!id && resolvedTournamentIdRef.current) {
-            const row = (payload.new ?? payload.old) as { tournament_id?: string } | null;
+            const row = (payload.new ?? payload.old) as {
+              tournament_id?: string;
+            } | null;
             if (row?.tournament_id !== resolvedTournamentIdRef.current) return;
           }
           void load();
@@ -298,8 +310,18 @@ const TournamentPairings: React.FC = () => {
             const row = payload.new as { id?: string } | null;
             if (row?.id !== resolvedTournamentIdRef.current) return;
           }
-          const newRow = payload.new as { status?: string; round_is_paused?: boolean; current_round_started_at?: string | null; round_elapsed_seconds?: number } | null;
-          const oldRow = payload.old as { status?: string; round_is_paused?: boolean; current_round_started_at?: string | null; round_elapsed_seconds?: number } | null;
+          const newRow = payload.new as {
+            status?: string;
+            round_is_paused?: boolean;
+            current_round_started_at?: string | null;
+            round_elapsed_seconds?: number;
+          } | null;
+          const oldRow = payload.old as {
+            status?: string;
+            round_is_paused?: boolean;
+            current_round_started_at?: string | null;
+            round_elapsed_seconds?: number;
+          } | null;
           if (newRow?.status === "completed") {
             void load();
             setSelectedRound("standings");
@@ -335,7 +357,10 @@ const TournamentPairings: React.FC = () => {
 
   // Auto-switch to standings when the tournament completes
   useEffect(() => {
-    if (tournamentStatus === "completed" && prevTournamentStatusRef.current !== "completed") {
+    if (
+      tournamentStatus === "completed" &&
+      prevTournamentStatusRef.current !== "completed"
+    ) {
       setSelectedRound("standings");
     }
     prevTournamentStatusRef.current = tournamentStatus;
@@ -412,7 +437,9 @@ const TournamentPairings: React.FC = () => {
   // check — a round with only byes should still show the large pairings board.
   const isPreRound =
     roundMatches.length > 0 &&
-    !roundMatches.some((m) => m.status === "pending" || m.status === "completed");
+    !roundMatches.some(
+      (m) => m.status === "pending" || m.status === "completed",
+    );
 
   const isStandings = selectedRound === "standings";
 
@@ -438,7 +465,8 @@ const TournamentPairings: React.FC = () => {
     </Box>
   );
 
-  const roundTabs = (rounds.length > 1 || tournament.status === "completed") && (
+  const roundTabs = (rounds.length > 1 ||
+    tournament.status === "completed") && (
     <Tabs
       value={selectedRound}
       onChange={(_e, v: number | "standings") => setSelectedRound(v)}
@@ -484,8 +512,8 @@ const TournamentPairings: React.FC = () => {
         {header}
         {roundTabs}
         {tournament.round_note && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            {tournament.round_note}
+          <Alert severity="info" sx={{ mb: 2, alignItems: "center" }}>
+            <Typography variant="h6" fontWeight={400}>{tournament.round_note}</Typography>
           </Alert>
         )}
         <Box
@@ -577,7 +605,10 @@ const TournamentPairings: React.FC = () => {
 
   // ── ROUND ACTIVE / COMPLETE: compact table ──────────────────────────────────
   const pairingsTable = (
-    <Paper variant="outlined" sx={{ flex: timerExpanded && showTimer ? 1 : undefined, minWidth: 0 }}>
+    <Paper
+      variant="outlined"
+      sx={{ flex: timerExpanded && showTimer ? 1 : undefined, minWidth: 0 }}
+    >
       <Box px={2} py={1}>
         <Typography variant="subtitle2" fontWeight={600}>
           Pairings — Round {selectedRound}
@@ -588,19 +619,54 @@ const TournamentPairings: React.FC = () => {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={{ width: 36, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+              <TableCell
+                sx={{
+                  width: 36,
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  color: "text.secondary",
+                }}
+              >
                 Table
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+              <TableCell
+                sx={{
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  color: "text.secondary",
+                }}
+              >
                 Player 1
               </TableCell>
-              <TableCell sx={{ width: 24, textAlign: "center", fontSize: "0.75rem", color: "text.secondary", px: 0 }}>
+              <TableCell
+                sx={{
+                  width: 24,
+                  textAlign: "center",
+                  fontSize: "0.75rem",
+                  color: "text.secondary",
+                  px: 0,
+                }}
+              >
                 vs
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+              <TableCell
+                sx={{
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  color: "text.secondary",
+                }}
+              >
                 Player 2
               </TableCell>
-              <TableCell sx={{ width: 68, textAlign: "right", fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+              <TableCell
+                sx={{
+                  width: 68,
+                  textAlign: "right",
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  color: "text.secondary",
+                }}
+              >
                 Result
               </TableCell>
             </TableRow>
@@ -618,7 +684,13 @@ const TournamentPairings: React.FC = () => {
 
               return (
                 <TableRow key={m.id} hover>
-                  <TableCell sx={{ color: "text.secondary", fontSize: "0.85rem", fontWeight: 500 }}>
+                  <TableCell
+                    sx={{
+                      color: "text.secondary",
+                      fontSize: "0.85rem",
+                      fontWeight: 500,
+                    }}
+                  >
                     {m.match_number ?? "—"}
                   </TableCell>
                   <TableCell
@@ -634,7 +706,14 @@ const TournamentPairings: React.FC = () => {
                   >
                     {m.player1_name}
                   </TableCell>
-                  <TableCell sx={{ textAlign: "center", color: "text.disabled", fontSize: "0.75rem", px: 0 }}>
+                  <TableCell
+                    sx={{
+                      textAlign: "center",
+                      color: "text.disabled",
+                      fontSize: "0.75rem",
+                      px: 0,
+                    }}
+                  >
                     vs
                   </TableCell>
                   <TableCell
@@ -654,18 +733,36 @@ const TournamentPairings: React.FC = () => {
                   </TableCell>
                   <TableCell sx={{ textAlign: "right" }}>
                     {isBye ? (
-                      <Chip label="BYE" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                      <Chip
+                        label="BYE"
+                        size="small"
+                        sx={{ fontSize: "0.65rem", height: 20 }}
+                      />
                     ) : isCompleted || hasTempResult ? (
                       <Typography
                         variant="caption"
-                        sx={{ fontWeight: 600, fontSize: "0.82rem", opacity: hasTempResult ? 0.6 : 1 }}
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: "0.82rem",
+                          opacity: hasTempResult ? 0.6 : 1,
+                        }}
                       >
                         {displayResult ?? "—"}
                       </Typography>
                     ) : isPending ? (
-                      <Chip label="Playing" color="primary" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                      <Chip
+                        label="Playing"
+                        color="primary"
+                        size="small"
+                        sx={{ fontSize: "0.65rem", height: 20 }}
+                      />
                     ) : (
-                      <Chip label="Waiting" size="small" variant="outlined" sx={{ fontSize: "0.65rem", height: 20 }} />
+                      <Chip
+                        label="Waiting"
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: "0.65rem", height: 20 }}
+                      />
                     )}
                   </TableCell>
                 </TableRow>
@@ -673,7 +770,10 @@ const TournamentPairings: React.FC = () => {
             })}
             {roundMatches.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} sx={{ textAlign: "center", color: "text.disabled", py: 3 }}>
+                <TableCell
+                  colSpan={5}
+                  sx={{ textAlign: "center", color: "text.disabled", py: 3 }}
+                >
                   No pairings for this round yet.
                 </TableCell>
               </TableRow>
@@ -690,8 +790,8 @@ const TournamentPairings: React.FC = () => {
       {roundTabs}
 
       {tournament.round_note && (
-        <Alert severity="info" sx={{ mb: 1.5 }}>
-          {tournament.round_note}
+        <Alert severity="info" sx={{ mb: 1.5, alignItems: "center" }}>
+          <Typography variant="h6" fontWeight={400}>{tournament.round_note}</Typography>
         </Alert>
       )}
 
@@ -711,7 +811,10 @@ const TournamentPairings: React.FC = () => {
           >
             <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
               <Tooltip title="Collapse timer">
-                <IconButton size="small" onClick={() => setTimerExpanded(false)}>
+                <IconButton
+                  size="small"
+                  onClick={() => setTimerExpanded(false)}
+                >
                   <FullscreenExitIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
