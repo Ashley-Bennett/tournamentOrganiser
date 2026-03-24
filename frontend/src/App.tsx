@@ -103,6 +103,7 @@ function App() {
                 <Route path="/invite/:token" element={<AcceptInvite />} />
                 <Route path="/claim/:token" element={<ClaimPlayer />} />
                 <Route path="/join" element={<JoinLanding />} />
+                <Route path="/join/c/:code" element={<JoinLanding />} />
                 <Route path="/join/:tournamentId" element={<TournamentJoin />} />
 
                 {/* ── What's New ───────────────────────────────── */}

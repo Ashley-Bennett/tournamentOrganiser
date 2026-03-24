@@ -1122,7 +1122,7 @@ const TournamentView: React.FC = () => {
                       size="small"
                       onClick={() => {
                         void navigator.clipboard.writeText(
-                          `${window.location.origin}/join`,
+                          `${window.location.origin}/join/c/${tournament.join_code}`,
                         ).then(() => {
                           setCopiedJoinLink(true);
                           setTimeout(() => setCopiedJoinLink(false), 2000);
@@ -1145,7 +1145,7 @@ const TournamentView: React.FC = () => {
                   variant="caption"
                   sx={{ fontFamily: "monospace", color: "text.secondary", display: "block", mt: 0.5 }}
                 >
-                  {`${window.location.origin}/join`}
+                  {`${window.location.origin}/join/c/${tournament.join_code}`}
                 </Typography>
               </Box>
             )}

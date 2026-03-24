@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Box,
   Button,
@@ -13,12 +13,18 @@ import { supabase } from "../supabaseClient";
 
 export default function JoinLanding() {
   const navigate = useNavigate();
-  const [code, setCode] = useState("");
+  const { code: urlCode } = useParams<{ code?: string }>();
+  const [code, setCode] = useState(urlCode?.toUpperCase() ?? "");
   const [looking, setLooking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGo = async () => {
-    const trimmed = code.trim().toUpperCase();
+  useEffect(() => {
+    if (urlCode) void handleGo(urlCode.toUpperCase());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlCode]);
+
+  const handleGo = async (overrideCode?: string) => {
+    const trimmed = (overrideCode ?? code).trim().toUpperCase();
     if (!trimmed) return;
 
     setLooking(true);
