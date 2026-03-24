@@ -250,7 +250,12 @@ const TournamentPairings: React.FC = () => {
 
     // Poll timer state every 2 s so pause/resume propagates even if the realtime
     // event is delayed or the tournaments table isn't in the publication yet.
-    const pollId = setInterval(() => void loadTimerState(), 2_000);
+    const timerPollId = setInterval(() => void loadTimerState(), 2_000);
+
+    // Full data poll every 5 s as a fallback in case realtime events are missed
+    // (e.g. publish pairings, round transitions). Realtime still fires instantly
+    // when it works; this just ensures the page never stays stale.
+    const dataPollId = setInterval(() => void load(), 5_000);
 
     // Real-time subscription so the page updates immediately when matches change.
     // Authenticated route: server-side filter keeps traffic minimal.
@@ -289,19 +294,28 @@ const TournamentPairings: React.FC = () => {
             const row = payload.new as { id?: string } | null;
             if (row?.id !== resolvedTournamentIdRef.current) return;
           }
-          const newRow = payload.new as { status?: string } | null;
+          const newRow = payload.new as { status?: string; round_is_paused?: boolean; current_round_started_at?: string | null; round_elapsed_seconds?: number } | null;
+          const oldRow = payload.old as { status?: string; round_is_paused?: boolean; current_round_started_at?: string | null; round_elapsed_seconds?: number } | null;
           if (newRow?.status === "completed") {
             void load();
             setSelectedRound("standings");
-          } else {
+          } else if (
+            newRow?.status === oldRow?.status &&
+            newRow?.round_is_paused !== oldRow?.round_is_paused
+          ) {
+            // Timer pause/resume only — fast path
             void loadTimerState();
+          } else {
+            // Any other tournament state change (round start, status update, etc.)
+            void load();
           }
         },
       )
       .subscribe();
 
     return () => {
-      clearInterval(pollId);
+      clearInterval(timerPollId);
+      clearInterval(dataPollId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       void supabase.removeChannel(channel);
     };
