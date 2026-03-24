@@ -958,54 +958,6 @@ const TournamentView: React.FC = () => {
                 </Box>
               }
             />
-            <Box>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={!!tournament.round_duration_minutes}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        void handleSetRoundDuration(50);
-                      } else {
-                        void handleSetRoundDuration(null);
-                      }
-                    }}
-                    disabled={savingTimer}
-                    size="small"
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography variant="body2">Round timer</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Countdown shown on the matches and pairings pages
-                    </Typography>
-                  </Box>
-                }
-              />
-              {!!tournament.round_duration_minutes && (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1, ml: 4 }}>
-                  <TextField
-                    type="number"
-                    size="small"
-                    label="Duration (minutes)"
-                    value={timerDurationInput ?? tournament.round_duration_minutes.toString()}
-                    onChange={(e) => setTimerDurationInput(e.target.value)}
-                    onBlur={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      setTimerDurationInput(null);
-                      if (!isNaN(v) && v >= 1 && v <= 180 && v !== tournament.round_duration_minutes) {
-                        void handleSetRoundDuration(v);
-                      }
-                    }}
-                    onWheel={(e) => e.currentTarget.blur()}
-                    inputProps={{ min: 1, max: 180, step: 1 }}
-                    sx={{ width: 160 }}
-                    disabled={savingTimer}
-                  />
-                </Box>
-              )}
-            </Box>
             <Button
               variant="contained"
               color="primary"
@@ -1027,6 +979,56 @@ const TournamentView: React.FC = () => {
                   ? "Set the number of rounds before starting."
                   : "Once started, players can no longer be removed."}
             </Typography>
+          </Box>
+        )}
+        {isManager && (
+          <Box mt={2}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={!!tournament.round_duration_minutes}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      void handleSetRoundDuration(50);
+                    } else {
+                      void handleSetRoundDuration(null);
+                    }
+                  }}
+                  disabled={savingTimer}
+                  size="small"
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body2">Round timer</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Countdown shown on the matches and pairings pages
+                  </Typography>
+                </Box>
+              }
+            />
+            {!!tournament.round_duration_minutes && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1, ml: 4 }}>
+                <TextField
+                  type="number"
+                  size="small"
+                  label="Duration (minutes)"
+                  value={timerDurationInput ?? tournament.round_duration_minutes.toString()}
+                  onChange={(e) => setTimerDurationInput(e.target.value)}
+                  onBlur={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    setTimerDurationInput(null);
+                    if (!isNaN(v) && v >= 1 && v <= 180 && v !== tournament.round_duration_minutes) {
+                      void handleSetRoundDuration(v);
+                    }
+                  }}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  inputProps={{ min: 1, max: 180, step: 1 }}
+                  sx={{ width: 160 }}
+                  disabled={savingTimer}
+                />
+              </Box>
+            )}
           </Box>
         )}
       </Paper>

@@ -187,6 +187,9 @@ const TournamentMatches: React.FC = () => {
   const [seatInputs, setSeatInputs] = useState<Map<string, string>>(new Map());
   const didRestoreRef = useRef(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [savingTimer, setSavingTimer] = useState(false);
+  const [timerDurationInput, setTimerDurationInput] = useState<string | null>(null);
+  const [timerEditorOpen, setTimerEditorOpen] = useState(false);
 
   // When the tab becomes visible after being backgrounded, force a re-fetch.
   // AuthContext also fires refreshSession() on visibilitychange, so we delay
@@ -1466,6 +1469,36 @@ const TournamentMatches: React.FC = () => {
         current_round_started_at: resumedAt,
         round_is_paused: false,
       });
+    }
+  };
+
+  const handleSetRoundDuration = async (minutes: number | null) => {
+    if (!tournament || !workspaceId) return;
+    setSavingTimer(true);
+    const payload =
+      minutes === null
+        ? {
+            round_duration_minutes: null as number | null,
+            current_round_started_at: null as string | null,
+            round_elapsed_seconds: 0,
+            round_is_paused: false,
+          }
+        : { round_duration_minutes: minutes };
+    const { error } = await supabase
+      .from("tournaments")
+      .update(payload)
+      .eq("id", tournament.id)
+      .eq("workspace_id", workspaceId);
+    setSavingTimer(false);
+    if (!error) {
+      setTournament({
+        ...tournament,
+        round_duration_minutes: minutes,
+        ...(minutes === null
+          ? { current_round_started_at: null, round_elapsed_seconds: 0, round_is_paused: false }
+          : {}),
+      });
+      if (minutes === null) setTimerEditorOpen(false);
     }
   };
 
@@ -2940,8 +2973,30 @@ const TournamentMatches: React.FC = () => {
                                               )}
                                             </IconButton>
                                           </Tooltip>
+                                          <Tooltip title="Edit timer duration">
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => setTimerEditorOpen((v) => !v)}
+                                            >
+                                              <EditIcon sx={{ fontSize: "1rem" }} />
+                                            </IconButton>
+                                          </Tooltip>
                                         </Box>
                                       )}
+                                    {!tournament.round_duration_minutes && (
+                                      <Tooltip title="Add round timer">
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => {
+                                            void handleSetRoundDuration(50);
+                                            setTimerEditorOpen(true);
+                                          }}
+                                          disabled={savingTimer}
+                                        >
+                                          <EditIcon sx={{ fontSize: "1rem" }} />
+                                        </IconButton>
+                                      </Tooltip>
+                                    )}
                                   </>
                                 )}
                                 {/* Phase 3: round complete — keep View Pairings visible */}
@@ -3008,6 +3063,72 @@ const TournamentMatches: React.FC = () => {
                                 )}
                               </>
                             )}
+                          </Box>
+                        )}
+                        {timerEditorOpen && (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              flexWrap: "wrap",
+                              mt: 1,
+                              mb: 1,
+                            }}
+                          >
+                            <Switch
+                              checked={!!tournament.round_duration_minutes}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  void handleSetRoundDuration(50);
+                                } else {
+                                  void handleSetRoundDuration(null);
+                                }
+                              }}
+                              disabled={savingTimer}
+                              size="small"
+                            />
+                            <Typography variant="body2" color="text.secondary">
+                              Round timer
+                            </Typography>
+                            {!!tournament.round_duration_minutes && (
+                              <TextField
+                                type="number"
+                                size="small"
+                                label="Duration (minutes)"
+                                value={
+                                  timerDurationInput ??
+                                  tournament.round_duration_minutes.toString()
+                                }
+                                onChange={(e) =>
+                                  setTimerDurationInput(e.target.value)
+                                }
+                                onBlur={(e) => {
+                                  const v = parseInt(e.target.value, 10);
+                                  setTimerDurationInput(null);
+                                  if (
+                                    !isNaN(v) &&
+                                    v >= 1 &&
+                                    v <= 180 &&
+                                    v !== tournament.round_duration_minutes
+                                  ) {
+                                    void handleSetRoundDuration(v);
+                                  }
+                                }}
+                                onWheel={(e) => e.currentTarget.blur()}
+                                inputProps={{ min: 1, max: 180, step: 1 }}
+                                sx={{ width: 160 }}
+                                disabled={savingTimer}
+                              />
+                            )}
+                            <Tooltip title="Close">
+                              <IconButton
+                                size="small"
+                                onClick={() => setTimerEditorOpen(false)}
+                              >
+                                <CloseIcon sx={{ fontSize: "1rem" }} />
+                              </IconButton>
+                            </Tooltip>
                           </Box>
                         )}
                         {editingPairings && (
