@@ -1008,7 +1008,7 @@ const TournamentView: React.FC = () => {
               }
             />
             {!!tournament.round_duration_minutes && (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1, ml: 4 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1, ml: 4, flexWrap: "wrap" }}>
                 <TextField
                   type="number"
                   size="small"
@@ -1027,6 +1027,22 @@ const TournamentView: React.FC = () => {
                   sx={{ width: 160 }}
                   disabled={savingTimer}
                 />
+                {([-10, -1, 1, 10] as const).map((delta) => {
+                  const next = (tournament.round_duration_minutes ?? 0) + delta;
+                  const disabled = savingTimer || next < 1 || next > 180;
+                  return (
+                    <Button
+                      key={delta}
+                      size="small"
+                      variant="outlined"
+                      disabled={disabled}
+                      onClick={() => void handleSetRoundDuration(next)}
+                      sx={{ minWidth: 0, px: 1 }}
+                    >
+                      {delta > 0 ? `+${delta}m` : `${delta}m`}
+                    </Button>
+                  );
+                })}
               </Box>
             )}
           </Box>

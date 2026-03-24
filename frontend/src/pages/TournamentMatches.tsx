@@ -3092,34 +3092,57 @@ const TournamentMatches: React.FC = () => {
                               Round timer
                             </Typography>
                             {!!tournament.round_duration_minutes && (
-                              <TextField
-                                type="number"
-                                size="small"
-                                label="Duration (minutes)"
-                                value={
-                                  timerDurationInput ??
-                                  tournament.round_duration_minutes.toString()
-                                }
-                                onChange={(e) =>
-                                  setTimerDurationInput(e.target.value)
-                                }
-                                onBlur={(e) => {
-                                  const v = parseInt(e.target.value, 10);
-                                  setTimerDurationInput(null);
-                                  if (
-                                    !isNaN(v) &&
-                                    v >= 1 &&
-                                    v <= 180 &&
-                                    v !== tournament.round_duration_minutes
-                                  ) {
-                                    void handleSetRoundDuration(v);
+                              <>
+                                <TextField
+                                  type="number"
+                                  size="small"
+                                  label="Duration (minutes)"
+                                  value={
+                                    timerDurationInput ??
+                                    tournament.round_duration_minutes.toString()
                                   }
-                                }}
-                                onWheel={(e) => e.currentTarget.blur()}
-                                inputProps={{ min: 1, max: 180, step: 1 }}
-                                sx={{ width: 160 }}
-                                disabled={savingTimer}
-                              />
+                                  onChange={(e) =>
+                                    setTimerDurationInput(e.target.value)
+                                  }
+                                  onBlur={(e) => {
+                                    const v = parseInt(e.target.value, 10);
+                                    setTimerDurationInput(null);
+                                    if (
+                                      !isNaN(v) &&
+                                      v >= 1 &&
+                                      v <= 180 &&
+                                      v !== tournament.round_duration_minutes
+                                    ) {
+                                      void handleSetRoundDuration(v);
+                                    }
+                                  }}
+                                  onWheel={(e) => e.currentTarget.blur()}
+                                  inputProps={{ min: 1, max: 180, step: 1 }}
+                                  sx={{ width: 160 }}
+                                  disabled={savingTimer}
+                                />
+                                {([-10, -1, 1, 10] as const).map((delta) => {
+                                  const next =
+                                    (tournament.round_duration_minutes ?? 0) +
+                                    delta;
+                                  const disabled =
+                                    savingTimer || next < 1 || next > 180;
+                                  return (
+                                    <Button
+                                      key={delta}
+                                      size="small"
+                                      variant="outlined"
+                                      disabled={disabled}
+                                      onClick={() =>
+                                        void handleSetRoundDuration(next)
+                                      }
+                                      sx={{ minWidth: 0, px: 1 }}
+                                    >
+                                      {delta > 0 ? `+${delta}m` : `${delta}m`}
+                                    </Button>
+                                  );
+                                })}
+                              </>
                             )}
                             <Tooltip title="Close">
                               <IconButton
