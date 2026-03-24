@@ -70,7 +70,7 @@ DECLARE
   v_organiser_id UUID;
 BEGIN
   -- Verify caller is the tournament organiser
-  SELECT organiser_id INTO v_organiser_id
+  SELECT created_by INTO v_organiser_id
   FROM tournaments
   WHERE id = p_tournament_id;
 
