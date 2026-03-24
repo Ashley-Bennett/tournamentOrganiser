@@ -289,7 +289,13 @@ const TournamentPairings: React.FC = () => {
             const row = payload.new as { id?: string } | null;
             if (row?.id !== resolvedTournamentIdRef.current) return;
           }
-          void loadTimerState();
+          const newRow = payload.new as { status?: string } | null;
+          if (newRow?.status === "completed") {
+            void load();
+            setSelectedRound("standings");
+          } else {
+            void loadTimerState();
+          }
         },
       )
       .subscribe();
