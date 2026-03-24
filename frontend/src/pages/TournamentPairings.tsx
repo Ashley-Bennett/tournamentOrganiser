@@ -37,6 +37,7 @@ interface Tournament {
   current_round_started_at?: string | null;
   round_elapsed_seconds?: number | null;
   round_is_paused?: boolean | null;
+  round_note?: string | null;
 }
 
 interface Player {
@@ -103,7 +104,7 @@ const TournamentPairings: React.FC = () => {
         // yields null data rather than a 406 error.
         const { data, error: tErr } = await supabase
           .from("tournaments")
-          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused")
+          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note")
           .eq("id", id)
           .maybeSingle();
         if (tErr || !data) {
@@ -116,7 +117,7 @@ const TournamentPairings: React.FC = () => {
         // Public route — fetch by public_slug, is_public = true required
         const { data, error: tErr } = await supabase
           .from("tournaments")
-          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused")
+          .select("id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note")
           .eq("public_slug", publicSlug!)
           .eq("is_public", true)
           .single();
@@ -482,6 +483,11 @@ const TournamentPairings: React.FC = () => {
       <Box>
         {header}
         {roundTabs}
+        {tournament.round_note && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {tournament.round_note}
+          </Alert>
+        )}
         <Box
           sx={{
             display: "grid",
@@ -682,6 +688,12 @@ const TournamentPairings: React.FC = () => {
     <Box>
       {header}
       {roundTabs}
+
+      {tournament.round_note && (
+        <Alert severity="info" sx={{ mb: 1.5 }}>
+          {tournament.round_note}
+        </Alert>
+      )}
 
       {/* Expanded layout: pairings and large timer side by side */}
       {showTimer && timerExpanded ? (

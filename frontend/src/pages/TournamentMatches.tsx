@@ -190,6 +190,8 @@ const TournamentMatches: React.FC = () => {
   const [savingTimer, setSavingTimer] = useState(false);
   const [timerDurationInput, setTimerDurationInput] = useState<string | null>(null);
   const [timerEditorOpen, setTimerEditorOpen] = useState(false);
+  const [roundNoteInput, setRoundNoteInput] = useState<string>("");
+  const noteInputFocusedRef = useRef(false);
 
   // When the tab becomes visible after being backgrounded, force a re-fetch.
   // AuthContext also fires refreshSession() on visibilitychange, so we delay
@@ -207,6 +209,13 @@ const TournamentMatches: React.FC = () => {
       clearTimeout(timer);
     };
   }, []);
+
+  // Sync round note input from tournament state (only when not actively editing)
+  useEffect(() => {
+    if (!noteInputFocusedRef.current) {
+      setRoundNoteInput(tournament?.round_note ?? "");
+    }
+  }, [tournament?.round_note]);
 
   const standingsByPlayerId = useMemo(() => {
     // Standings as-of the start of the selected round (all rounds < selectedRound)
@@ -1513,6 +1522,19 @@ const TournamentMatches: React.FC = () => {
             : {}),
       });
       if (minutes === null) setTimerEditorOpen(false);
+    }
+  };
+
+  const handleSaveRoundNote = async (note: string) => {
+    if (!tournament || !workspaceId) return;
+    const trimmed = note.trim();
+    const { error } = await supabase
+      .from("tournaments")
+      .update({ round_note: trimmed || null })
+      .eq("id", tournament.id)
+      .eq("workspace_id", workspaceId);
+    if (!error) {
+      setTournament({ ...tournament, round_note: trimmed || null });
     }
   };
 
@@ -3167,6 +3189,27 @@ const TournamentMatches: React.FC = () => {
                               </IconButton>
                             </Tooltip>
                           </Box>
+                        )}
+                        {hasPendingMatches && !allCompletedInDB && (
+                          <TextField
+                            size="small"
+                            fullWidth
+                            placeholder="Add a note for players… (e.g. timer paused for judge call)"
+                            value={roundNoteInput}
+                            onChange={(e) => setRoundNoteInput(e.target.value)}
+                            onFocus={() => { noteInputFocusedRef.current = true; }}
+                            onBlur={() => {
+                              noteInputFocusedRef.current = false;
+                              void handleSaveRoundNote(roundNoteInput);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.currentTarget.blur();
+                              }
+                            }}
+                            inputProps={{ maxLength: 280 }}
+                            sx={{ mt: 1, mb: 0.5 }}
+                          />
                         )}
                         {editingPairings && (
                           <Alert
