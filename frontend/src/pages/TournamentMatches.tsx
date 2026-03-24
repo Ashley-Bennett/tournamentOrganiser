@@ -45,6 +45,7 @@ import PauseIcon from "@mui/icons-material/Pause";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import EditIcon from "@mui/icons-material/Edit";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import PushPinIcon from "@mui/icons-material/PushPin";
@@ -3029,7 +3030,7 @@ const TournamentMatches: React.FC = () => {
                                           }}
                                           disabled={savingTimer}
                                         >
-                                          <EditIcon sx={{ fontSize: "1rem" }} />
+                                          <AccessTimeIcon sx={{ fontSize: "1rem" }} />
                                         </IconButton>
                                       </Tooltip>
                                     )}
