@@ -1191,14 +1191,14 @@ const TournamentView: React.FC = () => {
                       <ContentCopyIcon fontSize="inherit" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Display QR code">
-                    <IconButton
-                      size="small"
-                      onClick={() => navigate(wPath(`/tournaments/${tournament.id}/join-display`))}
-                    >
-                      <QrCode2Icon fontSize="inherit" />
-                    </IconButton>
-                  </Tooltip>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<QrCode2Icon />}
+                    onClick={() => window.open(wPath(`/tournaments/${tournament.id}/join-display`), "_blank")}
+                  >
+                    Display join info
+                  </Button>
                 </Box>
                 <Typography
                   variant="caption"
