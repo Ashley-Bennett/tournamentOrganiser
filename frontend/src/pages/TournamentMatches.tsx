@@ -568,19 +568,6 @@ const TournamentMatches: React.FC = () => {
     void fetchMatches();
   }, [tournament?.id, user, refreshTrigger]);
 
-  // Calculate final standings for leaderboard
-  const finalStandings = useMemo(() => {
-    if (!matches.length) return [];
-    return sortByTieBreakers(buildStandingsFromMatches(matches));
-  }, [matches]);
-
-  // Map from player ID → standing (all completed matches), used in the drop dialog
-  const finalStandingsById = useMemo(() => {
-    const map = new Map<string, (typeof finalStandings)[0]>();
-    for (const s of finalStandings) map.set(s.id, s);
-    return map;
-  }, [finalStandings]);
-
   // Map from player ID → dropped_at_round (for final standings table indicators)
   const droppedPlayersMap = useMemo(() => {
     const map = new Map<string, number | null>();
@@ -589,6 +576,22 @@ const TournamentMatches: React.FC = () => {
     }
     return map;
   }, [players]);
+
+  // Calculate final standings for leaderboard
+  const finalStandings = useMemo(() => {
+    if (!matches.length) return [];
+    return sortByTieBreakers(
+      buildStandingsFromMatches(matches),
+      new Set(droppedPlayersMap.keys()),
+    );
+  }, [matches, droppedPlayersMap]);
+
+  // Map from player ID → standing (all completed matches), used in the drop dialog
+  const finalStandingsById = useMemo(() => {
+    const map = new Map<string, (typeof finalStandings)[0]>();
+    for (const s of finalStandings) map.set(s.id, s);
+    return map;
+  }, [finalStandings]);
 
   // Map from player ID → static seating info (for match card pin indicator)
   const playerStaticSeatMap = useMemo(() => {
