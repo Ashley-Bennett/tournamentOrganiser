@@ -80,6 +80,9 @@ const TournamentPairings: React.FC = () => {
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [timerExpanded, setTimerExpanded] = useState(false);
   const didInitRoundRef = useRef(false);
+  const initialRoundsLoadedRef = useRef(false);
+  const prevRoundCountRef = useRef(0);
+  const prevTournamentStatusRef = useRef<string | null>(null);
   // Stores the resolved tournament ID so the realtime callback can ignore events
   // for other tournaments (the subscription has no server-side filter on public routes).
   const resolvedTournamentIdRef = useRef<string | null>(null);
@@ -326,6 +329,30 @@ const TournamentPairings: React.FC = () => {
       [...new Set(matches.map((m) => m.round_number))].sort((a, b) => a - b),
     [matches],
   );
+
+  const tournamentStatus = tournament?.status ?? null;
+
+  // Auto-switch to standings when the tournament completes
+  useEffect(() => {
+    if (tournamentStatus === "completed" && prevTournamentStatusRef.current !== "completed") {
+      setSelectedRound("standings");
+    }
+    prevTournamentStatusRef.current = tournamentStatus;
+  }, [tournamentStatus]);
+
+  // Auto-switch to a newly added round tab
+  useEffect(() => {
+    if (rounds.length === 0) return;
+    if (!initialRoundsLoadedRef.current) {
+      initialRoundsLoadedRef.current = true;
+      prevRoundCountRef.current = rounds.length;
+      return;
+    }
+    if (rounds.length > prevRoundCountRef.current) {
+      setSelectedRound(Math.max(...rounds));
+    }
+    prevRoundCountRef.current = rounds.length;
+  }, [rounds]);
 
   const roundMatches = useMemo(
     () =>
