@@ -50,6 +50,8 @@ import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import PersonIcon from "@mui/icons-material/Person";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
@@ -93,6 +95,7 @@ interface Match {
   temp_result: string | null;
   pairings_published: boolean;
   status: "ready" | "pending" | "completed" | "bye";
+  confirmed_by: "organiser" | "player_agreement" | "player_report" | "conflict" | null;
   pairing_decision_log?: PairingDecisionLog | null;
   created_at: string;
 }
@@ -3520,48 +3523,31 @@ const TournamentMatches: React.FC = () => {
                                       />
                                     </Box>
                                   )}
-                                  {/* Player-submitted report badge (mobile) */}
+                                  {/* Player-submitted result indicator (mobile) */}
                                   {matchReports.has(match.id) && (() => {
                                     const report = matchReports.get(match.id)!;
-                                    if (report.conflict_status === "agreed") {
-                                      const agreedLabel =
-                                        report.player1_report === "draw"
-                                          ? "Draw"
-                                          : report.player1_report === "win"
-                                            ? `${report.player1_name} wins`
-                                            : `${report.player2_name ?? "P2"} wins`;
-                                      return (
-                                        <Chip
-                                          icon={<CheckCircleIcon />}
-                                          label={`Agree: ${agreedLabel}`}
-                                          color="success"
-                                          size="small"
-                                          sx={{ cursor: "pointer", alignSelf: "flex-start" }}
-                                          onClick={() => void handleConfirmFromReport(report)}
-                                          disabled={!!updatingMatch}
-                                        />
-                                      );
-                                    }
                                     if (report.conflict_status === "conflict") {
+                                      const p1out = report.player1_report ?? "?";
+                                      const p2out = report.player2_report ?? "?";
                                       return (
                                         <Chip
-                                          label="Conflict: both claim win"
+                                          icon={<WarningAmberIcon />}
+                                          label={`Conflict: ${report.player1_name} ${p1out} / ${report.player2_name ?? "P2"} ${p2out}`}
                                           color="error"
                                           size="small"
                                           sx={{ alignSelf: "flex-start" }}
                                         />
                                       );
                                     }
-                                    const reporter = report.player1_report ? report.player1_name : report.player2_name;
-                                    const outcome = report.player1_report ?? report.player2_report;
+                                    // partial — result already applied, just indicate source
                                     return (
                                       <Chip
-                                        label={`${reporter}: ${outcome} · Accept?`}
-                                        color="warning"
+                                        icon={<PersonIcon />}
+                                        label="Player reported"
+                                        color="info"
                                         size="small"
-                                        sx={{ cursor: "pointer", alignSelf: "flex-start" }}
-                                        onClick={() => void handleConfirmFromReport(report)}
-                                        disabled={!!updatingMatch}
+                                        variant="outlined"
+                                        sx={{ alignSelf: "flex-start" }}
                                       />
                                     );
                                   })()}
@@ -4234,51 +4220,31 @@ const TournamentMatches: React.FC = () => {
                                                   : "default"
                                           }
                                         />
-                                        {/* Player-submitted result report badge */}
+                                        {/* Player-submitted result indicator */}
                                         {matchReports.has(match.id) && (() => {
                                           const report = matchReports.get(match.id)!;
-                                          const agreedLabel =
-                                            report.player1_report === "draw"
-                                              ? "Draw"
-                                              : report.player1_report === "win"
-                                                ? `${report.player1_name} wins`
-                                                : `${report.player2_name ?? "P2"} wins`;
-                                          if (report.conflict_status === "agreed") {
-                                            return (
-                                              <Chip
-                                                icon={<CheckCircleIcon />}
-                                                label={`Agree: ${agreedLabel}`}
-                                                color="success"
-                                                size="small"
-                                                sx={{ cursor: "pointer", fontSize: "0.65rem", height: 22 }}
-                                                onClick={() => void handleConfirmFromReport(report)}
-                                                disabled={!!updatingMatch}
-                                              />
-                                            );
-                                          }
                                           if (report.conflict_status === "conflict") {
+                                            const p1out = report.player1_report ?? "?";
+                                            const p2out = report.player2_report ?? "?";
                                             return (
                                               <Chip
-                                                label="Conflict: both claim win"
+                                                icon={<WarningAmberIcon />}
+                                                label={`Conflict: ${report.player1_name} ${p1out} / ${report.player2_name ?? "P2"} ${p2out}`}
                                                 color="error"
                                                 size="small"
                                                 sx={{ fontSize: "0.65rem", height: 22 }}
                                               />
                                             );
                                           }
-                                          // partial
-                                          const reporter = report.player1_report
-                                            ? report.player1_name
-                                            : report.player2_name;
-                                          const outcome = report.player1_report ?? report.player2_report;
+                                          // partial — result already applied, just indicate source
                                           return (
                                             <Chip
-                                              label={`${reporter}: ${outcome} · Accept?`}
-                                              color="warning"
+                                              icon={<PersonIcon />}
+                                              label="Player reported"
+                                              color="info"
                                               size="small"
-                                              sx={{ cursor: "pointer", fontSize: "0.65rem", height: 22 }}
-                                              onClick={() => void handleConfirmFromReport(report)}
-                                              disabled={!!updatingMatch}
+                                              variant="outlined"
+                                              sx={{ fontSize: "0.65rem", height: 22 }}
                                             />
                                           );
                                         })()}
