@@ -7,8 +7,17 @@ import type { TournamentPlayer } from "../types/tournament";
 // Mock Supabase — intercept the client before it makes any network calls
 // ---------------------------------------------------------------------------
 
+const mockChannel = {
+  on: vi.fn().mockReturnThis(),
+  subscribe: vi.fn().mockReturnThis(),
+};
+
 vi.mock("../supabaseClient", () => ({
-  supabase: { from: vi.fn() },
+  supabase: {
+    from: vi.fn(),
+    channel: vi.fn(() => mockChannel),
+    removeChannel: vi.fn().mockResolvedValue(undefined),
+  },
 }));
 
 // Import after mock so we get the mocked version

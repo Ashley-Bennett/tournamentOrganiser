@@ -52,7 +52,6 @@ import type { TournamentSummary, TournamentPlayer } from "../types/tournament";
 import { formatDateTime } from "../utils/format";
 import {
   getTournamentTypeLabel,
-  calculateSuggestedRounds,
   assignMatchNumbers,
 } from "../utils/tournamentUtils";
 import { generateRound1Pairings } from "../utils/tournamentPairing";
@@ -211,10 +210,6 @@ const TournamentView: React.FC = () => {
     }
   }, [tournament]);
 
-  const suggestedRounds = useMemo(
-    () => (tournament ? calculateSuggestedRounds(players.length, tournament.tournament_type) : 0),
-    [players.length, tournament],
-  );
 
   const filteredPlayers = useMemo(() => {
     let list = [...players];
@@ -501,22 +496,6 @@ const TournamentView: React.FC = () => {
     const { data, error } = await supabase
       .from("tournaments")
       .update({ num_rounds: next })
-      .eq("id", tournament.id)
-      .eq("workspace_id", workspaceId ?? "")
-      .select(
-        "id, name, status, tournament_type, num_rounds, created_at, created_by",
-      )
-      .maybeSingle();
-    if (!error && data) setTournament(data as TournamentSummary);
-  };
-
-  const handleResetToSuggested = async () => {
-    if (!tournament || tournament.status !== "draft" || !user) return;
-    if (!suggestedRounds) return;
-    setNumRounds(suggestedRounds);
-    const { data, error } = await supabase
-      .from("tournaments")
-      .update({ num_rounds: suggestedRounds })
       .eq("id", tournament.id)
       .eq("workspace_id", workspaceId ?? "")
       .select(
@@ -912,31 +891,7 @@ const TournamentView: React.FC = () => {
                   >
                     <AddIcon fontSize="small" />
                   </IconButton>
-                  {players.length >= 2 && numRounds !== suggestedRounds && (
-                    <Button
-                      size="small"
-                      variant="text"
-                      onClick={handleResetToSuggested}
-                      sx={{ ml: 0.5, textTransform: "none", fontSize: "0.75rem" }}
-                    >
-                      Use suggested ({suggestedRounds})
-                    </Button>
-                  )}
                 </Box>
-                <Tooltip title="Swiss standard: ≤8 players → 3 rounds, 9–16 → 4, 17–32 → 5, 33–64 → 6">
-                  <Typography variant="caption" color="text.secondary" sx={{ cursor: "help", textDecoration: "underline dotted" }}>
-                    {players.length < 2
-                      ? "Add players to see a suggestion."
-                      : numRounds === suggestedRounds
-                        ? `Suggested for ${players.length} players (Swiss standard)`
-                        : `Suggested: ${suggestedRounds} for ${players.length} players (Swiss standard)`}
-                  </Typography>
-                </Tooltip>
-                {players.length >= 2 && players.length % 2 !== 0 && (
-                  <Typography variant="caption" color="text.secondary">
-                    With {players.length} players (odd number), one player will receive a bye each round.
-                  </Typography>
-                )}
               </Box>
 
               <FormControlLabel
