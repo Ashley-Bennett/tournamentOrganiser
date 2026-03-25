@@ -3384,8 +3384,24 @@ const TournamentMatches: React.FC = () => {
                               const canEditCard = match.status === "pending" && match.player2_id !== null;
                               const matchNumCard = matchNumberById.get(match.id) ?? 0;
                               const pendingResultCard = pendingResults.get(match.id);
-                              const effWinnerId = pendingResultCard ? pendingResultCard.winnerId : match.winner_id;
-                              const effResult = pendingResultCard ? pendingResultCard.result : match.result;
+                              let effWinnerId = pendingResultCard ? pendingResultCard.winnerId : match.winner_id;
+                              let effResult = pendingResultCard ? pendingResultCard.result : match.result;
+                              if (!pendingResultCard && match.result == null) {
+                                const reportCard = matchReports.get(match.id);
+                                if (reportCard && reportCard.conflict_status !== "conflict") {
+                                  const reportingOutcome = reportCard.player1_report ?? reportCard.player2_report;
+                                  const reportingPlayerId = reportCard.player1_report ? reportCard.player1_id : reportCard.player2_id;
+                                  if (reportingOutcome === "draw") {
+                                    effResult = "Draw";
+                                  } else if (reportingOutcome === "win") {
+                                    effWinnerId = reportingPlayerId;
+                                    effResult = reportingPlayerId === reportCard.player1_id ? "1-0" : "0-1";
+                                  } else if (reportingOutcome === "loss") {
+                                    effWinnerId = reportingPlayerId === reportCard.player1_id ? match.player2_id : reportCard.player1_id;
+                                    effResult = reportingPlayerId === reportCard.player1_id ? "0-1" : "1-0";
+                                  }
+                                }
+                              }
                               const isByeCard = match.status === "bye" || !match.player2_id;
                               const p1Wins = effWinnerId === match.player1_id;
                               const p2Wins = effWinnerId === match.player2_id;
@@ -3617,12 +3633,28 @@ const TournamentMatches: React.FC = () => {
                                 const pendingResult = pendingResults.get(
                                   match.id,
                                 );
-                                const effectiveWinnerId = pendingResult
+                                let effectiveWinnerId = pendingResult
                                   ? pendingResult.winnerId
                                   : match.winner_id;
-                                const effectiveResult = pendingResult
+                                let effectiveResult = pendingResult
                                   ? pendingResult.result
                                   : match.result;
+                                if (!pendingResult && match.result == null) {
+                                  const report = matchReports.get(match.id);
+                                  if (report && report.conflict_status !== "conflict") {
+                                    const reportingOutcome = report.player1_report ?? report.player2_report;
+                                    const reportingPlayerId = report.player1_report ? report.player1_id : report.player2_id;
+                                    if (reportingOutcome === "draw") {
+                                      effectiveResult = "Draw";
+                                    } else if (reportingOutcome === "win") {
+                                      effectiveWinnerId = reportingPlayerId;
+                                      effectiveResult = reportingPlayerId === report.player1_id ? "1-0" : "0-1";
+                                    } else if (reportingOutcome === "loss") {
+                                      effectiveWinnerId = reportingPlayerId === report.player1_id ? match.player2_id : report.player1_id;
+                                      effectiveResult = reportingPlayerId === report.player1_id ? "0-1" : "1-0";
+                                    }
+                                  }
+                                }
 
                                 // Determine background color for Player 1
                                 const getPlayer1BgColor = () => {
