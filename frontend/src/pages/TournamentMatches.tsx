@@ -3342,20 +3342,16 @@ const TournamentMatches: React.FC = () => {
                             sx={{ mt: 1, mb: 0.5 }}
                           />
                         )}
-                        {/* Partial report notification */}
+                        {/* Conflict notification */}
                         {!editingPairings && (() => {
-                          const partialReports = roundMatches
-                            .filter((m) => matchReports.get(m.id)?.conflict_status === "partial");
-                          if (!partialReports.length) return null;
-                          const names = partialReports.map((m) => {
-                            const r = matchReports.get(m.id)!;
-                            return r.player1_report ? r.player1_name : r.player2_name;
-                          });
+                          const conflictMatches = roundMatches
+                            .filter((m) => matchReports.get(m.id)?.conflict_status === "conflict");
+                          if (!conflictMatches.length) return null;
                           return (
-                            <Alert severity="warning" sx={{ mb: 1 }}>
-                              {names.length === 1
-                                ? `${names[0]} has submitted a result but their opponent hasn't — you may need to enter the result manually.`
-                                : `${names.length} players have submitted results but their opponents haven't — you may need to enter those results manually.`}
+                            <Alert severity="error" sx={{ mb: 1 }}>
+                              {conflictMatches.length === 1
+                                ? "1 match has a player conflict — check the match below and resolve manually."
+                                : `${conflictMatches.length} matches have player conflicts — check them below and resolve manually.`}
                             </Alert>
                           );
                         })()}

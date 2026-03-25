@@ -12,7 +12,8 @@
       "Bash(npx eslint src/pages/PlayerTournamentView.tsx src/pages/TournamentMatches.tsx src/pages/TournamentJoin.tsx src/utils/playerStorage.ts --max-warnings=0)",
       "Bash(npx eslint src/pages/TournamentMatches.tsx --max-warnings=0)",
       "Bash(npx supabase db query \"SELECT table_name FROM information_schema.tables WHERE table_schema = ''public'' AND table_name LIKE ''%workspace%'';\")",
-      "Bash(npx supabase db query --linked \"SELECT table_name FROM information_schema.tables WHERE table_schema = ''public'' AND table_name LIKE ''%workspace%'';\")"
+      "Bash(npx supabase db query --linked \"SELECT table_name FROM information_schema.tables WHERE table_schema = ''public'' AND table_name LIKE ''%workspace%'';\")",
+      "Bash(npx supabase db diff)"
     ]
   },
   "hooks": {
