@@ -1,8 +1,7 @@
--- ── get_tournaments_summary ───────────────────────────────────────────────────
--- Public batch lookup: returns name, workspace, status, and (for completed
--- tournaments) the player's final position and total player count.
--- Rank is computed by match points (3/win, 1/draw, 0/loss) — the primary
--- tiebreaker, matching the primary sort key used by the frontend standings.
+-- ── get_tournaments_summary (v2) ──────────────────────────────────────────────
+-- Extends the original with player_position and total_players for completed
+-- tournaments. Rank is by match points (3/win, 1/draw, 0/loss) — the primary
+-- sort key used by the frontend standings.
 -- No auth required — callable by anonymous users.
 
 CREATE OR REPLACE FUNCTION public.get_tournaments_summary(
@@ -34,13 +33,13 @@ BEGIN
       tp.id AS player_id,
       COALESCE(SUM(
         CASE
-          WHEN tm.status = 'bye'                                              THEN 3
+          WHEN tm.status = 'bye'                                               THEN 3
           WHEN tm.player2_id IS NULL
             AND tm.result = 'loss'
-            AND tm.status = 'completed'                                       THEN 0  -- late-entry loss
-          WHEN tm.status = 'completed' AND tm.winner_id = tp.id              THEN 3  -- win
-          WHEN tm.status = 'completed' AND tm.winner_id IS NULL               THEN 1  -- draw
-          WHEN tm.status = 'completed'                                         THEN 0  -- loss
+            AND tm.status = 'completed'                                        THEN 0  -- late-entry loss
+          WHEN tm.status = 'completed' AND tm.winner_id = tp.id               THEN 3  -- win
+          WHEN tm.status = 'completed' AND tm.winner_id IS NULL                THEN 1  -- draw
+          WHEN tm.status = 'completed'                                          THEN 0  -- loss
           ELSE 0
         END
       ), 0) AS match_points
@@ -55,8 +54,8 @@ BEGIN
     SELECT
       pp.tournament_id,
       pp.player_id,
-      RANK()  OVER (PARTITION BY pp.tournament_id ORDER BY pp.match_points DESC)::INT AS position,
-      COUNT(*) OVER (PARTITION BY pp.tournament_id)::INT                              AS total_players
+      RANK()   OVER (PARTITION BY pp.tournament_id ORDER BY pp.match_points DESC)::INT AS position,
+      COUNT(*) OVER (PARTITION BY pp.tournament_id)::INT                               AS total_players
     FROM player_points pp
   )
   SELECT

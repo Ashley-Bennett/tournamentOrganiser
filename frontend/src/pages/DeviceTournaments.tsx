@@ -13,11 +13,19 @@ import { EmojiEventsOutlined as TrophyIcon } from "@mui/icons-material";
 import { getAllEntries } from "../utils/playerStorage";
 import { supabase } from "../supabaseClient";
 
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return s[(v - 20) % 10] ?? s[v] ?? s[0]!;
+}
+
 interface TournamentSummary {
   tournament_id: string;
   tournament_name: string;
   workspace_name: string;
   status: string;
+  player_position: number | null;
+  total_players: number | null;
 }
 
 export default function DeviceTournaments() {
@@ -30,6 +38,7 @@ export default function DeviceTournaments() {
     void (async () => {
       const { data } = await supabase.rpc("get_tournaments_summary", {
         p_tournament_ids: entries.map((e) => e.tournamentId),
+        p_player_ids: entries.map((e) => e.playerId),
       });
       setSummaries((data as TournamentSummary[]) ?? []);
       setLoading(false);
@@ -45,6 +54,8 @@ export default function DeviceTournaments() {
         tournamentName: live?.tournament_name ?? e.tournamentName ?? "Tournament",
         workspaceName: live?.workspace_name ?? null,
         status: live?.status ?? null,
+        playerPosition: live?.player_position ?? null,
+        totalPlayers: live?.total_players ?? null,
       };
     });
   }, [entries, summaries]);
@@ -78,6 +89,8 @@ export default function DeviceTournaments() {
         <Stack spacing={1.5}>
           {rows.map((row) => {
             const isActive = row.status === "active";
+            const isCompleted = row.status === "completed";
+            const hasPosition = isCompleted && row.playerPosition != null && row.totalPlayers != null;
             return (
               <Paper
                 key={row.tournamentId}
@@ -101,6 +114,11 @@ export default function DeviceTournaments() {
                     {row.workspaceName && (
                       <Typography variant="body2" color="text.secondary">
                         {row.workspaceName}
+                      </Typography>
+                    )}
+                    {hasPosition && (
+                      <Typography variant="body2" color="text.secondary">
+                        Finished {row.playerPosition}{ordinal(row.playerPosition!)} of {row.totalPlayers}
                       </Typography>
                     )}
                   </Box>

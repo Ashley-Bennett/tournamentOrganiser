@@ -1,13 +1,9 @@
--- ── get_tournaments_summary ───────────────────────────────────────────────────
--- Public batch lookup: returns name, workspace, status, and (for completed
--- tournaments) the player's final position and total player count.
--- Rank is computed by match points (3/win, 1/draw, 0/loss) — the primary
--- tiebreaker, matching the primary sort key used by the frontend standings.
--- No auth required — callable by anonymous users.
+-- Fix: PostgreSQL 17 does not allow unnest(arr1, arr2) AS alias(col1, col2)
+-- inside a PL/pgSQL function body. Use SELECT unnest()...unnest() instead.
 
 CREATE OR REPLACE FUNCTION public.get_tournaments_summary(
   p_tournament_ids UUID[],
-  p_player_ids     UUID[]   -- parallel array; same index = same tournament
+  p_player_ids     UUID[]
 )
 RETURNS TABLE(
   tournament_id   UUID,
@@ -24,23 +20,23 @@ AS $$
 BEGIN
   RETURN QUERY
   WITH input AS (
-    SELECT u.tid, u.pid
-    FROM unnest(p_tournament_ids, p_player_ids) AS u(tid UUID, pid UUID)
+    SELECT
+      unnest(p_tournament_ids) AS tid,
+      unnest(p_player_ids)     AS pid
   ),
-  -- Compute match points for every player in the relevant tournaments
   player_points AS (
     SELECT
       tp.tournament_id,
       tp.id AS player_id,
       COALESCE(SUM(
         CASE
-          WHEN tm.status = 'bye'                                              THEN 3
+          WHEN tm.status = 'bye'                                               THEN 3
           WHEN tm.player2_id IS NULL
             AND tm.result = 'loss'
-            AND tm.status = 'completed'                                       THEN 0  -- late-entry loss
-          WHEN tm.status = 'completed' AND tm.winner_id = tp.id              THEN 3  -- win
-          WHEN tm.status = 'completed' AND tm.winner_id IS NULL               THEN 1  -- draw
-          WHEN tm.status = 'completed'                                         THEN 0  -- loss
+            AND tm.status = 'completed'                                        THEN 0
+          WHEN tm.status = 'completed' AND tm.winner_id = tp.id               THEN 3
+          WHEN tm.status = 'completed' AND tm.winner_id IS NULL                THEN 1
+          WHEN tm.status = 'completed'                                          THEN 0
           ELSE 0
         END
       ), 0) AS match_points
@@ -55,8 +51,8 @@ BEGIN
     SELECT
       pp.tournament_id,
       pp.player_id,
-      RANK()  OVER (PARTITION BY pp.tournament_id ORDER BY pp.match_points DESC)::INT AS position,
-      COUNT(*) OVER (PARTITION BY pp.tournament_id)::INT                              AS total_players
+      RANK()   OVER (PARTITION BY pp.tournament_id ORDER BY pp.match_points DESC)::INT AS position,
+      COUNT(*) OVER (PARTITION BY pp.tournament_id)::INT                               AS total_players
     FROM player_points pp
   )
   SELECT
