@@ -620,6 +620,36 @@ const TournamentMatches: React.FC = () => {
       const map = new Map<string, MatchReportRow>();
       (data as MatchReportRow[] ?? []).forEach((r) => map.set(r.match_id, r));
       setMatchReports(map);
+
+      // Immediately sync pendingResults with the latest player report so the
+      // result chip updates without waiting for the match list to refresh.
+      // Skip conflicts — the organiser must resolve those manually.
+      setPendingResults((prev) => {
+        const next = new Map(prev);
+        let changed = false;
+        for (const [matchId, report] of map.entries()) {
+          if (report.conflict_status === "conflict") continue;
+          const reportingOutcome = report.player1_report ?? report.player2_report;
+          const reportingPlayerId = report.player1_report ? report.player1_id : report.player2_id;
+          let winnerId: string | null = null;
+          let result: string;
+          if (reportingOutcome === "draw") {
+            result = "Draw";
+          } else if (reportingOutcome === "win") {
+            winnerId = reportingPlayerId;
+            result = reportingPlayerId === report.player1_id ? "1-0" : "0-1";
+          } else {
+            winnerId = reportingPlayerId === report.player1_id ? report.player2_id : report.player1_id;
+            result = reportingPlayerId === report.player1_id ? "0-1" : "1-0";
+          }
+          const existing = prev.get(matchId);
+          if (!existing || existing.result !== result || existing.winnerId !== winnerId) {
+            next.set(matchId, { winnerId, result });
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
     };
 
     // Fetch immediately on mount so badges are populated without waiting for a change
@@ -3386,7 +3416,7 @@ const TournamentMatches: React.FC = () => {
                               const pendingResultCard = pendingResults.get(match.id);
                               let effWinnerId = pendingResultCard ? pendingResultCard.winnerId : match.winner_id;
                               let effResult = pendingResultCard ? pendingResultCard.result : match.result;
-                              if (!pendingResultCard && match.result == null) {
+                              if (!pendingResultCard && match.status !== "completed") {
                                 const reportCard = matchReports.get(match.id);
                                 if (reportCard && reportCard.conflict_status !== "conflict") {
                                   const reportingOutcome = reportCard.player1_report ?? reportCard.player2_report;
@@ -3639,7 +3669,7 @@ const TournamentMatches: React.FC = () => {
                                 let effectiveResult = pendingResult
                                   ? pendingResult.result
                                   : match.result;
-                                if (!pendingResult && match.result == null) {
+                                if (!pendingResult && match.status !== "completed") {
                                   const report = matchReports.get(match.id);
                                   if (report && report.conflict_status !== "conflict") {
                                     const reportingOutcome = report.player1_report ?? report.player2_report;
