@@ -665,8 +665,8 @@ const PlayerTournamentView: React.FC = () => {
             <TableBody>
               {roundMatches.map((m) => {
                 const isBye = m.status === "bye" || m.player2_id === null;
-                const isCompleted = m.status === "completed";
-                const isPending = m.status === "pending";
+                const isCompleted = m.status === "completed" || m.confirmed_by === "player_report" || m.confirmed_by === "player_agreement";
+                const isPending = m.status === "pending" && !isCompleted;
                 const p1Won = m.winner_id === m.player1_id;
                 const p2Won = m.winner_id === m.player2_id;
                 const isMyRow = m.is_my_match;
