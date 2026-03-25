@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   Box,
@@ -59,6 +59,7 @@ interface MatchWithNames {
   confirmed_by: "organiser" | "player_agreement" | "player_report" | null;
   pairings_published: boolean;
   is_my_match: boolean;
+  report_count: number;
 }
 
 interface ViewData {
@@ -69,7 +70,7 @@ interface ViewData {
   my_report: { reported_outcome: "win" | "loss" | "draw" } | null;
 }
 
-type SubmitStatus = "submitted" | "confirmed" | "conflict" | null;
+type SubmitStatus = "submitted" | "agreed" | "conflict" | null;
 
 // ── MyMatchCard ───────────────────────────────────────────────────────────────
 
@@ -77,19 +78,61 @@ function MyMatchCard({
   match,
   playerId,
   myReport,
-  submitStatus,
-  submitting,
-  onSubmit,
-  onContest,
+  entry,
+  onRefresh,
 }: {
   match: MatchWithNames | null;
   playerId: string;
   myReport: { reported_outcome: "win" | "loss" | "draw" } | null;
-  submitStatus: SubmitStatus;
-  submitting: boolean;
-  onSubmit: (outcome: "win" | "loss" | "draw") => void;
-  onContest: (outcome: "win" | "loss" | "draw") => void;
+  entry: { playerId: string; deviceToken: string } | null;
+  onRefresh: () => void;
 }) {
+  const [selectedOutcome, setSelectedOutcome] = useState<"win" | "loss" | "draw" | null>(null);
+  const [undone, setUndone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>(null);
+
+  const prevReportOutcomeRef = useRef(myReport?.reported_outcome);
+
+  // Sync selected outcome from server state when myReport changes
+  useEffect(() => {
+    const prev = prevReportOutcomeRef.current;
+    const next = myReport?.reported_outcome;
+    if (next !== prev) {
+      if (next) setSelectedOutcome(next);
+      if (!next) {
+        // Report was cleared (e.g. organiser confirmed and round advanced)
+        setSelectedOutcome(null);
+        setSubmitStatus(null);
+      }
+      setUndone(false);
+      prevReportOutcomeRef.current = next;
+    }
+  }, [myReport?.reported_outcome]);
+
+  const inSubmittedMode = Boolean(myReport) && !undone;
+
+  const handleSubmit = async () => {
+    if (!selectedOutcome || !entry || !match) return;
+    setSubmitting(true);
+    const { data, error } = await supabase.rpc("submit_match_result", {
+      p_match_id: match.id,
+      p_player_id: entry.playerId,
+      p_device_token: entry.deviceToken,
+      p_reported_outcome: selectedOutcome,
+    });
+    setSubmitting(false);
+    if (error) return;
+    setUndone(false);
+    setSubmitStatus((data as { status: string }).status as SubmitStatus);
+    onRefresh();
+  };
+
+  const handleUndo = () => {
+    setUndone(true);
+    setSubmitStatus(null);
+  };
+
   if (!match) {
     return (
       <Paper variant="outlined" sx={{ p: 2.5, mb: 2, borderRadius: 2 }}>
@@ -102,7 +145,6 @@ function MyMatchCard({
 
   const isBye = match.player2_id === null || match.status === "bye";
   const isCompleted = match.status === "completed";
-  const isPending = match.status === "pending";
   const opponentName = match.player1_id === playerId ? match.player2_name : match.player1_name;
   const iWon = match.winner_id === playerId;
   const iLost = match.winner_id !== null && match.winner_id !== playerId;
@@ -112,10 +154,15 @@ function MyMatchCard({
   const outcomeLabel = iWon ? "You won" : iLost ? "You lost" : isDraw ? "Draw" : null;
   const outcomeColor = iWon ? "success" : iLost ? "error" : "default";
 
-  const reportLabel: Record<string, string> = {
+  const outcomeButtonLabel: Record<string, string> = {
     win: "I won",
     loss: "I lost",
     draw: "Draw",
+  };
+  const outcomeButtonColor: Record<string, "success" | "error" | "inherit"> = {
+    win: "success",
+    loss: "error",
+    draw: "inherit",
   };
 
   return (
@@ -151,120 +198,79 @@ function MyMatchCard({
       </Box>
 
       {/* Result submission — pending match */}
-      {isPending && !isBye && (
+      {match.status === "pending" && !isBye && (
         <>
-          {submitStatus === "conflict" && (
-            <Alert severity="warning" sx={{ mb: 1.5 }}>
-              Both players reported different results — your organiser will resolve this.
-            </Alert>
-          )}
-          {submitStatus === "confirmed" && (
-            <Alert severity="success" sx={{ mb: 1.5 }}>
-              Result confirmed.
-            </Alert>
-          )}
-
-          {myReport && submitStatus !== "confirmed" ? (
+          {inSubmittedMode ? (
+            /* ── Submitted mode ── */
             <Box>
-              <Typography variant="body2" color="text.secondary" mb={1}>
-                Your report: <strong>{reportLabel[myReport.reported_outcome]}</strong>
-                {submitStatus !== "conflict" && " · Waiting for opponent…"}
-              </Typography>
-              <Box display="flex" gap={1} flexWrap="wrap">
-                {(["win", "loss", "draw"] as const).map((o) => (
-                  <Button
-                    key={o}
-                    size="small"
-                    variant={myReport.reported_outcome === o ? "contained" : "outlined"}
-                    disabled={submitting || myReport.reported_outcome === o}
-                    onClick={() => onSubmit(o)}
-                  >
-                    {reportLabel[o]}
-                  </Button>
-                ))}
+              <Box display="flex" alignItems="center" gap={1} mb={1} flexWrap="wrap">
+                <Chip
+                  label={`Submitted: ${outcomeButtonLabel[myReport!.reported_outcome]}`}
+                  color="primary"
+                  size="small"
+                />
+                {submitStatus === "agreed" && (
+                  <Chip label="Both players agree" color="success" size="small" />
+                )}
+                {submitStatus === "conflict" && (
+                  <Chip label="Conflict" color="warning" size="small" />
+                )}
               </Box>
+              {submitStatus === "conflict" && (
+                <Alert severity="warning" sx={{ mb: 1 }}>
+                  Both players reported different results — your organiser will resolve this.
+                </Alert>
+              )}
+              {submitStatus === "agreed" && (
+                <Alert severity="success" sx={{ mb: 1 }}>
+                  Both players agree — waiting for the organiser to confirm.
+                </Alert>
+              )}
+              {!submitStatus && (
+                <Typography variant="body2" color="text.secondary" mb={1}>
+                  Waiting for the organiser to confirm…
+                </Typography>
+              )}
+              <Button size="small" variant="outlined" onClick={handleUndo}>
+                Undo
+              </Button>
             </Box>
-          ) : submitStatus !== "confirmed" ? (
+          ) : (
+            /* ── Selection mode ── */
             <Box>
               <Typography variant="body2" color="text.secondary" mb={1}>
                 How did the match go?
               </Typography>
-              <Box display="flex" gap={1} flexWrap="wrap">
-                <Button
-                  variant="contained"
-                  color="success"
-                  size="small"
-                  disabled={submitting}
-                  onClick={() => onSubmit("win")}
-                >
-                  {submitting ? <CircularProgress size={16} /> : "I won"}
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={submitting}
-                  onClick={() => onSubmit("draw")}
-                >
-                  Draw
-                </Button>
-                <Button
-                  variant="contained"
-                  color="error"
-                  size="small"
-                  disabled={submitting}
-                  onClick={() => onSubmit("loss")}
-                >
-                  I lost
-                </Button>
+              <Box display="flex" gap={1} flexWrap="wrap" mb={1.5}>
+                {(["win", "draw", "loss"] as const).map((o) => (
+                  <Button
+                    key={o}
+                    size="small"
+                    variant={selectedOutcome === o ? "contained" : "outlined"}
+                    color={outcomeButtonColor[o]}
+                    onClick={() => setSelectedOutcome(o)}
+                  >
+                    {outcomeButtonLabel[o]}
+                  </Button>
+                ))}
               </Box>
+              <Button
+                size="small"
+                variant="contained"
+                disabled={!selectedOutcome || submitting}
+                onClick={() => void handleSubmit()}
+              >
+                {submitting ? <CircularProgress size={16} /> : "Submit result"}
+              </Button>
             </Box>
-          ) : null}
+          )}
         </>
       )}
 
-      {/* Contest section — completed by first player's report only */}
-      {isCompleted &&
-        match.confirmed_by === "player_report" &&
-        submitStatus === null && (
-          <Box mt={1}>
-            <Typography variant="body2" color="text.secondary" mb={1}>
-              Result reported by your opponent. Incorrect?
-            </Typography>
-            <Box display="flex" gap={1} flexWrap="wrap">
-              <Button
-                variant="outlined"
-                color="success"
-                size="small"
-                disabled={submitting}
-                onClick={() => onContest("win")}
-              >
-                I won
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                disabled={submitting}
-                onClick={() => onContest("draw")}
-              >
-                Draw
-              </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                size="small"
-                disabled={submitting}
-                onClick={() => onContest("loss")}
-              >
-                I lost
-              </Button>
-            </Box>
-          </Box>
-        )}
-
-      {isCompleted && submitStatus === "conflict" && (
-        <Alert severity="warning" sx={{ mt: 1 }}>
-          Both players reported different results — your organiser will resolve this.
-        </Alert>
+      {isCompleted && (
+        <Typography variant="body2" color="text.secondary">
+          Result confirmed by your organiser.
+        </Typography>
       )}
 
       {match.status === "ready" && (
@@ -285,8 +291,6 @@ const PlayerTournamentView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>(null);
 
   const didInitRoundRef = useRef(false);
   const initialRoundsLoadedRef = useRef(false);
@@ -437,56 +441,15 @@ const PlayerTournamentView: React.FC = () => {
     prevRoundCountRef.current = rounds.length;
   }, [rounds]);
 
-  const doSubmit = async (matchId: string, outcome: "win" | "loss" | "draw") => {
-    if (!entry) return;
-    setSubmitting(true);
-    const { data, error: rpcError } = await supabase.rpc("submit_match_result", {
-      p_match_id: matchId,
-      p_player_id: entry.playerId,
-      p_device_token: entry.deviceToken,
-      p_reported_outcome: outcome,
-    });
-    if (rpcError) {
-      setSubmitting(false);
-      return;
-    }
-    const result = (data as { status: string }).status as SubmitStatus;
-    setSubmitStatus(result);
-    setSubmitting(false);
+  const handleRefresh = useCallback(async () => {
+    if (!tournamentId || !entry) return;
     const { data: fresh } = await supabase.rpc("get_player_tournament_view", {
-      p_tournament_id: tournamentId!,
+      p_tournament_id: tournamentId,
       p_player_id: entry.playerId,
       p_device_token: entry.deviceToken,
     });
     if (fresh) setViewData(fresh as ViewData);
-  };
-
-  const handleSubmit = async (outcome: "win" | "loss" | "draw") => {
-    if (!viewData) return;
-    const myMatch = (viewData.matches ?? []).find(
-      (m) =>
-        m.is_my_match &&
-        typeof selectedRound === "number" &&
-        m.round_number === selectedRound &&
-        m.status === "pending",
-    );
-    if (!myMatch) return;
-    await doSubmit(myMatch.id, outcome);
-  };
-
-  const handleContest = async (outcome: "win" | "loss" | "draw") => {
-    if (!viewData) return;
-    const myMatch = (viewData.matches ?? []).find(
-      (m) =>
-        m.is_my_match &&
-        typeof selectedRound === "number" &&
-        m.round_number === selectedRound &&
-        m.status === "completed" &&
-        m.confirmed_by === "player_report",
-    );
-    if (!myMatch) return;
-    await doSubmit(myMatch.id, outcome);
-  };
+  }, [tournamentId, entry]);
 
   // ── Derived state (all hooks must be before any conditional returns) ─────────
 
@@ -604,7 +567,6 @@ const PlayerTournamentView: React.FC = () => {
       value={selectedRound}
       onChange={(_e, v: number | "standings") => {
         setSelectedRound(v);
-        setSubmitStatus(null);
       }}
       variant="scrollable"
       scrollButtons="auto"
@@ -650,10 +612,8 @@ const PlayerTournamentView: React.FC = () => {
         match={myRoundMatch}
         playerId={player.id}
         myReport={my_report}
-        submitStatus={submitStatus}
-        submitting={submitting}
-        onSubmit={(outcome) => void handleSubmit(outcome)}
-        onContest={(outcome) => void handleContest(outcome)}
+        entry={entry}
+        onRefresh={() => void handleRefresh()}
       />
 
       {/* Full pairings */}
@@ -751,6 +711,13 @@ const PlayerTournamentView: React.FC = () => {
                         <Typography variant="caption" sx={{ fontWeight: 600, fontSize: "0.82rem" }}>
                           {m.result ?? "—"}
                         </Typography>
+                      ) : isPending && m.report_count > 0 ? (
+                        <Chip
+                          label="Reported"
+                          color="warning"
+                          size="small"
+                          sx={{ fontSize: "0.65rem", height: 20 }}
+                        />
                       ) : isPending ? (
                         <Chip
                           label="Playing"
