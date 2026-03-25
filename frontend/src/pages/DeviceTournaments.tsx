@@ -45,20 +45,21 @@ export default function DeviceTournaments() {
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Preserve localStorage order; fall back to stored name if RPC hasn't loaded yet
+  // Preserve localStorage order; omit entries not returned by the RPC (deleted tournaments)
   const rows = useMemo(() => {
-    return entries.map((e) => {
+    return entries.flatMap((e) => {
       const live = summaries.find((s) => s.tournament_id === e.tournamentId);
-      return {
+      if (!loading && !live) return [];
+      return [{
         tournamentId: e.tournamentId,
         tournamentName: live?.tournament_name ?? e.tournamentName ?? "Tournament",
         workspaceName: live?.workspace_name ?? null,
         status: live?.status ?? null,
         playerPosition: live?.player_position ?? null,
         totalPlayers: live?.total_players ?? null,
-      };
+      }];
     });
-  }, [entries, summaries]);
+  }, [entries, summaries, loading]);
 
   return (
     <Box maxWidth={560} mx="auto" mt={4}>
