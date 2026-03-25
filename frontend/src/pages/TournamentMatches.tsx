@@ -632,6 +632,16 @@ const TournamentMatches: React.FC = () => {
         },
         () => { void fetchReports(); },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "tournament_matches",
+          filter: `tournament_id=eq.${tournament.id}`,
+        },
+        () => { setRefreshTrigger((n) => n + 1); },
+      )
       .subscribe();
 
     return () => { void supabase.removeChannel(channel); };
@@ -903,16 +913,18 @@ const TournamentMatches: React.FC = () => {
     let winnerId: string | null = null;
     let resultStr: string;
 
-    if (report.player1_report === "draw") {
+    const reportingOutcome = report.player1_report ?? report.player2_report;
+    const reportingPlayerId = report.player1_report ? report.player1_id : report.player2_id;
+    if (reportingOutcome === "draw") {
       winnerId = null;
       resultStr = "Draw";
-    } else if (report.player1_report === "win") {
-      winnerId = report.player1_id;
-      resultStr = "1-0";
+    } else if (reportingOutcome === "win") {
+      winnerId = reportingPlayerId;
+      resultStr = reportingPlayerId === report.player1_id ? "1-0" : "0-1";
     } else {
-      // player1 lost → player2 won
-      winnerId = match.player2_id;
-      resultStr = "0-1";
+      // reporter lost → other player won
+      winnerId = reportingPlayerId === report.player1_id ? match.player2_id : report.player1_id;
+      resultStr = reportingPlayerId === report.player1_id ? "0-1" : "1-0";
     }
 
     try {
@@ -3316,6 +3328,23 @@ const TournamentMatches: React.FC = () => {
                             sx={{ mt: 1, mb: 0.5 }}
                           />
                         )}
+                        {/* Partial report notification */}
+                        {!editingPairings && (() => {
+                          const partialReports = roundMatches
+                            .filter((m) => matchReports.get(m.id)?.conflict_status === "partial");
+                          if (!partialReports.length) return null;
+                          const names = partialReports.map((m) => {
+                            const r = matchReports.get(m.id)!;
+                            return r.player1_report ? r.player1_name : r.player2_name;
+                          });
+                          return (
+                            <Alert severity="warning" sx={{ mb: 1 }}>
+                              {names.length === 1
+                                ? `${names[0]} has submitted a result but their opponent hasn't — you may need to enter the result manually.`
+                                : `${names.length} players have submitted results but their opponents haven't — you may need to enter those results manually.`}
+                            </Alert>
+                          );
+                        })()}
                         {editingPairings && (
                           <Alert
                             severity={
@@ -3516,11 +3545,12 @@ const TournamentMatches: React.FC = () => {
                                     const outcome = report.player1_report ?? report.player2_report;
                                     return (
                                       <Chip
-                                        label={`${reporter}: ${outcome}`}
+                                        label={`${reporter}: ${outcome} · Accept?`}
                                         color="warning"
                                         size="small"
-                                        variant="outlined"
-                                        sx={{ alignSelf: "flex-start" }}
+                                        sx={{ cursor: "pointer", alignSelf: "flex-start" }}
+                                        onClick={() => void handleConfirmFromReport(report)}
+                                        disabled={!!updatingMatch}
                                       />
                                     );
                                   })()}
@@ -4232,11 +4262,12 @@ const TournamentMatches: React.FC = () => {
                                           const outcome = report.player1_report ?? report.player2_report;
                                           return (
                                             <Chip
-                                              label={`${reporter}: ${outcome}`}
+                                              label={`${reporter}: ${outcome} · Accept?`}
                                               color="warning"
                                               size="small"
-                                              variant="outlined"
-                                              sx={{ fontSize: "0.65rem", height: 22 }}
+                                              sx={{ cursor: "pointer", fontSize: "0.65rem", height: 22 }}
+                                              onClick={() => void handleConfirmFromReport(report)}
+                                              disabled={!!updatingMatch}
                                             />
                                           );
                                         })()}
