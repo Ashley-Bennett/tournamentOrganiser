@@ -91,6 +91,7 @@ function MyMatchCard({
   const [undone, setUndone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const prevReportOutcomeRef = useRef(myReport?.reported_outcome);
 
@@ -115,6 +116,7 @@ function MyMatchCard({
   const handleSubmit = async () => {
     if (!selectedOutcome || !entry || !match) return;
     setSubmitting(true);
+    setSubmitError(null);
     const { data, error } = await supabase.rpc("submit_match_result", {
       p_match_id: match.id,
       p_player_id: entry.playerId,
@@ -122,7 +124,10 @@ function MyMatchCard({
       p_reported_outcome: selectedOutcome,
     });
     setSubmitting(false);
-    if (error) return;
+    if (error) {
+      setSubmitError(error.message);
+      return;
+    }
     setUndone(false);
     setSubmitStatus((data as { status: string }).status as SubmitStatus);
     onRefresh();
@@ -131,6 +136,7 @@ function MyMatchCard({
   const handleUndo = () => {
     setUndone(true);
     setSubmitStatus(null);
+    setSubmitError(null);
   };
 
   if (!match) {
@@ -254,6 +260,11 @@ function MyMatchCard({
                   </Button>
                 ))}
               </Box>
+              {submitError && (
+                <Alert severity="error" sx={{ mb: 1 }}>
+                  {submitError}
+                </Alert>
+              )}
               <Button
                 size="small"
                 variant="contained"

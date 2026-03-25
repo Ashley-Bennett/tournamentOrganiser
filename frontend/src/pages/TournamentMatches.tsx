@@ -606,7 +606,7 @@ const TournamentMatches: React.FC = () => {
     void fetchMatches();
   }, [tournament?.id, user, refreshTrigger]);
 
-  // Realtime subscription: refresh reports map whenever a player submits or changes a report
+  // Refresh reports map and keep it in sync via realtime + fallback poll
   useEffect(() => {
     if (!tournament?.id) return;
 
@@ -614,12 +614,16 @@ const TournamentMatches: React.FC = () => {
       const { data } = await supabase.rpc("get_match_result_reports", {
         p_tournament_id: tournament.id,
       });
-      if (data) {
-        const map = new Map<string, MatchReportRow>();
-        (data as MatchReportRow[]).forEach((r) => map.set(r.match_id, r));
-        setMatchReports(map);
-      }
+      const map = new Map<string, MatchReportRow>();
+      (data as MatchReportRow[] ?? []).forEach((r) => map.set(r.match_id, r));
+      setMatchReports(map);
     };
+
+    // Fetch immediately on mount so badges are populated without waiting for a change
+    void fetchReports();
+
+    // Fallback poll every 5 s in case realtime events are missed
+    const pollId = setInterval(() => void fetchReports(), 5_000);
 
     const channel = supabase
       .channel(`match-reports-${tournament.id}`)
@@ -630,7 +634,11 @@ const TournamentMatches: React.FC = () => {
           schema: "public",
           table: "match_result_reports",
         },
-        () => { void fetchReports(); },
+        () => {
+          void fetchReports();
+          // Also bump the match list so any status changes are picked up immediately
+          setRefreshTrigger((n) => n + 1);
+        },
       )
       .on(
         "postgres_changes",
@@ -644,7 +652,10 @@ const TournamentMatches: React.FC = () => {
       )
       .subscribe();
 
-    return () => { void supabase.removeChannel(channel); };
+    return () => {
+      clearInterval(pollId);
+      void supabase.removeChannel(channel);
+    };
   }, [tournament?.id]);
 
   // Map from player ID → dropped_at_round (for final standings table indicators)
