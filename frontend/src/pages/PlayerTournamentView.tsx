@@ -55,8 +55,10 @@ interface MatchWithNames {
   player2_name: string | null;
   winner_id: string | null;
   result: string | null;
+  temp_result: string | null;
+  temp_winner_id: string | null;
   status: "ready" | "pending" | "completed" | "bye";
-  confirmed_by: "organiser" | "player_agreement" | "player_report" | null;
+  confirmed_by: "organiser" | "player_agreement" | "player_report" | "conflict" | null;
   pairings_published: boolean;
   is_my_match: boolean;
   report_count: number;
@@ -504,6 +506,14 @@ const PlayerTournamentView: React.FC = () => {
     return sortByTieBreakers(raw, new Set(droppedMap.keys()));
   }, [matches, players, droppedMap]);
 
+  const recordMap = useMemo(() => {
+    const m = new Map<string, string>();
+    standings.forEach((s) => {
+      m.set(s.id, `${s.wins}-${s.losses}${s.draws > 0 ? `-${s.draws}` : ""}`);
+    });
+    return m;
+  }, [standings]);
+
   // ── Early returns ──────────────────────────────────────────────────────────
 
   if (!entry) {
@@ -665,10 +675,14 @@ const PlayerTournamentView: React.FC = () => {
             <TableBody>
               {roundMatches.map((m) => {
                 const isBye = m.status === "bye" || m.player2_id === null;
+                const isConflict = m.confirmed_by === "conflict";
                 const isCompleted = m.status === "completed" || m.confirmed_by === "player_report" || m.confirmed_by === "player_agreement";
-                const isPending = m.status === "pending" && !isCompleted;
-                const p1Won = m.winner_id === m.player1_id;
-                const p2Won = m.winner_id === m.player2_id;
+                const hasTempResult = !isCompleted && !isConflict && m.temp_result !== null;
+                const isPending = m.status === "pending" && !isCompleted && !isConflict && !hasTempResult;
+                const displayResult = m.result ?? m.temp_result;
+                const displayWinnerId = m.winner_id ?? m.temp_winner_id;
+                const p1Won = displayWinnerId === m.player1_id;
+                const p2Won = displayWinnerId === m.player2_id;
                 const isMyRow = m.is_my_match;
 
                 return (
@@ -696,6 +710,11 @@ const PlayerTournamentView: React.FC = () => {
                       }}
                     >
                       {m.player1_name}
+                      {recordMap.has(m.player1_id) && (
+                        <Typography component="span" variant="caption" sx={{ ml: 0.75, opacity: 0.6, fontWeight: 400 }}>
+                          {recordMap.get(m.player1_id)}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell sx={{ textAlign: "center", fontSize: "0.75rem", px: 0, color: isMyRow ? "inherit" : "text.disabled" }}>
                       vs
@@ -713,15 +732,31 @@ const PlayerTournamentView: React.FC = () => {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {isBye ? "Bye" : m.player2_name}
+                      {isBye ? "Bye" : (
+                        <>
+                          {m.player2_name}
+                          {m.player2_id && recordMap.has(m.player2_id) && (
+                            <Typography component="span" variant="caption" sx={{ ml: 0.75, opacity: 0.6, fontWeight: 400 }}>
+                              {recordMap.get(m.player2_id)}
+                            </Typography>
+                          )}
+                        </>
+                      )}
                     </TableCell>
                     <TableCell sx={{ textAlign: "right" }}>
                       {isBye ? (
                         <Chip label="BYE" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
-                      ) : isCompleted ? (
-                        <Typography variant="caption" sx={{ fontWeight: 600, fontSize: "0.82rem" }}>
-                          {m.result ?? "—"}
+                      ) : isCompleted || hasTempResult ? (
+                        <Typography variant="caption" sx={{ fontWeight: 600, fontSize: "0.82rem", opacity: hasTempResult ? 0.7 : 1 }}>
+                          {displayResult ?? "—"}
                         </Typography>
+                      ) : isConflict ? (
+                        <Chip
+                          label="Conflict"
+                          color="error"
+                          size="small"
+                          sx={{ fontSize: "0.65rem", height: 20 }}
+                        />
                       ) : isPending && m.report_count > 0 ? (
                         <Chip
                           label="Reported"
