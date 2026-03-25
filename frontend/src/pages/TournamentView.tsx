@@ -159,23 +159,6 @@ const TournamentView: React.FC = () => {
   // ── Self-registration toggle ─────────────────────────────────────────────
   const [copiedJoinLink, setCopiedJoinLink] = useState(false);
 
-  const handleToggleJoinEnabled = async (enabled: boolean) => {
-    if (!tournament) return;
-    const prev = { ...tournament };
-    setTournament({ ...tournament, join_enabled: enabled });
-    const { data, error } = await supabase
-      .rpc("set_tournament_join_enabled", {
-        p_tournament_id: tournament.id,
-        p_enabled: enabled,
-      });
-    if (error) {
-      setTournament(prev);
-      setError(error.message);
-    } else if (data && data.length > 0) {
-      setTournament((t) => t ? { ...t, join_enabled: enabled, join_code: (data[0] as { join_code: string }).join_code } : t);
-    }
-  };
-
   // ── Inline name editing ───────────────────────────────────────────────────
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
@@ -1062,20 +1045,9 @@ const TournamentView: React.FC = () => {
         )}
 
         {/* ── Self-registration (draft + manager only) ──────────────── */}
-        {tournament.status === "draft" && isManager && (
+        {tournament.status === "draft" && isManager && tournament.join_code && (
           <Box mb={2}>
-            <FormControlLabel
-              control={
-                <Switch
-                  size="small"
-                  checked={tournament.join_enabled ?? false}
-                  onChange={(e) => void handleToggleJoinEnabled(e.target.checked)}
-                />
-              }
-              label="Allow self-registration"
-            />
-            {tournament.join_enabled && tournament.join_code && (
-              <Box mt={1}>
+            <Box mt={1}>
                 <Box display="flex" alignItems="center" gap={1}>
                   <Typography variant="caption" color="text.secondary">
                     Room code
@@ -1118,7 +1090,6 @@ const TournamentView: React.FC = () => {
                   {`${window.location.origin}/join/c/${tournament.join_code}`}
                 </Typography>
               </Box>
-            )}
           </Box>
         )}
 
