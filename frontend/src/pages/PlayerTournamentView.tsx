@@ -56,6 +56,7 @@ interface MatchWithNames {
   winner_id: string | null;
   result: string | null;
   status: "ready" | "pending" | "completed" | "bye";
+  confirmed_by: "organiser" | "player_agreement" | "player_report" | null;
   pairings_published: boolean;
   is_my_match: boolean;
 }
@@ -79,6 +80,7 @@ function MyMatchCard({
   submitStatus,
   submitting,
   onSubmit,
+  onContest,
 }: {
   match: MatchWithNames | null;
   playerId: string;
@@ -86,6 +88,7 @@ function MyMatchCard({
   submitStatus: SubmitStatus;
   submitting: boolean;
   onSubmit: (outcome: "win" | "loss" | "draw") => void;
+  onContest: (outcome: "win" | "loss" | "draw") => void;
 }) {
   if (!match) {
     return (
@@ -147,12 +150,12 @@ function MyMatchCard({
         )}
       </Box>
 
-      {/* Result submission */}
+      {/* Result submission — pending match */}
       {isPending && !isBye && (
         <>
           {submitStatus === "conflict" && (
             <Alert severity="warning" sx={{ mb: 1.5 }}>
-              Both players reported a win — your organiser will resolve this.
+              Both players reported different results — your organiser will resolve this.
             </Alert>
           )}
           {submitStatus === "confirmed" && (
@@ -217,6 +220,51 @@ function MyMatchCard({
             </Box>
           ) : null}
         </>
+      )}
+
+      {/* Contest section — completed by first player's report only */}
+      {isCompleted &&
+        match.confirmed_by === "player_report" &&
+        submitStatus === null && (
+          <Box mt={1}>
+            <Typography variant="body2" color="text.secondary" mb={1}>
+              Result reported by your opponent. Incorrect?
+            </Typography>
+            <Box display="flex" gap={1} flexWrap="wrap">
+              <Button
+                variant="outlined"
+                color="success"
+                size="small"
+                disabled={submitting}
+                onClick={() => onContest("win")}
+              >
+                I won
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={submitting}
+                onClick={() => onContest("draw")}
+              >
+                Draw
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                disabled={submitting}
+                onClick={() => onContest("loss")}
+              >
+                I lost
+              </Button>
+            </Box>
+          </Box>
+        )}
+
+      {isCompleted && submitStatus === "conflict" && (
+        <Alert severity="warning" sx={{ mt: 1 }}>
+          Both players reported different results — your organiser will resolve this.
+        </Alert>
       )}
 
       {match.status === "ready" && (
@@ -389,47 +437,55 @@ const PlayerTournamentView: React.FC = () => {
     prevRoundCountRef.current = rounds.length;
   }, [rounds]);
 
-  const handleSubmit = async (outcome: "win" | "loss" | "draw") => {
-    if (!entry || !viewData) return;
-    const myMatch = (viewData.matches ?? []).find(
-      (m) => m.is_my_match && typeof selectedRound === "number" && m.round_number === selectedRound && m.status === "pending",
-    );
-    if (!myMatch) return;
-
+  const doSubmit = async (matchId: string, outcome: "win" | "loss" | "draw") => {
+    if (!entry) return;
     setSubmitting(true);
     const { data, error: rpcError } = await supabase.rpc("submit_match_result", {
-      p_match_id: myMatch.id,
+      p_match_id: matchId,
       p_player_id: entry.playerId,
       p_device_token: entry.deviceToken,
       p_reported_outcome: outcome,
     });
-
     if (rpcError) {
       setSubmitting(false);
       return;
     }
-
     const result = (data as { status: string }).status as SubmitStatus;
     setSubmitStatus(result);
     setSubmitting(false);
+    const { data: fresh } = await supabase.rpc("get_player_tournament_view", {
+      p_tournament_id: tournamentId!,
+      p_player_id: entry.playerId,
+      p_device_token: entry.deviceToken,
+    });
+    if (fresh) setViewData(fresh as ViewData);
+  };
 
-    // Reload to get fresh data (confirmed match will show result, report will clear)
-    if (result === "confirmed") {
-      const { data: fresh } = await supabase.rpc("get_player_tournament_view", {
-        p_tournament_id: tournamentId!,
-        p_player_id: entry.playerId,
-        p_device_token: entry.deviceToken,
-      });
-      if (fresh) setViewData(fresh as ViewData);
-    } else {
-      // Reload to reflect the submitted report
-      const { data: fresh } = await supabase.rpc("get_player_tournament_view", {
-        p_tournament_id: tournamentId!,
-        p_player_id: entry.playerId,
-        p_device_token: entry.deviceToken,
-      });
-      if (fresh) setViewData(fresh as ViewData);
-    }
+  const handleSubmit = async (outcome: "win" | "loss" | "draw") => {
+    if (!viewData) return;
+    const myMatch = (viewData.matches ?? []).find(
+      (m) =>
+        m.is_my_match &&
+        typeof selectedRound === "number" &&
+        m.round_number === selectedRound &&
+        m.status === "pending",
+    );
+    if (!myMatch) return;
+    await doSubmit(myMatch.id, outcome);
+  };
+
+  const handleContest = async (outcome: "win" | "loss" | "draw") => {
+    if (!viewData) return;
+    const myMatch = (viewData.matches ?? []).find(
+      (m) =>
+        m.is_my_match &&
+        typeof selectedRound === "number" &&
+        m.round_number === selectedRound &&
+        m.status === "completed" &&
+        m.confirmed_by === "player_report",
+    );
+    if (!myMatch) return;
+    await doSubmit(myMatch.id, outcome);
   };
 
   // ── Derived state (all hooks must be before any conditional returns) ─────────
@@ -597,6 +653,7 @@ const PlayerTournamentView: React.FC = () => {
         submitStatus={submitStatus}
         submitting={submitting}
         onSubmit={(outcome) => void handleSubmit(outcome)}
+        onContest={(outcome) => void handleContest(outcome)}
       />
 
       {/* Full pairings */}
