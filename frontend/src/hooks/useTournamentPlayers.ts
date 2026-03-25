@@ -7,10 +7,10 @@ export function useTournamentPlayers(tournamentId: string | undefined) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPlayers = useCallback(async () => {
+  const fetchPlayers = useCallback(async (silent = false) => {
     if (!tournamentId) return;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
 
       const { data, error: fetchError } = await supabase
@@ -39,7 +39,7 @@ export function useTournamentPlayers(tournamentId: string | undefined) {
   // Polling fallback: re-fetch every 10s in case realtime is disrupted
   useEffect(() => {
     if (!tournamentId) return;
-    const id = setInterval(() => void fetchPlayers(), 10_000);
+    const id = setInterval(() => void fetchPlayers(true), 10_000);
     return () => clearInterval(id);
   }, [tournamentId, fetchPlayers]);
 
