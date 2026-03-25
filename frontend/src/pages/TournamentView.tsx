@@ -19,6 +19,7 @@ import {
   Switch,
   FormControlLabel,
   Tooltip,
+  Divider,
   Table,
   TableBody,
   TableCell,
@@ -33,7 +34,7 @@ import {
   InputAdornment,
 } from "@mui/material";
 import SeatIcon from "@mui/icons-material/EventSeat";
-import { PlayArrow as PlayArrowIcon } from "@mui/icons-material";
+import { PlayArrow as PlayArrowIcon, Add as AddIcon, Remove as RemoveIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import PeopleIcon from "@mui/icons-material/People";
@@ -824,156 +825,170 @@ const TournamentView: React.FC = () => {
       />
 
       <Paper sx={{ p: 3, mb: 3 }}>
+        {/* Status chip */}
+        <Box mb={2}>
+          <Chip
+            label={tournament.status}
+            size="small"
+            color={
+              tournament.status === "active"
+                ? "success"
+                : tournament.status === "completed"
+                ? "primary"
+                : "default"
+            }
+            sx={{ fontWeight: 500, textTransform: "capitalize" }}
+          />
+        </Box>
+
+        {/* Info rows */}
         <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          mb={1}
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "auto 1fr",
+            columnGap: 2,
+            rowGap: 0.75,
+            alignItems: "center",
+            bgcolor: "action.hover",
+            borderRadius: 1,
+            px: 2,
+            py: 1.5,
+          }}
         >
-          <Typography variant="subtitle1" gutterBottom>
-            Basic Details
-          </Typography>
-          {tournament.status !== "draft" && (
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => navigate(wPath(`/tournaments/${tournament.id}/matches`))}
-            >
-              View matches
-            </Button>
-          )}
-        </Box>
-        <Box display="flex" flexDirection="column" gap={1}>
-          <Box display="flex" gap={1} alignItems="center">
-            <Typography variant="body2" color="text.secondary">
-              Status:
-            </Typography>
-            <Chip label={tournament.status} size="small" />
-          </Box>
-          <Box display="flex" gap={1}>
-            <Typography variant="body2" color="text.secondary">
-              Type:
-            </Typography>
-            <Typography variant="body2">
-              {getTournamentTypeLabel(tournament.tournament_type)}
-            </Typography>
-          </Box>
-          <Box display="flex" gap={1}>
-            <Typography variant="body2" color="text.secondary">
-              Created at:
-            </Typography>
-            <Typography variant="body2">
-              {formatDateTime(tournament.created_at)}
-            </Typography>
-          </Box>
+          <Typography variant="body2" color="text.secondary">Type</Typography>
+          <Typography variant="body2">{getTournamentTypeLabel(tournament.tournament_type)}</Typography>
+
+          <Typography variant="body2" color="text.secondary">Created</Typography>
+          <Typography variant="body2">{formatDateTime(tournament.created_at)}</Typography>
+
           {tournament.num_rounds && tournament.status !== "draft" && (
-            <Box display="flex" gap={1}>
-              <Typography variant="body2" color="text.secondary">
-                Number of Rounds:
-              </Typography>
+            <>
+              <Typography variant="body2" color="text.secondary">Rounds</Typography>
               <Typography variant="body2">{tournament.num_rounds}</Typography>
-            </Box>
+            </>
           )}
         </Box>
+
+        {tournament.status !== "draft" && (
+          <Button
+            variant="contained"
+            color="primary"
+            fullWidth
+            sx={{ mt: 2 }}
+            onClick={() => navigate(wPath(`/tournaments/${tournament.id}/matches`))}
+          >
+            View matches
+          </Button>
+        )}
+
         {tournament.status === "draft" && (
-          <Box mt={2} display="flex" flexDirection="column" gap={2}>
-            <Box display="flex" flexDirection="column" gap={1}>
-              <Typography variant="subtitle2">
-                Number of Rounds
-              </Typography>
-              <Box display="flex" alignItems="center" gap={1}>
-                <IconButton
-                  size="small"
-                  onClick={() => handleRoundStep(-1)}
-                  disabled={!numRounds || numRounds <= 1}
-                  aria-label="Decrease rounds"
-                >
-                  −
-                </IconButton>
-                <Typography
-                  variant="h6"
-                  component="span"
-                  sx={{ minWidth: 32, textAlign: "center" }}
-                >
-                  {numRounds ?? "—"}
-                </Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => handleRoundStep(1)}
-                  disabled={!!numRounds && numRounds >= 20}
-                  aria-label="Increase rounds"
-                >
-                  +
-                </IconButton>
-                {players.length >= 2 && numRounds !== suggestedRounds && (
-                  <Button
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Box display="flex" flexDirection="column" gap={2}>
+              {/* Round count stepper */}
+              <Box display="flex" flexDirection="column" gap={0.75}>
+                <Typography variant="subtitle2">Number of Rounds</Typography>
+                <Box display="flex" alignItems="center" gap={0.5}>
+                  <IconButton
                     size="small"
-                    variant="text"
-                    onClick={handleResetToSuggested}
-                    sx={{ ml: 0.5, textTransform: "none", fontSize: "0.75rem" }}
+                    onClick={() => handleRoundStep(-1)}
+                    disabled={!numRounds || numRounds <= 1}
+                    aria-label="Decrease rounds"
                   >
-                    Use suggested ({suggestedRounds})
-                  </Button>
+                    <RemoveIcon fontSize="small" />
+                  </IconButton>
+                  <Typography
+                    variant="h6"
+                    component="span"
+                    sx={{ minWidth: 36, textAlign: "center", fontWeight: 600 }}
+                  >
+                    {numRounds ?? "—"}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleRoundStep(1)}
+                    disabled={!!numRounds && numRounds >= 20}
+                    aria-label="Increase rounds"
+                  >
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                  {players.length >= 2 && numRounds !== suggestedRounds && (
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={handleResetToSuggested}
+                      sx={{ ml: 0.5, textTransform: "none", fontSize: "0.75rem" }}
+                    >
+                      Use suggested ({suggestedRounds})
+                    </Button>
+                  )}
+                </Box>
+                <Tooltip title="Swiss standard: ≤8 players → 3 rounds, 9–16 → 4, 17–32 → 5, 33–64 → 6">
+                  <Typography variant="caption" color="text.secondary" sx={{ cursor: "help", textDecoration: "underline dotted" }}>
+                    {players.length < 2
+                      ? "Add players to see a suggestion."
+                      : numRounds === suggestedRounds
+                        ? `Suggested for ${players.length} players (Swiss standard)`
+                        : `Suggested: ${suggestedRounds} for ${players.length} players (Swiss standard)`}
+                  </Typography>
+                </Tooltip>
+                {players.length >= 2 && players.length % 2 !== 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    With {players.length} players (odd number), one player will receive a bye each round.
+                  </Typography>
                 )}
               </Box>
-              <Tooltip title="Swiss standard: ≤8 players → 3 rounds, 9–16 → 4, 17–32 → 5, 33–64 → 6">
-                <Typography variant="caption" color="text.secondary" sx={{ cursor: "help", textDecoration: "underline dotted" }}>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={!!tournament.is_public}
+                    onChange={(e) => void handleTogglePublic(e.target.checked)}
+                    disabled={savingPublic}
+                    size="small"
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body2">Public tournament</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Anyone with the link can view pairings without logging in
+                    </Typography>
+                  </Box>
+                }
+              />
+
+              <Box>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="medium"
+                  startIcon={<PlayArrowIcon />}
+                  onClick={() => setConfirmStartOpen(true)}
+                  disabled={
+                    startingTournament ||
+                    players.length < 2 ||
+                    !numRounds ||
+                    numRounds < 1
+                  }
+                >
+                  Start tournament
+                </Button>
+                <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
                   {players.length < 2
-                    ? "Add players to see a suggestion."
-                    : numRounds === suggestedRounds
-                      ? `Suggested for ${players.length} players (Swiss standard)`
-                      : `Suggested: ${suggestedRounds} for ${players.length} players (Swiss standard)`}
+                    ? "Add at least 2 players before starting."
+                    : !numRounds || numRounds < 1
+                      ? "Set the number of rounds before starting."
+                      : "Once started, players can no longer be removed."}
                 </Typography>
-              </Tooltip>
-              {players.length >= 2 && players.length % 2 !== 0 && (
-                <Typography variant="caption" color="text.secondary">
-                  With {players.length} players (odd number), one player will receive a bye each round.
-                </Typography>
-              )}
+              </Box>
             </Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={!!tournament.is_public}
-                  onChange={(e) => void handleTogglePublic(e.target.checked)}
-                  disabled={savingPublic}
-                  size="small"
-                />
-              }
-              label={
-                <Box>
-                  <Typography variant="body2">Public tournament</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Anyone with the link can view pairings without logging in
-                  </Typography>
-                </Box>
-              }
-            />
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<PlayArrowIcon />}
-              onClick={() => setConfirmStartOpen(true)}
-              disabled={
-                startingTournament ||
-                players.length < 2 ||
-                !numRounds ||
-                numRounds < 1
-              }
-            >
-              Start tournament
-            </Button>
-            <Typography variant="caption" color="text.secondary">
-              {players.length < 2
-                ? "Add at least 2 players before starting."
-                : !numRounds || numRounds < 1
-                  ? "Set the number of rounds before starting."
-                  : "Once started, players can no longer be removed."}
-            </Typography>
-          </Box>
+          </>
         )}
+
         {isManager && (
-          <Box mt={2}>
+          <>
+            <Divider sx={{ my: 2 }} />
             <FormControlLabel
               control={
                 <Switch
@@ -999,7 +1014,7 @@ const TournamentView: React.FC = () => {
               }
             />
             {!!tournament.round_duration_minutes && (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1, ml: 4, flexWrap: "wrap" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5, flexWrap: "wrap" }}>
                 <TextField
                   type="number"
                   size="small"
@@ -1036,7 +1051,7 @@ const TournamentView: React.FC = () => {
                 })}
               </Box>
             )}
-          </Box>
+          </>
         )}
       </Paper>
 
