@@ -14,6 +14,7 @@ export interface TjEntry {
   playerId: string;
   deviceToken: string;
   joinedAt: string;
+  tournamentName?: string;
 }
 
 export function entryKey(tournamentId: string) {
@@ -57,6 +58,23 @@ export function saveEntry(tournamentId: string, entry: TjEntry) {
   localStorage.setItem(entryKey(tournamentId), JSON.stringify(entry));
   const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
   document.cookie = `${entryKey(tournamentId)}=${encodeURIComponent(JSON.stringify(entry))}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+/** Returns all stored tournament entries, each paired with its tournament ID. */
+export function getAllEntries(): Array<{ tournamentId: string } & TjEntry> {
+  const results: Array<{ tournamentId: string } & TjEntry> = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith("tj_") || key === PROFILE_KEY) continue;
+    const tournamentId = key.slice(3); // strip "tj_"
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) results.push({ tournamentId, ...(JSON.parse(raw) as TjEntry) });
+    } catch {
+      // ignore
+    }
+  }
+  return results;
 }
 
 export function clearEntry(tournamentId: string) {

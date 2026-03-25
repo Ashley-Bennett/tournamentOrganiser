@@ -19,7 +19,7 @@ import {
   Alert,
 } from "@mui/material";
 import { supabase } from "../supabaseClient";
-import { getEntry } from "../utils/playerStorage";
+import { getEntry, getAllEntries } from "../utils/playerStorage";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import StandingsTable from "../components/StandingsTable";
@@ -316,6 +316,11 @@ const PlayerTournamentView: React.FC = () => {
     [tournamentId],
   );
 
+  const otherTournaments = useMemo(
+    () => getAllEntries().filter((e) => e.tournamentId !== tournamentId),
+    [tournamentId],
+  );
+
   useEffect(() => {
     if (!tournamentId || !entry) return;
 
@@ -580,6 +585,24 @@ const PlayerTournamentView: React.FC = () => {
               ? ` · Round ${selectedRound}`
               : ""}
       </Typography>
+      {otherTournaments.length > 0 && (
+        <Box display="flex" alignItems="center" gap={0.75} flexWrap="wrap" mt={1}>
+          <Typography variant="caption" color="text.secondary">
+            Also on this device:
+          </Typography>
+          {otherTournaments.map((e) => (
+            <Chip
+              key={e.tournamentId}
+              label={e.tournamentName ?? e.tournamentId.slice(0, 8)}
+              size="small"
+              variant="outlined"
+              component={Link}
+              to={`/t/${e.tournamentId}/me`}
+              clickable
+            />
+          ))}
+        </Box>
+      )}
     </Box>
   );
 

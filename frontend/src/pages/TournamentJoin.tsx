@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
+  Button,
   CircularProgress,
   TextField,
   Typography,
@@ -101,9 +102,10 @@ export default function TournamentJoin() {
 
     const row = Array.isArray(data) ? data[0] : data;
     const entry: TjEntry = {
-      playerId: (row as { player_id: string; device_token: string }).player_id,
-      deviceToken: (row as { player_id: string; device_token: string }).device_token,
+      playerId: (row as { player_id: string; device_token: string; tournament_name: string }).player_id,
+      deviceToken: (row as { player_id: string; device_token: string; tournament_name: string }).device_token,
       joinedAt: new Date().toISOString(),
+      tournamentName: (row as { player_id: string; device_token: string; tournament_name: string }).tournament_name,
     };
 
     saveEntry(tournamentId, entry);

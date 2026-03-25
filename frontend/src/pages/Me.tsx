@@ -629,7 +629,7 @@ const Me = () => {
       <Divider sx={{ mb: 3 }} />
 
       {/* ── My Tournaments ──────────────────────────────────── */}
-      <Stack direction="row" spacing={1} alignItems="center" mb={2}>
+      <Stack id="my-tournaments" direction="row" spacing={1} alignItems="center" mb={2}>
         <TrophyIcon sx={{ color: "text.secondary" }} />
         <Typography variant="h6">My Tournaments</Typography>
       </Stack>
@@ -653,26 +653,45 @@ const Me = () => {
         </Paper>
       ) : (
         <Stack spacing={1.5} mb={3}>
-          {playerEntries.map((entry) => (
-            <Paper key={entry.tournament_player_id} variant="outlined" sx={{ p: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={1.5}>
-                <Box flexGrow={1}>
-                  <Typography variant="subtitle2" fontWeight={500}>
-                    {entry.tournament_name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {entry.workspace_name}
-                  </Typography>
-                </Box>
-                <Chip label="Player" size="small" color="info" />
-                <Chip
-                  label={entry.tournament_status}
-                  size="small"
+          {[...playerEntries]
+            .sort((a, b) => (a.tournament_status === "active" ? -1 : b.tournament_status === "active" ? 1 : 0))
+            .map((entry) => {
+              const isActive = entry.tournament_status === "active";
+              return (
+                <Paper
+                  key={entry.tournament_player_id}
                   variant="outlined"
-                />
-              </Stack>
-            </Paper>
-          ))}
+                  component={RouterLink}
+                  to={`/t/${entry.tournament_id}/me`}
+                  sx={{
+                    p: 2,
+                    textDecoration: "none",
+                    display: "block",
+                    borderColor: isActive ? "primary.main" : undefined,
+                    "&:hover": { borderColor: "primary.main", bgcolor: "action.hover" },
+                    transition: "border-color 0.15s, background-color 0.15s",
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={1.5}>
+                    <Box flexGrow={1}>
+                      <Typography variant="subtitle2" fontWeight={500}>
+                        {entry.tournament_name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {entry.workspace_name}
+                      </Typography>
+                    </Box>
+                    <Chip label="Player" size="small" color="info" />
+                    <Chip
+                      label={entry.tournament_status}
+                      size="small"
+                      color={isActive ? "success" : "default"}
+                      variant={isActive ? "filled" : "outlined"}
+                    />
+                  </Stack>
+                </Paper>
+              );
+            })}
         </Stack>
       )}
 

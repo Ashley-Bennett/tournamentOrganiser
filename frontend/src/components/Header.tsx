@@ -172,6 +172,9 @@ const Header: React.FC = () => {
                 <Button component={RouterLink} to={wPath("/tournaments")} sx={navBtnSx}>
                   Tournaments
                 </Button>
+                <Button component={RouterLink} to="/me#my-tournaments" sx={navBtnSx}>
+                  My Tournaments
+                </Button>
                 <Button component={RouterLink} to="/me" sx={navBtnSx}>
                   My Profile
                 </Button>
@@ -252,6 +255,11 @@ const Header: React.FC = () => {
                     <ListItem disablePadding>
                       <ListItemButton onClick={() => handleNavClick(wPath("/tournaments"))}>
                         <ListItemText primary="Tournaments" />
+                      </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => handleNavClick("/me#my-tournaments")}>
+                        <ListItemText primary="My Tournaments" />
                       </ListItemButton>
                     </ListItem>
                     <ListItem disablePadding>
