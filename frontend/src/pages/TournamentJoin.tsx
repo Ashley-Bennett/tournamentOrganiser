@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import {
   Box,
   Button,
@@ -10,72 +10,15 @@ import {
   Paper,
 } from "@mui/material";
 import { supabase } from "../supabaseClient";
-
-// ── localStorage / cookie helpers ────────────────────────────────────────────
-
-const PROFILE_KEY = "tj_profile";
-
-interface TjProfile {
-  name: string;
-  deviceId: string;
-}
-
-interface TjEntry {
-  playerId: string;
-  deviceToken: string;
-  joinedAt: string;
-}
-
-function entryKey(tournamentId: string) {
-  return `tj_${tournamentId}`;
-}
-
-function getProfile(): TjProfile {
-  try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    if (raw) return JSON.parse(raw) as TjProfile;
-  } catch {
-    // ignore parse errors
-  }
-  // First visit: generate a stable deviceId
-  const newProfile: TjProfile = {
-    name: "",
-    deviceId: crypto.randomUUID(),
-  };
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(newProfile));
-  return newProfile;
-}
-
-function saveProfile(name: string, deviceId: string) {
-  localStorage.setItem(PROFILE_KEY, JSON.stringify({ name, deviceId }));
-}
-
-function getEntry(tournamentId: string): TjEntry | null {
-  try {
-    // Check localStorage first, fall back to cookie
-    const lsRaw = localStorage.getItem(entryKey(tournamentId));
-    if (lsRaw) return JSON.parse(lsRaw) as TjEntry;
-    const cookie = document.cookie
-      .split("; ")
-      .find((c) => c.startsWith(`${entryKey(tournamentId)}=`));
-    if (cookie) return JSON.parse(decodeURIComponent(cookie.split("=")[1])) as TjEntry;
-  } catch {
-    // ignore parse errors
-  }
-  return null;
-}
-
-function saveEntry(tournamentId: string, entry: TjEntry) {
-  localStorage.setItem(entryKey(tournamentId), JSON.stringify(entry));
-  // Cookie as fallback (survives localStorage clear), 30-day expiry
-  const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
-  document.cookie = `${entryKey(tournamentId)}=${encodeURIComponent(JSON.stringify(entry))}; expires=${expires}; path=/; SameSite=Lax`;
-}
-
-function clearEntry(tournamentId: string) {
-  localStorage.removeItem(entryKey(tournamentId));
-  document.cookie = `${entryKey(tournamentId)}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-}
+import {
+  TjEntry,
+  TjProfile,
+  getProfile,
+  saveProfile,
+  getEntry,
+  saveEntry,
+  clearEntry,
+} from "../utils/playerStorage";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -164,7 +107,7 @@ export default function TournamentJoin() {
     };
 
     saveEntry(tournamentId, entry);
-    saveProfile(nameInput.trim(), profile.deviceId);
+    saveProfile(nameInput.trim(), (profile as TjProfile).deviceId);
 
     setPageState("success");
     setSubmitting(false);
@@ -208,16 +151,40 @@ export default function TournamentJoin() {
         {pageState === "already_joined" && (
           <>
             <Typography variant="h6" gutterBottom>{tournamentName}</Typography>
-            <Alert severity="info">You&apos;re already registered for this tournament.</Alert>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              You&apos;re already registered for this tournament.
+            </Alert>
+            {tournamentId && (
+              <Button
+                component={Link}
+                to={`/t/${tournamentId}/me`}
+                variant="contained"
+                fullWidth
+                size="large"
+              >
+                Go to your tournament page
+              </Button>
+            )}
           </>
         )}
 
         {pageState === "success" && (
           <>
             <Typography variant="h6" gutterBottom>{tournamentName}</Typography>
-            <Alert severity="success">
+            <Alert severity="success" sx={{ mb: 2 }}>
               You&apos;re in! See you at the tournament.
             </Alert>
+            {tournamentId && (
+              <Button
+                component={Link}
+                to={`/t/${tournamentId}/me`}
+                variant="contained"
+                fullWidth
+                size="large"
+              >
+                Go to your tournament page
+              </Button>
+            )}
           </>
         )}
 

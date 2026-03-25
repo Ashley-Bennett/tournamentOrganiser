@@ -21,6 +21,7 @@ import AcceptInvite from "./pages/AcceptInvite";
 import ClaimPlayer from "./pages/ClaimPlayer";
 import TournamentJoin from "./pages/TournamentJoin";
 import TournamentJoinDisplay from "./pages/TournamentJoinDisplay";
+import PlayerTournamentView from "./pages/PlayerTournamentView";
 import JoinLanding from "./pages/JoinLanding";
 import WhatsNew from "./pages/WhatsNew";
 import { useAuth } from "./AuthContext";
@@ -105,6 +106,7 @@ function App() {
                 <Route path="/join" element={<JoinLanding />} />
                 <Route path="/join/c/:code" element={<JoinLanding />} />
                 <Route path="/join/:tournamentId" element={<TournamentJoin />} />
+                <Route path="/t/:tournamentId/me" element={<PlayerTournamentView />} />
 
                 {/* ── What's New ───────────────────────────────── */}
                 <Route path="/whats-new" element={<WhatsNew />} />

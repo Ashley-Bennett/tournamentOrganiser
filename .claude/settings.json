@@ -8,7 +8,9 @@
       "Bash(supabase db reset*)",
       "Bash(printf 'y\\\\n')",
       "WebSearch",
-      "Bash(npx eslint src/)"
+      "Bash(npx eslint src/)",
+      "Bash(npx eslint src/pages/PlayerTournamentView.tsx src/pages/TournamentMatches.tsx src/pages/TournamentJoin.tsx src/utils/playerStorage.ts --max-warnings=0)",
+      "Bash(npx eslint src/pages/TournamentMatches.tsx --max-warnings=0)"
     ]
   },
   "hooks": {

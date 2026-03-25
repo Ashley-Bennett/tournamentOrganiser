@@ -103,6 +103,17 @@ interface MatchWithPlayers extends Match {
   winner_name: string | null;
 }
 
+interface MatchReportRow {
+  match_id: string;
+  player1_id: string;
+  player1_name: string;
+  player2_id: string | null;
+  player2_name: string | null;
+  player1_report: string | null;
+  player2_report: string | null;
+  conflict_status: "agreed" | "conflict" | "partial";
+}
+
 const MATCH_STATUS = {
   READY: "ready",
   PENDING: "pending",
@@ -193,6 +204,7 @@ const TournamentMatches: React.FC = () => {
   const [timerEditorOpen, setTimerEditorOpen] = useState(false);
   const [roundNoteInput, setRoundNoteInput] = useState<string>("");
   const noteInputFocusedRef = useRef(false);
+  const [matchReports, setMatchReports] = useState<Map<string, MatchReportRow>>(new Map());
 
   // When the tab becomes visible after being backgrounded, force a re-fetch.
   // AuthContext also fires refreshSession() on visibilitychange, so we delay
@@ -571,6 +583,19 @@ const TournamentMatches: React.FC = () => {
         }
 
         setRoundDecisionLogs(decisionLogsMap);
+
+        // Fetch player-submitted match reports (for organiser report badges)
+        const { data: reportsData } = await supabase.rpc(
+          "get_match_result_reports",
+          { p_tournament_id: tournament.id },
+        );
+        if (reportsData) {
+          const reportsMap = new Map<string, MatchReportRow>();
+          (reportsData as MatchReportRow[]).forEach((r) => {
+            reportsMap.set(r.match_id, r);
+          });
+          setMatchReports(reportsMap);
+        }
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed to load matches");
       } finally {
@@ -580,6 +605,37 @@ const TournamentMatches: React.FC = () => {
 
     void fetchMatches();
   }, [tournament?.id, user, refreshTrigger]);
+
+  // Realtime subscription: refresh reports map whenever a player submits or changes a report
+  useEffect(() => {
+    if (!tournament?.id) return;
+
+    const fetchReports = async () => {
+      const { data } = await supabase.rpc("get_match_result_reports", {
+        p_tournament_id: tournament.id,
+      });
+      if (data) {
+        const map = new Map<string, MatchReportRow>();
+        (data as MatchReportRow[]).forEach((r) => map.set(r.match_id, r));
+        setMatchReports(map);
+      }
+    };
+
+    const channel = supabase
+      .channel(`match-reports-${tournament.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "match_result_reports",
+        },
+        () => { void fetchReports(); },
+      )
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  }, [tournament?.id]);
 
   // Map from player ID → dropped_at_round (for final standings table indicators)
   const droppedPlayersMap = useMemo(() => {
@@ -835,6 +891,54 @@ const TournamentMatches: React.FC = () => {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to save results");
       throw e; // Re-throw so handleNextRound can handle it
+    } finally {
+      setUpdatingMatch(false);
+    }
+  };
+
+  const handleConfirmFromReport = async (report: MatchReportRow) => {
+    const match = matches.find((m) => m.id === report.match_id);
+    if (!match || !match.player2_id) return;
+
+    let winnerId: string | null = null;
+    let resultStr: string;
+
+    if (report.player1_report === "draw") {
+      winnerId = null;
+      resultStr = "Draw";
+    } else if (report.player1_report === "win") {
+      winnerId = report.player1_id;
+      resultStr = "1-0";
+    } else {
+      // player1 lost → player2 won
+      winnerId = match.player2_id;
+      resultStr = "0-1";
+    }
+
+    try {
+      setUpdatingMatch(true);
+      const { error: updateError } = await supabase
+        .from("tournament_matches")
+        .update({
+          winner_id: winnerId,
+          result: resultStr,
+          status: "completed",
+          confirmed_by: "organiser",
+          temp_winner_id: null,
+          temp_result: null,
+        })
+        .eq("id", report.match_id);
+
+      if (updateError) throw new Error(updateError.message);
+      // The cleanup trigger deletes the reports. Refresh reports map.
+      setMatchReports((prev) => {
+        const next = new Map(prev);
+        next.delete(report.match_id);
+        return next;
+      });
+      setRefreshTrigger((t) => t + 1);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to confirm result");
     } finally {
       setUpdatingMatch(false);
     }
@@ -3376,6 +3480,50 @@ const TournamentMatches: React.FC = () => {
                                       />
                                     </Box>
                                   )}
+                                  {/* Player-submitted report badge (mobile) */}
+                                  {matchReports.has(match.id) && (() => {
+                                    const report = matchReports.get(match.id)!;
+                                    if (report.conflict_status === "agreed") {
+                                      const agreedLabel =
+                                        report.player1_report === "draw"
+                                          ? "Draw"
+                                          : report.player1_report === "win"
+                                            ? `${report.player1_name} wins`
+                                            : `${report.player2_name ?? "P2"} wins`;
+                                      return (
+                                        <Chip
+                                          icon={<CheckCircleIcon />}
+                                          label={`Agree: ${agreedLabel}`}
+                                          color="success"
+                                          size="small"
+                                          sx={{ cursor: "pointer", alignSelf: "flex-start" }}
+                                          onClick={() => void handleConfirmFromReport(report)}
+                                          disabled={!!updatingMatch}
+                                        />
+                                      );
+                                    }
+                                    if (report.conflict_status === "conflict") {
+                                      return (
+                                        <Chip
+                                          label="Conflict: both claim win"
+                                          color="error"
+                                          size="small"
+                                          sx={{ alignSelf: "flex-start" }}
+                                        />
+                                      );
+                                    }
+                                    const reporter = report.player1_report ? report.player1_name : report.player2_name;
+                                    const outcome = report.player1_report ?? report.player2_report;
+                                    return (
+                                      <Chip
+                                        label={`${reporter}: ${outcome}`}
+                                        color="warning"
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{ alignSelf: "flex-start" }}
+                                      />
+                                    );
+                                  })()}
                                 </Box>
                               );
                             })}
@@ -4023,27 +4171,76 @@ const TournamentMatches: React.FC = () => {
                                       )}
                                     </TableCell>
                                     <TableCell>
-                                      <Chip
-                                        label={
-                                          match.status === "bye"
-                                            ? "Bye"
-                                            : match.status === "completed"
-                                              ? "Completed"
-                                              : match.status === "pending"
-                                                ? "Pending"
-                                                : "Ready"
-                                        }
-                                        size="small"
-                                        color={
-                                          match.status === "bye"
-                                            ? "info"
-                                            : match.status === "completed"
-                                              ? "success"
-                                              : match.status === "pending"
-                                                ? "warning"
-                                                : "default"
-                                        }
-                                      />
+                                      <Box display="flex" flexDirection="column" gap={0.5} alignItems="flex-start">
+                                        <Chip
+                                          label={
+                                            match.status === "bye"
+                                              ? "Bye"
+                                              : match.status === "completed"
+                                                ? "Completed"
+                                                : match.status === "pending"
+                                                  ? "Pending"
+                                                  : "Ready"
+                                          }
+                                          size="small"
+                                          color={
+                                            match.status === "bye"
+                                              ? "info"
+                                              : match.status === "completed"
+                                                ? "success"
+                                                : match.status === "pending"
+                                                  ? "warning"
+                                                  : "default"
+                                          }
+                                        />
+                                        {/* Player-submitted result report badge */}
+                                        {matchReports.has(match.id) && (() => {
+                                          const report = matchReports.get(match.id)!;
+                                          const agreedLabel =
+                                            report.player1_report === "draw"
+                                              ? "Draw"
+                                              : report.player1_report === "win"
+                                                ? `${report.player1_name} wins`
+                                                : `${report.player2_name ?? "P2"} wins`;
+                                          if (report.conflict_status === "agreed") {
+                                            return (
+                                              <Chip
+                                                icon={<CheckCircleIcon />}
+                                                label={`Agree: ${agreedLabel}`}
+                                                color="success"
+                                                size="small"
+                                                sx={{ cursor: "pointer", fontSize: "0.65rem", height: 22 }}
+                                                onClick={() => void handleConfirmFromReport(report)}
+                                                disabled={!!updatingMatch}
+                                              />
+                                            );
+                                          }
+                                          if (report.conflict_status === "conflict") {
+                                            return (
+                                              <Chip
+                                                label="Conflict: both claim win"
+                                                color="error"
+                                                size="small"
+                                                sx={{ fontSize: "0.65rem", height: 22 }}
+                                              />
+                                            );
+                                          }
+                                          // partial
+                                          const reporter = report.player1_report
+                                            ? report.player1_name
+                                            : report.player2_name;
+                                          const outcome = report.player1_report ?? report.player2_report;
+                                          return (
+                                            <Chip
+                                              label={`${reporter}: ${outcome}`}
+                                              color="warning"
+                                              size="small"
+                                              variant="outlined"
+                                              sx={{ fontSize: "0.65rem", height: 22 }}
+                                            />
+                                          );
+                                        })()}
+                                      </Box>
                                     </TableCell>
                                   </TableRow>
                                 );

@@ -36,6 +36,13 @@ export function useTournamentPlayers(tournamentId: string | undefined) {
     void fetchPlayers();
   }, [tournamentId, fetchPlayers]);
 
+  // Polling fallback: re-fetch every 10s in case realtime is disrupted
+  useEffect(() => {
+    if (!tournamentId) return;
+    const id = setInterval(() => void fetchPlayers(), 10_000);
+    return () => clearInterval(id);
+  }, [tournamentId, fetchPlayers]);
+
   // Realtime: pick up self-registrations and any external player changes
   useEffect(() => {
     if (!tournamentId) return;
