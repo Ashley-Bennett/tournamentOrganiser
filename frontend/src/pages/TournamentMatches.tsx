@@ -201,6 +201,7 @@ const TournamentMatches: React.FC = () => {
   const [addingLateEntry, setAddingLateEntry] = useState(false);
   const [seatInputs, setSeatInputs] = useState<Map<string, string>>(new Map());
   const didRestoreRef = useRef(false);
+  const initialRoundSetRef = useRef(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [savingTimer, setSavingTimer] = useState(false);
   const [timerDurationInput, setTimerDurationInput] = useState<string | null>(null);
@@ -556,6 +557,13 @@ const TournamentMatches: React.FC = () => {
         );
 
         setMatches(matchesWithPlayers);
+
+        // On first load, jump to the current (highest) round
+        if (!initialRoundSetRef.current && matchesWithPlayers.length > 0) {
+          const maxRound = Math.max(...matchesWithPlayers.map((m) => m.round_number));
+          setSelectedRound(maxRound);
+          initialRoundSetRef.current = true;
+        }
 
         // Extract decision logs from matches (stored on first match of each round)
         const decisionLogsMap = new Map<number, PairingDecisionLog>();
