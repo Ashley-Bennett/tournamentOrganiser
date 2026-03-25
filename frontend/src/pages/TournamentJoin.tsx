@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
-  Button,
   CircularProgress,
   TextField,
   Typography,
@@ -24,9 +23,10 @@ import {
 
 export default function TournamentJoin() {
   const { tournamentId } = useParams<{ tournamentId: string }>();
+  const navigate = useNavigate();
 
   const [pageState, setPageState] = useState<
-    "loading" | "open" | "already_joined" | "closed" | "not_found" | "success"
+    "loading" | "open" | "closed" | "not_found"
   >("loading");
   const [tournamentName, setTournamentName] = useState("");
   const [nameInput, setNameInput] = useState("");
@@ -63,7 +63,7 @@ export default function TournamentJoin() {
       // Check for existing registration
       const existing = getEntry(tournamentId);
       if (existing) {
-        setPageState("already_joined");
+        navigate(`/t/${tournamentId}/me`, { replace: true });
         return;
       }
 
@@ -109,8 +109,7 @@ export default function TournamentJoin() {
     saveEntry(tournamentId, entry);
     saveProfile(nameInput.trim(), (profile as TjProfile).deviceId);
 
-    setPageState("success");
-    setSubmitting(false);
+    navigate(`/t/${tournamentId}/me`, { replace: true });
   };
 
   if (pageState === "loading") {
@@ -145,46 +144,6 @@ export default function TournamentJoin() {
             <Typography variant="body2" color="text.secondary">
               Registration is closed for this tournament.
             </Typography>
-          </>
-        )}
-
-        {pageState === "already_joined" && (
-          <>
-            <Typography variant="h6" gutterBottom>{tournamentName}</Typography>
-            <Alert severity="info" sx={{ mb: 2 }}>
-              You&apos;re already registered for this tournament.
-            </Alert>
-            {tournamentId && (
-              <Button
-                component={Link}
-                to={`/t/${tournamentId}/me`}
-                variant="contained"
-                fullWidth
-                size="large"
-              >
-                Go to your tournament page
-              </Button>
-            )}
-          </>
-        )}
-
-        {pageState === "success" && (
-          <>
-            <Typography variant="h6" gutterBottom>{tournamentName}</Typography>
-            <Alert severity="success" sx={{ mb: 2 }}>
-              You&apos;re in! See you at the tournament.
-            </Alert>
-            {tournamentId && (
-              <Button
-                component={Link}
-                to={`/t/${tournamentId}/me`}
-                variant="contained"
-                fullWidth
-                size="large"
-              >
-                Go to your tournament page
-              </Button>
-            )}
           </>
         )}
 
