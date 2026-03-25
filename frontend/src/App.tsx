@@ -22,6 +22,7 @@ import ClaimPlayer from "./pages/ClaimPlayer";
 import TournamentJoin from "./pages/TournamentJoin";
 import TournamentJoinDisplay from "./pages/TournamentJoinDisplay";
 import PlayerTournamentView from "./pages/PlayerTournamentView";
+import DeviceTournaments from "./pages/DeviceTournaments";
 import JoinLanding from "./pages/JoinLanding";
 import WhatsNew from "./pages/WhatsNew";
 import { useAuth } from "./AuthContext";
@@ -107,6 +108,7 @@ function App() {
                 <Route path="/join/c/:code" element={<JoinLanding />} />
                 <Route path="/join/:tournamentId" element={<TournamentJoin />} />
                 <Route path="/t/:tournamentId/me" element={<PlayerTournamentView />} />
+                <Route path="/my-tournaments" element={<DeviceTournaments />} />
 
                 {/* ── What's New ───────────────────────────────── */}
                 <Route path="/whats-new" element={<WhatsNew />} />

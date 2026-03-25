@@ -586,22 +586,14 @@ const PlayerTournamentView: React.FC = () => {
               : ""}
       </Typography>
       {otherTournaments.length > 0 && (
-        <Box display="flex" alignItems="center" gap={0.75} flexWrap="wrap" mt={1}>
-          <Typography variant="caption" color="text.secondary">
-            Also on this device:
-          </Typography>
-          {otherTournaments.map((e) => (
-            <Chip
-              key={e.tournamentId}
-              label={e.tournamentName ?? e.tournamentId.slice(0, 8)}
-              size="small"
-              variant="outlined"
-              component={Link}
-              to={`/t/${e.tournamentId}/me`}
-              clickable
-            />
-          ))}
-        </Box>
+        <Typography
+          variant="caption"
+          component={Link}
+          to="/my-tournaments"
+          sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { textDecoration: "underline" }, mt: 0.5, display: "inline-block" }}
+        >
+          ← My tournaments ({otherTournaments.length + 1} on this device)
+        </Typography>
       )}
     </Box>
   );
