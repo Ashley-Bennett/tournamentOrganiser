@@ -145,20 +145,32 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                   </Typography>
                 </TableCell>
                 {deckMap && (
-                  <TableCell>
-                    <Box display="flex" alignItems="center" gap={0.25}>
+                  <TableCell sx={{ p: 0, position: "relative", overflow: "visible", width: 0 }}>
+                    <Box
+                      display="flex"
+                      alignItems="center"
+                      gap={0.25}
+                      sx={{
+                        position: "absolute",
+                        top: "50%",
+                        left: 0,
+                        transform: "translateY(-50%)",
+                        overflow: "visible",
+                        pointerEvents: "none",
+                      }}
+                    >
                       {deckMap.get(player.id)?.[0] != null && (
                         <img
                           src={getSpriteUrl(deckMap.get(player.id)![0]!)}
                           alt=""
-                          style={{ width: 24, height: 24, imageRendering: "pixelated" }}
+                          style={{ width: 72, height: 72, imageRendering: "pixelated", display: "block" }}
                         />
                       )}
                       {deckMap.get(player.id)?.[1] != null && (
                         <img
                           src={getSpriteUrl(deckMap.get(player.id)![1]!)}
                           alt=""
-                          style={{ width: 24, height: 24, imageRendering: "pixelated" }}
+                          style={{ width: 72, height: 72, imageRendering: "pixelated", display: "block" }}
                         />
                       )}
                     </Box>
