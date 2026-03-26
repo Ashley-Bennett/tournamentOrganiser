@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { getSpriteUrl } from "../utils/pokemonCache";
 import {
   Box,
   Chip,
@@ -20,6 +21,8 @@ interface Props {
   standings: PlayerWithTieBreakers[];
   /** player id → dropped_at_round (null = dropped, round unknown) */
   droppedMap: Map<string, number | null>;
+  /** Optional: player id → [pokemon1Id|null, pokemon2Id|null] */
+  deckMap?: Map<string, [number | null, number | null]>;
 }
 
 const getRankDisplay = (rank: number): string => {
@@ -48,6 +51,7 @@ interface ChunkTableProps {
   chunk: PlayerWithTieBreakers[];
   rankOffset: number;
   droppedMap: Map<string, number | null>;
+  deckMap?: Map<string, [number | null, number | null]>;
   size: "small" | "medium";
   /** vertical cell padding override (MUI spacing units) */
   cellPy?: number;
@@ -59,6 +63,7 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
   chunk,
   rankOffset,
   droppedMap,
+  deckMap,
   size,
   cellPy,
   cellPx,
@@ -131,12 +136,28 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                   </Box>
                 </TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
-                  >
-                    {player.name}
-                  </Typography>
+                  <Box display="flex" alignItems="center" gap={0.5}>
+                    {deckMap?.get(player.id)?.[0] != null && (
+                      <img
+                        src={getSpriteUrl(deckMap.get(player.id)![0]!)}
+                        alt=""
+                        style={{ width: 24, height: 24, imageRendering: "pixelated" }}
+                      />
+                    )}
+                    {deckMap?.get(player.id)?.[1] != null && (
+                      <img
+                        src={getSpriteUrl(deckMap.get(player.id)![1]!)}
+                        alt=""
+                        style={{ width: 24, height: 24, imageRendering: "pixelated" }}
+                      />
+                    )}
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
+                    >
+                      {player.name}
+                    </Typography>
+                  </Box>
                 </TableCell>
                 <TableCell align="right">
                   <Box
@@ -191,7 +212,7 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
   </Paper>
 );
 
-const StandingsTable: React.FC<Props> = ({ standings, droppedMap }) => {
+const StandingsTable: React.FC<Props> = ({ standings, droppedMap, deckMap }) => {
   const theme = useTheme();
   const isMd = useMediaQuery(theme.breakpoints.up("md"));
   const isLg = useMediaQuery(theme.breakpoints.up("lg"));
@@ -224,6 +245,7 @@ const StandingsTable: React.FC<Props> = ({ standings, droppedMap }) => {
             chunk={chunk}
             rankOffset={colIdx * Math.ceil(standings.length / columnCount)}
             droppedMap={droppedMap}
+            deckMap={deckMap}
             size={tableSize}
             cellPy={cellPy}
             cellPx={cellPx}

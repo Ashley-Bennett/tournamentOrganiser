@@ -34,4 +34,6 @@ export interface TournamentPlayer {
   late_entry_round?: number | null;
   device_token?: string | null;
   device_id?: string | null;
+  deck_pokemon1?: number | null;
+  deck_pokemon2?: number | null;
 }

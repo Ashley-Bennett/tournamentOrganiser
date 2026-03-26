@@ -6,6 +6,7 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  IconButton,
   Paper,
   Table,
   TableBody,
@@ -18,11 +19,14 @@ import {
   Typography,
   Alert,
 } from "@mui/material";
+import CatchingPokemonIcon from "@mui/icons-material/CatchingPokemon";
 import { supabase } from "../supabaseClient";
 import { getEntry, getAllEntries } from "../utils/playerStorage";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
+import { getSpriteUrl } from "../utils/pokemonCache";
 import StandingsTable from "../components/StandingsTable";
+import DeckPickerDialog from "../components/DeckPickerDialog";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -43,6 +47,8 @@ interface PlayerInfo {
   name: string;
   dropped: boolean;
   dropped_at_round: number | null;
+  deck_pokemon1?: number | null;
+  deck_pokemon2?: number | null;
 }
 
 interface MatchWithNames {
@@ -304,6 +310,7 @@ const PlayerTournamentView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
+  const [deckPickerOpen, setDeckPickerOpen] = useState(false);
 
   const didInitRoundRef = useRef(false);
   const initialRoundsLoadedRef = useRef(false);
@@ -500,6 +507,32 @@ const PlayerTournamentView: React.FC = () => {
     return m;
   }, [players]);
 
+  const deckMap = useMemo(() => {
+    const m = new Map<string, [number | null, number | null]>();
+    players.forEach((p) => {
+      if (p.deck_pokemon1 != null || p.deck_pokemon2 != null) {
+        m.set(p.id, [p.deck_pokemon1 ?? null, p.deck_pokemon2 ?? null]);
+      }
+    });
+    return m;
+  }, [players]);
+
+  const handleSaveDeck = useCallback(
+    async (p1: number | null, p2: number | null) => {
+      if (!tournamentId || !entry) return;
+      const { error: rpcError } = await supabase.rpc("set_player_deck", {
+        p_tournament_id: tournamentId,
+        p_player_id: entry.playerId,
+        p_device_token: entry.deviceToken,
+        p_pokemon1: p1,
+        p_pokemon2: p2,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+      await handleRefresh();
+    },
+    [tournamentId, entry, handleRefresh],
+  );
+
   const standings = useMemo(() => {
     const completed = matches.filter(
       (m) => m.status === "completed" || m.status === "bye",
@@ -585,16 +618,40 @@ const PlayerTournamentView: React.FC = () => {
         </Typography>
         {statusChip}
       </Box>
-      <Typography variant="body2" color="text.secondary">
-        Playing as <strong>{player.name}</strong>
-        {isStandings
-          ? " · Final Standings"
-          : typeof selectedRound === "number" && tournament.num_rounds
-            ? ` · Round ${selectedRound} of ${tournament.num_rounds}`
-            : typeof selectedRound === "number"
-              ? ` · Round ${selectedRound}`
-              : ""}
-      </Typography>
+      <Box display="flex" alignItems="center" flexWrap="wrap" gap={0.5} mt={0.25}>
+        <Typography variant="body2" color="text.secondary" component="span">
+          Playing as <strong>{player.name}</strong>
+          {isStandings
+            ? " · Final Standings"
+            : typeof selectedRound === "number" && tournament.num_rounds
+              ? ` · Round ${selectedRound} of ${tournament.num_rounds}`
+              : typeof selectedRound === "number"
+                ? ` · Round ${selectedRound}`
+                : ""}
+        </Typography>
+        <IconButton
+          size="small"
+          onClick={() => setDeckPickerOpen(true)}
+          title={player.deck_pokemon1 ? "Edit deck Pokémon" : "Choose deck Pokémon"}
+          sx={{ p: 0.25 }}
+        >
+          <CatchingPokemonIcon sx={{ fontSize: "1rem", color: "text.secondary" }} />
+        </IconButton>
+        {player.deck_pokemon1 != null && (
+          <img
+            src={getSpriteUrl(player.deck_pokemon1)}
+            alt=""
+            style={{ width: 24, height: 24, imageRendering: "pixelated" }}
+          />
+        )}
+        {player.deck_pokemon2 != null && (
+          <img
+            src={getSpriteUrl(player.deck_pokemon2)}
+            alt=""
+            style={{ width: 24, height: 24, imageRendering: "pixelated" }}
+          />
+        )}
+      </Box>
     </Box>
   );
 
@@ -623,10 +680,17 @@ const PlayerTournamentView: React.FC = () => {
       <Box>
         {header}
         {roundTabs}
-        <StandingsTable standings={standings} droppedMap={droppedMap} />
+        <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap} />
         <Box textAlign="center" mt={2}>
           <Typography variant="caption" color="text.disabled">Updates automatically</Typography>
         </Box>
+        <DeckPickerDialog
+          open={deckPickerOpen}
+          onClose={() => setDeckPickerOpen(false)}
+          initialPokemon1={viewData?.player.deck_pokemon1 ?? null}
+          initialPokemon2={viewData?.player.deck_pokemon2 ?? null}
+          onSave={handleSaveDeck}
+        />
       </Box>
     );
   }
@@ -813,6 +877,14 @@ const PlayerTournamentView: React.FC = () => {
       <Box textAlign="center" mt={2}>
         <Typography variant="caption" color="text.disabled">Updates automatically</Typography>
       </Box>
+
+      <DeckPickerDialog
+        open={deckPickerOpen}
+        onClose={() => setDeckPickerOpen(false)}
+        initialPokemon1={viewData?.player.deck_pokemon1 ?? null}
+        initialPokemon2={viewData?.player.deck_pokemon2 ?? null}
+        onSave={handleSaveDeck}
+      />
     </Box>
   );
 };
