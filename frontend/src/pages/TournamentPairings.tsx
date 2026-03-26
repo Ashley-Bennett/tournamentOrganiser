@@ -45,6 +45,8 @@ interface Player {
   name: string;
   dropped: boolean;
   dropped_at_round: number | null;
+  deck_pokemon1: number | null;
+  deck_pokemon2: number | null;
 }
 
 interface Match {
@@ -144,7 +146,7 @@ const TournamentPairings: React.FC = () => {
       // Fetch players
       const { data: pData, error: pErr } = await supabase
         .from("tournament_players")
-        .select("id, name, dropped, dropped_at_round")
+        .select("id, name, dropped, dropped_at_round, deck_pokemon1, deck_pokemon2")
         .eq("tournament_id", tournamentId);
 
       if (pErr) {
@@ -398,6 +400,16 @@ const TournamentPairings: React.FC = () => {
     return m;
   }, [players]);
 
+  const deckMap = useMemo(() => {
+    const m = new Map<string, [number | null, number | null]>();
+    players.forEach((p) => {
+      if (p.deck_pokemon1 != null || p.deck_pokemon2 != null) {
+        m.set(p.id, [p.deck_pokemon1, p.deck_pokemon2]);
+      }
+    });
+    return m;
+  }, [players]);
+
   const standings = useMemo(() => {
     const completed = matches.filter(
       (m) => m.status === "completed" || m.status === "bye",
@@ -498,7 +510,7 @@ const TournamentPairings: React.FC = () => {
         {header}
         {roundTabs}
         <Box sx={{ flex: 1, minHeight: 0 }}>
-          <StandingsTable standings={standings} droppedMap={droppedMap} />
+          <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap.size > 0 ? deckMap : undefined} />
         </Box>
         {footer}
       </Box>

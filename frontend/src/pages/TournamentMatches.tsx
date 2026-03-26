@@ -80,6 +80,8 @@ interface TournamentPlayer {
   static_seat_number: number | null;
   is_late_entry: boolean;
   late_entry_round: number | null;
+  deck_pokemon1: number | null;
+  deck_pokemon2: number | null;
 }
 
 interface Match {
@@ -533,7 +535,7 @@ const TournamentMatches: React.FC = () => {
         const { data: allPlayersData, error: allPlayersError } = await supabase
           .from("tournament_players")
           .select(
-            "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round",
+            "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round, deck_pokemon1, deck_pokemon2",
           )
           .eq("tournament_id", tournament.id)
           .order("name");
@@ -704,6 +706,16 @@ const TournamentMatches: React.FC = () => {
     const map = new Map<string, number | null>();
     for (const p of players) {
       if (p.dropped) map.set(p.id, p.dropped_at_round);
+    }
+    return map;
+  }, [players]);
+
+  const deckPlayersMap = useMemo(() => {
+    const map = new Map<string, [number | null, number | null]>();
+    for (const p of players) {
+      if (p.deck_pokemon1 != null || p.deck_pokemon2 != null) {
+        map.set(p.id, [p.deck_pokemon1, p.deck_pokemon2]);
+      }
     }
     return map;
   }, [players]);
@@ -1165,7 +1177,7 @@ const TournamentMatches: React.FC = () => {
     const { data: freshPlayers } = await supabase
       .from("tournament_players")
       .select(
-        "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round",
+        "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round, deck_pokemon1, deck_pokemon2",
       )
       .eq("tournament_id", tournament.id)
       .order("name");
@@ -1363,7 +1375,7 @@ const TournamentMatches: React.FC = () => {
       const { data: fresh } = await supabase
         .from("tournament_players")
         .select(
-          "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number",
+          "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, deck_pokemon1, deck_pokemon2",
         )
         .eq("tournament_id", tournament.id)
         .order("name");
@@ -1395,7 +1407,7 @@ const TournamentMatches: React.FC = () => {
       const { data: fresh } = await supabase
         .from("tournament_players")
         .select(
-          "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number",
+          "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, deck_pokemon1, deck_pokemon2",
         )
         .eq("tournament_id", tournament.id)
         .order("name");
@@ -2122,7 +2134,7 @@ const TournamentMatches: React.FC = () => {
       const { data: playersData } = await supabase
         .from("tournament_players")
         .select(
-          "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number",
+          "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, deck_pokemon1, deck_pokemon2",
         )
         .eq("tournament_id", tournament.id);
 
@@ -2676,6 +2688,7 @@ const TournamentMatches: React.FC = () => {
                             <StandingsTable
                               standings={finalStandings}
                               droppedMap={droppedPlayersMap}
+                              deckMap={deckPlayersMap.size > 0 ? deckPlayersMap : undefined}
                             />
                           )}
                         </Box>
