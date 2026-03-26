@@ -147,13 +147,16 @@ const DeckPickerDialog: React.FC<Props> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Filter results — max 3
+  // Filter results — word-based so "mega absol" and "absol mega" both match
+  // "Mega Absol", and "hisuian growlithe" matches "Hisuian Growlithe".
   const searchResults =
     searchQuery.trim().length > 0
       ? allPokemon
-          .filter((p) =>
-            p.displayName.toLowerCase().includes(searchQuery.toLowerCase()),
-          )
+          .filter((p) => {
+            const words = searchQuery.toLowerCase().trim().split(/\s+/);
+            const name = p.displayName.toLowerCase();
+            return words.every((w) => name.includes(w));
+          })
           .slice(0, 3)
       : [];
 

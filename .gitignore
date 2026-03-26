@@ -25,6 +25,9 @@ build/
 *.sqlite3
 backend/data/*.db
 
+# Generated at build time — do not commit
+frontend/public/pokemonList.json
+
 # Logs
 logs
 *.log
