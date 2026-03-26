@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { getSpriteUrl } from "../utils/pokemonCache";
+import NormalizedSprite from "./NormalizedSprite";
 import {
   Box,
   Chip,
@@ -160,17 +161,15 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                       }}
                     >
                       {deckMap.get(player.id)?.[0] != null && (
-                        <img
+                        <NormalizedSprite
                           src={getSpriteUrl(deckMap.get(player.id)![0]!)}
-                          alt=""
-                          style={{ width: 72, height: 72, imageRendering: "pixelated", display: "block" }}
+                          size={50}
                         />
                       )}
                       {deckMap.get(player.id)?.[1] != null && (
-                        <img
+                        <NormalizedSprite
                           src={getSpriteUrl(deckMap.get(player.id)![1]!)}
-                          alt=""
-                          style={{ width: 72, height: 72, imageRendering: "pixelated", display: "block" }}
+                          size={50}
                         />
                       )}
                     </Box>
