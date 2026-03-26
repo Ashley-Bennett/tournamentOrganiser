@@ -6,7 +6,6 @@ import {
   Chip,
   CircularProgress,
   Divider,
-  IconButton,
   Paper,
   Table,
   TableBody,
@@ -618,37 +617,37 @@ const PlayerTournamentView: React.FC = () => {
         </Typography>
         {statusChip}
       </Box>
-      <Box display="flex" alignItems="center" flexWrap="wrap" gap={0.5} mt={0.25}>
-        <Typography variant="body2" color="text.secondary" component="span">
-          Playing as <strong>{player.name}</strong>
-          {isStandings
-            ? " · Final Standings"
-            : typeof selectedRound === "number" && tournament.num_rounds
-              ? ` · Round ${selectedRound} of ${tournament.num_rounds}`
-              : typeof selectedRound === "number"
-                ? ` · Round ${selectedRound}`
-                : ""}
-        </Typography>
-        <IconButton
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+        Playing as <strong>{player.name}</strong>
+        {isStandings
+          ? " · Final Standings"
+          : typeof selectedRound === "number" && tournament.num_rounds
+            ? ` · Round ${selectedRound} of ${tournament.num_rounds}`
+            : typeof selectedRound === "number"
+              ? ` · Round ${selectedRound}`
+              : ""}
+      </Typography>
+      <Box display="flex" alignItems="center" gap={1} mt={1}>
+        <Button
           size="small"
+          variant={player.deck_pokemon1 ? "outlined" : "contained"}
+          startIcon={<CatchingPokemonIcon />}
           onClick={() => setDeckPickerOpen(true)}
-          title={player.deck_pokemon1 ? "Edit deck Pokémon" : "Choose deck Pokémon"}
-          sx={{ p: 0.25 }}
         >
-          <CatchingPokemonIcon sx={{ fontSize: "1rem", color: "text.secondary" }} />
-        </IconButton>
+          {player.deck_pokemon1 ? "Edit deck" : "Choose deck"}
+        </Button>
         {player.deck_pokemon1 != null && (
           <img
             src={getSpriteUrl(player.deck_pokemon1)}
             alt=""
-            style={{ width: 24, height: 24, imageRendering: "pixelated" }}
+            style={{ width: 32, height: 32, imageRendering: "pixelated" }}
           />
         )}
         {player.deck_pokemon2 != null && (
           <img
             src={getSpriteUrl(player.deck_pokemon2)}
             alt=""
-            style={{ width: 24, height: 24, imageRendering: "pixelated" }}
+            style={{ width: 32, height: 32, imageRendering: "pixelated" }}
           />
         )}
       </Box>

@@ -83,6 +83,7 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
           <TableRow>
             <TableCell sx={{ fontWeight: "bold" }}>Rank</TableCell>
             <TableCell sx={{ fontWeight: "bold" }}>Player</TableCell>
+            {deckMap && <TableCell sx={{ fontWeight: "bold" }}>Deck</TableCell>}
             <TableCell sx={{ fontWeight: "bold" }} align="right">
               Record
             </TableCell>
@@ -136,29 +137,33 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                   </Box>
                 </TableCell>
                 <TableCell>
-                  <Box display="flex" alignItems="center" gap={0.5}>
-                    {deckMap?.get(player.id)?.[0] != null && (
-                      <img
-                        src={getSpriteUrl(deckMap.get(player.id)![0]!)}
-                        alt=""
-                        style={{ width: 24, height: 24, imageRendering: "pixelated" }}
-                      />
-                    )}
-                    {deckMap?.get(player.id)?.[1] != null && (
-                      <img
-                        src={getSpriteUrl(deckMap.get(player.id)![1]!)}
-                        alt=""
-                        style={{ width: 24, height: 24, imageRendering: "pixelated" }}
-                      />
-                    )}
-                    <Typography
-                      variant="body2"
-                      sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
-                    >
-                      {player.name}
-                    </Typography>
-                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
+                  >
+                    {player.name}
+                  </Typography>
                 </TableCell>
+                {deckMap && (
+                  <TableCell>
+                    <Box display="flex" alignItems="center" gap={0.25}>
+                      {deckMap.get(player.id)?.[0] != null && (
+                        <img
+                          src={getSpriteUrl(deckMap.get(player.id)![0]!)}
+                          alt=""
+                          style={{ width: 24, height: 24, imageRendering: "pixelated" }}
+                        />
+                      )}
+                      {deckMap.get(player.id)?.[1] != null && (
+                        <img
+                          src={getSpriteUrl(deckMap.get(player.id)![1]!)}
+                          alt=""
+                          style={{ width: 24, height: 24, imageRendering: "pixelated" }}
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
+                )}
                 <TableCell align="right">
                   <Box
                     display="flex"

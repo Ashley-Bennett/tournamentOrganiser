@@ -40,6 +40,8 @@ interface LeaderboardPlayer {
   name: string;
   dropped: boolean;
   dropped_at_round: number | null;
+  deck_pokemon1: number | null;
+  deck_pokemon2: number | null;
 }
 
 const TournamentLeaderboard: React.FC = () => {
@@ -134,7 +136,7 @@ const TournamentLeaderboard: React.FC = () => {
 
         const { data: allPlayersData } = await supabase
           .from("tournament_players")
-          .select("id, name, dropped, dropped_at_round")
+          .select("id, name, dropped, dropped_at_round, deck_pokemon1, deck_pokemon2")
           .eq("tournament_id", id);
         setPlayers((allPlayersData as LeaderboardPlayer[]) ?? []);
 
@@ -166,6 +168,16 @@ const TournamentLeaderboard: React.FC = () => {
     const m = new Map<string, number | null>();
     players.forEach((p) => {
       if (p.dropped) m.set(p.id, p.dropped_at_round);
+    });
+    return m;
+  }, [players]);
+
+  const deckMap = useMemo(() => {
+    const m = new Map<string, [number | null, number | null]>();
+    players.forEach((p) => {
+      if (p.deck_pokemon1 != null || p.deck_pokemon2 != null) {
+        m.set(p.id, [p.deck_pokemon1, p.deck_pokemon2]);
+      }
     });
     return m;
   }, [players]);
@@ -233,7 +245,7 @@ const TournamentLeaderboard: React.FC = () => {
         </Paper>
       ) : (
         <Box sx={{ flex: 1, minHeight: 0 }}>
-          <StandingsTable standings={finalStandings} droppedMap={droppedMap} />
+          <StandingsTable standings={finalStandings} droppedMap={droppedMap} deckMap={deckMap.size > 0 ? deckMap : undefined} />
         </Box>
       )}
     </Box>
