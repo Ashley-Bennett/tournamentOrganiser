@@ -13,7 +13,9 @@ export default function TournamentJoinDisplay() {
 
   const { tournament } = useTournament(id, user, authLoading, workspace?.id ?? null);
 
-  const joinUrl = `${window.location.origin}/join`;
+  const joinUrl = tournament?.join_code
+    ? `${window.location.origin}/join/c/${tournament.join_code}`
+    : `${window.location.origin}/join`;
 
   return (
     <Box

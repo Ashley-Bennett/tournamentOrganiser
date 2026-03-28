@@ -601,16 +601,16 @@ const PlayerTournamentView: React.FC = () => {
 
   const header = (
     <Box mb={2}>
-      {otherTournaments.length > 0 && (
-        <Typography
-          variant="caption"
-          component={Link}
-          to="/my-tournaments"
-          sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { textDecoration: "underline" }, mb: 0.75, display: "inline-block" }}
-        >
-          ← My tournaments ({otherTournaments.length + 1} on this device)
-        </Typography>
-      )}
+      <Typography
+        variant="caption"
+        component={Link}
+        to="/my-tournaments"
+        sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { textDecoration: "underline" }, mb: 0.75, display: "inline-block" }}
+      >
+        {otherTournaments.length > 0
+          ? `← My tournaments (${otherTournaments.length + 1} on this device)`
+          : "← My tournaments"}
+      </Typography>
       <Box display="flex" alignItems="center" gap={1} mb={0.25}>
         <Typography variant="h5" fontWeight={700}>
           {tournament.name}

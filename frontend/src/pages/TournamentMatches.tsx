@@ -1561,6 +1561,30 @@ const TournamentMatches: React.FC = () => {
       setError(null);
       if (typeof selectedRound !== "number") return;
 
+      // Record the absolute start time on the tournament FIRST, before match
+      // transitions. This ensures any re-fetch triggered by the realtime subscription
+      // (fired when matches update below) reads the timer state from DB rather than
+      // overwriting local state with stale null data.
+      if (tournament.round_duration_minutes) {
+        const startedAt = new Date().toISOString();
+        const { error: timerError } = await supabase
+          .from("tournaments")
+          .update({
+            current_round_started_at: startedAt,
+            round_elapsed_seconds: 0,
+            round_is_paused: false,
+          })
+          .eq("id", tournament.id);
+        if (!timerError) {
+          setTournament({
+            ...tournament,
+            current_round_started_at: startedAt,
+            round_elapsed_seconds: 0,
+            round_is_paused: false,
+          });
+        }
+      }
+
       // Auto-complete any bye matches (player2_id is null) that are still "ready".
       // Byes are created as "ready" so the organiser can edit pairings; we finalise
       // them here when the round officially starts.
@@ -1593,28 +1617,6 @@ const TournamentMatches: React.FC = () => {
 
       if (updateError) {
         throw new Error(updateError.message || "Failed to begin round");
-      }
-
-      // Record the absolute start time on the tournament so both pages can compute
-      // remaining time without drift, regardless of when they load.
-      if (tournament.round_duration_minutes) {
-        const startedAt = new Date().toISOString();
-        const { error: timerError } = await supabase
-          .from("tournaments")
-          .update({
-            current_round_started_at: startedAt,
-            round_elapsed_seconds: 0,
-            round_is_paused: false,
-          })
-          .eq("id", tournament.id);
-        if (!timerError) {
-          setTournament({
-            ...tournament,
-            current_round_started_at: startedAt,
-            round_elapsed_seconds: 0,
-            round_is_paused: false,
-          });
-        }
       }
 
       await refreshMatches();

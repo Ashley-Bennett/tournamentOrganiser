@@ -710,9 +710,9 @@ const TournamentView: React.FC = () => {
         match_number: seatAssignments[index].matchNumber,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
-        status: pairing.player2Id === null ? "bye" : "ready",
-        result: pairing.player2Id === null ? "bye" : null,
-        winner_id: pairing.player2Id === null ? pairing.player1Id : null,
+        status: "ready",
+        result: null,
+        winner_id: null,
       }));
 
       const { data: insertedMatches, error: matchesError } = await supabase
@@ -1458,6 +1458,11 @@ const TournamentView: React.FC = () => {
               <strong>{numRounds} round{numRounds !== 1 ? "s" : ""}</strong>.
               {players.length % 2 !== 0 && " One player will receive a bye each round."}
             </Typography>
+            {tournament.round_duration_minutes && (
+              <Typography variant="body2" color="text.secondary">
+                Round timer: {tournament.round_duration_minutes} minutes per round.
+              </Typography>
+            )}
             <Typography variant="body2" color="text.secondary">
               Players cannot be removed once the tournament has started.
             </Typography>
