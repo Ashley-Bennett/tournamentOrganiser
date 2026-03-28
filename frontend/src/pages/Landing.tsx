@@ -134,7 +134,7 @@ export default function Landing() {
   const { mode, toggleTheme } = useThemeMode();
 
   return (
-    <Box sx={{ bgcolor: BG, minHeight: "100vh", color: "white" }}>
+    <Box sx={{ bgcolor: "background.default", minHeight: "100vh", color: "text.primary" }}>
 
       {/* ── Nav ─────────────────────────────────────────── */}
       <Box
@@ -162,6 +162,18 @@ export default function Landing() {
               Matchamp
             </Typography>
             <Stack direction="row" spacing={1} alignItems="center">
+              <Button
+                component={Link}
+                to="/whats-new"
+                sx={{
+                  color: TEXT_MUTED,
+                  textTransform: "none",
+                  fontWeight: 500,
+                  "&:hover": { color: "white", bgcolor: "transparent" },
+                }}
+              >
+                What&apos;s New
+              </Button>
               <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                 <IconButton
                   onClick={toggleTheme}

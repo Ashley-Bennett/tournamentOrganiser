@@ -172,9 +172,6 @@ const Header: React.FC = () => {
                 <Button component={RouterLink} to={wPath("/tournaments")} sx={navBtnSx}>
                   Tournaments
                 </Button>
-                <Button component={RouterLink} to="/me#my-tournaments" sx={navBtnSx}>
-                  My Tournaments
-                </Button>
                 <Button component={RouterLink} to="/me" sx={navBtnSx}>
                   My Profile
                 </Button>
@@ -197,10 +194,6 @@ const Header: React.FC = () => {
                 >
                   Create Tournament
                 </Button>
-
-                <Typography sx={{ ml: 1, color: TEXT_MUTED, fontSize: "0.82rem" }}>
-                  {displayName}
-                </Typography>
 
                 <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                   <IconButton
@@ -258,11 +251,6 @@ const Header: React.FC = () => {
                       </ListItemButton>
                     </ListItem>
                     <ListItem disablePadding>
-                      <ListItemButton onClick={() => handleNavClick("/me#my-tournaments")}>
-                        <ListItemText primary="My Tournaments" />
-                      </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
                       <ListItemButton onClick={() => handleNavClick("/me")}>
                         <ListItemText primary="My Profile" />
                       </ListItemButton>
@@ -296,6 +284,9 @@ const Header: React.FC = () => {
           ) : (
             /* Unauthenticated — shown on auth pages (/login, /register, etc.) */
             <Stack direction="row" alignItems="center" spacing={1}>
+              <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
+                What&apos;s New
+              </Button>
               <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                 <IconButton
                   onClick={toggleTheme}
