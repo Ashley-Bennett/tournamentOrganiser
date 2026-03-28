@@ -9,6 +9,47 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.4.0",
+    date: "2026-03-28",
+    entries: [
+      {
+        category: "New Features",
+        items: [
+          "Player self-registration — players can join a tournament by entering a Pokémon room code or opening a shareable link. No account required.",
+          "Player result submission — players can now submit their own match results from the player view. The first report auto-applies the result; the organiser can always confirm or override.",
+          "My Tournaments page — all tournaments you've joined from your device are listed in one place at /my-tournaments, with live status.",
+          "Organiser announcements — add a note to any round and it appears as an announcement on the public pairings page for all players to see.",
+          "Pokémon deck support — players can pick a Pokémon to represent their deck. Their sprite shows up in standings and pairings so everyone can see what's in the room.",
+          "Timer quick-adjust buttons — +/-1m and +/-10m buttons added to the timer editor for faster adjustments.",
+          "You can now add or edit the round timer after a tournament has already been created.",
+        ],
+      },
+      {
+        category: "Tournaments",
+        items: [
+          "The pairings page automatically switches to the new round tab when a round starts, and to standings when the final round ends.",
+          "Dropped players are now sorted to the bottom of standings.",
+          "Pairings on the player view update in real-time as match results come in — no refresh needed.",
+          "The matches view opens on the current round by default instead of round 1.",
+          "Self-registration is always enabled for draft tournaments — no separate toggle needed.",
+          "Joining via self-registration now automatically takes you to your player view.",
+          "The tournament details panel has been refreshed with a cleaner look.",
+          "Removed the suggested rounds field and bye warning to simplify tournament setup.",
+        ],
+      },
+      {
+        category: "Fixes & Polish",
+        items: [
+          "Result chips now update correctly when a result is undone and resubmitted.",
+          "Deck sprites now display correctly in pairings and standings.",
+          "Deleted tournaments no longer appear in the device tournament list.",
+          "The player list no longer scrolls back to the top during background updates.",
+          "Fixed an issue that could prevent tournament data from loading.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.3.0",
     date: "2026-03-23",
     entries: [

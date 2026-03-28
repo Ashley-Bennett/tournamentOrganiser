@@ -6,6 +6,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.4.0] - 2026-03-28
+
+### Added
+- **Tournament self-registration** — organisers can enable a join code (Pokémon-named room code) on any tournament. Players enter the code or open a shareable URL (join code embedded in query string) to register themselves without an account. `join_enabled` toggle + `room_code` column on `tournaments`.
+- **Player result submission** — players can report their own match result from the player view. The first report auto-applies the result to the match; subsequent conflicting reports queue for organiser confirmation. Organiser can always override.
+- **My Tournaments page** (`/my-tournaments`) — lists all tournaments the device has joined, with live polling for status updates. Deleted tournaments are filtered out.
+- **Organiser round announcements** — organisers can add a note to any round; it appears as an announcement banner on the public pairings page.
+- **Pokémon deck picker** — players can select a Pokémon to represent their deck. Sprites are shown in the standings table and pairings view. Pokémon list (Gen 1–3 + Mega/form variants) is generated at build time. `set_player_deck` RPC accepts Mega/alternate-form IDs.
+- **Timer: add/edit after creation** — the round timer can now be added or modified after a tournament has already been created, not just at setup time.
+- **Timer quick-adjust buttons** — +/-1m and +/-10m buttons in the timer editor for faster adjustments.
+- **Auto-tab switching on pairings page** — automatically switches to the new round tab when a round starts; switches to standings tab when the final round ends.
+- `self_registered` indicator column in player list, replacing the account-link column.
+- Security headers served via `frontend/public/_headers`.
+
+### Changed
+- Self-registration is always enabled for draft tournaments — the separate toggle is no longer needed.
+- Matches view now defaults to the current round tab instead of round 1.
+- Tournament details panel UI refreshed.
+- Removed suggested rounds input and bye warning from tournament setup.
+- Player view shows all device-joined tournaments (not just the current one) so players can navigate between events.
+
+### Fixed
+- Result chip reflects player report immediately without a page refresh.
+- Player result submissions correctly populate organiser pending results queue.
+- Player-submitted results are reflected in the organiser matches view in real-time.
+- Organiser result-confirm flow works correctly alongside the player report flow.
+- Player list no longer scrolls back to the top during background polls.
+- Dropped players are sorted to the bottom of standings (both organiser and public views).
+- Pairings page update reliability improved.
+- Auto-redirect to player view after self-registration (previously showed a button instead).
+- `join_enabled` state correctly persists on page refresh; player self-registrations stream in real-time.
+- Deck sprites display correctly in pairings and standings.
+- Fixed tournament data failing to load on the device tournaments page.
+- Guard against NaN in seat number input.
+
+### Database Migrations
+- `20260310010000_tournaments_realtime` — enable realtime on tournaments table
+- `20260324000000_add_round_note` — `round_note` column for organiser announcements
+- `20260325000000_tournament_matches_select_anon` — anon select policy on matches
+- `20260325000001_tournament_matches_realtime` — realtime on matches
+- `20260325000002_player_view_temp_result` — temp result column for player view
+- `20260325120000_get_tournaments_summary` — `get_tournaments_summary` RPC
+- `20260325130000_get_tournaments_summary_v2` — v2 of summary RPC
+- `20260325140000_fix_get_tournaments_summary` — fix summary RPC
+- `20260325150000_fix_get_tournaments_summary_unnest` — fix unnest in summary RPC
+- `20260326000000_tournament_self_registration` — self-registration support
+- `20260326000001_nullable_created_by` — allow null `created_by` for self-registered players
+- `20260326000002_tournament_players_realtime` — realtime on tournament_players
+- `20260326000003_join_code` — `room_code` + `join_enabled` columns on tournaments
+- `20260326000004_clean_pokemon_list` — cleaned Pokémon list seed data
+- `20260327000000_match_result_reports` — `match_result_reports` table
+- `20260327000001_player_tournament_rpcs` — RPCs for player tournament interactions
+- `20260327000002_fix_player_view_null_arrays` — fix null array handling in player view RPC
+- `20260327000003_match_reports_realtime` — realtime on match_result_reports
+- `20260328000000_auto_confirm_first_report` — auto-confirm match on first player report
+- `20260329000000_organiser_confirms_results` — organiser result confirmation flow
+- `20260329000001_match_reports_rls_select` — RLS select policy on match_result_reports
+- `20260329000002_fix_workspace_memberships_ref` — fix FK reference in workspace_memberships
+- `20260330000000_player_auto_applies_result` — player report auto-applies match result
+- `20260330000001_player_report_sets_temp_result` — player report sets temp result on match
+- `20260330000002_join_enabled_by_default` — `join_enabled` defaults to true for draft tournaments
+- `20260331000000_pokemon_deck` — `player_deck` column + `set_player_deck` RPC
+- `20260331000001_fix_deck_pokemon_id_range` — expand valid Pokémon ID range for Mega/forms
+
+---
+
 ## [0.3.0] - 2026-03-10
 
 ### Added
