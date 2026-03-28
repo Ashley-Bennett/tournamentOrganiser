@@ -2676,7 +2676,7 @@ const TournamentMatches: React.FC = () => {
                             <Button
                               size="small"
                               endIcon={<OpenInNewIcon />}
-                              onClick={() => navigate(wPath(`/tournaments/${tournament.id}/pairings`))}
+                              onClick={() => window.open(window.location.origin + wPath(`/tournaments/${tournament.id}/pairings`), "_blank")}
                             >
                               View on pairings page
                             </Button>

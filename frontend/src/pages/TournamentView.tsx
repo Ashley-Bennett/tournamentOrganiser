@@ -8,7 +8,6 @@ import {
   Chip,
   Alert,
   TextField,
-  Checkbox,
   IconButton,
   CircularProgress,
   Dialog,
@@ -27,17 +26,12 @@ import {
   TableHead,
   TableRow,
   TableSortLabel,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemButton,
   InputAdornment,
 } from "@mui/material";
 import SeatIcon from "@mui/icons-material/EventSeat";
 import { PlayArrow as PlayArrowIcon, Add as AddIcon, Remove as RemoveIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import PeopleIcon from "@mui/icons-material/People";
 import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/Edit";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
@@ -134,7 +128,6 @@ const TournamentView: React.FC = () => {
     loading: playersLoading,
     error: playersError,
     setError: setPlayersError,
-    refetch: refetchPlayers,
   } = useTournamentPlayers(tournament?.id);
 
   const [addingPlayer, setAddingPlayer] = useState(false);
@@ -168,18 +161,6 @@ const TournamentView: React.FC = () => {
   const [playerSort, setPlayerSort] = useState<"name" | "joined">("joined");
   const [playerSortDir, setPlayerSortDir] = useState<"asc" | "desc">("asc");
 
-  // ── Known Players dialog ─────────────────────────────────────────────────
-  interface WorkspacePlayer {
-    user_id: string;
-    preferred_name: string | null;
-    display_name: string | null;
-  }
-  const [knownPlayersOpen, setKnownPlayersOpen] = useState(false);
-  const [knownPlayers, setKnownPlayers] = useState<WorkspacePlayer[]>([]);
-  const [knownPlayersLoading, setKnownPlayersLoading] = useState(false);
-  const [knownPlayersSearch, setKnownPlayersSearch] = useState("");
-  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
-  const [addingKnown, setAddingKnown] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -613,45 +594,6 @@ const TournamentView: React.FC = () => {
     }
   };
 
-  // ── Known Players handlers ───────────────────────────────────────────────
-
-  const handleOpenKnownPlayers = async () => {
-    if (!workspaceId) return;
-    setKnownPlayersOpen(true);
-    setKnownPlayersLoading(true);
-    setSelectedUserIds(new Set());
-    setKnownPlayersSearch("");
-    try {
-      const { data, error } = await supabase.rpc("list_workspace_players", {
-        p_workspace_id: workspaceId,
-      });
-      if (error) throw new Error(error.message);
-      setKnownPlayers((data as WorkspacePlayer[]) ?? []);
-    } catch (e: unknown) {
-      setPlayersError(e instanceof Error ? e.message : "Failed to load known players");
-      setKnownPlayersOpen(false);
-    } finally {
-      setKnownPlayersLoading(false);
-    }
-  };
-
-  const handleAddKnownPlayers = async () => {
-    if (!tournament || selectedUserIds.size === 0) return;
-    setAddingKnown(true);
-    try {
-      const { error } = await supabase.rpc("add_known_players_to_tournament", {
-        p_tournament_id: tournament.id,
-        p_user_ids: Array.from(selectedUserIds),
-      });
-      if (error) throw new Error(error.message);
-      setKnownPlayersOpen(false);
-      await refetchPlayers();
-    } catch (e: unknown) {
-      setPlayersError(e instanceof Error ? e.message : "Failed to add known players");
-    } finally {
-      setAddingKnown(false);
-    }
-  };
 
   const handleStartTournament = async () => {
     if (!tournament || tournament.status !== "draft" || !user) return;
@@ -1030,19 +972,6 @@ const TournamentView: React.FC = () => {
           </Alert>
         )}
 
-        {/* ── Add from Known Players (draft + manager only) ──────────── */}
-        {tournament.status === "draft" && isManager && (
-          <Box mb={2} display="flex" alignItems="center" gap={1}>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<PeopleIcon />}
-              onClick={() => void handleOpenKnownPlayers()}
-            >
-              Add from Known Players
-            </Button>
-          </Box>
-        )}
 
         {/* ── Self-registration (draft + manager only) ──────────────── */}
         {tournament.status === "draft" && isManager && tournament.join_code && (
@@ -1359,93 +1288,6 @@ const TournamentView: React.FC = () => {
         )}
       </Paper>
 
-      {/* ── Known Players dialog ──────────────────────────────────────── */}
-      <Dialog
-        open={knownPlayersOpen}
-        onClose={() => setKnownPlayersOpen(false)}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Add from Known Players</DialogTitle>
-        <DialogContent>
-          <TextField
-            placeholder="Search by name…"
-            size="small"
-            fullWidth
-            value={knownPlayersSearch}
-            onChange={(e) => setKnownPlayersSearch(e.target.value)}
-            sx={{ mb: 1, mt: 0.5 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-          />
-          {knownPlayersLoading ? (
-            <Box display="flex" justifyContent="center" py={3}>
-              <CircularProgress size={24} />
-            </Box>
-          ) : knownPlayers.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" py={2}>
-              No known players yet. Players appear here once they claim a link.
-            </Typography>
-          ) : (
-            <List dense disablePadding sx={{ maxHeight: 360, overflowY: "auto" }}>
-              {knownPlayers
-                .filter((kp) => {
-                  const label = (kp.preferred_name ?? kp.display_name ?? "").toLowerCase();
-                  return label.includes(knownPlayersSearch.toLowerCase());
-                })
-                .map((kp) => {
-                  const label = kp.preferred_name ?? kp.display_name ?? kp.user_id;
-                  const selected = selectedUserIds.has(kp.user_id);
-                  // Grey out if already in this tournament
-                  const alreadyAdded = players.some((p) => p.user_id === kp.user_id);
-                  return (
-                    <ListItem key={kp.user_id} disablePadding>
-                      <ListItemButton
-                        disabled={alreadyAdded}
-                        onClick={() => {
-                          setSelectedUserIds((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(kp.user_id)) next.delete(kp.user_id);
-                            else next.add(kp.user_id);
-                            return next;
-                          });
-                        }}
-                      >
-                        <Checkbox
-                          edge="start"
-                          checked={selected}
-                          disabled={alreadyAdded}
-                          tabIndex={-1}
-                          disableRipple
-                          size="small"
-                        />
-                        <ListItemText
-                          primary={label}
-                          secondary={alreadyAdded ? "Already in tournament" : undefined}
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                  );
-                })}
-            </List>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setKnownPlayersOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={selectedUserIds.size === 0 || addingKnown}
-            onClick={() => void handleAddKnownPlayers()}
-          >
-            {addingKnown ? "Adding…" : `Add ${selectedUserIds.size > 0 ? selectedUserIds.size : ""} Player${selectedUserIds.size === 1 ? "" : "s"}`}
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       <Dialog open={confirmStartOpen} onClose={() => setConfirmStartOpen(false)}>
         <DialogTitle>Start tournament?</DialogTitle>
