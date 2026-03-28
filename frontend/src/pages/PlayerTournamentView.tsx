@@ -254,14 +254,15 @@ function MyMatchCard({
               <Typography variant="body2" color="text.secondary" mb={1}>
                 How did the match go?
               </Typography>
-              <Box display="flex" gap={1} flexWrap="wrap" mb={1.5}>
+              <Box display="flex" gap={1.5} flexWrap="wrap" mb={2}>
                 {(["win", "draw", "loss"] as const).map((o) => (
                   <Button
                     key={o}
-                    size="small"
+                    size="large"
                     variant={selectedOutcome === o ? "contained" : "outlined"}
                     color={outcomeButtonColor[o]}
                     onClick={() => setSelectedOutcome(o)}
+                    sx={{ flex: 1, minWidth: 90, py: 1.5 }}
                   >
                     {outcomeButtonLabel[o]}
                   </Button>
@@ -273,12 +274,14 @@ function MyMatchCard({
                 </Alert>
               )}
               <Button
-                size="small"
+                size="large"
+                fullWidth
                 variant="contained"
                 disabled={!selectedOutcome || submitting}
                 onClick={() => void handleSubmit()}
+                sx={{ py: 1.5 }}
               >
-                {submitting ? <CircularProgress size={16} /> : "Submit result"}
+                {submitting ? <CircularProgress size={20} /> : "Submit result"}
               </Button>
             </Box>
           )}
@@ -679,7 +682,7 @@ const PlayerTournamentView: React.FC = () => {
       <Box>
         {header}
         {roundTabs}
-        <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap} />
+        <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap} currentPlayerId={entry?.playerId} />
         <Box textAlign="center" mt={2}>
           <Typography variant="caption" color="text.disabled">Updates automatically</Typography>
         </Box>

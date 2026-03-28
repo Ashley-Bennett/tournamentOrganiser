@@ -24,6 +24,8 @@ interface Props {
   droppedMap: Map<string, number | null>;
   /** Optional: player id → [pokemon1Id|null, pokemon2Id|null] */
   deckMap?: Map<string, [number | null, number | null]>;
+  /** Optional: highlight this player's row as "you" */
+  currentPlayerId?: string;
 }
 
 const getRankDisplay = (rank: number): string => {
@@ -58,6 +60,7 @@ interface ChunkTableProps {
   cellPy?: number;
   /** horizontal cell padding override (MUI spacing units) */
   cellPx?: number;
+  currentPlayerId?: string;
 }
 
 const ChunkTable: React.FC<ChunkTableProps> = ({
@@ -68,6 +71,7 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
   size,
   cellPy,
   cellPx,
+  currentPlayerId,
 }) => (
   <Paper sx={{ overflow: "hidden", height: "100%" }}>
     <TableContainer>
@@ -105,13 +109,23 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
             const isTopThree = rank <= 3;
             const droppedRound = droppedMap.get(player.id);
             const isDropped = droppedRound !== undefined;
+            const isCurrentPlayer = player.id === currentPlayerId;
             return (
               <TableRow
                 key={player.id}
                 sx={{
                   opacity: isDropped ? 0.65 : 1,
-                  backgroundColor: getRowBg(rank, isDropped),
-                  "&:hover": { backgroundColor: getHoverBg(rank) },
+                  backgroundColor: isCurrentPlayer
+                    ? "rgba(25, 118, 210, 0.12)"
+                    : getRowBg(rank, isDropped),
+                  outline: isCurrentPlayer ? "2px solid" : "none",
+                  outlineColor: isCurrentPlayer ? "primary.main" : "transparent",
+                  outlineOffset: "-2px",
+                  "&:hover": {
+                    backgroundColor: isCurrentPlayer
+                      ? "rgba(25, 118, 210, 0.2)"
+                      : getHoverBg(rank),
+                  },
                 }}
               >
                 <TableCell>
@@ -131,45 +145,43 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                     )}
                     <Typography
                       variant="body2"
-                      sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
+                      sx={{ fontWeight: isTopThree || isCurrentPlayer ? "bold" : "normal" }}
                     >
                       {getRankDisplay(rank)}
                     </Typography>
                   </Box>
                 </TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: isTopThree ? "bold" : "normal" }}
-                  >
-                    {player.name}
-                  </Typography>
+                  <Box display="flex" alignItems="center" gap={0.75}>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: isTopThree || isCurrentPlayer ? "bold" : "normal" }}
+                    >
+                      {player.name}
+                    </Typography>
+                    {isCurrentPlayer && (
+                      <Chip
+                        label="You"
+                        size="small"
+                        color="primary"
+                        sx={{ height: 18, fontSize: "0.65rem", fontWeight: "bold" }}
+                      />
+                    )}
+                  </Box>
                 </TableCell>
                 {deckMap && (
-                  <TableCell sx={{ p: 0, position: "relative", overflow: "visible", width: 0 }}>
-                    <Box
-                      display="flex"
-                      alignItems="center"
-                      gap={0.25}
-                      sx={{
-                        position: "absolute",
-                        top: "50%",
-                        left: 0,
-                        transform: "translateY(-50%)",
-                        overflow: "visible",
-                        pointerEvents: "none",
-                      }}
-                    >
+                  <TableCell sx={{ px: 0.5, py: 0, width: size === "small" ? 88 : 108 }}>
+                    <Box display="flex" alignItems="center" gap={0.25}>
                       {deckMap.get(player.id)?.[0] != null && (
                         <NormalizedSprite
                           src={getSpriteUrl(deckMap.get(player.id)![0]!)}
-                          size={50}
+                          size={size === "small" ? 40 : 50}
                         />
                       )}
                       {deckMap.get(player.id)?.[1] != null && (
                         <NormalizedSprite
                           src={getSpriteUrl(deckMap.get(player.id)![1]!)}
-                          size={50}
+                          size={size === "small" ? 40 : 50}
                         />
                       )}
                     </Box>
@@ -228,7 +240,7 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
   </Paper>
 );
 
-const StandingsTable: React.FC<Props> = ({ standings, droppedMap, deckMap }) => {
+const StandingsTable: React.FC<Props> = ({ standings, droppedMap, deckMap, currentPlayerId }) => {
   const theme = useTheme();
   const isMd = useMediaQuery(theme.breakpoints.up("md"));
   const isLg = useMediaQuery(theme.breakpoints.up("lg"));
@@ -265,6 +277,7 @@ const StandingsTable: React.FC<Props> = ({ standings, droppedMap, deckMap }) => 
             size={tableSize}
             cellPy={cellPy}
             cellPx={cellPx}
+            currentPlayerId={currentPlayerId}
           />
         </Box>
       ))}
