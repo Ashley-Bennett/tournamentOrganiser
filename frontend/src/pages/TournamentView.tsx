@@ -140,7 +140,6 @@ const TournamentView: React.FC = () => {
   >(null);
   const [startingTournament, setStartingTournament] = useState(false);
   const [confirmStartOpen, setConfirmStartOpen] = useState(false);
-  const [savingPublic, setSavingPublic] = useState(false);
   const [savingTimer, setSavingTimer] = useState(false);
   const [timerDurationInput, setTimerDurationInput] = useState<string | null>(null);
   const [numRounds, setNumRounds] = useState<number | null>(null);
@@ -469,19 +468,7 @@ const TournamentView: React.FC = () => {
     if (!error && data) setTournament(data as TournamentSummary);
   };
 
-  const handleTogglePublic = async (value: boolean) => {
-    if (!tournament || !workspaceId) return;
-    setSavingPublic(true);
-    const { error } = await supabase
-      .from("tournaments")
-      .update({ is_public: value })
-      .eq("id", tournament.id)
-      .eq("workspace_id", workspaceId);
-    setSavingPublic(false);
-    if (!error) setTournament({ ...tournament, is_public: value });
-  };
-
-  const handleSetRoundDuration = async (minutes: number | null) => {
+const handleSetRoundDuration = async (minutes: number | null) => {
     if (!tournament || !workspaceId) return;
     setSavingTimer(true);
     const { error } = await supabase
@@ -819,26 +806,7 @@ const TournamentView: React.FC = () => {
                 </Box>
               </Box>
 
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={!!tournament.is_public}
-                    onChange={(e) => void handleTogglePublic(e.target.checked)}
-                    disabled={savingPublic}
-                    size="small"
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography variant="body2">Public tournament</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Anyone with the link can view pairings without logging in
-                    </Typography>
-                  </Box>
-                }
-              />
-
-              <Box>
+<Box>
                 <Button
                   variant="contained"
                   color="primary"
