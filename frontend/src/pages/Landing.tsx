@@ -133,6 +133,13 @@ const steps = [
 export default function Landing() {
   const { mode, toggleTheme } = useThemeMode();
 
+  // Mode-aware colour tokens (nav and hero stay dark regardless)
+  const textMuted = mode === "dark" ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.55)";
+  const cardBg    = mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)";
+  const border    = mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)";
+  const sectionBg = mode === "dark" ? "rgba(255,255,255,0.015)" : "rgba(0,0,0,0.025)";
+  const footerText = mode === "dark" ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.35)";
+
   return (
     <Box sx={{ bgcolor: "background.default", minHeight: "100vh", color: "text.primary" }}>
 
@@ -225,6 +232,7 @@ export default function Landing() {
           textAlign: "center",
           position: "relative",
           overflow: "hidden",
+          color: "white",
         }}
       >
         {/* Glow blob */}
@@ -278,7 +286,7 @@ export default function Landing() {
           <Typography
             sx={{
               fontSize: { xs: "1rem", md: "1.15rem" },
-              color: TEXT_MUTED,
+              color: "rgba(255,255,255,0.6)",
               maxWidth: 540,
               mx: "auto",
               mb: 5,
@@ -320,7 +328,7 @@ export default function Landing() {
               to="/login"
               size="large"
               sx={{
-                color: TEXT_MUTED,
+                color: "rgba(255,255,255,0.6)",
                 textTransform: "none",
                 fontWeight: 500,
                 fontSize: "0.95rem",
@@ -341,7 +349,7 @@ export default function Landing() {
       </Box>
 
       {/* ── Trust strip ─────────────────────────────────── */}
-      <Box sx={{ borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}`, py: 2.5 }}>
+      <Box sx={{ borderTop: `1px solid ${border}`, borderBottom: `1px solid ${border}`, py: 2.5 }}>
         <Container maxWidth="lg">
           <Stack
             direction="row"
@@ -359,7 +367,7 @@ export default function Landing() {
             ].map((label) => (
               <Stack key={label} direction="row" spacing={0.75} alignItems="center">
                 <CheckIcon sx={{ fontSize: 15, color: ACCENT }} />
-                <Typography sx={{ fontSize: "0.82rem", color: TEXT_MUTED, whiteSpace: "nowrap" }}>
+                <Typography sx={{ fontSize: "0.82rem", color: textMuted, whiteSpace: "nowrap" }}>
                   {label}
                 </Typography>
               </Stack>
@@ -383,7 +391,7 @@ export default function Landing() {
             >
               Everything you need. Nothing you don&apos;t.
             </Typography>
-            <Typography sx={{ color: TEXT_MUTED, fontSize: "1rem" }}>
+            <Typography sx={{ color: textMuted, fontSize: "1rem" }}>
               Built for organisers who want to run great events without the overhead.
             </Typography>
           </Box>
@@ -393,8 +401,8 @@ export default function Landing() {
               <Grid item xs={12} sm={6} md={4} key={f.title}>
                 <Box
                   sx={{
-                    bgcolor: CARD_BG,
-                    border: `1px solid ${BORDER}`,
+                    bgcolor: cardBg,
+                    border: `1px solid ${border}`,
                     borderRadius: "16px",
                     p: 3.5,
                     height: "100%",
@@ -409,7 +417,7 @@ export default function Landing() {
                   <Typography sx={{ fontWeight: 700, mb: 1, fontSize: "1rem" }}>
                     {f.title}
                   </Typography>
-                  <Typography sx={{ color: TEXT_MUTED, lineHeight: 1.7, fontSize: "0.9rem" }}>
+                  <Typography sx={{ color: textMuted, lineHeight: 1.7, fontSize: "0.9rem" }}>
                     {f.desc}
                   </Typography>
                 </Box>
@@ -423,9 +431,9 @@ export default function Landing() {
       <Box
         sx={{
           py: { xs: 8, md: 12 },
-          bgcolor: "rgba(255,255,255,0.015)",
-          borderTop: `1px solid ${BORDER}`,
-          borderBottom: `1px solid ${BORDER}`,
+          bgcolor: sectionBg,
+          borderTop: `1px solid ${border}`,
+          borderBottom: `1px solid ${border}`,
         }}
       >
         <Container maxWidth="lg">
@@ -441,7 +449,7 @@ export default function Landing() {
             >
               Up and running in three steps
             </Typography>
-            <Typography sx={{ color: TEXT_MUTED, fontSize: "1rem" }}>
+            <Typography sx={{ color: textMuted, fontSize: "1rem" }}>
               No setup fee. No configuration wizard. Just a tournament.
             </Typography>
           </Box>
@@ -481,7 +489,7 @@ export default function Landing() {
                       >
                         {step.title}
                       </Typography>
-                      <Typography sx={{ color: TEXT_MUTED, lineHeight: 1.75, fontSize: "0.95rem" }}>
+                      <Typography sx={{ color: textMuted, lineHeight: 1.75, fontSize: "0.95rem" }}>
                         {step.desc}
                       </Typography>
                     </Box>
@@ -515,7 +523,7 @@ export default function Landing() {
                   just work
                 </Box>
               </Typography>
-              <Typography sx={{ color: TEXT_MUTED, lineHeight: 1.8, mb: 3.5, fontSize: "0.95rem" }}>
+              <Typography sx={{ color: textMuted, lineHeight: 1.8, mb: 3.5, fontSize: "0.95rem" }}>
                 Opponent match win percentage and tiebreakers are calculated
                 automatically every time a result is entered. No spreadsheets.
                 No arguments. Just the right answer.
@@ -529,7 +537,7 @@ export default function Landing() {
                 ].map((item) => (
                   <Stack key={item} direction="row" spacing={1.5} alignItems="flex-start">
                     <CheckIcon sx={{ color: ACCENT, fontSize: 17, mt: 0.2, flexShrink: 0 }} />
-                    <Typography sx={{ color: TEXT_MUTED, fontSize: "0.9rem", lineHeight: 1.6 }}>
+                    <Typography sx={{ color: textMuted, fontSize: "0.9rem", lineHeight: 1.6 }}>
                       {item}
                     </Typography>
                   </Stack>
@@ -550,9 +558,9 @@ export default function Landing() {
       <Box
         sx={{
           py: { xs: 8, md: 12 },
-          bgcolor: "rgba(255,255,255,0.015)",
-          borderTop: `1px solid ${BORDER}`,
-          borderBottom: `1px solid ${BORDER}`,
+          bgcolor: sectionBg,
+          borderTop: `1px solid ${border}`,
+          borderBottom: `1px solid ${border}`,
         }}
       >
         <Container maxWidth="lg">
@@ -568,7 +576,7 @@ export default function Landing() {
             >
               Built for every level of competition
             </Typography>
-            <Typography sx={{ color: TEXT_MUTED, fontSize: "1rem" }}>
+            <Typography sx={{ color: textMuted, fontSize: "1rem" }}>
               Whether it&apos;s six friends or sixty competitors, Matchamp scales with you.
             </Typography>
           </Box>
@@ -601,8 +609,8 @@ export default function Landing() {
               <Grid item xs={12} md={6} key={card.title}>
                 <Box
                   sx={{
-                    bgcolor: CARD_BG,
-                    border: `1px solid ${BORDER}`,
+                    bgcolor: cardBg,
+                    border: `1px solid ${border}`,
                     borderRadius: "16px",
                     p: { xs: 3, md: 4 },
                     height: "100%",
@@ -621,7 +629,7 @@ export default function Landing() {
                     {card.items.map((item) => (
                       <Stack key={item} direction="row" spacing={1.5} alignItems="flex-start">
                         <CheckIcon sx={{ color: ACCENT, fontSize: 17, mt: 0.2, flexShrink: 0 }} />
-                        <Typography sx={{ color: TEXT_MUTED, fontSize: "0.9rem", lineHeight: 1.65 }}>
+                        <Typography sx={{ color: textMuted, fontSize: "0.9rem", lineHeight: 1.65 }}>
                           {item}
                         </Typography>
                       </Stack>
@@ -671,7 +679,7 @@ export default function Landing() {
           >
             Ready to run your first tournament?
           </Typography>
-          <Typography sx={{ color: TEXT_MUTED, mb: 5, fontSize: "1.05rem", lineHeight: 1.7 }}>
+          <Typography sx={{ color: textMuted, mb: 5, fontSize: "1.05rem", lineHeight: 1.7 }}>
             Sign up and run your first tournament in minutes.
           </Typography>
           <Button
@@ -697,8 +705,8 @@ export default function Landing() {
       </Box>
 
       {/* ── Footer ──────────────────────────────────────── */}
-      <Box sx={{ borderTop: `1px solid ${BORDER}`, py: 3, textAlign: "center" }}>
-        <Typography sx={{ color: "rgba(255,255,255,0.25)", fontSize: "0.82rem" }}>
+      <Box sx={{ borderTop: `1px solid ${border}`, py: 3, textAlign: "center" }}>
+        <Typography sx={{ color: footerText, fontSize: "0.82rem" }}>
           © {new Date().getFullYear()} Matchamp · Made for tournament organisers everywhere
         </Typography>
       </Box>
