@@ -9,6 +9,24 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.4.1",
+    date: "2026-03-28",
+    entries: [
+      {
+        category: "Fixes & Polish",
+        items: [
+          "Removed the public tournament toggle from tournament setup.",
+          "Improved the mobile experience for entering match results and viewing standings.",
+          "Removed the 'known players' shortcut button to simplify the add-player flow.",
+          "Pairings now open in a new tab so you don't lose your place.",
+          "Fixed light mode display on the landing page.",
+          "Polished the header and landing page navigation.",
+          "Fixed various tournament flow and timer issues.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.4.0",
     date: "2026-03-28",
     entries: [

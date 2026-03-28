@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.4.1] - 2026-03-28
+
+### Changed
+- Removed public tournament toggle (UI + `handleTogglePublic` handler) from tournament setup panel.
+- Removed "known players" shortcut button from the add-player flow.
+- Pairings link now opens in a new tab.
+
+### Fixed
+- Mobile UX improvements for player result entry and standings view.
+- Light mode rendering on the landing page.
+- Header and landing page navigation polish.
+- Various tournament flow and timer fixes.
+
+---
+
 ## [0.4.0] - 2026-03-28
 
 ### Added
