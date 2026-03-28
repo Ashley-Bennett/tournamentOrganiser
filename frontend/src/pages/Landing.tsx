@@ -31,11 +31,18 @@ function ScreenshotFrame({
   src,
   alt,
   sx = {},
+  priority = false,
+  width,
+  height,
 }: {
   src: string;
   alt: string;
   sx?: object;
+  priority?: boolean;
+  width?: number;
+  height?: number;
 }) {
+  const webpSrc = src.replace(/\.png$/, ".webp");
   return (
     <Box
       sx={{
@@ -65,9 +72,15 @@ function ScreenshotFrame({
       </Box>
       <Box
         component="img"
-        src={src}
+        src={webpSrc}
         alt={alt}
-        sx={{ width: "100%", display: "block" }}
+        fetchPriority={priority ? "high" : "auto"}
+        loading={priority ? "eager" : "lazy"}
+        sx={{
+          width: "100%",
+          display: "block",
+          ...(width && height ? { aspectRatio: `${width} / ${height}` } : {}),
+        }}
       />
     </Box>
   );
@@ -113,6 +126,8 @@ const steps = [
     desc: "Name it, pick Swiss or single-elimination, set the number of rounds, and add a round timer if you need one.",
     img: "/screenshots/setup.png",
     imgAlt: "Tournament setup screen",
+    imgWidth: 1061,
+    imgHeight: 836,
   },
   {
     n: "2",
@@ -120,6 +135,8 @@ const steps = [
     desc: "Type names one by one, bulk paste a list, or pick from players in your workspace. Start whenever you're ready.",
     img: "/screenshots/setup.png",
     imgAlt: "Player management",
+    imgWidth: 1061,
+    imgHeight: 836,
   },
   {
     n: "3",
@@ -127,6 +144,8 @@ const steps = [
     desc: "Enter results after each round. Pairings and standings update instantly. When it's over, share the final standings.",
     img: "/screenshots/matches.png",
     imgAlt: "Match results view",
+    imgWidth: 1066,
+    imgHeight: 782,
   },
 ];
 
@@ -343,6 +362,9 @@ export default function Landing() {
           <ScreenshotFrame
             src="/screenshots/matches.png"
             alt="Matchamp match tracking view"
+            priority
+            width={1066}
+            height={782}
             sx={{ maxWidth: 900, mx: "auto" }}
           />
         </Container>
@@ -496,7 +518,7 @@ export default function Landing() {
                   </Stack>
                 </Grid>
                 <Grid item xs={12} md={7}>
-                  <ScreenshotFrame src={step.img} alt={step.imgAlt} />
+                  <ScreenshotFrame src={step.img} alt={step.imgAlt} width={step.imgWidth} height={step.imgHeight} />
                 </Grid>
               </Grid>
             ))}
@@ -548,6 +570,8 @@ export default function Landing() {
               <ScreenshotFrame
                 src="/screenshots/standings.png"
                 alt="Final standings with tiebreakers"
+                width={1082}
+                height={333}
               />
             </Grid>
           </Grid>

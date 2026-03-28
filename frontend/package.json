@@ -7,7 +7,7 @@
     "generate:pokemon": "node ../scripts/generatePokemonList.mjs --force",
     "predev": "node ../scripts/generatePokemonList.mjs",
     "dev": "vite",
-    "prebuild": "node ../scripts/generatePokemonList.mjs",
+    "prebuild": "node ../scripts/generatePokemonList.mjs && node scripts/convert-screenshots.mjs",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
@@ -17,6 +17,7 @@
   "dependencies": {
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
+    "@fontsource/roboto": "^5.2.10",
     "@mui/icons-material": "^5.14.20",
     "@mui/material": "^5.14.20",
     "@mui/x-date-pickers": "^6.18.2",
@@ -43,6 +44,7 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.4",
     "jsdom": "^28.1.0",
+    "sharp": "^0.34.5",
     "typescript": "^5.2.2",
     "vite": "^5.0.0",
     "vitest": "^2.0.0"
