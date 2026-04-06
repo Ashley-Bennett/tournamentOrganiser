@@ -11,7 +11,12 @@ export default function TournamentJoinDisplay() {
   const { wPath, workspace } = useWorkspace();
   const { user, loading: authLoading } = useAuth();
 
-  const { tournament } = useTournament(id, user, authLoading, workspace?.id ?? null);
+  const { tournament } = useTournament(
+    id,
+    user,
+    authLoading,
+    workspace?.id ?? null,
+  );
 
   const joinUrl = tournament?.join_code
     ? `${window.location.origin}/join/c/${tournament.join_code}`
@@ -70,10 +75,18 @@ export default function TournamentJoinDisplay() {
       )}
 
       <Typography
-        variant="body2"
-        sx={{ fontFamily: "monospace", opacity: 0.45, textAlign: "center" }}
+        variant="h2"
+        fontWeight={800}
+        sx={{
+          fontFamily: "monospace",
+          letterSpacing: 6,
+          lineHeight: 1.1,
+          opacity: 0.45,
+          textAlign: "center",
+          wordBreak: "break-all",
+        }}
       >
-        {joinUrl}
+        {`${window.location.host}/join`}
       </Typography>
     </Box>
   );
