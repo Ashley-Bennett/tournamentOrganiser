@@ -29,8 +29,6 @@ import CheckIcon from "@mui/icons-material/Check";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
-const BG = "#060e1d";
-const CARD_BG = "rgba(255,255,255,0.04)";
 const ACCENT = "#dc004e";
 const BORDER = "rgba(255,255,255,0.08)";
 const TEXT_MUTED = "rgba(255,255,255,0.6)";
@@ -74,7 +72,13 @@ function ScreenshotFrame({
         {["#ff5f56", "#ffbd2e", "#27c93f"].map((c) => (
           <Box
             key={c}
-            sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: c, flexShrink: 0 }}
+            sx={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              bgcolor: c,
+              flexShrink: 0,
+            }}
           />
         ))}
       </Box>
@@ -163,15 +167,24 @@ export default function Landing() {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
   // Mode-aware colour tokens (nav and hero stay dark regardless)
-  const textMuted = mode === "dark" ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.55)";
-  const cardBg    = mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)";
-  const border    = mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)";
-  const sectionBg = mode === "dark" ? "rgba(255,255,255,0.015)" : "rgba(0,0,0,0.025)";
-  const footerText = mode === "dark" ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.35)";
+  const textMuted =
+    mode === "dark" ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.55)";
+  const cardBg =
+    mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)";
+  const border = mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)";
+  const sectionBg =
+    mode === "dark" ? "rgba(255,255,255,0.015)" : "rgba(0,0,0,0.025)";
+  const footerText =
+    mode === "dark" ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.35)";
 
   return (
-    <Box sx={{ bgcolor: "background.default", minHeight: "100vh", color: "text.primary" }}>
-
+    <Box
+      sx={{
+        bgcolor: "background.default",
+        minHeight: "100vh",
+        color: "text.primary",
+      }}
+    >
       {/* ── Nav ─────────────────────────────────────────── */}
       <Box
         component="nav"
@@ -193,12 +206,22 @@ export default function Landing() {
           >
             <Typography
               variant="h6"
-              sx={{ fontWeight: 900, letterSpacing: "-0.02em", color: "white", fontSize: "1.2rem" }}
+              sx={{
+                fontWeight: 900,
+                letterSpacing: "-0.02em",
+                color: "white",
+                fontSize: "1.2rem",
+              }}
             >
               Matchamp
             </Typography>
             {/* Desktop */}
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ display: { xs: "none", sm: "flex" } }}>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ display: { xs: "none", sm: "flex" } }}
+            >
               <Button
                 component={Link}
                 to="/my-tournaments"
@@ -223,13 +246,23 @@ export default function Landing() {
               >
                 What&apos;s New
               </Button>
-              <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+              <Tooltip
+                title={
+                  mode === "dark"
+                    ? "Switch to light mode"
+                    : "Switch to dark mode"
+                }
+              >
                 <IconButton
                   onClick={toggleTheme}
                   size="small"
                   sx={{ color: TEXT_MUTED, "&:hover": { color: "white" } }}
                 >
-                  {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                  {mode === "dark" ? (
+                    <LightModeIcon fontSize="small" />
+                  ) : (
+                    <DarkModeIcon fontSize="small" />
+                  )}
                 </IconButton>
               </Tooltip>
               <Button
@@ -263,14 +296,23 @@ export default function Landing() {
             </Stack>
 
             {/* Mobile */}
-            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ display: { xs: "flex", sm: "none" } }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={0.5}
+              sx={{ display: { xs: "flex", sm: "none" } }}
+            >
               <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
                 <IconButton
                   onClick={toggleTheme}
                   size="small"
                   sx={{ color: TEXT_MUTED, "&:hover": { color: "white" } }}
                 >
-                  {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                  {mode === "dark" ? (
+                    <LightModeIcon fontSize="small" />
+                  ) : (
+                    <DarkModeIcon fontSize="small" />
+                  )}
                 </IconButton>
               </Tooltip>
               <IconButton
@@ -283,28 +325,58 @@ export default function Landing() {
             </Stack>
 
             {/* Mobile drawer */}
-            <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+            <Drawer
+              anchor="right"
+              open={drawerOpen}
+              onClose={() => setDrawerOpen(false)}
+            >
               <Box sx={{ width: 260, pt: 2 }} role="navigation">
                 <List disablePadding>
                   <ListItem disablePadding>
-                    <ListItemButton onClick={() => { navigate("/my-tournaments"); setDrawerOpen(false); }}>
+                    <ListItemButton
+                      onClick={() => {
+                        navigate("/my-tournaments");
+                        setDrawerOpen(false);
+                      }}
+                    >
                       <ListItemText primary="My Tournaments" />
                     </ListItemButton>
                   </ListItem>
                   <ListItem disablePadding>
-                    <ListItemButton onClick={() => { navigate("/whats-new"); setDrawerOpen(false); }}>
+                    <ListItemButton
+                      onClick={() => {
+                        navigate("/whats-new");
+                        setDrawerOpen(false);
+                      }}
+                    >
                       <ListItemText primary="What's New" />
                     </ListItemButton>
                   </ListItem>
                   <Divider sx={{ my: 1 }} />
                   <ListItem disablePadding>
-                    <ListItemButton onClick={() => { navigate("/login"); setDrawerOpen(false); }}>
+                    <ListItemButton
+                      onClick={() => {
+                        navigate("/login");
+                        setDrawerOpen(false);
+                      }}
+                    >
                       <ListItemText primary="Log in" />
                     </ListItemButton>
                   </ListItem>
                   <ListItem disablePadding>
-                    <ListItemButton onClick={() => { navigate("/register"); setDrawerOpen(false); }}>
-                      <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 600, color: ACCENT }} />
+                    <ListItemButton
+                      onClick={() => {
+                        navigate("/register");
+                        setDrawerOpen(false);
+                      }}
+                    >
+                      <ListItemText
+                        primary="Sign up"
+                        primaryTypographyProps={{
+                          fontWeight: 600,
+                          color: ACCENT,
+                        }}
+                      />
                     </ListItemButton>
                   </ListItem>
                 </List>
@@ -443,7 +515,13 @@ export default function Landing() {
       </Box>
 
       {/* ── Trust strip ─────────────────────────────────── */}
-      <Box sx={{ borderTop: `1px solid ${border}`, borderBottom: `1px solid ${border}`, py: 2.5 }}>
+      <Box
+        sx={{
+          borderTop: `1px solid ${border}`,
+          borderBottom: `1px solid ${border}`,
+          py: 2.5,
+        }}
+      >
         <Container maxWidth="lg">
           <Stack
             direction="row"
@@ -459,9 +537,20 @@ export default function Landing() {
               "Round timers",
               "Team workspaces",
             ].map((label) => (
-              <Stack key={label} direction="row" spacing={0.75} alignItems="center">
+              <Stack
+                key={label}
+                direction="row"
+                spacing={0.75}
+                alignItems="center"
+              >
                 <CheckIcon sx={{ fontSize: 15, color: ACCENT }} />
-                <Typography sx={{ fontSize: "0.82rem", color: textMuted, whiteSpace: "nowrap" }}>
+                <Typography
+                  sx={{
+                    fontSize: "0.82rem",
+                    color: textMuted,
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {label}
                 </Typography>
               </Stack>
@@ -486,7 +575,8 @@ export default function Landing() {
               Everything you need. Nothing you don&apos;t.
             </Typography>
             <Typography sx={{ color: textMuted, fontSize: "1rem" }}>
-              Built for organisers who want to run great events without the overhead.
+              Built for organisers who want to run great events without the
+              overhead.
             </Typography>
           </Box>
 
@@ -511,7 +601,13 @@ export default function Landing() {
                   <Typography sx={{ fontWeight: 700, mb: 1, fontSize: "1rem" }}>
                     {f.title}
                   </Typography>
-                  <Typography sx={{ color: textMuted, lineHeight: 1.7, fontSize: "0.9rem" }}>
+                  <Typography
+                    sx={{
+                      color: textMuted,
+                      lineHeight: 1.7,
+                      fontSize: "0.9rem",
+                    }}
+                  >
                     {f.desc}
                   </Typography>
                 </Box>
@@ -555,7 +651,12 @@ export default function Landing() {
                 key={step.n}
                 spacing={{ xs: 4, md: 8 }}
                 alignItems="center"
-                sx={{ flexDirection: { xs: "column", md: i % 2 === 0 ? "row" : "row-reverse" } }}
+                sx={{
+                  flexDirection: {
+                    xs: "column",
+                    md: i % 2 === 0 ? "row" : "row-reverse",
+                  },
+                }}
               >
                 <Grid item xs={12} md={5}>
                   <Stack direction="row" spacing={2} alignItems="flex-start">
@@ -579,18 +680,33 @@ export default function Landing() {
                     </Box>
                     <Box>
                       <Typography
-                        sx={{ fontWeight: 700, mb: 1.5, fontSize: { xs: "1.2rem", md: "1.4rem" } }}
+                        sx={{
+                          fontWeight: 700,
+                          mb: 1.5,
+                          fontSize: { xs: "1.2rem", md: "1.4rem" },
+                        }}
                       >
                         {step.title}
                       </Typography>
-                      <Typography sx={{ color: textMuted, lineHeight: 1.75, fontSize: "0.95rem" }}>
+                      <Typography
+                        sx={{
+                          color: textMuted,
+                          lineHeight: 1.75,
+                          fontSize: "0.95rem",
+                        }}
+                      >
                         {step.desc}
                       </Typography>
                     </Box>
                   </Stack>
                 </Grid>
                 <Grid item xs={12} md={7}>
-                  <ScreenshotFrame src={step.img} alt={step.imgAlt} width={step.imgWidth} height={step.imgHeight} />
+                  <ScreenshotFrame
+                    src={step.img}
+                    alt={step.imgAlt}
+                    width={step.imgWidth}
+                    height={step.imgHeight}
+                  />
                 </Grid>
               </Grid>
             ))}
@@ -617,7 +733,14 @@ export default function Landing() {
                   just work
                 </Box>
               </Typography>
-              <Typography sx={{ color: textMuted, lineHeight: 1.8, mb: 3.5, fontSize: "0.95rem" }}>
+              <Typography
+                sx={{
+                  color: textMuted,
+                  lineHeight: 1.8,
+                  mb: 3.5,
+                  fontSize: "0.95rem",
+                }}
+              >
                 Opponent match win percentage and tiebreakers are calculated
                 automatically every time a result is entered. No spreadsheets.
                 No arguments. Just the right answer.
@@ -629,9 +752,27 @@ export default function Landing() {
                   "Two-column layout handles large player counts",
                   "Final standings shareable via public link",
                 ].map((item) => (
-                  <Stack key={item} direction="row" spacing={1.5} alignItems="flex-start">
-                    <CheckIcon sx={{ color: ACCENT, fontSize: 17, mt: 0.2, flexShrink: 0 }} />
-                    <Typography sx={{ color: textMuted, fontSize: "0.9rem", lineHeight: 1.6 }}>
+                  <Stack
+                    key={item}
+                    direction="row"
+                    spacing={1.5}
+                    alignItems="flex-start"
+                  >
+                    <CheckIcon
+                      sx={{
+                        color: ACCENT,
+                        fontSize: 17,
+                        mt: 0.2,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Typography
+                      sx={{
+                        color: textMuted,
+                        fontSize: "0.9rem",
+                        lineHeight: 1.6,
+                      }}
+                    >
                       {item}
                     </Typography>
                   </Stack>
@@ -673,7 +814,8 @@ export default function Landing() {
               Built for every level of competition
             </Typography>
             <Typography sx={{ color: textMuted, fontSize: "1rem" }}>
-              Whether it&apos;s six friends or sixty competitors, Matchamp scales with you.
+              Whether it&apos;s six friends or sixty competitors, Matchamp
+              scales with you.
             </Typography>
           </Box>
 
@@ -712,20 +854,49 @@ export default function Landing() {
                     height: "100%",
                   }}
                 >
-                  <Typography sx={{ fontSize: "2.2rem", mb: 1.5, lineHeight: 1 }}>
+                  <Typography
+                    sx={{ fontSize: "2.2rem", mb: 1.5, lineHeight: 1 }}
+                  >
                     {card.emoji}
                   </Typography>
-                  <Typography sx={{ fontWeight: 700, fontSize: "1.15rem", mb: 0.5 }}>
+                  <Typography
+                    sx={{ fontWeight: 700, fontSize: "1.15rem", mb: 0.5 }}
+                  >
                     {card.title}
                   </Typography>
-                  <Typography sx={{ color: ACCENT, fontSize: "0.85rem", fontWeight: 500, mb: 3 }}>
+                  <Typography
+                    sx={{
+                      color: ACCENT,
+                      fontSize: "0.85rem",
+                      fontWeight: 500,
+                      mb: 3,
+                    }}
+                  >
                     {card.subtitle}
                   </Typography>
                   <Stack spacing={1.5}>
                     {card.items.map((item) => (
-                      <Stack key={item} direction="row" spacing={1.5} alignItems="flex-start">
-                        <CheckIcon sx={{ color: ACCENT, fontSize: 17, mt: 0.2, flexShrink: 0 }} />
-                        <Typography sx={{ color: textMuted, fontSize: "0.9rem", lineHeight: 1.65 }}>
+                      <Stack
+                        key={item}
+                        direction="row"
+                        spacing={1.5}
+                        alignItems="flex-start"
+                      >
+                        <CheckIcon
+                          sx={{
+                            color: ACCENT,
+                            fontSize: 17,
+                            mt: 0.2,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <Typography
+                          sx={{
+                            color: textMuted,
+                            fontSize: "0.9rem",
+                            lineHeight: 1.65,
+                          }}
+                        >
                           {item}
                         </Typography>
                       </Stack>
@@ -775,7 +946,14 @@ export default function Landing() {
           >
             Ready to run your first tournament?
           </Typography>
-          <Typography sx={{ color: textMuted, mb: 5, fontSize: "1.05rem", lineHeight: 1.7 }}>
+          <Typography
+            sx={{
+              color: textMuted,
+              mb: 5,
+              fontSize: "1.05rem",
+              lineHeight: 1.7,
+            }}
+          >
             Sign up and run your first tournament in minutes.
           </Typography>
           <Button
@@ -801,12 +979,14 @@ export default function Landing() {
       </Box>
 
       {/* ── Footer ──────────────────────────────────────── */}
-      <Box sx={{ borderTop: `1px solid ${border}`, py: 3, textAlign: "center" }}>
+      <Box
+        sx={{ borderTop: `1px solid ${border}`, py: 3, textAlign: "center" }}
+      >
         <Typography sx={{ color: footerText, fontSize: "0.82rem" }}>
-          © {new Date().getFullYear()} Matchamp · Made for tournament organisers everywhere
+          © {new Date().getFullYear()} Matchamp · Made for tournament organisers
+          everywhere
         </Typography>
       </Box>
-
     </Box>
   );
 }
