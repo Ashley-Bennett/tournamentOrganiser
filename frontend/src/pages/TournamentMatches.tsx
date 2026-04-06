@@ -205,6 +205,7 @@ const TournamentMatches: React.FC = () => {
   const didRestoreRef = useRef(false);
   const initialRoundSetRef = useRef(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const initialMatchLoadDoneRef = useRef(false);
   const [savingTimer, setSavingTimer] = useState(false);
   const [timerDurationInput, setTimerDurationInput] = useState<string | null>(null);
   const [timerEditorOpen, setTimerEditorOpen] = useState(false);
@@ -433,7 +434,7 @@ const TournamentMatches: React.FC = () => {
     };
 
     void fetchTournament();
-  }, [id, user, authLoading, navigate, workspaceId, refreshTrigger]);
+  }, [id, user, authLoading, navigate, workspaceId]);
 
   // Restore pending results from DB temp columns when matches first load
   useEffect(() => {
@@ -482,8 +483,9 @@ const TournamentMatches: React.FC = () => {
     if (!tournament?.id || !user) return;
 
     const fetchMatches = async () => {
+      const isInitialLoad = !initialMatchLoadDoneRef.current;
       try {
-        setMatchesLoading(true);
+        if (isInitialLoad) setMatchesLoading(true);
         setError(null);
 
         // Fetch matches - stable order so match numbers never change
@@ -501,7 +503,7 @@ const TournamentMatches: React.FC = () => {
 
         if (!matchesData || matchesData.length === 0) {
           setMatches([]);
-          setMatchesLoading(false);
+          if (isInitialLoad) { setMatchesLoading(false); initialMatchLoadDoneRef.current = true; }
           return;
         }
 
@@ -612,7 +614,7 @@ const TournamentMatches: React.FC = () => {
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed to load matches");
       } finally {
-        setMatchesLoading(false);
+        if (isInitialLoad) { setMatchesLoading(false); initialMatchLoadDoneRef.current = true; }
       }
     };
 
@@ -679,8 +681,6 @@ const TournamentMatches: React.FC = () => {
         },
         () => {
           void fetchReports();
-          // Also bump the match list so any status changes are picked up immediately
-          setRefreshTrigger((n) => n + 1);
         },
       )
       .on(
