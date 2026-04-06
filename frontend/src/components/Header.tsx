@@ -291,6 +291,9 @@ const Header: React.FC = () => {
                 spacing={1}
                 sx={{ display: { xs: "none", sm: "flex" } }}
               >
+                <Button component={RouterLink} to="/my-tournaments" sx={navBtnSx}>
+                  My Tournaments
+                </Button>
                 <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
                   What&apos;s New
                 </Button>
@@ -348,6 +351,11 @@ const Header: React.FC = () => {
               <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
                 <Box sx={{ width: 260, pt: 2 }} role="navigation">
                   <List disablePadding>
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => handleNavClick("/my-tournaments")}>
+                        <ListItemText primary="My Tournaments" />
+                      </ListItemButton>
+                    </ListItem>
                     <ListItem disablePadding>
                       <ListItemButton onClick={() => handleNavClick("/whats-new")}>
                         <ListItemText primary="What's New" />
