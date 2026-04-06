@@ -9,6 +9,29 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.4.3",
+    date: "2026-04-06",
+    entries: [
+      {
+        category: "New Features",
+        items: [
+          "Added a 'My Tournaments' link to the header so you can quickly jump to your tournaments without logging in.",
+          "Added a burger menu for mobile navigation on the landing page and logged-out header.",
+          "The join display screen now shows the join URL in a larger, cleaner format — easier to read across the room.",
+        ],
+      },
+      {
+        category: "Fixes & Polish",
+        items: [
+          "Fixed a bug where both players agreeing on a result could auto-complete the match — organiser confirmation is now always required.",
+          "The organiser's matches view no longer scrolls back to the top when a result is entered or submitted.",
+          "Standings table is less cramped when the deck column is shown.",
+          "Performance improvements — faster page loads with better font handling and image optimisation.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.4.1",
     date: "2026-03-28",
     entries: [

@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.4.3] - 2026-04-06
+
+### Added
+- "My Tournaments" link added to the logged-out header navigation.
+- Burger menu for mobile on the landing page nav and logged-out header.
+- Join display screen now renders the join URL in a larger, cleaner layout.
+
+### Changed
+- Lighthouse performance pass: preloaded fonts, explicit image dimensions for CLS, `priority` flag on LCP images.
+- Standings table density tightened when the deck column is present.
+- Removed unused constants.
+
+### Fixed
+- Player agreement on a result no longer auto-completes the match — organiser confirmation is always required.
+- Added `'conflict'` to the `confirmed_by` check constraint on `tournament_matches`.
+- Organiser matches view no longer scrolls back to the top when a result is entered or submitted by a player. Root causes: `fetchTournament` was included in `refreshTrigger` deps (triggering `loading=true`); `fetchMatches` was setting `matchesLoading=true` on background refreshes. Both fixed.
+
+---
+
 ## [0.4.1] - 2026-03-28
 
 ### Changed
