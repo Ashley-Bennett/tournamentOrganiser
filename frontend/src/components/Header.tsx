@@ -282,40 +282,95 @@ const Header: React.FC = () => {
               </Drawer>
             </>
           ) : (
-            /* Unauthenticated — shown on auth pages (/login, /register, etc.) */
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
-                What&apos;s New
-              </Button>
-              <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+            /* Unauthenticated */
+            <>
+              {/* Desktop */}
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={1}
+                sx={{ display: { xs: "none", sm: "flex" } }}
+              >
+                <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
+                  What&apos;s New
+                </Button>
+                <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+                  <IconButton
+                    onClick={toggleTheme}
+                    size="small"
+                    sx={{ color: TEXT_MUTED, "&:hover": { color: "white" } }}
+                  >
+                    {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
+                <Button component={RouterLink} to="/login" sx={navBtnSx}>
+                  Log in
+                </Button>
+                <Button
+                  component={RouterLink}
+                  to="/register"
+                  variant="contained"
+                  sx={{
+                    bgcolor: ACCENT,
+                    "&:hover": { bgcolor: "#b8003f" },
+                    textTransform: "none",
+                    fontWeight: 600,
+                    borderRadius: "8px",
+                    px: 2.5,
+                    py: 0.75,
+                  }}
+                >
+                  Sign up
+                </Button>
+              </Stack>
+
+              {/* Mobile */}
+              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ display: { xs: "flex", sm: "none" } }}>
+                <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
+                  <IconButton
+                    onClick={toggleTheme}
+                    size="small"
+                    sx={{ color: TEXT_MUTED, "&:hover": { color: "white" } }}
+                  >
+                    {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
                 <IconButton
-                  onClick={toggleTheme}
-                  size="small"
+                  onClick={() => setDrawerOpen(true)}
+                  aria-label="Open navigation menu"
                   sx={{ color: TEXT_MUTED, "&:hover": { color: "white" } }}
                 >
-                  {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                  <MenuIcon />
                 </IconButton>
-              </Tooltip>
-              <Button component={RouterLink} to="/login" sx={navBtnSx}>
-                Log in
-              </Button>
-              <Button
-                component={RouterLink}
-                to="/register"
-                variant="contained"
-                sx={{
-                  bgcolor: ACCENT,
-                  "&:hover": { bgcolor: "#b8003f" },
-                  textTransform: "none",
-                  fontWeight: 600,
-                  borderRadius: "8px",
-                  px: 2.5,
-                  py: 0.75,
-                }}
-              >
-                Sign up
-              </Button>
-            </Stack>
+              </Stack>
+
+              {/* Mobile drawer */}
+              <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+                <Box sx={{ width: 260, pt: 2 }} role="navigation">
+                  <List disablePadding>
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => handleNavClick("/whats-new")}>
+                        <ListItemText primary="What's New" />
+                      </ListItemButton>
+                    </ListItem>
+                    <Divider sx={{ my: 1 }} />
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => handleNavClick("/login")}>
+                        <ListItemText primary="Log in" />
+                      </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                      <ListItemButton
+                        onClick={() => handleNavClick("/register")}
+                        sx={{ color: ACCENT, fontWeight: 600 }}
+                      >
+                        <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 600, color: ACCENT }} />
+                      </ListItemButton>
+                    </ListItem>
+                  </List>
+                </Box>
+              </Drawer>
+            </>
           )}
         </Stack>
       </Container>
