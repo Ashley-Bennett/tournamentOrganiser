@@ -170,18 +170,18 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                   </Box>
                 </TableCell>
                 {deckMap && (
-                  <TableCell sx={{ px: 0.5, py: 0, width: size === "small" ? 88 : 108 }}>
+                  <TableCell sx={{ px: 0.5, py: 0, width: size === "small" ? 72 : 108 }}>
                     <Box display="flex" alignItems="center" gap={0.25}>
                       {deckMap.get(player.id)?.[0] != null && (
                         <NormalizedSprite
                           src={getSpriteUrl(deckMap.get(player.id)![0]!)}
-                          size={size === "small" ? 40 : 50}
+                          size={size === "small" ? 34 : 50}
                         />
                       )}
                       {deckMap.get(player.id)?.[1] != null && (
                         <NormalizedSprite
                           src={getSpriteUrl(deckMap.get(player.id)![1]!)}
-                          size={size === "small" ? 40 : 50}
+                          size={size === "small" ? 34 : 50}
                         />
                       )}
                     </Box>
@@ -260,10 +260,17 @@ const StandingsTable: React.FC<Props> = ({ standings, droppedMap, deckMap, curre
   }, [standings, columnCount]);
 
   // Progressively tighten density as column count increases
+  const hasDeck = !!deckMap;
   const tableSize = columnCount > 1 ? "small" : "medium";
   const cellPy = columnCount === 3 ? 0.4 : columnCount === 2 ? 0.6 : undefined;
-  // Reduce horizontal padding in multi-col so 6 columns fit without overflow
-  const cellPx = columnCount === 3 ? 0.75 : columnCount === 2 ? 1 : undefined;
+  // Reduce horizontal padding in multi-col so columns fit without overflow;
+  // tighten further when deck column is present (adds ~72–88px per chunk)
+  const cellPx =
+    columnCount === 3
+      ? hasDeck ? 0.4 : 0.75
+      : columnCount === 2
+        ? hasDeck ? 0.6 : 1
+        : hasDeck ? 0.75 : undefined;
 
   return (
     <Box sx={{ display: "flex", gap: 2, alignItems: "stretch", height: "100%" }}>
