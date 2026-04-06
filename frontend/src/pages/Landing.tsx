@@ -201,6 +201,18 @@ export default function Landing() {
             <Stack direction="row" spacing={1} alignItems="center" sx={{ display: { xs: "none", sm: "flex" } }}>
               <Button
                 component={Link}
+                to="/my-tournaments"
+                sx={{
+                  color: TEXT_MUTED,
+                  textTransform: "none",
+                  fontWeight: 500,
+                  "&:hover": { color: "white", bgcolor: "transparent" },
+                }}
+              >
+                My Tournaments
+              </Button>
+              <Button
+                component={Link}
                 to="/whats-new"
                 sx={{
                   color: TEXT_MUTED,
@@ -274,6 +286,11 @@ export default function Landing() {
             <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
               <Box sx={{ width: 260, pt: 2 }} role="navigation">
                 <List disablePadding>
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={() => { navigate("/my-tournaments"); setDrawerOpen(false); }}>
+                      <ListItemText primary="My Tournaments" />
+                    </ListItemButton>
+                  </ListItem>
                   <ListItem disablePadding>
                     <ListItemButton onClick={() => { navigate("/whats-new"); setDrawerOpen(false); }}>
                       <ListItemText primary="What's New" />
