@@ -1,3 +1,4 @@
+import React from "react";
 import {
   Box,
   Button,
@@ -8,10 +9,17 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Divider,
 } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
+import MenuIcon from "@mui/icons-material/Menu";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { useThemeMode } from "../ThemeContext";
 import GroupsIcon from "@mui/icons-material/Groups";
@@ -151,6 +159,8 @@ const steps = [
 
 export default function Landing() {
   const { mode, toggleTheme } = useThemeMode();
+  const navigate = useNavigate();
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
 
   // Mode-aware colour tokens (nav and hero stay dark regardless)
   const textMuted = mode === "dark" ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.55)";
@@ -187,7 +197,8 @@ export default function Landing() {
             >
               Matchamp
             </Typography>
-            <Stack direction="row" spacing={1} alignItems="center">
+            {/* Desktop */}
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ display: { xs: "none", sm: "flex" } }}>
               <Button
                 component={Link}
                 to="/whats-new"
@@ -238,6 +249,50 @@ export default function Landing() {
                 Sign up
               </Button>
             </Stack>
+
+            {/* Mobile */}
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ display: { xs: "flex", sm: "none" } }}>
+              <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
+                <IconButton
+                  onClick={toggleTheme}
+                  size="small"
+                  sx={{ color: TEXT_MUTED, "&:hover": { color: "white" } }}
+                >
+                  {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+              <IconButton
+                onClick={() => setDrawerOpen(true)}
+                aria-label="Open navigation menu"
+                sx={{ color: TEXT_MUTED, "&:hover": { color: "white" } }}
+              >
+                <MenuIcon />
+              </IconButton>
+            </Stack>
+
+            {/* Mobile drawer */}
+            <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+              <Box sx={{ width: 260, pt: 2 }} role="navigation">
+                <List disablePadding>
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={() => { navigate("/whats-new"); setDrawerOpen(false); }}>
+                      <ListItemText primary="What's New" />
+                    </ListItemButton>
+                  </ListItem>
+                  <Divider sx={{ my: 1 }} />
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={() => { navigate("/login"); setDrawerOpen(false); }}>
+                      <ListItemText primary="Log in" />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={() => { navigate("/register"); setDrawerOpen(false); }}>
+                      <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 600, color: ACCENT }} />
+                    </ListItemButton>
+                  </ListItem>
+                </List>
+              </Box>
+            </Drawer>
           </Stack>
         </Container>
       </Box>
