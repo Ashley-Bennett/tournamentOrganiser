@@ -51,7 +51,7 @@ describe("calculateOpponentMatchWinPercentage", () => {
   });
 
   it("returns the win rate of a single opponent", () => {
-    const opp = player("B", 2, 1, 0); // 2 wins out of 3 matches = 0.666…
+    const opp = player("B", 2, 1, 0); // 2 wins out of 3 matches = 0.666… (between floor/cap)
     const p = player("A", 1, 0, 0, ["B"]);
     expect(calculateOpponentMatchWinPercentage(p, map(p, opp))).toBeCloseTo(
       2 / 3,
@@ -59,10 +59,29 @@ describe("calculateOpponentMatchWinPercentage", () => {
   });
 
   it("averages across multiple opponents", () => {
-    const strong = player("B", 3, 0, 0); // 1.0
-    const weak = player("C", 0, 3, 0); // 0.0
+    const strong = player("B", 3, 0, 0); // 1.0 → capped to 0.75
+    const weak = player("C", 0, 3, 0); // 0.0 → floored to 0.25
     const p = player("A", 0, 0, 0, ["B", "C"]);
     expect(calculateOpponentMatchWinPercentage(p, map(p, strong, weak))).toBeCloseTo(0.5);
+  });
+
+  it("counts draws as 0.5 wins per Pokemon TCG rules", () => {
+    // Ged: 2-1-1 → winValue = 2 + 0.5*1 = 2.5, matchesPlayed = 4 → 2.5/4 = 0.625
+    const ged = player("Ged", 2, 1, 1);
+    const ethan = player("Ethan", 3, 1, 0, ["Ged"]);
+    expect(calculateOpponentMatchWinPercentage(ethan, map(ethan, ged))).toBeCloseTo(0.625);
+  });
+
+  it("applies 25% floor to opponents with very poor records", () => {
+    const terrible = player("B", 0, 4, 0); // 0/4 = 0% → floored to 0.25
+    const p = player("A", 1, 0, 0, ["B"]);
+    expect(calculateOpponentMatchWinPercentage(p, map(p, terrible))).toBeCloseTo(0.25);
+  });
+
+  it("applies 75% cap to opponents with perfect records", () => {
+    const perfect = player("B", 4, 0, 0); // 4/4 = 100% → capped to 0.75
+    const p = player("A", 1, 0, 0, ["B"]);
+    expect(calculateOpponentMatchWinPercentage(p, map(p, perfect))).toBeCloseTo(0.75);
   });
 
   it("skips opponents with 0 matches played (avoids divide-by-zero)", () => {
@@ -77,10 +96,10 @@ describe("calculateOpponentMatchWinPercentage", () => {
   });
 
   it("only counts opponents found in map when some are missing", () => {
-    const real = player("B", 2, 0, 0); // 1.0
+    const real = player("B", 2, 0, 0); // 1.0 → capped to 0.75
     const p = player("A", 0, 0, 0, ["B", "ghost"]);
-    // Only B is counted, so result = 1.0
-    expect(calculateOpponentMatchWinPercentage(p, map(p, real))).toBeCloseTo(1.0);
+    // Only B is counted, so result = 0.75 (capped)
+    expect(calculateOpponentMatchWinPercentage(p, map(p, real))).toBeCloseTo(0.75);
   });
 });
 
@@ -95,25 +114,25 @@ describe("calculateOpponentOpponentMatchWinPercentage", () => {
   });
 
   it("computes OOMW% as the average of each opponent's OMW%", () => {
-    // Chain: A → B → C (C has 100% win rate)
+    // Chain: A → B → C (C has 100% win rate, capped to 0.75)
     const c = player("C", 3, 0, 0);
     const b = player("B", 1, 0, 0, ["C"]);
     const a = player("A", 1, 0, 0, ["B"]);
     const standings = map(a, b, c);
-    // B's OMW% = 1.0, so A's OOMW% = 1.0
+    // B's OMW% = 0.75 (capped), so A's OOMW% = 0.75
     expect(
       calculateOpponentOpponentMatchWinPercentage(a, standings),
-    ).toBeCloseTo(1.0);
+    ).toBeCloseTo(0.75);
   });
 
   it("averages when the player has multiple opponents with different OMW%s", () => {
     const c = player("C", 3, 0, 0); // strong
     const d = player("D", 0, 3, 0); // weak
-    const b1 = player("B1", 1, 0, 0, ["C"]); // OMW% = 1.0
-    const b2 = player("B2", 1, 0, 0, ["D"]); // OMW% = 0.0
+    const b1 = player("B1", 1, 0, 0, ["C"]); // OMW% = 0.75 (capped)
+    const b2 = player("B2", 1, 0, 0, ["D"]); // OMW% = 0.25 (floored)
     const a = player("A", 0, 0, 0, ["B1", "B2"]);
     const standings = map(a, b1, b2, c, d);
-    // OOMW% = (1.0 + 0.0) / 2 = 0.5
+    // OOMW% = (0.75 + 0.25) / 2 = 0.5
     expect(
       calculateOpponentOpponentMatchWinPercentage(a, standings),
     ).toBeCloseTo(0.5);

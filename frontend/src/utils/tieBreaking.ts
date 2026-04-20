@@ -44,7 +44,8 @@ export function calculateOpponentMatchWinPercentage(
   for (const opponentId of player.opponents) {
     const opponent = allStandings.get(opponentId);
     if (opponent && opponent.matchesPlayed > 0) {
-      const opponentWinPercentage = opponent.wins / opponent.matchesPlayed;
+      const winValue = opponent.wins + opponent.draws * 0.5;
+      const opponentWinPercentage = Math.min(0.75, Math.max(0.25, winValue / opponent.matchesPlayed));
       totalOpponentWinPercentage += opponentWinPercentage;
       validOpponents++;
     }
