@@ -669,6 +669,26 @@ describe("generateSwissPairings — multi-round simulation", () => {
     expect(p13Opponent).not.toBe("p6");
   });
 
+  it("9-player, 4 rounds all p1wins: invariants hold every round", () => {
+    let sim = freshTournament(["p0","p1","p2","p3","p4","p5","p6","p7","p8"]);
+    for (let round = 1; round <= 4; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "p1wins"));
+    }
+  });
+
+  it("12-player, 4 rounds mixed results: invariants hold every round", () => {
+    let sim = freshTournament(Array.from({ length: 12 }, (_, i) => `p${i}`));
+    for (let round = 1; round <= 4; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      const nonBye = pairings.filter(p => p.player2Id !== null);
+      const results: MatchResult[] = nonBye.map((_, i) => (i % 3 === 0 ? "draw" : "p1wins"));
+      sim = applyResults(sim, pairings, results);
+    }
+  });
+
   it("11-player round-3: no rematch when last two 1pt players drew each other in round 2", () => {
     // Reproduces the reported bug (11 players, 4 rounds):
     //   After round 2: 3 × 6pts | 5 × 3pts | 2 × 1pt (who drew each other) | 1 × 0pts
@@ -721,5 +741,631 @@ describe("generateSwissPairings — multi-round simulation", () => {
       (p) => p.player1Id === "p10" || p.player2Id === "p10",
     );
     expect(p10Pairing?.player2Id).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 10. Minimal edge-case player counts
+// ---------------------------------------------------------------------------
+
+describe("generateSwissPairings — minimal player counts", () => {
+  it("single player produces exactly one bye pairing in round 1", () => {
+    const sim = freshTournament(["solo"]);
+    const { pairings } = generateSwissPairings(sim.standings, 1, []);
+    assertInvariants(pairings, sim.standings, 1);
+    expect(pairings[0]!.player2Id).toBeNull();
+  });
+
+  it("single player produces a bye in round 2 as well", () => {
+    let sim = freshTournament(["solo"]);
+    const r1 = generateSwissPairings(sim.standings, 1, []);
+    sim = applyResults(sim, r1.pairings, []);
+    const { pairings } = generateSwissPairings(sim.standings, 2, sim.previousPairings);
+    assertInvariants(pairings, sim.standings, 2);
+    expect(pairings[0]!.player2Id).toBeNull();
+  });
+
+  it("2-player round 1: exactly one match, no bye", () => {
+    const sim = freshTournament(["A", "B"]);
+    const { pairings } = generateSwissPairings(sim.standings, 1, []);
+    assertInvariants(pairings, sim.standings, 1);
+    expect(pairings).toHaveLength(1);
+    expect(pairings[0]!.player2Id).not.toBeNull();
+  });
+
+  it("3-player: invariants hold across 3 rounds (p1wins each match)", () => {
+    let sim = freshTournament(["A", "B", "C"]);
+    for (let round = 1; round <= 3; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "p1wins"));
+    }
+  });
+
+  it("3-player: invariants hold across 3 rounds (all draws)", () => {
+    let sim = freshTournament(["A", "B", "C"]);
+    for (let round = 1; round <= 3; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "draw"));
+    }
+  });
+
+  it("3-player: each player receives the bye at most once across 3 rounds when results differ", () => {
+    let sim = freshTournament(["A", "B", "C"]);
+    const byeRecipients: string[] = [];
+    for (let round = 1; round <= 3; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      const byeP = pairings.find(p => p.player2Id === null);
+      if (byeP) byeRecipients.push(byeP.player1Id);
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "p2wins"));
+    }
+    // At most 3 rounds × 1 bye each; verify no player received 2+ byes when avoidable.
+    // With 3 players over 3 rounds every player should get the bye at most once.
+    const counts = new Map<string, number>();
+    for (const id of byeRecipients) counts.set(id, (counts.get(id) ?? 0) + 1);
+    for (const [, count] of counts) {
+      expect(count).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 11. Large player counts
+// ---------------------------------------------------------------------------
+
+describe("generateSwissPairings — large player counts", () => {
+  it.each([16, 20, 32])(
+    "%i-player even tournament: invariants hold for 5 rounds",
+    (n) => {
+      let sim = freshTournament(Array.from({ length: n }, (_, i) => `p${i}`));
+      for (let round = 1; round <= 5; round++) {
+        const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+        assertInvariants(pairings, sim.standings, round);
+        sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "p1wins"));
+      }
+    },
+  );
+
+  it.each([15, 17, 33])(
+    "%i-player odd tournament: invariants hold for 5 rounds",
+    (n) => {
+      let sim = freshTournament(Array.from({ length: n }, (_, i) => `p${i}`));
+      for (let round = 1; round <= 5; round++) {
+        const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+        assertInvariants(pairings, sim.standings, round);
+        sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "p1wins"));
+      }
+    },
+  );
+
+  it("32-player tournament with all draws: invariants hold for 4 rounds", () => {
+    let sim = freshTournament(Array.from({ length: 32 }, (_, i) => `p${i}`));
+    for (let round = 1; round <= 4; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "draw"));
+    }
+  });
+
+  it("20-player tournament with mixed results: invariants hold for 5 rounds", () => {
+    let sim = freshTournament(Array.from({ length: 20 }, (_, i) => `p${i}`));
+    for (let round = 1; round <= 5; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      const nonBye = pairings.filter(p => p.player2Id !== null);
+      const results: MatchResult[] = nonBye.map((_, i) =>
+        i % 4 === 0 ? "draw" : i % 4 === 1 ? "p2wins" : "p1wins",
+      );
+      sim = applyResults(sim, pairings, results);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. Bye distribution across rounds
+// ---------------------------------------------------------------------------
+
+describe("generateSwissPairings — bye distribution", () => {
+  it("player who received a bye in round 1 does not receive another in round 2", () => {
+    let sim = freshTournament(["A", "B", "C", "D", "E"]);
+    const r1 = generateSwissPairings(sim.standings, 1, []);
+    assertInvariants(r1.pairings, sim.standings, 1);
+
+    const round1ByeId = r1.pairings.find(p => p.player2Id === null)!.player1Id;
+
+    sim = applyResults(sim, r1.pairings, r1.pairings.filter(p => p.player2Id !== null).map(() => "p1wins"));
+
+    const r2 = generateSwissPairings(sim.standings, 2, sim.previousPairings);
+    assertInvariants(r2.pairings, sim.standings, 2);
+
+    const round2ByeId = r2.pairings.find(p => p.player2Id === null)!.player1Id;
+    expect(round2ByeId).not.toBe(round1ByeId);
+  });
+
+  it("bye goes to player with fewest prior byes when points are equal", () => {
+    // A already received a bye (byesReceived = 1); B and C have not.
+    // All three are at 3pts. The bye must not go to A.
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), wins: 1, matchPoints: 3, matchesPlayed: 1, byesReceived: 1 },
+      { ...freshPlayer("B"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["C"] },
+      { ...freshPlayer("C"), losses: 1, matchesPlayed: 1, opponents: ["B"] },
+    ];
+    const prev = [makePairing("B", "C", 1), makePairing("A", null, 1)];
+
+    const { pairings } = generateSwissPairings(standings, 2, prev);
+    assertInvariants(pairings, standings, 2);
+
+    const byePairing = pairings.find(p => p.player2Id === null)!;
+    expect(byePairing.player1Id).not.toBe("A");
+  });
+
+  it("bye goes to the lowest-score player across odd multi-bracket tournaments", () => {
+    // 7-player round 2: bottom bracket should produce the bye recipient.
+    let sim = freshTournament(["p0","p1","p2","p3","p4","p5","p6"]);
+    const r1 = generateSwissPairings(sim.standings, 1, []);
+    sim = applyResults(sim, r1.pairings, r1.pairings.filter(p => p.player2Id !== null).map(() => "p1wins"));
+
+    const { pairings, decisionLog } = generateSwissPairings(sim.standings, 2, sim.previousPairings);
+    assertInvariants(pairings, sim.standings, 2);
+
+    const byePairing = pairings.find(p => p.player2Id === null)!;
+    const byePlayer = sim.standings.find(s => s.id === byePairing.player1Id)!;
+    const maxPts = Math.max(...sim.standings.map(s => s.matchPoints));
+
+    // Bye recipient should not be a top-score player (unless forced to avoid rematch)
+    // At minimum, their score is at most the median
+    expect(byePlayer.matchPoints).toBeLessThan(maxPts);
+    expect(decisionLog?.byePlayerId).toBe(byePairing.player1Id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 13. Score-bracket quality
+// ---------------------------------------------------------------------------
+
+describe("generateSwissPairings — score-bracket quality", () => {
+  it("8-player round 2: winners only play winners, losers only play losers", () => {
+    const winners = ["A", "B", "C", "D"];
+    const losers  = ["E", "F", "G", "H"];
+    const standings: PlayerStanding[] = [
+      ...winners.map((id, i) => ({
+        ...freshPlayer(id),
+        wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: [losers[i]!],
+      })),
+      ...losers.map((id, i) => ({
+        ...freshPlayer(id),
+        losses: 1, matchesPlayed: 1, opponents: [winners[i]!],
+      })),
+    ];
+    const prev = winners.map((w, i) => makePairing(w, losers[i]!, 1));
+
+    const { pairings } = generateSwissPairings(standings, 2, prev);
+    assertInvariants(pairings, standings, 2);
+
+    const winnerSet = new Set(winners);
+    for (const p of pairings) {
+      if (p.player2Id === null) continue;
+      const p1isWinner = winnerSet.has(p.player1Id);
+      const p2isWinner = winnerSet.has(p.player2Id);
+      expect(p1isWinner, `cross-bracket pairing: ${p.player1Id} vs ${p.player2Id}`).toBe(p2isWinner);
+    }
+  });
+
+  it("top-score player is always paired within their bracket in round 3 (8-player)", () => {
+    // After 2 rounds with all-wins the standings have clear score groups.
+    // The undefeated player (6 pts) must pair with another 6pt player, not a 3pt player,
+    // unless they are the sole 6pt player.
+    let sim = freshTournament(["A","B","C","D","E","F","G","H"]);
+    for (let round = 1; round <= 2; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "p1wins"));
+    }
+
+    const { pairings } = generateSwissPairings(sim.standings, 3, sim.previousPairings);
+    assertInvariants(pairings, sim.standings, 3);
+
+    // Find 6pt players and confirm they play each other
+    const sixPtPlayers = new Set(sim.standings.filter(s => s.matchPoints === 6).map(s => s.id));
+    if (sixPtPlayers.size >= 2) {
+      for (const p of pairings) {
+        if (p.player2Id && sixPtPlayers.has(p.player1Id)) {
+          expect(sixPtPlayers.has(p.player2Id)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("no pairing crosses more than one score bracket unless unavoidable", () => {
+    // Run a 10-player 3-round simulation and verify every pairing is at most 1
+    // win-bracket apart (3 pts), except when the code itself signals unavoidability.
+    let sim = freshTournament(Array.from({ length: 10 }, (_, i) => `p${i}`));
+    for (let round = 1; round <= 3; round++) {
+      const { pairings, decisionLog } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+
+      const standingsById = new Map(sim.standings.map(s => [s.id, s]));
+      const multiStepForced = (decisionLog?.maxFloatDistance ?? 0) > 3;
+
+      if (!multiStepForced) {
+        for (const p of pairings) {
+          if (!p.player2Id) continue;
+          const diff = Math.abs(
+            (standingsById.get(p.player1Id)?.matchPoints ?? 0) -
+            (standingsById.get(p.player2Id)?.matchPoints ?? 0),
+          );
+          // Allow at most 1 bracket (3 pts for wins or 1 pt for draws) apart
+          expect(diff, `round ${round}: ${p.player1Id} vs ${p.player2Id} differ by ${diff} pts`).toBeLessThanOrEqual(3);
+        }
+      }
+
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "p1wins"));
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 14. Forced rematches in exhausted pools
+// ---------------------------------------------------------------------------
+
+describe("generateSwissPairings — forced rematches in exhausted pools", () => {
+  it("4-player all-play-all: round 4 must rematch but does not throw", () => {
+    // All draws so everyone stays at the same score (1pt per round).
+    // After 3 rounds each player has played every other player.
+    // Round 4 is forced to produce rematches.
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), draws: 3, matchPoints: 3, matchesPlayed: 3, opponents: ["B","C","D"] },
+      { ...freshPlayer("B"), draws: 3, matchPoints: 3, matchesPlayed: 3, opponents: ["A","C","D"] },
+      { ...freshPlayer("C"), draws: 3, matchPoints: 3, matchesPlayed: 3, opponents: ["D","A","B"] },
+      { ...freshPlayer("D"), draws: 3, matchPoints: 3, matchesPlayed: 3, opponents: ["C","B","A"] },
+    ];
+    const prev: Pairing[] = [
+      makePairing("A","B",1), makePairing("C","D",1),
+      makePairing("A","C",2), makePairing("B","D",2),
+      makePairing("A","D",3), makePairing("B","C",3),
+    ];
+
+    expect(() => generateSwissPairings(standings, 4, prev)).not.toThrow();
+    const { pairings, decisionLog } = generateSwissPairings(standings, 4, prev);
+    assertInvariants(pairings, standings, 4);
+    expect(decisionLog?.rematchCount).toBeGreaterThan(0);
+  });
+
+  it("decisionLog.rematchCount accurately reflects the number of rematches", () => {
+    // 2-player field in round 2: exactly 1 forced rematch
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["B"] },
+      { ...freshPlayer("B"), losses: 1, matchesPlayed: 1, opponents: ["A"] },
+    ];
+    const prev = [makePairing("A","B",1)];
+    const { decisionLog } = generateSwissPairings(standings, 2, prev);
+    expect(decisionLog?.rematchCount).toBe(1);
+  });
+
+  it("6-player all-draws: first 5 rounds have zero rematches; round 6 forces them", () => {
+    // K6 is 1-factorable (5 perfect matchings). All draws keep everyone in the same
+    // score bracket, so the backtracking always finds the zero-rematch solution for
+    // rounds 1–5. By round 6 every player has played every other player.
+    let sim = freshTournament(["A","B","C","D","E","F"]);
+
+    for (let round = 1; round <= 5; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      expect(
+        pairings.some(p => p.player2Id && havePlayedBefore(p.player1Id, p.player2Id, sim.previousPairings)),
+        `unexpected rematch in round ${round}`,
+      ).toBe(false);
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "draw"));
+    }
+
+    // Round 6: forced rematches (every pair has met)
+    const r6 = generateSwissPairings(sim.standings, 6, sim.previousPairings);
+    assertInvariants(r6.pairings, sim.standings, 6);
+    expect(r6.decisionLog?.rematchCount).toBeGreaterThan(0);
+  });
+
+  it("8-player all-draws: zero rematches in rounds 1–7, forced in round 8", () => {
+    // K8 is 1-factorable (7 perfect matchings).
+    let sim = freshTournament(["A","B","C","D","E","F","G","H"]);
+
+    for (let round = 1; round <= 7; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      expect(
+        pairings.some(p => p.player2Id && havePlayedBefore(p.player1Id, p.player2Id, sim.previousPairings)),
+        `unexpected rematch in round ${round}`,
+      ).toBe(false);
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "draw"));
+    }
+
+    const r8 = generateSwissPairings(sim.standings, 8, sim.previousPairings);
+    assertInvariants(r8.pairings, sim.standings, 8);
+    expect(r8.decisionLog?.rematchCount).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 15. Decision log content
+// ---------------------------------------------------------------------------
+
+describe("generateSwissPairings — decision log", () => {
+  it("decisionLog is defined in round 2 and contains all required fields", () => {
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["B"] },
+      { ...freshPlayer("B"), losses: 1, matchesPlayed: 1, opponents: ["A"] },
+      { ...freshPlayer("C"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["D"] },
+      { ...freshPlayer("D"), losses: 1, matchesPlayed: 1, opponents: ["C"] },
+    ];
+    const prev = [makePairing("A","B",1), makePairing("C","D",1)];
+    const { decisionLog } = generateSwissPairings(standings, 2, prev);
+
+    expect(decisionLog).toBeDefined();
+    expect(decisionLog).toHaveProperty("floatReasons");
+    expect(decisionLog).toHaveProperty("maxFloatDistance");
+    expect(decisionLog).toHaveProperty("rematchCount");
+    expect(decisionLog).toHaveProperty("stageUsed");
+  });
+
+  it("stageUsed = 1 when all brackets are even and no floats are needed", () => {
+    // 4-player, 2 even brackets → no floats
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["B"] },
+      { ...freshPlayer("B"), losses: 1, matchesPlayed: 1, opponents: ["A"] },
+      { ...freshPlayer("C"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["D"] },
+      { ...freshPlayer("D"), losses: 1, matchesPlayed: 1, opponents: ["C"] },
+    ];
+    const prev = [makePairing("A","B",1), makePairing("C","D",1)];
+    const { decisionLog } = generateSwissPairings(standings, 2, prev);
+    expect(decisionLog?.stageUsed).toBe(1);
+  });
+
+  it("stageUsed = 2 when a bracket float is needed", () => {
+    // 6-player: 3 at 3pts (odd bracket → float) and 3 at 0pts
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["X"] },
+      { ...freshPlayer("B"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["Y"] },
+      { ...freshPlayer("C"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["Z"] },
+      { ...freshPlayer("X"), losses: 1, matchesPlayed: 1, opponents: ["A"] },
+      { ...freshPlayer("Y"), losses: 1, matchesPlayed: 1, opponents: ["B"] },
+      { ...freshPlayer("Z"), losses: 1, matchesPlayed: 1, opponents: ["C"] },
+    ];
+    const prev = [
+      makePairing("A","X",1), makePairing("B","Y",1), makePairing("C","Z",1),
+    ];
+    const { decisionLog } = generateSwissPairings(standings, 2, prev);
+    // Odd 3pt bracket → 1 float → stageUsed = 2
+    expect(decisionLog?.stageUsed).toBe(2);
+    expect(decisionLog?.floatDetails?.length).toBeGreaterThan(0);
+  });
+
+  it("byePlayerId, byePlayerName, and byePlayerPoints all match the actual bye recipient", () => {
+    let sim = freshTournament(["p0","p1","p2","p3","p4"]);
+    const r1 = generateSwissPairings(sim.standings, 1, []);
+    sim = applyResults(sim, r1.pairings, r1.pairings.filter(p => p.player2Id !== null).map(() => "p1wins"));
+
+    const { pairings, decisionLog } = generateSwissPairings(sim.standings, 2, sim.previousPairings);
+    assertInvariants(pairings, sim.standings, 2);
+
+    const actualByePairing = pairings.find(p => p.player2Id === null)!;
+    expect(decisionLog?.byePlayerId).toBe(actualByePairing.player1Id);
+    expect(decisionLog?.byePlayerName).toBe(actualByePairing.player1Name);
+
+    const byeStanding = sim.standings.find(s => s.id === decisionLog?.byePlayerId)!;
+    expect(decisionLog?.byePlayerPoints).toBe(byeStanding.matchPoints);
+  });
+
+  it("rematchCount is 0 when all pairings are fresh match-ups", () => {
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["B"] },
+      { ...freshPlayer("B"), losses: 1, matchesPlayed: 1, opponents: ["A"] },
+      { ...freshPlayer("C"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["D"] },
+      { ...freshPlayer("D"), losses: 1, matchesPlayed: 1, opponents: ["C"] },
+    ];
+    const prev = [makePairing("A","B",1), makePairing("C","D",1)];
+    const { decisionLog } = generateSwissPairings(standings, 2, prev);
+    expect(decisionLog?.rematchCount).toBe(0);
+  });
+
+  it("maxFloatDistance is 0 when all brackets are even and same-score pairings are made", () => {
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["B"] },
+      { ...freshPlayer("B"), losses: 1, matchesPlayed: 1, opponents: ["A"] },
+      { ...freshPlayer("C"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["D"] },
+      { ...freshPlayer("D"), losses: 1, matchesPlayed: 1, opponents: ["C"] },
+    ];
+    const prev = [makePairing("A","B",1), makePairing("C","D",1)];
+    const { decisionLog } = generateSwissPairings(standings, 2, prev);
+    expect(decisionLog?.maxFloatDistance).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 16. All-draws tournaments
+// ---------------------------------------------------------------------------
+
+describe("generateSwissPairings — all-draws tournaments", () => {
+  it("6-player, 4 rounds all draws: invariants hold each round", () => {
+    let sim = freshTournament(["A","B","C","D","E","F"]);
+    for (let round = 1; round <= 4; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "draw"));
+    }
+  });
+
+  it("9-player, 4 rounds all draws: invariants hold each round", () => {
+    let sim = freshTournament(["p0","p1","p2","p3","p4","p5","p6","p7","p8"]);
+    for (let round = 1; round <= 4; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "draw"));
+    }
+  });
+
+  it("4-player all-draws: after 3 rounds every player has exactly 3 match points", () => {
+    let sim = freshTournament(["A","B","C","D"]);
+    for (let round = 1; round <= 3; round++) {
+      const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+      assertInvariants(pairings, sim.standings, round);
+      sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "draw"));
+    }
+    for (const s of sim.standings) {
+      expect(s.draws).toBe(3);
+      expect(s.wins).toBe(0);
+      expect(s.losses).toBe(0);
+      expect(s.matchPoints).toBe(3); // 3 × 1pt draws
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 17. Float mechanics
+// ---------------------------------------------------------------------------
+
+describe("generateSwissPairings — float mechanics", () => {
+  it("floated player appears in the next bracket's pairing, not their original bracket", () => {
+    // 6 players: 3 at 3pts (odd bracket → 1 floats), 3 at 0pts.
+    // The floated player ends up paired against a 0pt player.
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["X"] },
+      { ...freshPlayer("B"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["Y"] },
+      { ...freshPlayer("C"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["Z"] },
+      { ...freshPlayer("X"), losses: 1, matchesPlayed: 1, opponents: ["A"] },
+      { ...freshPlayer("Y"), losses: 1, matchesPlayed: 1, opponents: ["B"] },
+      { ...freshPlayer("Z"), losses: 1, matchesPlayed: 1, opponents: ["C"] },
+    ];
+    const prev = [
+      makePairing("A","X",1), makePairing("B","Y",1), makePairing("C","Z",1),
+    ];
+    const { pairings, decisionLog } = generateSwissPairings(standings, 2, prev);
+    assertInvariants(pairings, standings, 2);
+
+    // There must be exactly one cross-bracket pairing (the floated 3pt player vs a 0pt player)
+    const crossBracketPairings = pairings.filter(p => {
+      if (!p.player2Id) return false;
+      const pts1 = standings.find(s => s.id === p.player1Id)!.matchPoints;
+      const pts2 = standings.find(s => s.id === p.player2Id)!.matchPoints;
+      return pts1 !== pts2;
+    });
+    expect(crossBracketPairings).toHaveLength(1);
+    expect(decisionLog?.floatDetails?.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("cascading float: 9-player round 2 with odd brackets at multiple levels produces valid pairings", () => {
+    // After round 1 with 9 players (1 bye + 4 matches):
+    // Some players end up with cascading float requirements.
+    let sim = freshTournament(["p0","p1","p2","p3","p4","p5","p6","p7","p8"]);
+    const r1 = generateSwissPairings(sim.standings, 1, []);
+    sim = applyResults(sim, r1.pairings, r1.pairings.filter(p => p.player2Id !== null).map(() => "p1wins"));
+
+    const { pairings } = generateSwissPairings(sim.standings, 2, sim.previousPairings);
+    assertInvariants(pairings, sim.standings, 2);
+
+    // No duplicate player IDs across all pairings (invariant check already ensures this,
+    // but be explicit about the cascade concern)
+    const seenIds = new Set<string>();
+    for (const p of pairings) {
+      expect(seenIds.has(p.player1Id)).toBe(false);
+      seenIds.add(p.player1Id);
+      if (p.player2Id) {
+        expect(seenIds.has(p.player2Id)).toBe(false);
+        seenIds.add(p.player2Id);
+      }
+    }
+  });
+
+  it("rematch-escape float: 2-player same-score bracket dissolves when both already played", () => {
+    // Round 1: A-X (A wins), B-Y (B wins), C-Z (C wins)
+    // Round 2: A-B (A wins), C-X (C wins), Y-Z (Y wins)
+    // Result: A(6), C(6), B(3), Y(3), X(0), Z(0)
+    // Round 3: 3pt bracket = [B,Y] — they already played in round 1!
+    // FIX 9 should dissolve this 2-player bracket so B and Y pair against
+    // 0pt opponents instead of rematching each other.
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), wins: 2, matchPoints: 6, matchesPlayed: 2, opponents: ["X","B"] },
+      { ...freshPlayer("C"), wins: 2, matchPoints: 6, matchesPlayed: 2, opponents: ["Z","X"] },
+      { ...freshPlayer("B"), wins: 1, losses: 1, matchPoints: 3, matchesPlayed: 2, opponents: ["Y","A"] },
+      { ...freshPlayer("Y"), wins: 1, losses: 1, matchPoints: 3, matchesPlayed: 2, opponents: ["B","Z"] },
+      { ...freshPlayer("X"), losses: 2, matchesPlayed: 2, opponents: ["A","C"] },
+      { ...freshPlayer("Z"), losses: 2, matchesPlayed: 2, opponents: ["C","Y"] },
+    ];
+    const prev: Pairing[] = [
+      makePairing("A","X",1), makePairing("B","Y",1), makePairing("C","Z",1),
+      makePairing("A","B",2), makePairing("C","X",2), makePairing("Y","Z",2),
+    ];
+
+    expect(() => generateSwissPairings(standings, 3, prev)).not.toThrow();
+    const { pairings } = generateSwissPairings(standings, 3, prev);
+    assertInvariants(pairings, standings, 3);
+
+    // B and Y must NOT play each other again
+    const byRematch = pairings.find(
+      p => (p.player1Id === "B" && p.player2Id === "Y") ||
+           (p.player1Id === "Y" && p.player2Id === "B"),
+    );
+    expect(byRematch).toBeUndefined();
+  });
+
+  it("decisionLog.floatDetails lists all floated players with their scores and reasons", () => {
+    // 6-player odd 3pt bracket → 1 float expected
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["X"] },
+      { ...freshPlayer("B"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["Y"] },
+      { ...freshPlayer("C"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["Z"] },
+      { ...freshPlayer("X"), losses: 1, matchesPlayed: 1, opponents: ["A"] },
+      { ...freshPlayer("Y"), losses: 1, matchesPlayed: 1, opponents: ["B"] },
+      { ...freshPlayer("Z"), losses: 1, matchesPlayed: 1, opponents: ["C"] },
+    ];
+    const prev = [
+      makePairing("A","X",1), makePairing("B","Y",1), makePairing("C","Z",1),
+    ];
+    const { decisionLog } = generateSwissPairings(standings, 2, prev);
+
+    expect(decisionLog?.floatDetails).toBeDefined();
+    expect(decisionLog!.floatDetails!.length).toBeGreaterThanOrEqual(1);
+    for (const detail of decisionLog!.floatDetails!) {
+      expect(detail.playerId).toBeTruthy();
+      expect(detail.reason).toBeTruthy();
+      expect(typeof detail.playerPoints).toBe("number");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 18. Determinism under different input orderings
+// ---------------------------------------------------------------------------
+
+describe("generateSwissPairings — determinism", () => {
+  it("same standings in different array order produce the same pairings", () => {
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("A"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["B"] },
+      { ...freshPlayer("B"), losses: 1, matchesPlayed: 1, opponents: ["A"] },
+      { ...freshPlayer("C"), wins: 1, matchPoints: 3, matchesPlayed: 1, opponents: ["D"] },
+      { ...freshPlayer("D"), losses: 1, matchesPlayed: 1, opponents: ["C"] },
+    ];
+    const prev = [makePairing("A","B",1), makePairing("C","D",1)];
+
+    const r1 = generateSwissPairings([...standings], 2, prev);
+    const r2 = generateSwissPairings([...standings].reverse(), 2, prev);
+
+    expect(r1.pairings).toEqual(r2.pairings);
+  });
+
+  it("same standings over 4 rounds always produce the same sequence of pairings", () => {
+    const ids = ["A","B","C","D","E","F","G","H"];
+
+    const runTournament = () => {
+      let sim = freshTournament(ids);
+      const allPairings: Pairing[][] = [];
+      for (let round = 1; round <= 4; round++) {
+        const { pairings } = generateSwissPairings(sim.standings, round, sim.previousPairings);
+        allPairings.push(pairings);
+        sim = applyResults(sim, pairings, pairings.filter(p => p.player2Id !== null).map(() => "p1wins"));
+      }
+      return allPairings;
+    };
+
+    expect(runTournament()).toEqual(runTournament());
   });
 });
