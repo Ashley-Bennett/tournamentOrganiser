@@ -626,6 +626,49 @@ describe("generateSwissPairings — multi-round simulation", () => {
     }
   });
 
+  it("14-player even round-2: two tied players must not rematch (dissolve 2-player 1pt bracket)", () => {
+    // Reported scenario: 14 players, round 1 produces 6 wins, 6 losses, 1 draw.
+    // Brackets for round 2: [3pts×6] [1pt×2 — the two who drew] [0pts×6].
+    // The 2-player 1pt bracket must be fully dissolved so both players pair
+    // against 0pt opponents rather than rematching each other.
+    const players = ["p0","p1","p2","p3","p4","p5","p6","p7","p8","p9","p10","p11","p12","p13"];
+    let sim = freshTournament(players);
+
+    // Round 1: p0–p5 win; p6 draws p13; p7–p12 lose
+    const r1: Pairing[] = [
+      makePairing("p0","p7",1), makePairing("p1","p8",1), makePairing("p2","p9",1),
+      makePairing("p3","p10",1), makePairing("p4","p11",1), makePairing("p5","p12",1),
+      makePairing("p6","p13",1),
+    ];
+    sim = applyResults(sim, r1, ["p1wins","p1wins","p1wins","p1wins","p1wins","p1wins","draw"]);
+
+    // Confirm expected score distribution
+    const byPts = (pts: number) => sim.standings.filter((s) => s.matchPoints === pts);
+    expect(byPts(3)).toHaveLength(6);
+    expect(byPts(1)).toHaveLength(2);
+    expect(byPts(0)).toHaveLength(6);
+
+    // Generate round 2
+    const { pairings } = generateSwissPairings(sim.standings, 2, sim.previousPairings);
+    assertInvariants(pairings, sim.standings, 2);
+
+    // No rematches — p6 and p13 must NOT play each other
+    expect(
+      pairings.some(
+        (p) => p.player2Id && havePlayedBefore(p.player1Id, p.player2Id, sim.previousPairings),
+      ),
+    ).toBe(false);
+
+    const p6Pairing = pairings.find((p) => p.player1Id === "p6" || p.player2Id === "p6")!;
+    const p13Pairing = pairings.find((p) => p.player1Id === "p13" || p.player2Id === "p13")!;
+    expect(p6Pairing.player2Id).not.toBeNull();
+    expect(p13Pairing.player2Id).not.toBeNull();
+    const p6Opponent = p6Pairing.player1Id === "p6" ? p6Pairing.player2Id : p6Pairing.player1Id;
+    const p13Opponent = p13Pairing.player1Id === "p13" ? p13Pairing.player2Id : p13Pairing.player1Id;
+    expect(p6Opponent).not.toBe("p13");
+    expect(p13Opponent).not.toBe("p6");
+  });
+
   it("11-player round-3: no rematch when last two 1pt players drew each other in round 2", () => {
     // Reproduces the reported bug (11 players, 4 rounds):
     //   After round 2: 3 × 6pts | 5 × 3pts | 2 × 1pt (who drew each other) | 1 × 0pts

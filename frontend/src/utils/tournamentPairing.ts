@@ -254,7 +254,15 @@ function findMinRematchMatching(
     havePlayedBefore(a, b, previousPairings);
 
   let nodesVisited = 0;
+  // bestSoFar holds the best *complete* solution (all players) — used for node-limit fallback.
   let bestSoFar: { pairings: Pairing[]; rematchCount: number } | null = null;
+  // bestTotalFromRoot tracks the best total rematch count seen from level 0, including
+  // all parent-accumulated rematches. This is used for pruning and must be kept separate
+  // from bestSoFar.rematchCount, which only counts rematches within the complete solution
+  // at the top recursion level. Conflating the two caused a bug where sub-level results
+  // (rematchCount=0 for a 6-player sub-problem) would set the pruning threshold to 0,
+  // causing valid sibling branches at the top level to be pruned prematurely.
+  let bestTotalFromRoot = Infinity;
 
   function recurse(
     indices: number[],
@@ -263,8 +271,8 @@ function findMinRematchMatching(
     nodesVisited++;
     // FIX 4: bail out early if we've exceeded the node budget
     if (nodesVisited > MAX_BACKTRACK_NODES) return null;
-    // Prune: can't beat best already found
-    if (bestSoFar && currentRematches >= bestSoFar.rematchCount) return null;
+    // Prune: even with 0 more rematches, can't improve on the best total from root
+    if (currentRematches >= bestTotalFromRoot) return null;
 
     if (indices.length === 0) return { pairings: [], rematchCount: 0 };
 
@@ -316,11 +324,22 @@ function findMinRematchMatching(
       }
     }
 
-    if (
-      best !== null &&
-      (bestSoFar === null || best.rematchCount < bestSoFar.rematchCount)
-    ) {
-      bestSoFar = best;
+    if (best !== null) {
+      // Update the pruning threshold using total rematches from level 0.
+      const totalFromRoot = currentRematches + best.rematchCount;
+      if (totalFromRoot < bestTotalFromRoot) {
+        bestTotalFromRoot = totalFromRoot;
+      }
+      // Only record a complete solution (all players paired at this call's level)
+      // when we are at the outermost call, i.e. indices covers all players.
+      // Sub-level results have smaller rematchCount (they don't include parent
+      // rematches), so storing them in bestSoFar would corrupt the fallback.
+      if (
+        indices.length === sorted.length &&
+        (bestSoFar === null || best.rematchCount < bestSoFar.rematchCount)
+      ) {
+        bestSoFar = best;
+      }
     }
     return best;
   }
