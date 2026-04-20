@@ -1,0 +1,43 @@
+# Libraries
+
+- `frontend\src\hooks\useTournament.ts` — function useTournament: (id, user, authLoading, workspaceId) => void
+- `frontend\src\hooks\useTournamentPlayers.ts` — function useTournamentPlayers: (tournamentId) => void
+- `frontend\src\utils\api.ts` — function apiCall, function handleApiError
+- `frontend\src\utils\format.ts` — function formatDate: (dateString) => string, function formatDateTime: (value) => string
+- `frontend\src\utils\playerStorage.ts`
+  - function entryKey: (tournamentId) => void
+  - function getProfile: () => TjProfile
+  - function saveProfile: (name, deviceId) => void
+  - function getEntry: (tournamentId) => TjEntry | null
+  - function saveEntry: (tournamentId, entry) => void
+  - function getAllEntries: () => Array<
+  - _...3 more_
+- `frontend\src\utils\pokemonCache.ts`
+  - function getSpriteUrl: (id) => string
+  - function getArtworkUrl: (id) => string
+  - function getPokemonList: () => Promise<PokemonEntry[]>
+  - interface PokemonEntry
+- `frontend\src\utils\slugify.ts` — function slugify: (input) => string, function randomSuffix: (len) => string
+- `frontend\src\utils\tieBreaking.ts`
+  - function calculateOpponentMatchWinPercentage: (player, allStandings, PlayerStanding>) => number
+  - function calculateOpponentOpponentMatchWinPercentage: (player, allStandings, PlayerStanding>) => number
+  - function addTieBreakers: (standings) => PlayerWithTieBreakers[]
+  - function sortByTieBreakers: (standings, droppedIds?) => PlayerWithTieBreakers[]
+  - interface PlayerStanding
+  - interface PlayerWithTieBreakers
+- `frontend\src\utils\tournamentPairing.ts`
+  - function calculateMatchPoints: (wins, draws) => number
+  - function groupByMatchPoints: (standings) => Map<number, PlayerStanding[]>
+  - function havePlayedBefore: (player1Id, player2Id, previousPairings) => boolean
+  - function generateSwissPairings: (standings, roundNumber, previousPairings) => PairingResult
+  - function generateRound1Pairings: (tournamentType, players) => Pairing[]
+  - interface PlayerStanding
+  - _...3 more_
+- `frontend\src\utils\tournamentUtils.ts`
+  - function buildStandingsFromMatches: (matches, allPlayers?) => PlayerStanding[]
+  - function getTournamentTypeLabel: (type) => string
+  - function calculateSuggestedRounds: (playerCount, tournamentType) => number
+  - function assignMatchNumbers: (pairings, staticSeats, number>, // playerId → seatNumber) => SeatAssignment[]
+  - interface MatchForStandings
+  - interface SeatConflict
+  - _...1 more_

@@ -1,0 +1,36 @@
+# Components
+
+- **RequireAuth** — `frontend\src\App.tsx`
+- **AuthProvider** — `frontend\src\AuthContext.tsx`
+- **PokemonSlot** — props: open, onClose, initialPokemon1, initialPokemon2, onSave — `frontend\src\components\DeckPickerDialog.tsx`
+- **BORDER** — `frontend\src\components\Header.tsx`
+- **NormalizedSprite** — props: src, size — `frontend\src\components\NormalizedSprite.tsx`
+- **PageLoading** — props: minHeight — `frontend\src\components\PageLoading.tsx`
+- **RoundTimer** — props: startedAt, durationMinutes, elapsedSeconds, isPaused, size — `frontend\src\components\RoundTimer.tsx`
+- **ChunkTable** — props: standings, droppedMap, deckMap, currentPlayerId — `frontend\src\components\StandingsTable.tsx`
+- **TournamentPageHeader** — props: title, onBack, backLabel — `frontend\src\components\TournamentPageHeader.tsx`
+- **AcceptInvite** — `frontend\src\pages\AcceptInvite.tsx`
+- **ClaimPlayer** — `frontend\src\pages\ClaimPlayer.tsx`
+- **WORKSPACE_TYPES** — `frontend\src\pages\CreateWorkspace.tsx`
+- **Dashboard** — `frontend\src\pages\Dashboard.tsx`
+- **DeviceTournaments** — `frontend\src\pages\DeviceTournaments.tsx`
+- **ForgotPassword** — `frontend\src\pages\ForgotPassword.tsx`
+- **JoinLanding** — `frontend\src\pages\JoinLanding.tsx`
+- **Landing** — `frontend\src\pages\Landing.tsx`
+- **Login** — `frontend\src\pages\Login.tsx`
+- **ROLE_COLOR** — `frontend\src\pages\Me.tsx`
+- **MyMatchCard** — props: match, playerId, myReport, entry, onRefresh — `frontend\src\pages\PlayerTournamentView.tsx`
+- **Register** — `frontend\src\pages\Register.tsx`
+- **ResetPassword** — `frontend\src\pages\ResetPassword.tsx`
+- **TournamentJoin** — `frontend\src\pages\TournamentJoin.tsx`
+- **TournamentJoinDisplay** — `frontend\src\pages\TournamentJoinDisplay.tsx`
+- **TournamentLeaderboard** — `frontend\src\pages\TournamentLeaderboard.tsx`
+- **MATCH_STATUS** — `frontend\src\pages\TournamentMatches.tsx`
+- **TournamentPairings** — `frontend\src\pages\TournamentPairings.tsx`
+- **Tournaments** — `frontend\src\pages\Tournaments.tsx`
+- **AddPlayerInput** — props: onAdd, disabled, inputRef, onBulkMode — `frontend\src\pages\TournamentView.tsx`
+- **Welcome** — `frontend\src\pages\Welcome.tsx`
+- **WhatsNew** — `frontend\src\pages\WhatsNew.tsx`
+- **WorkspaceSettings** — `frontend\src\pages\WorkspaceSettings.tsx`
+- **AppThemeProvider** — `frontend\src\ThemeContext.tsx`
+- **WorkspaceProvider** — `frontend\src\WorkspaceContext.tsx`

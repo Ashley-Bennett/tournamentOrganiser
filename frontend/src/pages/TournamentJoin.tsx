@@ -79,7 +79,7 @@ export default function TournamentJoin() {
 
       setPageState("open");
     })();
-  }, [tournamentId]);
+  }, [tournamentId, navigate]);
 
   const handleSubmit = async () => {
     if (!tournamentId || !nameInput.trim()) return;

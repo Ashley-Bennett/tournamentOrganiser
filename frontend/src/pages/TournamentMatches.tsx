@@ -970,55 +970,6 @@ const TournamentMatches: React.FC = () => {
     }
   };
 
-  const handleConfirmFromReport = async (report: MatchReportRow) => {
-    const match = matches.find((m) => m.id === report.match_id);
-    if (!match || !match.player2_id) return;
-
-    let winnerId: string | null = null;
-    let resultStr: string;
-
-    const reportingOutcome = report.player1_report ?? report.player2_report;
-    const reportingPlayerId = report.player1_report ? report.player1_id : report.player2_id;
-    if (reportingOutcome === "draw") {
-      winnerId = null;
-      resultStr = "Draw";
-    } else if (reportingOutcome === "win") {
-      winnerId = reportingPlayerId;
-      resultStr = reportingPlayerId === report.player1_id ? "1-0" : "0-1";
-    } else {
-      // reporter lost → other player won
-      winnerId = reportingPlayerId === report.player1_id ? match.player2_id : report.player1_id;
-      resultStr = reportingPlayerId === report.player1_id ? "0-1" : "1-0";
-    }
-
-    try {
-      setUpdatingMatch(true);
-      const { error: updateError } = await supabase
-        .from("tournament_matches")
-        .update({
-          winner_id: winnerId,
-          result: resultStr,
-          status: "completed",
-          confirmed_by: "organiser",
-          temp_winner_id: null,
-          temp_result: null,
-        })
-        .eq("id", report.match_id);
-
-      if (updateError) throw new Error(updateError.message);
-      // The cleanup trigger deletes the reports. Refresh reports map.
-      setMatchReports((prev) => {
-        const next = new Map(prev);
-        next.delete(report.match_id);
-        return next;
-      });
-      setRefreshTrigger((t) => t + 1);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to confirm result");
-    } finally {
-      setUpdatingMatch(false);
-    }
-  };
 
   const handleSaveMatchResult = async () => {
     if (!selectedMatch || !selectedWinner) return;

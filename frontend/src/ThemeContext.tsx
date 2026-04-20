@@ -14,6 +14,7 @@ const ThemeContext = createContext<ThemeContextValue>({
   toggleTheme: () => {},
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useThemeMode = () => useContext(ThemeContext);
 
 function buildTheme(mode: Mode) {

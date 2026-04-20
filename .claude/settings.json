@@ -15,7 +15,8 @@
       "Bash(npx supabase db query --linked \"SELECT table_name FROM information_schema.tables WHERE table_schema = ''public'' AND table_name LIKE ''%workspace%'';\")",
       "Bash(npx supabase db diff)",
       "Bash(find /c/Users/ashle/Code/tournamentOrganiser -type f \\\\\\(-name *.png -o -name *.jpg -o -name *.svg -o -name *.webp \\\\\\))",
-      "WebFetch(domain:pokeapi.co)"
+      "WebFetch(domain:pokeapi.co)",
+      "Bash(npm run:*)"
     ]
   },
   "hooks": {
