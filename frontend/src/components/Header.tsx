@@ -256,6 +256,9 @@ const Header: React.FC = () => {
                     <Button component={RouterLink} to={wPath("/tournaments")} sx={navBtnSx}>
                       Tournaments
                     </Button>
+                    <Button component={RouterLink} to="/me" sx={navBtnSx}>
+                      Account
+                    </Button>
                     <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
                       What&apos;s New
                     </Button>
@@ -277,7 +280,7 @@ const Header: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <Button component={RouterLink} to="/me" sx={navBtnSx}>
+                    <Button component={RouterLink} to="/my-tournaments" sx={navBtnSx}>
                       My Match History
                     </Button>
                     <Button component={RouterLink} to="/join" sx={navBtnSx}>
@@ -347,6 +350,11 @@ const Header: React.FC = () => {
                           </ListItemButton>
                         </ListItem>
                         <ListItem disablePadding>
+                          <ListItemButton onClick={() => handleNavClick("/me")}>
+                            <ListItemText primary="Account" />
+                          </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding>
                           <ListItemButton onClick={() => handleNavClick("/whats-new")}>
                             <ListItemText primary="What's New" />
                           </ListItemButton>
@@ -366,7 +374,7 @@ const Header: React.FC = () => {
                     ) : (
                       <>
                         <ListItem disablePadding>
-                          <ListItemButton onClick={() => handleNavClick("/me")}>
+                          <ListItemButton onClick={() => handleNavClick("/my-tournaments")}>
                             <ListItemText primary="My Match History" />
                           </ListItemButton>
                         </ListItem>

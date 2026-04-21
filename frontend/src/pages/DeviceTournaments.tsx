@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   Box,
@@ -30,50 +30,133 @@ interface TournamentSummary {
   total_players: number | null;
 }
 
+interface DbEntry {
+  tournament_player_id: string;
+  tournament_id: string;
+  tournament_name: string;
+  tournament_status: string;
+  workspace_name: string;
+  player_name: string;
+}
+
+interface Row {
+  tournamentId: string;
+  tournamentName: string;
+  workspaceName: string | null;
+  status: string | null;
+  playerPosition: number | null;
+  totalPlayers: number | null;
+  isLinked: boolean;
+  // present for unlinked device entries
+  playerId?: string;
+  deviceToken?: string;
+}
+
 export default function DeviceTournaments() {
   const { user } = useAuth();
-  const entries = useMemo(() => getAllEntries(), []);
+  const deviceEntries = useMemo(() => getAllEntries(), []);
+
+  const [dbEntries, setDbEntries] = useState<DbEntry[]>([]);
   const [summaries, setSummaries] = useState<TournamentSummary[]>([]);
-  const [loading, setLoading] = useState(entries.length > 0);
+  const [loading, setLoading] = useState(true);
+
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [claimErrors, setClaimErrors] = useState<Record<string, string>>({});
+  const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const results = await Promise.all([
+      user ? supabase.rpc("get_my_player_entries") : Promise.resolve({ data: [] }),
+      deviceEntries.length > 0
+        ? supabase.rpc("get_tournaments_summary", {
+            p_tournament_ids: deviceEntries.map((e) => e.tournamentId),
+            p_player_ids: deviceEntries.map((e) => e.playerId),
+          })
+        : Promise.resolve({ data: [] }),
+    ]);
+    setDbEntries((results[0].data as DbEntry[]) ?? []);
+    setSummaries((results[1].data as TournamentSummary[]) ?? []);
+    setLoading(false);
+  }, [user, deviceEntries]);
 
   useEffect(() => {
-    if (entries.length === 0) return;
-    void (async () => {
-      const { data } = await supabase.rpc("get_tournaments_summary", {
-        p_tournament_ids: entries.map((e) => e.tournamentId),
-        p_player_ids: entries.map((e) => e.playerId),
-      });
-      setSummaries((data as TournamentSummary[]) ?? []);
-      setLoading(false);
-    })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    void load();
+  }, [load]);
 
-  // Preserve localStorage order; omit entries not returned by the RPC (deleted tournaments)
-  const rows = useMemo(() => {
-    return entries.flatMap((e) => {
-      const live = summaries.find((s) => s.tournament_id === e.tournamentId);
-      if (!loading && !live) return [];
+  const linkedIds = useMemo(() => new Set(dbEntries.map((e) => e.tournament_id)), [dbEntries]);
+
+  const rows = useMemo((): Row[] => {
+    // DB-linked entries
+    const dbRows: Row[] = dbEntries.map((e) => ({
+      tournamentId: e.tournament_id,
+      tournamentName: e.tournament_name,
+      workspaceName: e.workspace_name,
+      status: e.tournament_status,
+      playerPosition: null,
+      totalPlayers: null,
+      isLinked: true,
+    }));
+
+    // Device entries not yet linked (or already claimed in this session)
+    const deviceRows: Row[] = deviceEntries.flatMap((e) => {
+      if (linkedIds.has(e.tournamentId) || claimedIds.has(e.tournamentId)) return [];
+      const summary = summaries.find((s) => s.tournament_id === e.tournamentId);
+      if (!loading && !summary) return [];
       return [{
         tournamentId: e.tournamentId,
-        tournamentName: live?.tournament_name ?? e.tournamentName ?? "Tournament",
-        workspaceName: live?.workspace_name ?? null,
-        status: live?.status ?? null,
-        playerPosition: live?.player_position ?? null,
-        totalPlayers: live?.total_players ?? null,
+        tournamentName: summary?.tournament_name ?? e.tournamentName ?? "Tournament",
+        workspaceName: summary?.workspace_name ?? null,
+        status: summary?.status ?? null,
+        playerPosition: summary?.player_position ?? null,
+        totalPlayers: summary?.total_players ?? null,
+        isLinked: false,
+        playerId: e.playerId,
+        deviceToken: e.deviceToken,
       }];
     });
-  }, [entries, summaries, loading]);
+
+    const all = [...dbRows, ...deviceRows];
+    // Active first, then by insertion order
+    return all.sort((a, b) => {
+      if (a.status === "active" && b.status !== "active") return -1;
+      if (b.status === "active" && a.status !== "active") return 1;
+      return 0;
+    });
+  }, [dbEntries, deviceEntries, summaries, linkedIds, claimedIds, loading]);
+
+  const unlinkedCount = rows.filter((r) => !r.isLinked).length;
+
+  const handleClaim = async (row: Row) => {
+    if (!row.playerId || !row.deviceToken) return;
+    setClaimingId(row.tournamentId);
+    setClaimErrors((prev) => ({ ...prev, [row.tournamentId]: "" }));
+    const { error } = await supabase.rpc("self_claim_player_entry", {
+      p_tournament_player_id: row.playerId,
+      p_device_token: row.deviceToken,
+    });
+    setClaimingId(null);
+    if (error && !error.message.includes("already linked")) {
+      setClaimErrors((prev) => ({ ...prev, [row.tournamentId]: error.message }));
+      return;
+    }
+    setClaimedIds((prev) => new Set([...prev, row.tournamentId]));
+    void load();
+  };
+
+  const isEmpty = !loading && rows.length === 0;
 
   return (
     <Box maxWidth={560} mx="auto" mt={4}>
       <Stack direction="row" spacing={1} alignItems="center" mb={3}>
         <TrophyIcon sx={{ color: "text.secondary" }} />
         <Typography variant="h5" fontWeight={700}>
-          My Tournaments
+          My Match History
         </Typography>
       </Stack>
 
-      {!user && entries.length > 0 && (
+      {/* Nudge: anonymous user with device entries */}
+      {!user && deviceEntries.length > 0 && (
         <Alert
           severity="warning"
           sx={{ mb: 3 }}
@@ -93,42 +176,55 @@ export default function DeviceTournaments() {
         </Alert>
       )}
 
-      {entries.length === 0 ? (
+      {/* Nudge: logged-in user with unlinked device entries */}
+      {user && unlinkedCount > 0 && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          {unlinkedCount} tournament{unlinkedCount !== 1 ? "s are" : " is"} saved on this device only.
+          Link {unlinkedCount !== 1 ? "them" : "it"} to your account to keep your history safe.
+        </Alert>
+      )}
+
+      {loading ? (
+        <Box display="flex" justifyContent="center" py={4}>
+          <CircularProgress size={24} />
+        </Box>
+      ) : isEmpty ? (
         <Paper
           variant="outlined"
           sx={{ p: 4, textAlign: "center", bgcolor: "action.hover" }}
         >
           <Typography variant="body1" color="text.secondary" gutterBottom>
-            No tournaments on this device yet.
+            No tournaments yet.
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Use a join link from your organiser to register for a tournament.
+            Scan a QR code or enter a join code to register for a tournament.
           </Typography>
         </Paper>
-      ) : loading ? (
-        <Box display="flex" justifyContent="center" py={4}>
-          <CircularProgress size={24} />
-        </Box>
       ) : (
         <Stack spacing={1.5}>
           {rows.map((row) => {
             const isActive = row.status === "active";
             const isCompleted = row.status === "completed";
             const hasPosition = isCompleted && row.playerPosition != null && row.totalPlayers != null;
+            const claimError = claimErrors[row.tournamentId];
+
             return (
               <Paper
                 key={row.tournamentId}
                 variant="outlined"
-                component={Link}
-                to={`/t/${row.tournamentId}/me`}
                 sx={{
                   p: 2,
-                  textDecoration: "none",
                   display: "block",
                   borderColor: isActive ? "primary.main" : undefined,
-                  "&:hover": { borderColor: "primary.main", bgcolor: "action.hover" },
                   transition: "border-color 0.15s, background-color 0.15s",
+                  ...(!row.isLinked && user ? {} : {
+                    textDecoration: "none",
+                    "&:hover": { borderColor: "primary.main", bgcolor: "action.hover" },
+                    cursor: "pointer",
+                  }),
                 }}
+                component={row.isLinked || !user ? Link : "div"}
+                to={row.isLinked || !user ? `/t/${row.tournamentId}/me` : undefined}
               >
                 <Stack direction="row" alignItems="center" spacing={1.5}>
                   <Box flexGrow={1}>
@@ -145,7 +241,11 @@ export default function DeviceTournaments() {
                         Finished {row.playerPosition}{ordinal(row.playerPosition!)} of {row.totalPlayers}
                       </Typography>
                     )}
+                    {claimError && (
+                      <Typography variant="caption" color="error">{claimError}</Typography>
+                    )}
                   </Box>
+
                   {row.status && (
                     <Chip
                       label={row.status}
@@ -153,6 +253,17 @@ export default function DeviceTournaments() {
                       color={isActive ? "success" : "default"}
                       variant={isActive ? "filled" : "outlined"}
                     />
+                  )}
+
+                  {!row.isLinked && user && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={claimingId === row.tournamentId}
+                      onClick={(e) => { e.stopPropagation(); void handleClaim(row); }}
+                    >
+                      {claimingId === row.tournamentId ? "Linking…" : "Link"}
+                    </Button>
                   )}
                 </Stack>
               </Paper>
