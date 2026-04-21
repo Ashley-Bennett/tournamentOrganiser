@@ -19,7 +19,8 @@
       "Bash(npm run:*)",
       "Bash(xargs wc *)",
       "Bash(supabase start *)",
-      "Bash(npx --no-install supabase status)"
+      "Bash(npx --no-install supabase status)",
+      "Bash(npx --no-install supabase start)"
     ]
   },
   "hooks": {
