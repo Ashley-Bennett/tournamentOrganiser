@@ -177,7 +177,7 @@ export default function DeviceTournaments() {
       )}
 
       {/* Nudge: logged-in user with unlinked device entries */}
-      {user && unlinkedCount > 0 && (
+      {user && !loading && unlinkedCount > 0 && (
         <Alert severity="info" sx={{ mb: 3 }}>
           {unlinkedCount} tournament{unlinkedCount !== 1 ? "s are" : " is"} saved on this device only.
           Link {unlinkedCount !== 1 ? "them" : "it"} to your account to keep your history safe.
