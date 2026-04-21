@@ -292,7 +292,7 @@ const Header: React.FC = () => {
                 sx={{ display: { xs: "none", sm: "flex" } }}
               >
                 <Button component={RouterLink} to="/my-tournaments" sx={navBtnSx}>
-                  My Tournaments
+                  My Match History
                 </Button>
                 <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
                   What&apos;s New
@@ -353,7 +353,7 @@ const Header: React.FC = () => {
                   <List disablePadding>
                     <ListItem disablePadding>
                       <ListItemButton onClick={() => handleNavClick("/my-tournaments")}>
-                        <ListItemText primary="My Tournaments" />
+                        <ListItemText primary="My Match History" />
                       </ListItemButton>
                     </ListItem>
                     <ListItem disablePadding>

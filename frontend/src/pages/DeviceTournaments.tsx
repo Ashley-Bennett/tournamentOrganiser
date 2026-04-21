@@ -8,10 +8,12 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Alert,
 } from "@mui/material";
 import { EmojiEventsOutlined as TrophyIcon } from "@mui/icons-material";
 import { getAllEntries } from "../utils/playerStorage";
 import { supabase } from "../supabaseClient";
+import { useAuth } from "../AuthContext";
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -29,6 +31,7 @@ interface TournamentSummary {
 }
 
 export default function DeviceTournaments() {
+  const { user } = useAuth();
   const entries = useMemo(() => getAllEntries(), []);
   const [summaries, setSummaries] = useState<TournamentSummary[]>([]);
   const [loading, setLoading] = useState(entries.length > 0);
@@ -69,6 +72,26 @@ export default function DeviceTournaments() {
           My Tournaments
         </Typography>
       </Stack>
+
+      {!user && entries.length > 0 && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 3 }}
+          action={
+            <Box display="flex" gap={1} alignItems="center" flexShrink={0}>
+              <Button component={Link} to="/register" size="small" color="inherit" variant="outlined">
+                Sign up
+              </Button>
+              <Button component={Link} to="/login" size="small" color="inherit">
+                Log in
+              </Button>
+            </Box>
+          }
+        >
+          This history is saved on this device only — it may be cleared after 7 days.
+          Sign up to keep it forever.
+        </Alert>
+      )}
 
       {entries.length === 0 ? (
         <Paper
