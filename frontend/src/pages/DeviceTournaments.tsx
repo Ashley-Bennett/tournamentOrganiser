@@ -151,7 +151,7 @@ export default function DeviceTournaments() {
       <Stack direction="row" spacing={1} alignItems="center" mb={3}>
         <TrophyIcon sx={{ color: "text.secondary" }} />
         <Typography variant="h5" fontWeight={700}>
-          My Match History
+          My Tournaments
         </Typography>
       </Stack>
 

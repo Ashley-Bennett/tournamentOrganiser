@@ -71,7 +71,7 @@ const Header: React.FC = () => {
     setModeMenuAnchor(null);
     setDrawerOpen(false);
     if (next === "player") {
-      navigate("/me");
+      navigate("/my-tournaments");
     } else {
       navigate(activeWorkspace ? wPath("/tournaments") : "/dashboard");
     }
@@ -91,7 +91,7 @@ const Header: React.FC = () => {
 
   const homeHref = user
     ? viewMode === "player"
-      ? "/me"
+      ? "/my-tournaments"
       : activeWorkspace
         ? wPath("/tournaments")
         : "/dashboard"
@@ -281,10 +281,13 @@ const Header: React.FC = () => {
                 ) : (
                   <>
                     <Button component={RouterLink} to="/my-tournaments" sx={navBtnSx}>
-                      My Match History
+                      My Tournaments
                     </Button>
                     <Button component={RouterLink} to="/join" sx={navBtnSx}>
                       Join Tournament
+                    </Button>
+                    <Button component={RouterLink} to="/me" sx={navBtnSx}>
+                      Account
                     </Button>
                     <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
                       What&apos;s New
@@ -375,12 +378,17 @@ const Header: React.FC = () => {
                       <>
                         <ListItem disablePadding>
                           <ListItemButton onClick={() => handleNavClick("/my-tournaments")}>
-                            <ListItemText primary="My Match History" />
+                            <ListItemText primary="My Tournaments" />
                           </ListItemButton>
                         </ListItem>
                         <ListItem disablePadding>
                           <ListItemButton onClick={() => handleNavClick("/join")}>
                             <ListItemText primary="Join Tournament" />
+                          </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding>
+                          <ListItemButton onClick={() => handleNavClick("/me")}>
+                            <ListItemText primary="Account" />
                           </ListItemButton>
                         </ListItem>
                         <ListItem disablePadding>
@@ -421,7 +429,7 @@ const Header: React.FC = () => {
                 sx={{ display: { xs: "none", sm: "flex" } }}
               >
                 <Button component={RouterLink} to="/my-tournaments" sx={navBtnSx}>
-                  My Match History
+                  My Tournaments
                 </Button>
                 <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
                   What&apos;s New
@@ -482,7 +490,7 @@ const Header: React.FC = () => {
                   <List disablePadding>
                     <ListItem disablePadding>
                       <ListItemButton onClick={() => handleNavClick("/my-tournaments")}>
-                        <ListItemText primary="My Match History" />
+                        <ListItemText primary="My Tournaments" />
                       </ListItemButton>
                     </ListItem>
                     <ListItem disablePadding>
