@@ -493,8 +493,24 @@ function pairEvenPool(
     if (highPlayers.length === 1) {
       const floater = highPlayers[0]!;
       const lowByBest = [...lowPlayers].sort(pairingOrder);
-      const bestLow = lowByBest[0]!;
-      const remainingLow = lowByBest.slice(1);
+
+      // Try each candidate in priority order; skip any that are a rematch with the floater.
+      // This prevents the fast-path from blindly pairing a floater against the first available
+      // opponent when a non-rematch option exists lower in the priority list.
+      let chosenIdx = 0;
+      for (let i = 0; i < lowByBest.length; i++) {
+        if (!havePlayedBefore(floater.id, lowByBest[i]!.id, previousPairings)) {
+          chosenIdx = i;
+          break;
+        }
+        // All candidates are rematches — fall through to full backtracking below.
+        if (i === lowByBest.length - 1) {
+          break;
+        }
+      }
+
+      const bestLow = lowByBest[chosenIdx]!;
+      const remainingLow = lowByBest.filter((_, i) => i !== chosenIdx);
       const pairings: Pairing[] = [
         {
           player1Id: floater.id,

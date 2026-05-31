@@ -1352,6 +1352,56 @@ describe("generateSwissPairings — determinism", () => {
     expect(r1.pairings).toEqual(r2.pairings);
   });
 
+  it("floater does not rematch when a non-rematch opponent exists in the lower bracket", () => {
+    // Regression for the Monday Night 25/05 bug:
+    // 3-player 9pt bracket → 1 floats to 6pt bracket (10 players total).
+    // The floater had already played one of the 6pt players (R1 matchup).
+    // The fast-path in pairEvenPool was pairing the floater blindly against
+    // the top of pairingOrder, causing a rematch even though a clean pairing existed.
+    const standings: PlayerStanding[] = [
+      { ...freshPlayer("DylanW"), wins: 3, matchPoints: 9, matchesPlayed: 3, opponents: ["Minnie","HarryA","Liv"] },
+      { ...freshPlayer("FinT"),   wins: 3, matchPoints: 9, matchesPlayed: 3, opponents: ["PaulE","BenSmith","Helen"] },
+      { ...freshPlayer("OllieS"), wins: 3, matchPoints: 9, matchesPlayed: 3, opponents: ["DanTM","RhysW","KevG"] },
+      { ...freshPlayer("RhysW"),  wins: 2, losses: 1, matchPoints: 6, matchesPlayed: 3, opponents: ["Jack","OllieS","Moxxi"] },
+      { ...freshPlayer("TomW"),   wins: 2, losses: 1, matchPoints: 6, matchesPlayed: 3, opponents: ["HarryA","JoeB","LiamJ"] },
+      { ...freshPlayer("Helen"),  wins: 2, losses: 1, matchPoints: 6, matchesPlayed: 3, opponents: ["Lux","Nay","FinT"] },
+      { ...freshPlayer("Liv"),    wins: 2, losses: 1, matchPoints: 6, matchesPlayed: 3, opponents: ["RyanM","LiamJ","DylanW"] },
+      { ...freshPlayer("KevG"),   wins: 2, losses: 1, matchPoints: 6, matchesPlayed: 3, opponents: ["ChrisM","DanJ","OllieS"] },
+      { ...freshPlayer("DanJ"),   wins: 2, losses: 1, matchPoints: 6, matchesPlayed: 3, opponents: ["Xavi","KevG","Lux"] },
+      { ...freshPlayer("Xavi"),   wins: 2, losses: 1, matchPoints: 6, matchesPlayed: 3, opponents: ["DanJ","ChrisM","Nay"] },
+      { ...freshPlayer("PaulE"),  wins: 2, losses: 1, matchPoints: 6, matchesPlayed: 3, opponents: ["FinT","DanTM","BenSmith"] },
+      { ...freshPlayer("HarryA"), wins: 2, losses: 1, matchPoints: 6, matchesPlayed: 3, opponents: ["TomW","DylanW","Jack"] },
+    ];
+    const prev: Pairing[] = [
+      makePairing("PaulE","FinT",1), makePairing("DanJ","Xavi",1),
+      makePairing("Jack","RhysW",1), makePairing("DylanW","Minnie",1),
+      makePairing("Nay","Nay2",1), makePairing("Liv","RyanM",1),
+      makePairing("KevG","ChrisM",1), makePairing("OllieS","DanTM",1),
+      makePairing("Lux","Helen",1), makePairing("HarryA","TomW",1),
+      makePairing("LiamJ","Moxxi",1),
+      makePairing("DanJ","KevG",2), makePairing("RhysW","OllieS",2),
+      makePairing("DylanW","HarryA",2), makePairing("BenSmith","FinT",2),
+      makePairing("Nay","Helen",2), makePairing("Liv","LiamJ",2),
+      makePairing("JoeB","TomW",2), makePairing("PaulE","DanTM",2),
+      makePairing("Xavi","ChrisM",2), makePairing("Lauren","Lux",2),
+      makePairing("Minnie","Moxxi",2), makePairing("Jack","RyanM",2),
+      makePairing("DylanW","Liv",3), makePairing("KevG","OllieS",3),
+      makePairing("FinT","Helen",3), makePairing("PaulE","BenSmith",3),
+      makePairing("Xavi","Nay",3), makePairing("DanJ","Lux",3),
+      makePairing("RhysW","Moxxi",3), makePairing("Jack","HarryA",3),
+      makePairing("TomW","LiamJ",3), makePairing("JoeB","Lauren",3),
+    ];
+
+    const { pairings } = generateSwissPairings(standings, 4, prev);
+
+    // FinT must NOT be paired with PaulE (they played in round 1)
+    const rematch = pairings.find(
+      p => (p.player1Id === "FinT" && p.player2Id === "PaulE") ||
+           (p.player1Id === "PaulE" && p.player2Id === "FinT"),
+    );
+    expect(rematch).toBeUndefined();
+  });
+
   it("same standings over 4 rounds always produce the same sequence of pairings", () => {
     const ids = ["A","B","C","D","E","F","G","H"];
 
