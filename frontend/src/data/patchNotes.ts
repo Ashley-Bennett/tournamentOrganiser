@@ -9,6 +9,20 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.4.3",
+    date: "2026-05-31",
+    entries: [
+      {
+        category: "Tournaments",
+        items: [
+          "Standings tiebreakers now use Opponent Match Win % (OMW%) and Opponent's Opponent Match Win % (OOMW%), so players are ranked by the actual strength of who they played — not randomly.",
+          "Draws now correctly count as half a win when calculating tiebreakers, matching standard Pokémon TCG rules.",
+          "Swiss pairings: fixed a bug where a floater player could be rematched against someone they'd already played, even when a fresh opponent was available.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.4.2",
     date: "2026-04-06",
     entries: [

@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.4.3] - 2026-05-31
+
+### Fixed
+- Swiss tiebreakers now use Opponent Match Win % (OMW%) and Opponent's Opponent Match Win % (OOMW%) instead of UUID ordering. Standings after tied records now reflect actual opponent strength.
+- Draws correctly count as 0.5 wins when calculating OMW%, matching standard Pokémon TCG tiebreaker rules.
+- Swiss pairing: floater player no longer gets rematched when a clean opponent exists in the lower bracket.
+- Removed the top/bottom bracket split from Swiss pairing logic that was causing unnecessary rematches.
+
+### Tests
+- Expanded Swiss pairing test suite with 646 additional cases covering floater, bye, and rematch edge cases.
+- Added tiebreaker tests for draw handling in OMW% calculations.
+
+### Chores
+- Backend `tsconfig.json`: added `ignoreDeprecations: "6.0"` to silence TypeScript 6.x `moduleResolution=node10` deprecation warning ahead of TS 7.0.
+
+---
+
 ## [0.4.2] - 2026-04-06
 
 ### Added
