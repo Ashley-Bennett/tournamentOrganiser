@@ -39,6 +39,9 @@ export interface PlayerStanding {
   opponentResults?: Record<string, "win" | "loss" | "draw">;
   gameWins?: number;
   gameLosses?: number;
+  // Computed tiebreakers — attached by enrichWithTiebreaks() before bracket processing
+  omw?: number;  // Opponent Match Win % (minimum 25% per Pokémon rules)
+  oomw?: number; // Opponent Opponent Match Win %
 }
 
 export interface Pairing {
@@ -174,6 +177,13 @@ function compareForPairing(a: PlayerStanding, b: PlayerStanding): number {
   const aByes = a.byesReceived ?? 0;
   const bByes = b.byesReceived ?? 0;
   if (aByes !== bByes) return aByes - bByes;
+  // Higher OMW% → ranked first (stronger schedule)
+  const aOmw = a.omw ?? 0;
+  const bOmw = b.omw ?? 0;
+  if (Math.abs(aOmw - bOmw) > 1e-9) return bOmw - aOmw;
+  const aOomw = a.oomw ?? 0;
+  const bOomw = b.oomw ?? 0;
+  if (Math.abs(aOomw - bOomw) > 1e-9) return bOomw - aOomw;
   return a.id.localeCompare(b.id);
 }
 
@@ -181,6 +191,13 @@ function pairingOrder(a: PlayerStanding, b: PlayerStanding): number {
   const aByes = a.byesReceived ?? 0;
   const bByes = b.byesReceived ?? 0;
   if (aByes !== bByes) return aByes - bByes;
+  // Higher OMW% → ranked first within a bracket
+  const aOmw = a.omw ?? 0;
+  const bOmw = b.omw ?? 0;
+  if (Math.abs(aOmw - bOmw) > 1e-9) return bOmw - aOmw;
+  const aOomw = a.oomw ?? 0;
+  const bOomw = b.oomw ?? 0;
+  if (Math.abs(aOomw - bOomw) > 1e-9) return bOomw - aOomw;
   return a.id.localeCompare(b.id);
 }
 
@@ -202,7 +219,14 @@ export function groupByMatchPoints(
 function floatPriority(a: PlayerStanding, b: PlayerStanding): number {
   const aByes = a.byesReceived ?? 0;
   const bByes = b.byesReceived ?? 0;
-  if (aByes !== bByes) return bByes - aByes;
+  if (aByes !== bByes) return bByes - aByes; // more byes → weaker, floats first
+  // Lower OMW% → weaker schedule, floats first
+  const aOmw = a.omw ?? 0;
+  const bOmw = b.omw ?? 0;
+  if (Math.abs(aOmw - bOmw) > 1e-9) return aOmw - bOmw;
+  const aOomw = a.oomw ?? 0;
+  const bOomw = b.oomw ?? 0;
+  if (Math.abs(aOomw - bOomw) > 1e-9) return aOomw - bOomw;
   return b.id.localeCompare(a.id);
 }
 
@@ -242,7 +266,9 @@ function buildPairingError(
  * FIX 4: Added node limit to prevent adversarial slowness.
  * If the limit is exceeded, falls back gracefully to best-found-so-far.
  */
-const MAX_POOL_FOR_FULL_BACKTRACK = 10;
+// Top/bottom split pairing (pairLargePool) is single-elimination logic and wrong for Swiss.
+// Swiss always uses full backtracking; the node limit is the safety valve for large pools.
+const MAX_POOL_FOR_FULL_BACKTRACK = 64;
 const MAX_BACKTRACK_NODES = 50_000;
 
 function findMinRematchMatching(
@@ -942,6 +968,40 @@ function validatePairingsConsistency(
   }
 }
 
+/**
+ * Computes OMW% and OOMW% for each player and returns enriched copies.
+ * OMW% minimum is capped at 25% per Pokémon Tournament Rules.
+ * These values are consumed by floatPriority, pairingOrder, and compareForPairing.
+ */
+function enrichWithTiebreaks(standings: PlayerStanding[]): PlayerStanding[] {
+  const copy = standings.map((s) => ({ ...s }));
+  const byId = new Map(copy.map((s) => [s.id, s]));
+
+  for (const s of copy) {
+    if (s.opponents.length === 0) {
+      s.omw = 0.25;
+    } else {
+      const rates = s.opponents.map((id) => {
+        const opp = byId.get(id);
+        if (!opp || opp.matchesPlayed === 0) return 0.25;
+        return Math.max(0.25, opp.wins / opp.matchesPlayed);
+      });
+      s.omw = rates.reduce((a, b) => a + b, 0) / rates.length;
+    }
+  }
+
+  for (const s of copy) {
+    if (s.opponents.length === 0) {
+      s.oomw = 0.25;
+    } else {
+      const rates = s.opponents.map((id) => byId.get(id)?.omw ?? 0.25);
+      s.oomw = rates.reduce((a, b) => a + b, 0) / rates.length;
+    }
+  }
+
+  return copy;
+}
+
 export function generateSwissPairings(
   standings: PlayerStanding[],
   roundNumber: number,
@@ -1050,7 +1110,9 @@ export function generateSwissPairings(
   let byeReason = "";
 
   const floatReasons = new Map<string, string>();
-  const groups = getScoreGroupsSorted(standings);
+  // Enrich with OMW%/OOMW% so comparators rank players correctly within brackets.
+  const enrichedStandings = enrichWithTiebreaks(standings);
+  const groups = getScoreGroupsSorted(enrichedStandings);
   const groupsMutable = groups.map((g) => ({
     points: g.points,
     players: [...g.players],
