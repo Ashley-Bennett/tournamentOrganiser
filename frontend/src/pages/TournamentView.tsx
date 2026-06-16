@@ -598,7 +598,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
         .eq("id", tournament.id)
         .eq("workspace_id", workspaceId)
         .select(
-          "id, name, status, tournament_type, num_rounds, created_at, created_by",
+          "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
         )
         .maybeSingle();
 
