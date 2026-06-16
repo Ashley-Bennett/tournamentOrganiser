@@ -55,17 +55,9 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
-import {
-  generateSwissPairings,
-  calculateMatchPoints,
-  type Pairing,
-} from "../utils/tournamentPairing";
+import { calculateMatchPoints } from "../utils/tournamentPairing";
 import { sortByTieBreakers } from "../utils/tieBreaking";
-import {
-  buildStandingsFromMatches,
-  assignMatchNumbers,
-  type SeatConflict,
-} from "../utils/tournamentUtils";
+import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { TournamentSummary } from "../types/tournament";
 import { usePairingEditor } from "../hooks/usePairingEditor";
 import { usePendingResults } from "../hooks/usePendingResults";
@@ -79,7 +71,6 @@ import {
   MATCH_STATUS,
   humanizeByeReason,
   humanizeFloatReason,
-  serializeDecisionLog,
 } from "../types/match";
 import StandingsTable from "../components/StandingsTable";
 import RoundTimer from "../components/RoundTimer";
@@ -109,13 +100,17 @@ const TournamentMatches: React.FC = () => {
   const [togglingDrop, setTogglingDrop] = useState<string | null>(null);
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
   const [hoveredRound, setHoveredRound] = useState<number | null>(null);
-  const [deleteRoundConfirmRound, setDeleteRoundConfirmRound] = useState<number | null>(null);
+  const [deleteRoundConfirmRound, setDeleteRoundConfirmRound] = useState<
+    number | null
+  >(null);
   const [lateEntryDialogOpen, setLateEntryDialogOpen] = useState(false);
   const [lateEntryName, setLateEntryName] = useState("");
   const [addingLateEntry, setAddingLateEntry] = useState(false);
   const [seatInputs, setSeatInputs] = useState<Map<string, string>>(new Map());
   const [savingTimer, setSavingTimer] = useState(false);
-  const [timerDurationInput, setTimerDurationInput] = useState<string | null>(null);
+  const [timerDurationInput, setTimerDurationInput] = useState<string | null>(
+    null,
+  );
   const [timerEditorOpen, setTimerEditorOpen] = useState(false);
   const [roundNoteInput, setRoundNoteInput] = useState<string>("");
   const noteInputFocusedRef = useRef(false);
@@ -230,7 +225,6 @@ const TournamentMatches: React.FC = () => {
 
     return map;
   }, [matches, selectedRound]);
-
 
   useEffect(() => {
     if (!id) {
@@ -865,7 +859,6 @@ const TournamentMatches: React.FC = () => {
   // ────────────────────────────────────────────────────────────────────────────
   // Round lifecycle handlers live in useRoundLifecycle
 
-
   if (authLoading || loading || matchesLoading) {
     return (
       <Box>
@@ -875,14 +868,21 @@ const TournamentMatches: React.FC = () => {
         </Box>
         <Paper sx={{ overflow: "hidden" }}>
           <Box sx={{ borderBottom: 1, borderColor: "divider", px: 1 }}>
-            <Skeleton variant="rounded" width={320} height={40} sx={{ my: 1 }} />
+            <Skeleton
+              variant="rounded"
+              width={320}
+              height={40}
+              sx={{ my: 1 }}
+            />
           </Box>
           <TableContainer sx={{ overflowX: "auto" }}>
             <Table>
               <TableHead>
                 <TableRow>
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <TableCell key={i}><Skeleton variant="text" /></TableCell>
+                    <TableCell key={i}>
+                      <Skeleton variant="text" />
+                    </TableCell>
                   ))}
                 </TableRow>
               </TableHead>
@@ -890,7 +890,9 @@ const TournamentMatches: React.FC = () => {
                 {Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
                     {Array.from({ length: 5 }).map((_, j) => (
-                      <TableCell key={j}><Skeleton variant="text" /></TableCell>
+                      <TableCell key={j}>
+                        <Skeleton variant="text" />
+                      </TableCell>
                     ))}
                   </TableRow>
                 ))}
@@ -928,20 +930,19 @@ const TournamentMatches: React.FC = () => {
 
   return (
     <Box>
-      <Box
-        display="flex"
-        flexWrap="wrap"
-        alignItems="center"
-        gap={1}
-        mb={3}
-      >
+      <Box display="flex" flexWrap="wrap" alignItems="center" gap={1} mb={3}>
         <Button
           startIcon={<ArrowBackIcon />}
           onClick={() => navigate(wPath(`/tournaments/${tournament.id}`))}
         >
           Back
         </Button>
-        <Typography variant="h5" component="h1" sx={{ flex: 1, minWidth: 0 }} noWrap>
+        <Typography
+          variant="h5"
+          component="h1"
+          sx={{ flex: 1, minWidth: 0 }}
+          noWrap
+        >
           {tournament.name} — Matches
         </Typography>
         {tournament.status === "active" && (
@@ -1118,7 +1119,10 @@ const TournamentMatches: React.FC = () => {
                     }
 
                     const isLastRound = roundNumber === totalRounds;
-                    const canDelete = !hasMatches && isLastRound && tournament.status === "active";
+                    const canDelete =
+                      !hasMatches &&
+                      isLastRound &&
+                      tournament.status === "active";
 
                     return (
                       <Tab
@@ -1127,7 +1131,9 @@ const TournamentMatches: React.FC = () => {
                           <Box
                             display="flex"
                             alignItems="center"
-                            onMouseEnter={() => canDelete && setHoveredRound(roundNumber)}
+                            onMouseEnter={() =>
+                              canDelete && setHoveredRound(roundNumber)
+                            }
                             onMouseLeave={() => setHoveredRound(null)}
                           >
                             {`Round ${roundNumber}`}
@@ -1139,8 +1145,12 @@ const TournamentMatches: React.FC = () => {
                                   ml: 0.75,
                                   fontSize: 14,
                                   cursor: "pointer",
-                                  opacity: hoveredRound === roundNumber ? 1 : 0.3,
-                                  color: hoveredRound === roundNumber ? "error.main" : "text.secondary",
+                                  opacity:
+                                    hoveredRound === roundNumber ? 1 : 0.3,
+                                  color:
+                                    hoveredRound === roundNumber
+                                      ? "error.main"
+                                      : "text.secondary",
                                   transition: "opacity 0.15s, color 0.15s",
                                 }}
                                 onClick={(e) => {
@@ -1164,14 +1174,16 @@ const TournamentMatches: React.FC = () => {
                       />
                     );
                   })}
-                  {tournament.status === "active" && (tournament.num_rounds ?? 0) < 20 && !finalRoundComplete && (
-                    <Tab
-                      icon={<AddIcon fontSize="small" />}
-                      value="add"
-                      title="Add round"
-                      sx={{ minWidth: 44, px: 1 }}
-                    />
-                  )}
+                  {tournament.status === "active" &&
+                    (tournament.num_rounds ?? 0) < 20 &&
+                    !finalRoundComplete && (
+                      <Tab
+                        icon={<AddIcon fontSize="small" />}
+                        value="add"
+                        title="Add round"
+                        sx={{ minWidth: 44, px: 1 }}
+                      />
+                    )}
                   <Tab
                     label="Final Standings"
                     value="standings"
@@ -1192,14 +1204,29 @@ const TournamentMatches: React.FC = () => {
                     if (selectedRound === "standings") {
                       return (
                         <Box>
-                          <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} mb={2}>
+                          <Box
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="space-between"
+                            flexWrap="wrap"
+                            gap={1}
+                            mb={2}
+                          >
                             <Typography variant="h6">
                               Final Standings
                             </Typography>
                             <Button
                               size="small"
                               endIcon={<OpenInNewIcon />}
-                              onClick={() => window.open(window.location.origin + wPath(`/tournaments/${tournament.id}/pairings`), "_blank")}
+                              onClick={() =>
+                                window.open(
+                                  window.location.origin +
+                                    wPath(
+                                      `/tournaments/${tournament.id}/pairings`,
+                                    ),
+                                  "_blank",
+                                )
+                              }
                             >
                               View on pairings page
                             </Button>
@@ -1213,7 +1240,11 @@ const TournamentMatches: React.FC = () => {
                             <StandingsTable
                               standings={finalStandings}
                               droppedMap={droppedPlayersMap}
-                              deckMap={deckPlayersMap.size > 0 ? deckPlayersMap : undefined}
+                              deckMap={
+                                deckPlayersMap.size > 0
+                                  ? deckPlayersMap
+                                  : undefined
+                              }
                             />
                           )}
                         </Box>
@@ -1449,40 +1480,59 @@ const TournamentMatches: React.FC = () => {
                       <Box>
                         {decisionLog && (
                           <Alert severity="info" sx={{ mb: 2 }} icon={false}>
-                            <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                            <Typography
+                              variant="subtitle2"
+                              gutterBottom
+                              fontWeight={600}
+                            >
                               Pairing notes — Round{" "}
-                              {typeof selectedRound === "number" ? selectedRound : "N/A"}
+                              {typeof selectedRound === "number"
+                                ? selectedRound
+                                : "N/A"}
                             </Typography>
 
                             {/* Bye */}
-                            {decisionLog.byeReason && decisionLog.byePlayerName && (
-                              <Typography variant="body2" sx={{ mb: 1 }}>
-                                <strong>{decisionLog.byePlayerName}</strong> received a bye (free win) this round
-                                {decisionLog.byePlayerPoints !== undefined &&
-                                  ` · ${decisionLog.byePlayerPoints} pts`}
-                                {" — "}
-                                {humanizeByeReason(decisionLog.byeReason)}
-                              </Typography>
-                            )}
+                            {decisionLog.byeReason &&
+                              decisionLog.byePlayerName && (
+                                <Typography variant="body2" sx={{ mb: 1 }}>
+                                  <strong>{decisionLog.byePlayerName}</strong>{" "}
+                                  received a bye (free win) this round
+                                  {decisionLog.byePlayerPoints !== undefined &&
+                                    ` · ${decisionLog.byePlayerPoints} pts`}
+                                  {" — "}
+                                  {humanizeByeReason(decisionLog.byeReason)}
+                                </Typography>
+                              )}
 
                             {/* Score group adjustments (floats) */}
                             {(() => {
-                              const visibleFloats = (decisionLog.floatDetails ?? []).filter(
+                              const visibleFloats = (
+                                decisionLog.floatDetails ?? []
+                              ).filter(
                                 (d) =>
                                   !d.reason.startsWith("DISSOLVE:") &&
                                   !d.reason.includes("bye (last bracket"),
                               );
                               return visibleFloats.length > 0 ? (
                                 <Box sx={{ mb: 1 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: "bold" }}
+                                  >
                                     Score group adjustments:
                                   </Typography>
-                                  <Box component="ul" sx={{ mt: 0.5, mb: 0, pl: 2 }}>
+                                  <Box
+                                    component="ul"
+                                    sx={{ mt: 0.5, mb: 0, pl: 2 }}
+                                  >
                                     {visibleFloats.map((detail) => (
                                       <li key={detail.playerId}>
-                                        <Typography variant="body2" component="span">
-                                          <strong>{detail.playerName}</strong>{" "}
-                                          ({detail.playerPoints} pts) —{" "}
+                                        <Typography
+                                          variant="body2"
+                                          component="span"
+                                        >
+                                          <strong>{detail.playerName}</strong> (
+                                          {detail.playerPoints} pts) —{" "}
                                           {humanizeFloatReason(detail.reason)}
                                         </Typography>
                                       </li>
@@ -1496,17 +1546,26 @@ const TournamentMatches: React.FC = () => {
                             {decisionLog.seatConflicts &&
                               decisionLog.seatConflicts.length > 0 && (
                                 <Box sx={{ mb: 1 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: "bold" }}
+                                  >
                                     Table assignments adjusted:
                                   </Typography>
-                                  <Box component="ul" sx={{ mt: 0.5, mb: 0, pl: 2 }}>
+                                  <Box
+                                    component="ul"
+                                    sx={{ mt: 0.5, mb: 0, pl: 2 }}
+                                  >
                                     {decisionLog.seatConflicts.map((sc, i) => (
                                       <li key={i}>
-                                        <Typography variant="body2" component="span">
-                                          <strong>{sc.movedPlayerName}</strong> moved to
-                                          table {sc.resolvedSeat} (was table{" "}
-                                          {sc.movedPlayerOriginalSeat}) to avoid a table
-                                          conflict with{" "}
+                                        <Typography
+                                          variant="body2"
+                                          component="span"
+                                        >
+                                          <strong>{sc.movedPlayerName}</strong>{" "}
+                                          moved to table {sc.resolvedSeat} (was
+                                          table {sc.movedPlayerOriginalSeat}) to
+                                          avoid a table conflict with{" "}
                                           <strong>{sc.opponentName}</strong>
                                         </Typography>
                                       </li>
@@ -1519,8 +1578,10 @@ const TournamentMatches: React.FC = () => {
                             {decisionLog.rematchCount > 0 && (
                               <Typography variant="body2" sx={{ mb: 0.5 }}>
                                 ⚠ {decisionLog.rematchCount} rematch
-                                {decisionLog.rematchCount !== 1 ? "es" : ""} this round
-                                — unavoidable given current standings
+                                {decisionLog.rematchCount !== 1
+                                  ? "es"
+                                  : ""}{" "}
+                                this round — unavoidable given current standings
                               </Typography>
                             )}
                             {decisionLog.rematchCount === 0 && (
@@ -1625,9 +1686,12 @@ const TournamentMatches: React.FC = () => {
                                       startIcon={<OpenInNewIcon />}
                                       onClick={() =>
                                         window.open(
-                                          tournament.is_public && tournament.public_slug
+                                          tournament.is_public &&
+                                            tournament.public_slug
                                             ? `/public/t/${tournament.public_slug}`
-                                            : wPath(`/tournaments/${tournament.id}/pairings`),
+                                            : wPath(
+                                                `/tournaments/${tournament.id}/pairings`,
+                                              ),
                                           "_blank",
                                         )
                                       }
@@ -1653,9 +1717,12 @@ const TournamentMatches: React.FC = () => {
                                       startIcon={<OpenInNewIcon />}
                                       onClick={() =>
                                         window.open(
-                                          tournament.is_public && tournament.public_slug
+                                          tournament.is_public &&
+                                            tournament.public_slug
                                             ? `/public/t/${tournament.public_slug}`
-                                            : wPath(`/tournaments/${tournament.id}/pairings`),
+                                            : wPath(
+                                                `/tournaments/${tournament.id}/pairings`,
+                                              ),
                                           "_blank",
                                         )
                                       }
@@ -1690,16 +1757,37 @@ const TournamentMatches: React.FC = () => {
                                     {tournament.round_duration_minutes &&
                                       (tournament.current_round_started_at ||
                                         tournament.round_is_paused) && (
-                                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+                                        <Box
+                                          sx={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: 0.5,
+                                          }}
+                                        >
                                           <RoundTimer
-                                            startedAt={tournament.current_round_started_at ?? null}
-                                            durationMinutes={tournament.round_duration_minutes}
-                                            elapsedSeconds={tournament.round_elapsed_seconds ?? 0}
-                                            isPaused={tournament.round_is_paused ?? false}
+                                            startedAt={
+                                              tournament.current_round_started_at ??
+                                              null
+                                            }
+                                            durationMinutes={
+                                              tournament.round_duration_minutes
+                                            }
+                                            elapsedSeconds={
+                                              tournament.round_elapsed_seconds ??
+                                              0
+                                            }
+                                            isPaused={
+                                              tournament.round_is_paused ??
+                                              false
+                                            }
                                             size="small"
                                           />
                                           <Tooltip
-                                            title={tournament.round_is_paused ? "Resume timer" : "Pause timer"}
+                                            title={
+                                              tournament.round_is_paused
+                                                ? "Resume timer"
+                                                : "Pause timer"
+                                            }
                                           >
                                             <IconButton
                                               size="small"
@@ -1710,18 +1798,26 @@ const TournamentMatches: React.FC = () => {
                                               }
                                             >
                                               {tournament.round_is_paused ? (
-                                                <PlayArrowIcon sx={{ fontSize: "1rem" }} />
+                                                <PlayArrowIcon
+                                                  sx={{ fontSize: "1rem" }}
+                                                />
                                               ) : (
-                                                <PauseIcon sx={{ fontSize: "1rem" }} />
+                                                <PauseIcon
+                                                  sx={{ fontSize: "1rem" }}
+                                                />
                                               )}
                                             </IconButton>
                                           </Tooltip>
                                           <Tooltip title="Edit timer duration">
                                             <IconButton
                                               size="small"
-                                              onClick={() => setTimerEditorOpen((v) => !v)}
+                                              onClick={() =>
+                                                setTimerEditorOpen((v) => !v)
+                                              }
                                             >
-                                              <EditIcon sx={{ fontSize: "1rem" }} />
+                                              <EditIcon
+                                                sx={{ fontSize: "1rem" }}
+                                              />
                                             </IconButton>
                                           </Tooltip>
                                         </Box>
@@ -1736,7 +1832,9 @@ const TournamentMatches: React.FC = () => {
                                           }}
                                           disabled={savingTimer}
                                         >
-                                          <AccessTimeIcon sx={{ fontSize: "1rem" }} />
+                                          <AccessTimeIcon
+                                            sx={{ fontSize: "1rem" }}
+                                          />
                                         </IconButton>
                                       </Tooltip>
                                     )}
@@ -1749,9 +1847,12 @@ const TournamentMatches: React.FC = () => {
                                     startIcon={<OpenInNewIcon />}
                                     onClick={() =>
                                       window.open(
-                                        tournament.is_public && tournament.public_slug
+                                        tournament.is_public &&
+                                          tournament.public_slug
                                           ? `/public/t/${tournament.public_slug}`
-                                          : wPath(`/tournaments/${tournament.id}/pairings`),
+                                          : wPath(
+                                              `/tournaments/${tournament.id}/pairings`,
+                                            ),
                                         "_blank",
                                       )
                                     }
@@ -1904,7 +2005,9 @@ const TournamentMatches: React.FC = () => {
                             placeholder="Add a note for players… (e.g. timer paused for judge call)"
                             value={roundNoteInput}
                             onChange={(e) => setRoundNoteInput(e.target.value)}
-                            onFocus={() => { noteInputFocusedRef.current = true; }}
+                            onFocus={() => {
+                              noteInputFocusedRef.current = true;
+                            }}
                             onBlur={() => {
                               noteInputFocusedRef.current = false;
                               void handleSaveRoundNote(roundNoteInput);
@@ -1919,18 +2022,22 @@ const TournamentMatches: React.FC = () => {
                           />
                         )}
                         {/* Conflict notification */}
-                        {!editingPairings && (() => {
-                          const conflictMatches = roundMatches
-                            .filter((m) => matchReports.get(m.id)?.conflict_status === "conflict");
-                          if (!conflictMatches.length) return null;
-                          return (
-                            <Alert severity="error" sx={{ mb: 1 }}>
-                              {conflictMatches.length === 1
-                                ? "1 match has a player conflict — check the match below and resolve manually."
-                                : `${conflictMatches.length} matches have player conflicts — check them below and resolve manually.`}
-                            </Alert>
-                          );
-                        })()}
+                        {!editingPairings &&
+                          (() => {
+                            const conflictMatches = roundMatches.filter(
+                              (m) =>
+                                matchReports.get(m.id)?.conflict_status ===
+                                "conflict",
+                            );
+                            if (!conflictMatches.length) return null;
+                            return (
+                              <Alert severity="error" sx={{ mb: 1 }}>
+                                {conflictMatches.length === 1
+                                  ? "1 match has a player conflict — check the match below and resolve manually."
+                                  : `${conflictMatches.length} matches have player conflicts — check them below and resolve manually.`}
+                              </Alert>
+                            );
+                          })()}
                         {editingPairings && (
                           <Alert
                             severity={
@@ -1955,74 +2062,221 @@ const TournamentMatches: React.FC = () => {
                         )}
                         {/* ── Mobile card view ────────────────────── */}
                         {isMobile && (
-                          <Box sx={{ display: "flex", flexDirection: "column" }}>
+                          <Box
+                            sx={{ display: "flex", flexDirection: "column" }}
+                          >
                             {roundMatches.map((match) => {
-                              const canEditCard = match.status === "pending" && match.player2_id !== null;
-                              const matchNumCard = matchNumberById.get(match.id) ?? 0;
-                              const pendingResultCard = pendingResults.get(match.id);
-                              let effWinnerId = pendingResultCard ? pendingResultCard.winnerId : match.winner_id;
-                              let effResult = pendingResultCard ? pendingResultCard.result : match.result;
-                              if (!pendingResultCard && match.status !== "completed") {
+                              const canEditCard =
+                                match.status === "pending" &&
+                                match.player2_id !== null;
+                              const matchNumCard =
+                                matchNumberById.get(match.id) ?? 0;
+                              const pendingResultCard = pendingResults.get(
+                                match.id,
+                              );
+                              let effWinnerId = pendingResultCard
+                                ? pendingResultCard.winnerId
+                                : match.winner_id;
+                              let effResult = pendingResultCard
+                                ? pendingResultCard.result
+                                : match.result;
+                              if (
+                                !pendingResultCard &&
+                                match.status !== "completed"
+                              ) {
                                 const reportCard = matchReports.get(match.id);
-                                if (reportCard && reportCard.conflict_status !== "conflict") {
-                                  const reportingOutcome = reportCard.player1_report ?? reportCard.player2_report;
-                                  const reportingPlayerId = reportCard.player1_report ? reportCard.player1_id : reportCard.player2_id;
+                                if (
+                                  reportCard &&
+                                  reportCard.conflict_status !== "conflict"
+                                ) {
+                                  const reportingOutcome =
+                                    reportCard.player1_report ??
+                                    reportCard.player2_report;
+                                  const reportingPlayerId =
+                                    reportCard.player1_report
+                                      ? reportCard.player1_id
+                                      : reportCard.player2_id;
                                   if (reportingOutcome === "draw") {
                                     effResult = "Draw";
                                   } else if (reportingOutcome === "win") {
                                     effWinnerId = reportingPlayerId;
-                                    effResult = reportingPlayerId === reportCard.player1_id ? "1-0" : "0-1";
+                                    effResult =
+                                      reportingPlayerId ===
+                                      reportCard.player1_id
+                                        ? "1-0"
+                                        : "0-1";
                                   } else if (reportingOutcome === "loss") {
-                                    effWinnerId = reportingPlayerId === reportCard.player1_id ? match.player2_id : reportCard.player1_id;
-                                    effResult = reportingPlayerId === reportCard.player1_id ? "0-1" : "1-0";
+                                    effWinnerId =
+                                      reportingPlayerId ===
+                                      reportCard.player1_id
+                                        ? match.player2_id
+                                        : reportCard.player1_id;
+                                    effResult =
+                                      reportingPlayerId ===
+                                      reportCard.player1_id
+                                        ? "0-1"
+                                        : "1-0";
                                   }
                                 }
                               }
-                              const isByeCard = match.status === "bye" || !match.player2_id;
+                              const isByeCard =
+                                match.status === "bye" || !match.player2_id;
                               const p1Wins = effWinnerId === match.player1_id;
                               const p2Wins = effWinnerId === match.player2_id;
                               const isDrawCard = effResult === "Draw";
-                              const cardP1Bg = isByeCard ? "rgba(33,150,243,0.1)" : isDrawCard ? "rgba(255,152,0,0.1)" : p1Wins ? "rgba(76,175,80,0.1)" : p2Wins ? "rgba(244,67,54,0.1)" : "transparent";
-                              const cardP2Bg = isByeCard ? "rgba(33,150,243,0.1)" : isDrawCard ? "rgba(255,152,0,0.1)" : p2Wins ? "rgba(76,175,80,0.1)" : p1Wins ? "rgba(244,67,54,0.1)" : "transparent";
-                              const p1SeatCard = playerStaticSeatMap.get(match.player1_id);
-                              const p2SeatCard = match.player2_id ? playerStaticSeatMap.get(match.player2_id) : undefined;
-                              const hasStaticSeatCard = p1SeatCard?.hasStaticSeating || p2SeatCard?.hasStaticSeating;
+                              const cardP1Bg = isByeCard
+                                ? "rgba(33,150,243,0.1)"
+                                : isDrawCard
+                                  ? "rgba(255,152,0,0.1)"
+                                  : p1Wins
+                                    ? "rgba(76,175,80,0.1)"
+                                    : p2Wins
+                                      ? "rgba(244,67,54,0.1)"
+                                      : "transparent";
+                              const cardP2Bg = isByeCard
+                                ? "rgba(33,150,243,0.1)"
+                                : isDrawCard
+                                  ? "rgba(255,152,0,0.1)"
+                                  : p2Wins
+                                    ? "rgba(76,175,80,0.1)"
+                                    : p1Wins
+                                      ? "rgba(244,67,54,0.1)"
+                                      : "transparent";
+                              const p1SeatCard = playerStaticSeatMap.get(
+                                match.player1_id,
+                              );
+                              const p2SeatCard = match.player2_id
+                                ? playerStaticSeatMap.get(match.player2_id)
+                                : undefined;
+                              const hasStaticSeatCard =
+                                p1SeatCard?.hasStaticSeating ||
+                                p2SeatCard?.hasStaticSeating;
                               const getCardRecord = (pid: string) => {
                                 const s = standingsByPlayerId.get(pid);
                                 return `${s?.wins ?? 0}-${s?.losses ?? 0}-${s?.draws ?? 0} · ${s?.matchPoints ?? 0}pts`;
                               };
-                              const isEditableMatch = editingPairings && (match.status === MATCH_STATUS.READY || match.status === MATCH_STATUS.BYE);
+                              const isEditableMatch =
+                                editingPairings &&
+                                (match.status === MATCH_STATUS.READY ||
+                                  match.status === MATCH_STATUS.BYE);
                               const ep = editedPairings.get(match.id);
                               const p1EditId = ep?.player1Id ?? null;
                               const p2EditId = ep?.player2Id ?? null;
-                              const p1EditName = p1EditId ? (roundPlayers.find((p) => p.id === p1EditId)?.name ?? "Unknown") : null;
-                              const p2EditName = p2EditId ? (roundPlayers.find((p) => p.id === p2EditId)?.name ?? "Unknown") : null;
+                              const p1EditName = p1EditId
+                                ? (roundPlayers.find((p) => p.id === p1EditId)
+                                    ?.name ?? "Unknown")
+                                : null;
+                              const p2EditName = p2EditId
+                                ? (roundPlayers.find((p) => p.id === p2EditId)
+                                    ?.name ?? "Unknown")
+                                : null;
                               return (
-                                <Box key={match.id} sx={{ borderBottom: "1px solid", borderColor: "divider", py: 1.5, px: 1 }}>
-                                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                                    <Box display="flex" alignItems="center" gap={0.5}>
-                                      <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                                <Box
+                                  key={match.id}
+                                  sx={{
+                                    borderBottom: "1px solid",
+                                    borderColor: "divider",
+                                    py: 1.5,
+                                    px: 1,
+                                  }}
+                                >
+                                  <Box
+                                    display="flex"
+                                    justifyContent="space-between"
+                                    alignItems="center"
+                                    mb={1}
+                                  >
+                                    <Box
+                                      display="flex"
+                                      alignItems="center"
+                                      gap={0.5}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        fontWeight="medium"
+                                      >
                                         Match {matchNumCard}
                                       </Typography>
                                       {hasStaticSeatCard && (
                                         <Tooltip title="Static seating">
-                                          <PushPinIcon sx={{ fontSize: 12, color: "text.secondary", opacity: 0.7 }} />
+                                          <PushPinIcon
+                                            sx={{
+                                              fontSize: 12,
+                                              color: "text.secondary",
+                                              opacity: 0.7,
+                                            }}
+                                          />
                                         </Tooltip>
                                       )}
                                     </Box>
                                     <Chip
-                                      label={match.status === "bye" ? "Bye" : match.status === "completed" ? "Completed" : match.status === "pending" ? "Pending" : "Ready"}
+                                      label={
+                                        match.status === "bye"
+                                          ? "Bye"
+                                          : match.status === "completed"
+                                            ? "Completed"
+                                            : match.status === "pending"
+                                              ? "Pending"
+                                              : "Ready"
+                                      }
                                       size="small"
-                                      color={match.status === "bye" ? "info" : match.status === "completed" ? "success" : match.status === "pending" ? "warning" : "default"}
+                                      color={
+                                        match.status === "bye"
+                                          ? "info"
+                                          : match.status === "completed"
+                                            ? "success"
+                                            : match.status === "pending"
+                                              ? "warning"
+                                              : "default"
+                                      }
                                     />
                                   </Box>
-                                  <Box display="flex" gap={1} mb={canEditCard && !isByeCard && !editingPairings ? 1 : 0}>
-                                    <Box sx={{ flex: 1, p: 0.75, borderRadius: 1, backgroundColor: isEditableMatch ? "transparent" : cardP1Bg, minWidth: 0 }}>
+                                  <Box
+                                    display="flex"
+                                    gap={1}
+                                    mb={
+                                      canEditCard &&
+                                      !isByeCard &&
+                                      !editingPairings
+                                        ? 1
+                                        : 0
+                                    }
+                                  >
+                                    <Box
+                                      sx={{
+                                        flex: 1,
+                                        p: 0.75,
+                                        borderRadius: 1,
+                                        backgroundColor: isEditableMatch
+                                          ? "transparent"
+                                          : cardP1Bg,
+                                        minWidth: 0,
+                                      }}
+                                    >
                                       {isEditableMatch ? (
                                         p1EditId ? (
-                                          <Box display="flex" alignItems="center" gap={0.5}>
-                                            <Typography variant="body2" noWrap sx={{ flex: 1 }}>{p1EditName}</Typography>
-                                            <IconButton size="small" onClick={() => removeFromSlot(match.id, "player1")}>
+                                          <Box
+                                            display="flex"
+                                            alignItems="center"
+                                            gap={0.5}
+                                          >
+                                            <Typography
+                                              variant="body2"
+                                              noWrap
+                                              sx={{ flex: 1 }}
+                                            >
+                                              {p1EditName}
+                                            </Typography>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() =>
+                                                removeFromSlot(
+                                                  match.id,
+                                                  "player1",
+                                                )
+                                              }
+                                            >
                                               <CloseIcon fontSize="small" />
                                             </IconButton>
                                           </Box>
@@ -2031,31 +2285,93 @@ const TournamentMatches: React.FC = () => {
                                             size="small"
                                             displayEmpty
                                             value=""
-                                            onChange={(e) => assignToSlot(match.id, "player1", e.target.value)}
-                                            renderValue={() => <em>Select player…</em>}
+                                            onChange={(e) =>
+                                              assignToSlot(
+                                                match.id,
+                                                "player1",
+                                                e.target.value,
+                                              )
+                                            }
+                                            renderValue={() => (
+                                              <em>Select player…</em>
+                                            )}
                                             sx={{ width: "100%" }}
                                           >
-                                            {[...availablePool.entries()].map(([id, name]) => (
-                                              <MenuItem key={id} value={id}>{name}</MenuItem>
-                                            ))}
+                                            {[...availablePool.entries()].map(
+                                              ([id, name]) => (
+                                                <MenuItem key={id} value={id}>
+                                                  {name}
+                                                </MenuItem>
+                                              ),
+                                            )}
                                           </Select>
                                         )
                                       ) : (
                                         <>
-                                          <Typography variant="body2" fontWeight="medium" noWrap>{match.player1_name}</Typography>
-                                          <Typography variant="caption" color="text.secondary">{getCardRecord(match.player1_id)}</Typography>
+                                          <Typography
+                                            variant="body2"
+                                            fontWeight="medium"
+                                            noWrap
+                                          >
+                                            {match.player1_name}
+                                          </Typography>
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                          >
+                                            {getCardRecord(match.player1_id)}
+                                          </Typography>
                                         </>
                                       )}
                                     </Box>
-                                    <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-                                      <Typography variant="caption" color="text.secondary">vs</Typography>
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                      >
+                                        vs
+                                      </Typography>
                                     </Box>
-                                    <Box sx={{ flex: 1, p: 0.75, borderRadius: 1, backgroundColor: isEditableMatch ? "transparent" : cardP2Bg, minWidth: 0 }}>
+                                    <Box
+                                      sx={{
+                                        flex: 1,
+                                        p: 0.75,
+                                        borderRadius: 1,
+                                        backgroundColor: isEditableMatch
+                                          ? "transparent"
+                                          : cardP2Bg,
+                                        minWidth: 0,
+                                      }}
+                                    >
                                       {isEditableMatch ? (
                                         p2EditId ? (
-                                          <Box display="flex" alignItems="center" gap={0.5}>
-                                            <Typography variant="body2" noWrap sx={{ flex: 1 }}>{p2EditName}</Typography>
-                                            <IconButton size="small" onClick={() => removeFromSlot(match.id, "player2")}>
+                                          <Box
+                                            display="flex"
+                                            alignItems="center"
+                                            gap={0.5}
+                                          >
+                                            <Typography
+                                              variant="body2"
+                                              noWrap
+                                              sx={{ flex: 1 }}
+                                            >
+                                              {p2EditName}
+                                            </Typography>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() =>
+                                                removeFromSlot(
+                                                  match.id,
+                                                  "player2",
+                                                )
+                                              }
+                                            >
                                               <CloseIcon fontSize="small" />
                                             </IconButton>
                                           </Box>
@@ -2064,88 +2380,193 @@ const TournamentMatches: React.FC = () => {
                                             size="small"
                                             displayEmpty
                                             value=""
-                                            onChange={(e) => assignToSlot(match.id, "player2", e.target.value)}
-                                            renderValue={() => <em>Select player…</em>}
+                                            onChange={(e) =>
+                                              assignToSlot(
+                                                match.id,
+                                                "player2",
+                                                e.target.value,
+                                              )
+                                            }
+                                            renderValue={() => (
+                                              <em>Select player…</em>
+                                            )}
                                             sx={{ width: "100%" }}
                                           >
-                                            {[...availablePool.entries()].map(([id, name]) => (
-                                              <MenuItem key={id} value={id}>{name}</MenuItem>
-                                            ))}
+                                            {[...availablePool.entries()].map(
+                                              ([id, name]) => (
+                                                <MenuItem key={id} value={id}>
+                                                  {name}
+                                                </MenuItem>
+                                              ),
+                                            )}
                                           </Select>
                                         )
                                       ) : match.player2_name ? (
                                         <>
-                                          <Typography variant="body2" fontWeight="medium" noWrap>{match.player2_name}</Typography>
-                                          <Typography variant="caption" color="text.secondary">{match.player2_id ? getCardRecord(match.player2_id) : ""}</Typography>
+                                          <Typography
+                                            variant="body2"
+                                            fontWeight="medium"
+                                            noWrap
+                                          >
+                                            {match.player2_name}
+                                          </Typography>
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                          >
+                                            {match.player2_id
+                                              ? getCardRecord(match.player2_id)
+                                              : ""}
+                                          </Typography>
                                         </>
                                       ) : (
-                                        <Typography variant="body2" color="info.main" fontStyle="italic">BYE</Typography>
+                                        <Typography
+                                          variant="body2"
+                                          color="info.main"
+                                          fontStyle="italic"
+                                        >
+                                          BYE
+                                        </Typography>
                                       )}
                                     </Box>
                                   </Box>
-                                  {canEditCard && match.player2_id && !editingPairings && (
-                                    <Box display="flex" gap={0.5}>
-                                      <Chip
-                                        label="1-0"
-                                        size="small"
-                                        variant={p1Wins ? "filled" : "outlined"}
-                                        sx={{ flex: 1, borderColor: "success.main", color: p1Wins ? "white" : "success.main", backgroundColor: p1Wins ? "success.main" : "transparent", cursor: "pointer", "&:hover": { backgroundColor: p1Wins ? "success.dark" : "success.light", color: "white" } }}
-                                        onClick={() => handleQuickResult(match, "player1")}
-                                        disabled={!!updatingMatch}
-                                      />
-                                      <Chip
-                                        label="Draw"
-                                        size="small"
-                                        variant={isDrawCard ? "filled" : "outlined"}
-                                        sx={{ flex: 1, borderColor: "warning.main", color: isDrawCard ? "white" : "warning.main", backgroundColor: isDrawCard ? "warning.main" : "transparent", cursor: "pointer", "&:hover": { backgroundColor: isDrawCard ? "warning.dark" : "warning.light", color: "white" } }}
-                                        onClick={() => handleQuickResult(match, "draw")}
-                                        disabled={!!updatingMatch}
-                                      />
-                                      <Chip
-                                        label="0-1"
-                                        size="small"
-                                        variant={p2Wins ? "filled" : "outlined"}
-                                        sx={{ flex: 1, borderColor: "error.main", color: p2Wins ? "white" : "error.main", backgroundColor: p2Wins ? "error.main" : "transparent", cursor: "pointer", "&:hover": { backgroundColor: p2Wins ? "error.dark" : "error.light", color: "white" } }}
-                                        onClick={() => handleQuickResult(match, "player2")}
-                                        disabled={!!updatingMatch}
-                                      />
-                                    </Box>
-                                  )}
+                                  {canEditCard &&
+                                    match.player2_id &&
+                                    !editingPairings && (
+                                      <Box display="flex" gap={0.5}>
+                                        <Chip
+                                          label="1-0"
+                                          size="small"
+                                          variant={
+                                            p1Wins ? "filled" : "outlined"
+                                          }
+                                          sx={{
+                                            flex: 1,
+                                            borderColor: "success.main",
+                                            color: p1Wins
+                                              ? "white"
+                                              : "success.main",
+                                            backgroundColor: p1Wins
+                                              ? "success.main"
+                                              : "transparent",
+                                            cursor: "pointer",
+                                            "&:hover": {
+                                              backgroundColor: p1Wins
+                                                ? "success.dark"
+                                                : "success.light",
+                                              color: "white",
+                                            },
+                                          }}
+                                          onClick={() =>
+                                            handleQuickResult(match, "player1")
+                                          }
+                                          disabled={!!updatingMatch}
+                                        />
+                                        <Chip
+                                          label="Draw"
+                                          size="small"
+                                          variant={
+                                            isDrawCard ? "filled" : "outlined"
+                                          }
+                                          sx={{
+                                            flex: 1,
+                                            borderColor: "warning.main",
+                                            color: isDrawCard
+                                              ? "white"
+                                              : "warning.main",
+                                            backgroundColor: isDrawCard
+                                              ? "warning.main"
+                                              : "transparent",
+                                            cursor: "pointer",
+                                            "&:hover": {
+                                              backgroundColor: isDrawCard
+                                                ? "warning.dark"
+                                                : "warning.light",
+                                              color: "white",
+                                            },
+                                          }}
+                                          onClick={() =>
+                                            handleQuickResult(match, "draw")
+                                          }
+                                          disabled={!!updatingMatch}
+                                        />
+                                        <Chip
+                                          label="0-1"
+                                          size="small"
+                                          variant={
+                                            p2Wins ? "filled" : "outlined"
+                                          }
+                                          sx={{
+                                            flex: 1,
+                                            borderColor: "error.main",
+                                            color: p2Wins
+                                              ? "white"
+                                              : "error.main",
+                                            backgroundColor: p2Wins
+                                              ? "error.main"
+                                              : "transparent",
+                                            cursor: "pointer",
+                                            "&:hover": {
+                                              backgroundColor: p2Wins
+                                                ? "error.dark"
+                                                : "error.light",
+                                              color: "white",
+                                            },
+                                          }}
+                                          onClick={() =>
+                                            handleQuickResult(match, "player2")
+                                          }
+                                          disabled={!!updatingMatch}
+                                        />
+                                      </Box>
+                                    )}
                                   {/* Player-submitted result indicator (mobile) */}
-                                  {matchReports.has(match.id) && (() => {
-                                    const report = matchReports.get(match.id)!;
-                                    if (report.conflict_status === "conflict") {
-                                      const p1out = report.player1_report ?? "?";
-                                      const p2out = report.player2_report ?? "?";
+                                  {matchReports.has(match.id) &&
+                                    (() => {
+                                      const report = matchReports.get(
+                                        match.id,
+                                      )!;
+                                      if (
+                                        report.conflict_status === "conflict"
+                                      ) {
+                                        const p1out =
+                                          report.player1_report ?? "?";
+                                        const p2out =
+                                          report.player2_report ?? "?";
+                                        return (
+                                          <Chip
+                                            icon={<WarningAmberIcon />}
+                                            label={`Conflict: ${report.player1_name} ${p1out} / ${report.player2_name ?? "P2"} ${p2out}`}
+                                            color="error"
+                                            size="small"
+                                            sx={{ alignSelf: "flex-start" }}
+                                          />
+                                        );
+                                      }
+                                      // partial — result already applied, just indicate source
                                       return (
                                         <Chip
-                                          icon={<WarningAmberIcon />}
-                                          label={`Conflict: ${report.player1_name} ${p1out} / ${report.player2_name ?? "P2"} ${p2out}`}
-                                          color="error"
+                                          icon={<PersonIcon />}
+                                          label="Player reported"
+                                          color="info"
                                           size="small"
+                                          variant="outlined"
                                           sx={{ alignSelf: "flex-start" }}
                                         />
                                       );
-                                    }
-                                    // partial — result already applied, just indicate source
-                                    return (
-                                      <Chip
-                                        icon={<PersonIcon />}
-                                        label="Player reported"
-                                        color="info"
-                                        size="small"
-                                        variant="outlined"
-                                        sx={{ alignSelf: "flex-start" }}
-                                      />
-                                    );
-                                  })()}
+                                    })()}
                                 </Box>
                               );
                             })}
                           </Box>
                         )}
                         {/* ── Desktop table ────────────────────────── */}
-                        <TableContainer sx={{ overflowX: "auto", display: { xs: "none", sm: "block" } }}>
+                        <TableContainer
+                          sx={{
+                            overflowX: "auto",
+                            display: { xs: "none", sm: "block" },
+                          }}
+                        >
                           <Table>
                             <TableHead>
                               <TableRow>
@@ -2215,19 +2636,39 @@ const TournamentMatches: React.FC = () => {
                                 let effectiveResult = pendingResult
                                   ? pendingResult.result
                                   : match.result;
-                                if (!pendingResult && match.status !== "completed") {
+                                if (
+                                  !pendingResult &&
+                                  match.status !== "completed"
+                                ) {
                                   const report = matchReports.get(match.id);
-                                  if (report && report.conflict_status !== "conflict") {
-                                    const reportingOutcome = report.player1_report ?? report.player2_report;
-                                    const reportingPlayerId = report.player1_report ? report.player1_id : report.player2_id;
+                                  if (
+                                    report &&
+                                    report.conflict_status !== "conflict"
+                                  ) {
+                                    const reportingOutcome =
+                                      report.player1_report ??
+                                      report.player2_report;
+                                    const reportingPlayerId =
+                                      report.player1_report
+                                        ? report.player1_id
+                                        : report.player2_id;
                                     if (reportingOutcome === "draw") {
                                       effectiveResult = "Draw";
                                     } else if (reportingOutcome === "win") {
                                       effectiveWinnerId = reportingPlayerId;
-                                      effectiveResult = reportingPlayerId === report.player1_id ? "1-0" : "0-1";
+                                      effectiveResult =
+                                        reportingPlayerId === report.player1_id
+                                          ? "1-0"
+                                          : "0-1";
                                     } else if (reportingOutcome === "loss") {
-                                      effectiveWinnerId = reportingPlayerId === report.player1_id ? match.player2_id : report.player1_id;
-                                      effectiveResult = reportingPlayerId === report.player1_id ? "0-1" : "1-0";
+                                      effectiveWinnerId =
+                                        reportingPlayerId === report.player1_id
+                                          ? match.player2_id
+                                          : report.player1_id;
+                                      effectiveResult =
+                                        reportingPlayerId === report.player1_id
+                                          ? "0-1"
+                                          : "1-0";
                                     }
                                   }
                                 }
@@ -2802,7 +3243,12 @@ const TournamentMatches: React.FC = () => {
                                       )}
                                     </TableCell>
                                     <TableCell>
-                                      <Box display="flex" flexDirection="column" gap={0.5} alignItems="flex-start">
+                                      <Box
+                                        display="flex"
+                                        flexDirection="column"
+                                        gap={0.5}
+                                        alignItems="flex-start"
+                                      >
                                         <Chip
                                           label={
                                             match.status === "bye"
@@ -2825,33 +3271,47 @@ const TournamentMatches: React.FC = () => {
                                           }
                                         />
                                         {/* Player-submitted result indicator */}
-                                        {matchReports.has(match.id) && (() => {
-                                          const report = matchReports.get(match.id)!;
-                                          if (report.conflict_status === "conflict") {
-                                            const p1out = report.player1_report ?? "?";
-                                            const p2out = report.player2_report ?? "?";
+                                        {matchReports.has(match.id) &&
+                                          (() => {
+                                            const report = matchReports.get(
+                                              match.id,
+                                            )!;
+                                            if (
+                                              report.conflict_status ===
+                                              "conflict"
+                                            ) {
+                                              const p1out =
+                                                report.player1_report ?? "?";
+                                              const p2out =
+                                                report.player2_report ?? "?";
+                                              return (
+                                                <Chip
+                                                  icon={<WarningAmberIcon />}
+                                                  label={`Conflict: ${report.player1_name} ${p1out} / ${report.player2_name ?? "P2"} ${p2out}`}
+                                                  color="error"
+                                                  size="small"
+                                                  sx={{
+                                                    fontSize: "0.65rem",
+                                                    height: 22,
+                                                  }}
+                                                />
+                                              );
+                                            }
+                                            // partial — result already applied, just indicate source
                                             return (
                                               <Chip
-                                                icon={<WarningAmberIcon />}
-                                                label={`Conflict: ${report.player1_name} ${p1out} / ${report.player2_name ?? "P2"} ${p2out}`}
-                                                color="error"
+                                                icon={<PersonIcon />}
+                                                label="Player reported"
+                                                color="info"
                                                 size="small"
-                                                sx={{ fontSize: "0.65rem", height: 22 }}
+                                                variant="outlined"
+                                                sx={{
+                                                  fontSize: "0.65rem",
+                                                  height: 22,
+                                                }}
                                               />
                                             );
-                                          }
-                                          // partial — result already applied, just indicate source
-                                          return (
-                                            <Chip
-                                              icon={<PersonIcon />}
-                                              label="Player reported"
-                                              color="info"
-                                              size="small"
-                                              variant="outlined"
-                                              sx={{ fontSize: "0.65rem", height: 22 }}
-                                            />
-                                          );
-                                        })()}
+                                          })()}
                                       </Box>
                                     </TableCell>
                                   </TableRow>
@@ -2899,7 +3359,9 @@ const TournamentMatches: React.FC = () => {
                               color="error"
                               size="small"
                               startIcon={<CloseIcon fontSize="small" />}
-                              onClick={() => setDeleteRoundConfirmRound(selectedRound)}
+                              onClick={() =>
+                                setDeleteRoundConfirmRound(selectedRound)
+                              }
                             >
                               Remove this round
                             </Button>
@@ -3249,83 +3711,83 @@ const TournamentMatches: React.FC = () => {
 
         return (
           <>
-          <Dialog
-            open={lateEntryDialogOpen}
-            onClose={() => {
-              setLateEntryDialogOpen(false);
-              setLateEntryName("");
-            }}
-            maxWidth="sm"
-            fullWidth
-          >
-            <DialogTitle>Add Late Entry</DialogTitle>
-            <DialogContent>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                {infoMessage}
-              </Alert>
-              <TextField
-                autoFocus
-                fullWidth
-                label="Player Name"
-                value={lateEntryName}
-                onChange={(e) => setLateEntryName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && lateEntryName.trim()) {
-                    void handleAddLateEntry();
-                  }
-                }}
-              />
-            </DialogContent>
-            <DialogActions>
-              <Button
-                onClick={() => {
-                  setLateEntryDialogOpen(false);
-                  setLateEntryName("");
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="contained"
-                onClick={() => void handleAddLateEntry()}
-                disabled={!lateEntryName.trim() || addingLateEntry}
-              >
-                {addingLateEntry ? "Adding…" : "Add Player"}
-              </Button>
-            </DialogActions>
-          </Dialog>
+            <Dialog
+              open={lateEntryDialogOpen}
+              onClose={() => {
+                setLateEntryDialogOpen(false);
+                setLateEntryName("");
+              }}
+              maxWidth="sm"
+              fullWidth
+            >
+              <DialogTitle>Add Late Entry</DialogTitle>
+              <DialogContent>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  {infoMessage}
+                </Alert>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  label="Player Name"
+                  value={lateEntryName}
+                  onChange={(e) => setLateEntryName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && lateEntryName.trim()) {
+                      void handleAddLateEntry();
+                    }
+                  }}
+                />
+              </DialogContent>
+              <DialogActions>
+                <Button
+                  onClick={() => {
+                    setLateEntryDialogOpen(false);
+                    setLateEntryName("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={() => void handleAddLateEntry()}
+                  disabled={!lateEntryName.trim() || addingLateEntry}
+                >
+                  {addingLateEntry ? "Adding…" : "Add Player"}
+                </Button>
+              </DialogActions>
+            </Dialog>
 
-          {/* Delete round confirmation */}
-          <Dialog
-            open={deleteRoundConfirmRound !== null}
-            onClose={() => setDeleteRoundConfirmRound(null)}
-          >
-            <DialogTitle>Remove Round {deleteRoundConfirmRound}?</DialogTitle>
-            <DialogContent>
-              <Typography>
-                This will permanently remove Round {deleteRoundConfirmRound}{" "}
-                from the tournament. The tournament will end after Round{" "}
-                {(deleteRoundConfirmRound ?? 1) - 1}.
-              </Typography>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setDeleteRoundConfirmRound(null)}>
-                Cancel
-              </Button>
-              <Button
-                color="error"
-                variant="contained"
-                onClick={() => {
-                  if (deleteRoundConfirmRound !== null) {
-                    handleDeleteRound(deleteRoundConfirmRound);
-                    setDeleteRoundConfirmRound(null);
-                  }
-                }}
-              >
-                Remove Round
-              </Button>
-            </DialogActions>
-          </Dialog>
+            {/* Delete round confirmation */}
+            <Dialog
+              open={deleteRoundConfirmRound !== null}
+              onClose={() => setDeleteRoundConfirmRound(null)}
+            >
+              <DialogTitle>Remove Round {deleteRoundConfirmRound}?</DialogTitle>
+              <DialogContent>
+                <Typography>
+                  This will permanently remove Round {deleteRoundConfirmRound}{" "}
+                  from the tournament. The tournament will end after Round{" "}
+                  {(deleteRoundConfirmRound ?? 1) - 1}.
+                </Typography>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setDeleteRoundConfirmRound(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  color="error"
+                  variant="contained"
+                  onClick={() => {
+                    if (deleteRoundConfirmRound !== null) {
+                      handleDeleteRound(deleteRoundConfirmRound);
+                      setDeleteRoundConfirmRound(null);
+                    }
+                  }}
+                >
+                  Remove Round
+                </Button>
+              </DialogActions>
+            </Dialog>
           </>
         );
       })()}
