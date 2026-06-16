@@ -7,7 +7,10 @@ import React, {
   useMemo,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "./supabaseClient";
+import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
+import SupabaseErrorScreen, {
+  type SupabaseErrorType,
+} from "./components/SupabaseErrorScreen";
 
 export interface Profile {
   id: string;
@@ -34,6 +37,35 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+interface SupabaseError {
+  type: SupabaseErrorType;
+  detail?: string;
+}
+
+async function probeSupabase(): Promise<SupabaseError | null> {
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/`, {
+      headers: { apikey: supabaseAnonKey },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (res.status === 503 || res.status === 402) {
+      return { type: "paused" };
+    }
+    if (!res.ok && res.status !== 200 && res.status !== 400 && res.status !== 401) {
+      return { type: "error", detail: `HTTP ${res.status}` };
+    }
+    return null;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "TimeoutError") {
+      return { type: "network", detail: "Request timed out" };
+    }
+    if (err instanceof TypeError) {
+      return { type: "network", detail: err.message };
+    }
+    return { type: "error", detail: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -41,6 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [supabaseError, setSupabaseError] = useState<SupabaseError | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   // Fetch the public.profiles row for the current user
   const fetchProfile = useCallback(async (userId: string) => {
@@ -62,6 +96,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const initAuth = async () => {
       setLoading(true);
+      setSupabaseError(null);
+
+      const probe = await probeSupabase();
+      if (!isMounted) return;
+      if (probe) {
+        setSupabaseError(probe);
+        setLoading(false);
+        return;
+      }
+
       const {
         data: { session: currentSession },
       } = await supabase.auth.getSession();
@@ -104,7 +148,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       isMounted = false;
       authSubscription?.unsubscribe();
     };
-  }, [fetchProfile]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchProfile, retryKey]);
 
   // Refresh session when the tab becomes visible again — browser timer throttling
   // can prevent the Supabase client's built-in proactive refresh from firing on time,
@@ -176,10 +221,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const displayName =
     profile?.display_name || user?.email || "User";
 
+  const handleRetry = useCallback(() => setRetryKey((k) => k + 1), []);
+
   const contextValue = useMemo(
     () => ({ user, session, profile, displayName, loading, login, register, logout, updateProfile }),
     [user, session, profile, displayName, loading, login, register, logout, updateProfile],
   );
+
+  if (!loading && supabaseError) {
+    return (
+      <SupabaseErrorScreen
+        type={supabaseError.type}
+        detail={supabaseError.detail}
+        onRetry={handleRetry}
+      />
+    );
+  }
 
   return (
     <AuthContext.Provider value={contextValue}>
