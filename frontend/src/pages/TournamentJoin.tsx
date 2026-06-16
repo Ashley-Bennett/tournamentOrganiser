@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -30,9 +30,15 @@ export default function TournamentJoin() {
     "loading" | "open" | "closed" | "not_found"
   >("loading");
   const [tournamentName, setTournamentName] = useState("");
+  const [registeredNames, setRegisteredNames] = useState<string[]>([]);
   const [nameInput, setNameInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const nameTaken = useMemo(
+    () => registeredNames.some((n) => n.toLowerCase() === nameInput.trim().toLowerCase()),
+    [registeredNames, nameInput],
+  );
 
   useEffect(() => {
     if (!tournamentId) { setPageState("not_found"); return; }
@@ -48,11 +54,13 @@ export default function TournamentJoin() {
       }
 
       const row = Array.isArray(data) ? data[0] : data;
-      const name = (row as { tournament_name: string; status: string; join_enabled: boolean }).tournament_name;
-      const status = (row as { tournament_name: string; status: string; join_enabled: boolean }).status;
-      const joinEnabled = (row as { tournament_name: string; status: string; join_enabled: boolean }).join_enabled;
+      const name = (row as { tournament_name: string; status: string; join_enabled: boolean; registered_names: string[] }).tournament_name;
+      const status = (row as { tournament_name: string; status: string; join_enabled: boolean; registered_names: string[] }).status;
+      const joinEnabled = (row as { tournament_name: string; status: string; join_enabled: boolean; registered_names: string[] }).join_enabled;
+      const names = (row as { tournament_name: string; status: string; join_enabled: boolean; registered_names: string[] }).registered_names ?? [];
 
       setTournamentName(name);
+      setRegisteredNames(names);
 
       // Expire cache if tournament is completed
       if (status === "completed") {
@@ -82,7 +90,7 @@ export default function TournamentJoin() {
   }, [tournamentId, navigate]);
 
   const handleSubmit = async () => {
-    if (!tournamentId || !nameInput.trim()) return;
+    if (!tournamentId || !nameInput.trim() || nameTaken) return;
     setSubmitting(true);
     setError(null);
 
@@ -170,6 +178,8 @@ export default function TournamentJoin() {
               onChange={(e) => setNameInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void handleSubmit(); }}
               disabled={submitting}
+              error={nameTaken}
+              helperText={nameTaken ? "This name is already taken — please use a different name." : " "}
               sx={{ mb: 2 }}
             />
             <Button
@@ -177,7 +187,7 @@ export default function TournamentJoin() {
               fullWidth
               size="large"
               onClick={() => void handleSubmit()}
-              disabled={submitting || !nameInput.trim()}
+              disabled={submitting || !nameInput.trim() || nameTaken}
             >
               {submitting ? <CircularProgress size={22} /> : "Join Tournament"}
             </Button>
