@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -59,7 +59,6 @@ import {
   generateSwissPairings,
   calculateMatchPoints,
   type Pairing,
-  type PairingDecisionLog,
 } from "../utils/tournamentPairing";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import {
@@ -68,91 +67,22 @@ import {
   type SeatConflict,
 } from "../utils/tournamentUtils";
 import { TournamentSummary } from "../types/tournament";
+import { usePairingEditor } from "../hooks/usePairingEditor";
+import { usePendingResults } from "../hooks/usePendingResults";
+import { useMatchReports } from "../hooks/useMatchReports";
+import { useMatchData } from "../hooks/useMatchData";
+import { useRoundLifecycle } from "../hooks/useRoundLifecycle";
+import {
+  type TournamentPlayer,
+  type Match,
+  type MatchWithPlayers,
+  MATCH_STATUS,
+  humanizeByeReason,
+  humanizeFloatReason,
+  serializeDecisionLog,
+} from "../types/match";
 import StandingsTable from "../components/StandingsTable";
 import RoundTimer from "../components/RoundTimer";
-
-interface TournamentPlayer {
-  id: string;
-  name: string;
-  dropped: boolean;
-  dropped_at_round: number | null;
-  has_static_seating: boolean;
-  static_seat_number: number | null;
-  is_late_entry: boolean;
-  late_entry_round: number | null;
-  deck_pokemon1: number | null;
-  deck_pokemon2: number | null;
-}
-
-interface Match {
-  id: string;
-  tournament_id: string;
-  round_number: number;
-  match_number: number | null;
-  player1_id: string;
-  player2_id: string | null;
-  winner_id: string | null;
-  result: string | null;
-  temp_winner_id: string | null;
-  temp_result: string | null;
-  pairings_published: boolean;
-  status: "ready" | "pending" | "completed" | "bye";
-  confirmed_by: "organiser" | "player_agreement" | "player_report" | "conflict" | null;
-  pairing_decision_log?: PairingDecisionLog | null;
-  created_at: string;
-}
-
-interface MatchWithPlayers extends Match {
-  player1_name: string;
-  player2_name: string | null;
-  winner_name: string | null;
-}
-
-interface MatchReportRow {
-  match_id: string;
-  player1_id: string;
-  player1_name: string;
-  player2_id: string | null;
-  player2_name: string | null;
-  player1_report: string | null;
-  player2_report: string | null;
-  conflict_status: "agreed" | "conflict" | "partial";
-}
-
-const MATCH_STATUS = {
-  READY: "ready",
-  PENDING: "pending",
-  COMPLETED: "completed",
-  BYE: "bye",
-} as const;
-
-// Plain-English helpers for pairing decision log display
-const humanizeByeReason = (reason: string): string => {
-  if (reason.includes("dissolved rematch bracket"))
-    return "their score group had no valid pairings";
-  if (reason.includes("lowest bracket") || reason.includes("bye priority"))
-    return "lowest score with the fewest previous byes";
-  return reason;
-};
-
-const humanizeFloatReason = (reason: string): string => {
-  if (reason.includes("rematch-escape float"))
-    return "moved to a different score group to avoid a rematch";
-  if (reason.includes("odd mixed bracket") || reason.includes("odd bracket"))
-    return "their score group had an odd number of players, so they played someone from the next group down";
-  return reason;
-};
-
-// Helper to convert PairingDecisionLog for database storage (Map -> object)
-const serializeDecisionLog = (
-  log: PairingDecisionLog | undefined,
-): Record<string, unknown> | null => {
-  if (!log) return null;
-  return {
-    ...log,
-    floatReasons: Object.fromEntries(log.floatReasons),
-  };
-};
 
 const TournamentMatches: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -162,17 +92,12 @@ const TournamentMatches: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
-  const [matches, setMatches] = useState<MatchWithPlayers[]>([]);
   const [loading, setLoading] = useState(true);
-  const [matchesLoading, setMatchesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoSaveWarning, setAutoSaveWarning] = useState(false);
-  const [seatWarnings, setSeatWarnings] = useState<string[]>([]);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [sortBy, setSortBy] = useState<"match" | "status" | "record">("record");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
-  const [processingRound, setProcessingRound] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithPlayers | null>(
     null,
   );
@@ -180,19 +105,6 @@ const TournamentMatches: React.FC = () => {
   const [player1Wins, setPlayer1Wins] = useState<number>(0);
   const [player2Wins, setPlayer2Wins] = useState<number>(0);
   const [updatingMatch, setUpdatingMatch] = useState(false);
-  const [pendingResults, setPendingResults] = useState<
-    Map<string, { winnerId: string | null; result: string }>
-  >(new Map());
-  const [roundDecisionLogs, setRoundDecisionLogs] = useState<
-    Map<number, PairingDecisionLog>
-  >(new Map());
-  const [editingPairings, setEditingPairings] = useState(false);
-  // matchId → { player1Id: string|null, player2Id: string|null }; null = slot emptied
-  const [editedPairings, setEditedPairings] = useState<
-    Map<string, { player1Id: string | null; player2Id: string | null }>
-  >(new Map());
-  const [savingPairings, setSavingPairings] = useState(false);
-  const [players, setPlayers] = useState<TournamentPlayer[]>([]);
   const [dropDialogOpen, setDropDialogOpen] = useState(false);
   const [togglingDrop, setTogglingDrop] = useState<string | null>(null);
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
@@ -202,33 +114,27 @@ const TournamentMatches: React.FC = () => {
   const [lateEntryName, setLateEntryName] = useState("");
   const [addingLateEntry, setAddingLateEntry] = useState(false);
   const [seatInputs, setSeatInputs] = useState<Map<string, string>>(new Map());
-  const didRestoreRef = useRef(false);
-  const initialRoundSetRef = useRef(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const initialMatchLoadDoneRef = useRef(false);
   const [savingTimer, setSavingTimer] = useState(false);
   const [timerDurationInput, setTimerDurationInput] = useState<string | null>(null);
   const [timerEditorOpen, setTimerEditorOpen] = useState(false);
   const [roundNoteInput, setRoundNoteInput] = useState<string>("");
   const noteInputFocusedRef = useRef(false);
-  const [matchReports, setMatchReports] = useState<Map<string, MatchReportRow>>(new Map());
 
-  // When the tab becomes visible after being backgrounded, force a re-fetch.
-  // AuthContext also fires refreshSession() on visibilitychange, so we delay
-  // slightly to let the token refresh complete before re-fetching data.
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        timer = setTimeout(() => setRefreshTrigger((t) => t + 1), 500);
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      clearTimeout(timer);
-    };
-  }, []);
+  const {
+    matches,
+    setMatches,
+    matchesLoading,
+    players,
+    setPlayers,
+    roundDecisionLogs,
+    setRefreshTrigger,
+    refreshMatches,
+  } = useMatchData({
+    tournamentId: tournament?.id,
+    user,
+    setSelectedRound,
+    setError,
+  });
 
   // Sync round note input from tournament state (only when not actively editing)
   useEffect(() => {
@@ -325,45 +231,6 @@ const TournamentMatches: React.FC = () => {
     return map;
   }, [matches, selectedRound]);
 
-  // All players appearing in the current round's matches (for the pairing editor)
-  const roundPlayers = useMemo(() => {
-    const seen = new Map<string, string>();
-    matches
-      .filter(
-        (m) =>
-          typeof selectedRound === "number" && m.round_number === selectedRound,
-      )
-      .forEach((m) => {
-        seen.set(m.player1_id, m.player1_name);
-        if (m.player2_id && m.player2_name)
-          seen.set(m.player2_id, m.player2_name);
-      });
-    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
-  }, [matches, selectedRound]);
-
-  // Players not currently assigned to any slot in editedPairings
-  const availablePool = useMemo(() => {
-    if (!editingPairings) return new Map<string, string>();
-    const assigned = new Set<string>();
-    for (const { player1Id, player2Id } of editedPairings.values()) {
-      if (player1Id) assigned.add(player1Id);
-      if (player2Id) assigned.add(player2Id);
-    }
-    const pool = new Map<string, string>();
-    roundPlayers.forEach((p) => {
-      if (!assigned.has(p.id)) pool.set(p.id, p.name);
-    });
-    return pool;
-  }, [editingPairings, editedPairings, roundPlayers]);
-
-  // Save is only enabled when every player is assigned exactly once (pool is empty)
-  const pairingEditsValid = useMemo(() => {
-    if (!editingPairings) return true;
-    if (availablePool.size > 0) return false;
-    return Array.from(editedPairings.values()).every(
-      (e) => e.player1Id !== null,
-    );
-  }, [editingPairings, availablePool, editedPairings]);
 
   useEffect(() => {
     if (!id) {
@@ -436,273 +303,10 @@ const TournamentMatches: React.FC = () => {
     void fetchTournament();
   }, [id, user, authLoading, navigate, workspaceId]);
 
-  // Restore pending results from DB temp columns when matches first load
-  useEffect(() => {
-    if (matches.length === 0 || didRestoreRef.current) return;
-    didRestoreRef.current = true;
-    const toRestore = new Map<
-      string,
-      { winnerId: string | null; result: string }
-    >();
-    for (const match of matches) {
-      if (
-        match.status !== "completed" &&
-        match.status !== "bye" &&
-        match.temp_result
-      ) {
-        toRestore.set(match.id, {
-          winnerId: match.temp_winner_id,
-          result: match.temp_result,
-        });
-      }
-    }
-    if (toRestore.size > 0) setPendingResults(toRestore);
-  }, [matches]);
-
-  // Clean up pending results for matches that no longer exist
-  useEffect(() => {
-    if (matches.length === 0 || pendingResults.size === 0) return;
-    const matchIds = new Set(matches.map((m) => m.id));
-    const hasInvalidEntries = Array.from(pendingResults.keys()).some(
-      (matchId) => !matchIds.has(matchId),
-    );
-    if (hasInvalidEntries) {
-      setPendingResults((prev) => {
-        const next = new Map();
-        for (const [matchId, result] of prev.entries()) {
-          if (matchIds.has(matchId)) {
-            next.set(matchId, result);
-          }
-        }
-        return next;
-      });
-    }
-  }, [matches, pendingResults]);
-
-  useEffect(() => {
-    if (!tournament?.id || !user) return;
-
-    const fetchMatches = async () => {
-      const isInitialLoad = !initialMatchLoadDoneRef.current;
-      try {
-        if (isInitialLoad) setMatchesLoading(true);
-        setError(null);
-
-        // Fetch matches - stable order so match numbers never change
-        const { data: matchesData, error: matchesError } = await supabase
-          .from("tournament_matches")
-          .select("*")
-          .eq("tournament_id", tournament.id)
-          .order("round_number", { ascending: true })
-          .order("created_at", { ascending: true })
-          .order("id", { ascending: true });
-
-        if (matchesError) {
-          throw new Error(matchesError.message || "Failed to load matches");
-        }
-
-        if (!matchesData || matchesData.length === 0) {
-          setMatches([]);
-          if (isInitialLoad) { setMatchesLoading(false); initialMatchLoadDoneRef.current = true; }
-          return;
-        }
-
-        // Fetch player names
-        const playerIds = new Set<string>();
-        matchesData.forEach((match) => {
-          playerIds.add(match.player1_id);
-          if (match.player2_id) {
-            playerIds.add(match.player2_id);
-          }
-          if (match.winner_id) {
-            playerIds.add(match.winner_id);
-          }
-        });
-
-        const { data: playersData, error: playersError } = await supabase
-          .from("tournament_players")
-          .select("id, name")
-          .in("id", Array.from(playerIds));
-
-        if (playersError) {
-          throw new Error(playersError.message || "Failed to load players");
-        }
-
-        const playersMap = new Map<string, string>();
-        playersData?.forEach((player) => {
-          playersMap.set(player.id, player.name);
-        });
-
-        // Load all tournament players (with drop status) for the drop manager
-        const { data: allPlayersData, error: allPlayersError } = await supabase
-          .from("tournament_players")
-          .select(
-            "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round, deck_pokemon1, deck_pokemon2",
-          )
-          .eq("tournament_id", tournament.id)
-          .order("name");
-        if (allPlayersError) {
-          throw new Error(allPlayersError.message || "Failed to load players");
-        }
-        setPlayers((allPlayersData as TournamentPlayer[]) ?? []);
-
-        // Combine matches with player names
-        const matchesWithPlayers: MatchWithPlayers[] = matchesData.map(
-          (match) => ({
-            ...match,
-            player1_name: playersMap.get(match.player1_id) || "Unknown",
-            player2_name: match.player2_id
-              ? playersMap.get(match.player2_id) || "Unknown"
-              : null,
-            winner_name: match.winner_id
-              ? playersMap.get(match.winner_id) || "Unknown"
-              : null,
-          }),
-        );
-
-        setMatches(matchesWithPlayers);
-
-        // On first load, jump to the current (highest) round
-        if (!initialRoundSetRef.current && matchesWithPlayers.length > 0) {
-          const maxRound = Math.max(...matchesWithPlayers.map((m) => m.round_number));
-          setSelectedRound(maxRound);
-          initialRoundSetRef.current = true;
-        }
-
-        // Extract decision logs from matches (stored on first match of each round)
-        const decisionLogsMap = new Map<number, PairingDecisionLog>();
-        const roundsProcessed = new Set<number>();
-
-        for (const match of matchesData) {
-          if (
-            match.pairing_decision_log &&
-            !roundsProcessed.has(match.round_number)
-          ) {
-            const log = match.pairing_decision_log as Omit<
-              PairingDecisionLog,
-              "floatReasons"
-            > & {
-              floatReasons: Map<string, string> | Record<string, string>;
-            };
-            // Convert floatReasons object back to Map if needed
-            const floatReasonsMap =
-              log.floatReasons instanceof Map
-                ? log.floatReasons
-                : new Map(Object.entries(log.floatReasons));
-            decisionLogsMap.set(match.round_number, {
-              ...log,
-              floatReasons: floatReasonsMap,
-            } as PairingDecisionLog);
-            roundsProcessed.add(match.round_number);
-          }
-        }
-
-        setRoundDecisionLogs(decisionLogsMap);
-
-        // Fetch player-submitted match reports (for organiser report badges)
-        const { data: reportsData } = await supabase.rpc(
-          "get_match_result_reports",
-          { p_tournament_id: tournament.id },
-        );
-        if (reportsData) {
-          const reportsMap = new Map<string, MatchReportRow>();
-          (reportsData as MatchReportRow[]).forEach((r) => {
-            reportsMap.set(r.match_id, r);
-          });
-          setMatchReports(reportsMap);
-        }
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Failed to load matches");
-      } finally {
-        if (isInitialLoad) { setMatchesLoading(false); initialMatchLoadDoneRef.current = true; }
-      }
-    };
-
-    void fetchMatches();
-  }, [tournament?.id, user, refreshTrigger]);
-
-  // Refresh reports map and keep it in sync via realtime + fallback poll
-  useEffect(() => {
-    if (!tournament?.id) return;
-    let isMounted = true;
-
-    const fetchReports = async () => {
-      const { data } = await supabase.rpc("get_match_result_reports", {
-        p_tournament_id: tournament.id,
-      });
-      if (!isMounted) return;
-      const map = new Map<string, MatchReportRow>();
-      (data as MatchReportRow[] ?? []).forEach((r) => map.set(r.match_id, r));
-      setMatchReports(map);
-
-      // Immediately sync pendingResults with the latest player report so the
-      // result chip updates without waiting for the match list to refresh.
-      // Skip conflicts — the organiser must resolve those manually.
-      setPendingResults((prev) => {
-        const next = new Map(prev);
-        let changed = false;
-        for (const [matchId, report] of map.entries()) {
-          if (report.conflict_status === "conflict") continue;
-          const reportingOutcome = report.player1_report ?? report.player2_report;
-          const reportingPlayerId = report.player1_report ? report.player1_id : report.player2_id;
-          let winnerId: string | null = null;
-          let result: string;
-          if (reportingOutcome === "draw") {
-            result = "Draw";
-          } else if (reportingOutcome === "win") {
-            winnerId = reportingPlayerId;
-            result = reportingPlayerId === report.player1_id ? "1-0" : "0-1";
-          } else {
-            winnerId = reportingPlayerId === report.player1_id ? report.player2_id : report.player1_id;
-            result = reportingPlayerId === report.player1_id ? "0-1" : "1-0";
-          }
-          const existing = prev.get(matchId);
-          if (!existing || existing.result !== result || existing.winnerId !== winnerId) {
-            next.set(matchId, { winnerId, result });
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    };
-
-    // Fetch immediately on mount so badges are populated without waiting for a change
-    void fetchReports();
-
-    // Fallback poll every 5 s in case realtime events are missed
-    const pollId = setInterval(() => void fetchReports(), 5_000);
-
-    const channel = supabase
-      .channel(`match-reports-${tournament.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "match_result_reports",
-        },
-        () => {
-          void fetchReports();
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "tournament_matches",
-          filter: `tournament_id=eq.${tournament.id}`,
-        },
-        () => { setRefreshTrigger((n) => n + 1); },
-      )
-      .subscribe();
-
-    return () => {
-      isMounted = false;
-      clearInterval(pollId);
-      void supabase.removeChannel(channel);
-    };
-  }, [tournament?.id]);
+  const { matchReports } = useMatchReports({
+    tournamentId: tournament?.id,
+    setRefreshTrigger,
+  });
 
   // Map from player ID → dropped_at_round (for final standings table indicators)
   const droppedPlayersMap = useMemo(() => {
@@ -843,137 +447,6 @@ const TournamentMatches: React.FC = () => {
     return null;
   };
 
-  const handleQuickResult = async (
-    match: MatchWithPlayers,
-    result: "player1" | "player2" | "draw",
-  ) => {
-    if (!match.player2_id) return; // Can't set result for bye
-
-    let winnerId: string | null = null;
-    let resultString = "";
-
-    if (result === "draw") {
-      winnerId = null;
-      resultString = "Draw";
-    } else if (result === "player1") {
-      winnerId = match.player1_id;
-      resultString = "1-0"; // Best of 1
-    } else {
-      // result === "player2"
-      winnerId = match.player2_id;
-      resultString = "0-1"; // Best of 1
-    }
-
-    setPendingResults((prev) => {
-      const next = new Map(prev);
-      next.set(match.id, { winnerId, result: resultString });
-      return next;
-    });
-
-    // Auto-save temp result to DB so it survives navigation
-    const { error } = await supabase
-      .from("tournament_matches")
-      .update({ temp_winner_id: winnerId, temp_result: resultString })
-      .eq("id", match.id);
-    if (error) {
-      setAutoSaveWarning(true);
-    }
-  };
-
-  const savePendingResults = async (): Promise<void> => {
-    if (pendingResults.size === 0) return;
-
-    try {
-      setUpdatingMatch(true);
-      setError(null);
-
-      // Save all pending results
-      const updates = Array.from(pendingResults.entries()).map(
-        ([matchId, { winnerId, result }]) => ({
-          id: matchId,
-          winner_id: winnerId,
-          result,
-          status: MATCH_STATUS.COMPLETED,
-        }),
-      );
-
-      for (const update of updates) {
-        const { error: updateError } = await supabase
-          .from("tournament_matches")
-          .update({
-            winner_id: update.winner_id,
-            result: update.result,
-            status: update.status,
-            temp_winner_id: null,
-            temp_result: null,
-          })
-          .eq("id", update.id);
-
-        if (updateError) {
-          throw new Error(updateError.message || "Failed to update match");
-        }
-      }
-
-      setPendingResults(new Map());
-
-      // Refresh matches
-      const { data: matchesData, error: matchesError } = await supabase
-        .from("tournament_matches")
-        .select("*")
-        .eq("tournament_id", tournament!.id)
-        .order("round_number", { ascending: true })
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true });
-
-      if (matchesError) {
-        throw new Error(matchesError.message || "Failed to refresh matches");
-      }
-
-      // Fetch updated player names
-      const playerIds = new Set<string>();
-      matchesData?.forEach((m) => {
-        playerIds.add(m.player1_id);
-        if (m.player2_id) {
-          playerIds.add(m.player2_id);
-        }
-        if (m.winner_id) {
-          playerIds.add(m.winner_id);
-        }
-      });
-
-      const { data: playersData } = await supabase
-        .from("tournament_players")
-        .select("id, name")
-        .in("id", Array.from(playerIds));
-
-      const playersMap = new Map<string, string>();
-      playersData?.forEach((player) => {
-        playersMap.set(player.id, player.name);
-      });
-
-      const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
-        (m) => ({
-          ...m,
-          player1_name: playersMap.get(m.player1_id) || "Unknown",
-          player2_name: m.player2_id
-            ? playersMap.get(m.player2_id) || "Unknown"
-            : null,
-          winner_name: m.winner_id
-            ? playersMap.get(m.winner_id) || "Unknown"
-            : null,
-        }),
-      );
-
-      setMatches(matchesWithPlayers);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save results");
-      throw e; // Re-throw so handleNextRound can handle it
-    } finally {
-      setUpdatingMatch(false);
-    }
-  };
-
-
   const handleSaveMatchResult = async () => {
     if (!selectedMatch || !selectedWinner) return;
 
@@ -1088,55 +561,71 @@ const TournamentMatches: React.FC = () => {
     }
   };
 
-  // Shared helper: fetch all tournament matches (with player names) and update state
-  const refreshMatches = async () => {
-    if (!tournament) return;
-    const { data: matchesData, error: matchesError } = await supabase
-      .from("tournament_matches")
-      .select("*")
-      .eq("tournament_id", tournament.id)
-      .order("round_number", { ascending: true })
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true });
-    if (matchesError)
-      throw new Error(matchesError.message || "Failed to refresh matches");
+  const {
+    editingPairings,
+    editedPairings,
+    savingPairings,
+    roundPlayers,
+    availablePool,
+    pairingEditsValid,
+    handleEditPairings,
+    handleCancelEditPairings,
+    handleSavePairingEdits,
+    removeFromSlot,
+    assignToSlot,
+  } = usePairingEditor({
+    matches,
+    selectedRound,
+    tournament,
+    workspaceId,
+    refreshMatches,
+    setError,
+  });
 
-    const playerIds = new Set<string>();
-    matchesData?.forEach((m) => {
-      playerIds.add(m.player1_id);
-      if (m.player2_id) playerIds.add(m.player2_id);
-      if (m.winner_id) playerIds.add(m.winner_id);
-    });
-    const { data: playersData } = await supabase
-      .from("tournament_players")
-      .select("id, name")
-      .in("id", Array.from(playerIds));
-    const playersMap = new Map<string, string>();
-    playersData?.forEach((p) => playersMap.set(p.id, p.name));
+  const {
+    pendingResults,
+    autoSaveWarning,
+    setAutoSaveWarning,
+    handleQuickResult,
+    savePendingResults,
+  } = usePendingResults({
+    matches,
+    matchReports,
+    refreshMatches,
+    setError,
+    setUpdatingMatch,
+  });
 
-    const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
-      (m) => ({
-        ...m,
-        player1_name: playersMap.get(m.player1_id) || "Unknown",
-        player2_name: m.player2_id
-          ? playersMap.get(m.player2_id) || "Unknown"
-          : null,
-        winner_name: m.winner_id
-          ? playersMap.get(m.winner_id) || "Unknown"
-          : null,
-      }),
-    );
-    setMatches(matchesWithPlayers);
-
-    const { data: freshPlayers } = await supabase
-      .from("tournament_players")
-      .select(
-        "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round, deck_pokemon1, deck_pokemon2",
-      )
-      .eq("tournament_id", tournament.id)
-      .order("name");
-    setPlayers((freshPlayers as TournamentPlayer[]) ?? []);
-  };
+  const {
+    processingRound,
+    seatWarnings,
+    setSeatWarnings,
+    handleBeginRound,
+    handlePauseTimer,
+    handleResumeTimer,
+    handleSetRoundDuration,
+    handleSaveRoundNote,
+    handlePublishPairings,
+    handleCompleteTournament,
+    handleRegenerateRound1,
+    handleAddRound,
+    handleDeleteRound,
+    handleNextRound,
+  } = useRoundLifecycle({
+    tournament,
+    setTournament,
+    matches,
+    setMatches,
+    selectedRound,
+    setSelectedRound,
+    workspaceId,
+    user,
+    savePendingResults,
+    refreshMatches,
+    setError,
+    setSavingTimer,
+    setTimerEditorOpen,
+  });
 
   // ── Late entry ───────────────────────────────────────────────────────────────
 
@@ -1373,929 +862,9 @@ const TournamentMatches: React.FC = () => {
     }
   };
 
-  // ── Pairing editor ──────────────────────────────────────────────────────────
-
-  const handleEditPairings = () => {
-    const initial = new Map<
-      string,
-      { player1Id: string | null; player2Id: string | null }
-    >();
-    matches
-      .filter(
-        (m) =>
-          typeof selectedRound === "number" && m.round_number === selectedRound,
-      )
-      .forEach((m) => {
-        initial.set(m.id, { player1Id: m.player1_id, player2Id: m.player2_id });
-      });
-    setEditedPairings(initial);
-    setEditingPairings(true);
-  };
-
-  const handleCancelEditPairings = () => {
-    setEditedPairings(new Map());
-    setEditingPairings(false);
-  };
-
-  const removeFromSlot = (matchId: string, slot: "player1" | "player2") => {
-    setEditedPairings((prev) => {
-      const next = new Map(prev);
-      const cur = next.get(matchId);
-      if (!cur) return prev;
-      next.set(matchId, {
-        ...cur,
-        [slot === "player1" ? "player1Id" : "player2Id"]: null,
-      });
-      return next;
-    });
-  };
-
-  const assignToSlot = (
-    matchId: string,
-    slot: "player1" | "player2",
-    playerId: string,
-  ) => {
-    setEditedPairings((prev) => {
-      const next = new Map(prev);
-      const cur = next.get(matchId);
-      if (!cur) return prev;
-      next.set(matchId, {
-        ...cur,
-        [slot === "player1" ? "player1Id" : "player2Id"]: playerId,
-      });
-      return next;
-    });
-  };
-
-  const handleSavePairingEdits = async () => {
-    if (!tournament) return;
-    setSavingPairings(true);
-    setError(null);
-    try {
-      const currentRoundMatches = matches.filter(
-        (m) =>
-          typeof selectedRound === "number" && m.round_number === selectedRound,
-      );
-
-      // Collect matches that have actually changed
-      const changedMatches: {
-        match: MatchWithPlayers;
-        edited: { player1Id: string | null; player2Id: string | null };
-      }[] = [];
-      for (const match of currentRoundMatches) {
-        const edited = editedPairings.get(match.id);
-        if (!edited || edited.player1Id === null) continue;
-        const p1Changed = edited.player1Id !== match.player1_id;
-        const p2Changed = edited.player2Id !== match.player2_id;
-        const isLegacyBye = match.status === MATCH_STATUS.BYE;
-        if (!p1Changed && !p2Changed && !isLegacyBye) continue;
-        changedMatches.push({ match, edited });
-      }
-
-      if (changedMatches.length > 0) {
-        // DELETE then re-INSERT changed matches to avoid the unique constraint
-        // on player1_id firing mid-loop when players are swapped between rows.
-        const idsToDelete = changedMatches.map(({ match }) => match.id);
-        const { error: deleteError } = await supabase
-          .from("tournament_matches")
-          .delete()
-          .in("id", idsToDelete);
-        if (deleteError)
-          throw new Error(deleteError.message || "Failed to update pairings");
-
-        const rowsToInsert = changedMatches.map(({ match, edited }) => ({
-          tournament_id: match.tournament_id,
-          workspace_id: workspaceId,
-          round_number: match.round_number,
-          match_number: match.match_number,
-          player1_id: edited.player1Id,
-          player2_id: edited.player2Id,
-          status: MATCH_STATUS.READY,
-          result: null,
-          winner_id: null,
-          temp_winner_id: null,
-          temp_result: null,
-          pairings_published: false,
-          pairing_decision_log: match.pairing_decision_log ?? null,
-        }));
-        const { error: insertError } = await supabase
-          .from("tournament_matches")
-          .insert(rowsToInsert);
-        if (insertError)
-          throw new Error(insertError.message || "Failed to update pairings");
-      }
-
-      // Reset published state for any unchanged matches that were already published
-      await supabase
-        .from("tournament_matches")
-        .update({ pairings_published: false })
-        .eq("tournament_id", tournament.id)
-        .eq("round_number", selectedRound as number)
-        .eq("status", MATCH_STATUS.READY);
-
-      await refreshMatches();
-      setEditingPairings(false);
-      setEditedPairings(new Map());
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save pairing edits");
-    } finally {
-      setSavingPairings(false);
-    }
-  };
-
   // ────────────────────────────────────────────────────────────────────────────
+  // Round lifecycle handlers live in useRoundLifecycle
 
-  const handleBeginRound = async () => {
-    if (!tournament || !user) return;
-    // Guard against double-click: if the timer is already running, do nothing
-    if (tournament.current_round_started_at) return;
-
-    try {
-      setProcessingRound(true);
-      setError(null);
-      if (typeof selectedRound !== "number") return;
-
-      // Record the absolute start time on the tournament FIRST, before match
-      // transitions. This ensures any re-fetch triggered by the realtime subscription
-      // (fired when matches update below) reads the timer state from DB rather than
-      // overwriting local state with stale null data.
-      if (tournament.round_duration_minutes) {
-        const startedAt = new Date().toISOString();
-        const { error: timerError } = await supabase
-          .from("tournaments")
-          .update({
-            current_round_started_at: startedAt,
-            round_elapsed_seconds: 0,
-            round_is_paused: false,
-          })
-          .eq("id", tournament.id);
-        if (!timerError) {
-          setTournament({
-            ...tournament,
-            current_round_started_at: startedAt,
-            round_elapsed_seconds: 0,
-            round_is_paused: false,
-          });
-        }
-      }
-
-      // Auto-complete any bye matches (player2_id is null) that are still "ready".
-      // Byes are created as "ready" so the organiser can edit pairings; we finalise
-      // them here when the round officially starts.
-      const readyByeMatches = matches.filter(
-        (m) =>
-          m.round_number === selectedRound &&
-          m.status === MATCH_STATUS.READY &&
-          !m.player2_id,
-      );
-      for (const byeMatch of readyByeMatches) {
-        const { error: byeError } = await supabase
-          .from("tournament_matches")
-          .update({
-            status: MATCH_STATUS.BYE,
-            result: "bye",
-            winner_id: byeMatch.player1_id,
-          })
-          .eq("id", byeMatch.id);
-        if (byeError)
-          throw new Error(byeError.message || "Failed to complete bye match");
-      }
-
-      // Transition all remaining "ready" matches (real matches) to "pending"
-      const { error: updateError } = await supabase
-        .from("tournament_matches")
-        .update({ status: MATCH_STATUS.PENDING })
-        .eq("tournament_id", tournament.id)
-        .eq("round_number", selectedRound)
-        .eq("status", MATCH_STATUS.READY);
-
-      if (updateError) {
-        throw new Error(updateError.message || "Failed to begin round");
-      }
-
-      await refreshMatches();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to begin round");
-    } finally {
-      setProcessingRound(false);
-    }
-  };
-
-  const handlePauseTimer = async () => {
-    if (!tournament || !tournament.round_duration_minutes) return;
-    if (!tournament.current_round_started_at || tournament.round_is_paused) return;
-    const elapsed =
-      (tournament.round_elapsed_seconds ?? 0) +
-      Math.floor((Date.now() - new Date(tournament.current_round_started_at).getTime()) / 1_000);
-    const { error } = await supabase
-      .from("tournaments")
-      .update({ current_round_started_at: null, round_elapsed_seconds: elapsed, round_is_paused: true })
-      .eq("id", tournament.id);
-    if (!error) {
-      setTournament({
-        ...tournament,
-        current_round_started_at: null,
-        round_elapsed_seconds: elapsed,
-        round_is_paused: true,
-      });
-    }
-  };
-
-  const handleResumeTimer = async () => {
-    if (!tournament || !tournament.round_duration_minutes) return;
-    if (!tournament.round_is_paused) return;
-    const resumedAt = new Date().toISOString();
-    const { error } = await supabase
-      .from("tournaments")
-      .update({ current_round_started_at: resumedAt, round_is_paused: false })
-      .eq("id", tournament.id);
-    if (!error) {
-      setTournament({
-        ...tournament,
-        current_round_started_at: resumedAt,
-        round_is_paused: false,
-      });
-    }
-  };
-
-  const handleSetRoundDuration = async (minutes: number | null) => {
-    if (!tournament || !workspaceId) return;
-    setSavingTimer(true);
-    // If enabling a timer on an active round that never had one, start it paused
-    // so the organiser can resume when ready rather than counting from an unknown point.
-    const addingToActiveRound =
-      minutes !== null &&
-      tournament.status === "active" &&
-      !tournament.current_round_started_at &&
-      !tournament.round_is_paused;
-    const payload =
-      minutes === null
-        ? {
-            round_duration_minutes: null as number | null,
-            current_round_started_at: null as string | null,
-            round_elapsed_seconds: 0,
-            round_is_paused: false,
-          }
-        : {
-            round_duration_minutes: minutes,
-            ...(addingToActiveRound
-              ? { current_round_started_at: null as string | null, round_elapsed_seconds: 0, round_is_paused: true }
-              : {}),
-          };
-    const { error } = await supabase
-      .from("tournaments")
-      .update(payload)
-      .eq("id", tournament.id)
-      .eq("workspace_id", workspaceId);
-    setSavingTimer(false);
-    if (!error) {
-      setTournament({
-        ...tournament,
-        round_duration_minutes: minutes,
-        ...(minutes === null
-          ? { current_round_started_at: null, round_elapsed_seconds: 0, round_is_paused: false }
-          : addingToActiveRound
-            ? { current_round_started_at: null, round_elapsed_seconds: 0, round_is_paused: true }
-            : {}),
-      });
-      if (minutes === null) setTimerEditorOpen(false);
-    }
-  };
-
-  const handleSaveRoundNote = async (note: string) => {
-    if (!tournament || !workspaceId) return;
-    const trimmed = note.trim();
-    const { error } = await supabase
-      .from("tournaments")
-      .update({ round_note: trimmed || null })
-      .eq("id", tournament.id)
-      .eq("workspace_id", workspaceId);
-    if (!error) {
-      setTournament({ ...tournament, round_note: trimmed || null });
-    }
-  };
-
-  const handlePublishPairings = async () => {
-    if (!tournament || typeof selectedRound !== "number") return;
-    try {
-      setProcessingRound(true);
-      setError(null);
-      const { error: updateError } = await supabase
-        .from("tournament_matches")
-        .update({ pairings_published: true })
-        .eq("tournament_id", tournament.id)
-        .eq("round_number", selectedRound)
-        .eq("status", MATCH_STATUS.READY);
-      if (updateError)
-        throw new Error(updateError.message || "Failed to publish pairings");
-      // Optimistically mark the published matches in local state so the Begin Round
-      // button appears immediately, without waiting for the refreshMatches round-trip.
-      setMatches((prev) =>
-        prev.map((m) =>
-          m.round_number === selectedRound && m.status === MATCH_STATUS.READY
-            ? { ...m, pairings_published: true }
-            : m,
-        ),
-      );
-      setProcessingRound(false);
-      void refreshMatches();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to publish pairings");
-    } finally {
-      setProcessingRound(false);
-    }
-  };
-
-  const handleCompleteTournament = async () => {
-    if (!tournament || !user) return;
-
-    try {
-      setProcessingRound(true);
-      setError(null);
-
-      // Save all pending results first
-      await savePendingResults();
-
-      // Update tournament status to completed, and clear any active round timer
-      const { error: updateError } = await supabase
-        .from("tournaments")
-        .update({
-          status: "completed",
-          current_round_started_at: null,
-          round_elapsed_seconds: 0,
-          round_is_paused: false,
-        })
-        .eq("id", tournament.id)
-        .eq("workspace_id", workspaceId ?? "");
-
-      if (updateError) {
-        throw new Error(updateError.message || "Failed to complete tournament");
-      }
-
-      setTournament({
-        ...tournament,
-        status: "completed",
-        current_round_started_at: null,
-        round_elapsed_seconds: 0,
-        round_is_paused: false,
-      });
-      // Switch to standings tab
-      setSelectedRound("standings");
-    } catch (e: unknown) {
-      setError(
-        e instanceof Error ? e.message : "Failed to complete tournament",
-      );
-    } finally {
-      setProcessingRound(false);
-    }
-  };
-
-  const handleRegenerateRound1 = async () => {
-    if (!tournament || !user) return;
-
-    try {
-      setProcessingRound(true);
-      setError(null);
-      setSeatWarnings([]);
-
-      // Fetch all players for the tournament
-      const { data: playersData, error: playersError } = await supabase
-        .from("tournament_players")
-        .select("id, name, has_static_seating, static_seat_number")
-        .eq("tournament_id", tournament.id)
-        .order("created_at", { ascending: true });
-
-      if (playersError) {
-        throw new Error(playersError.message || "Failed to load players");
-      }
-
-      if (!playersData || playersData.length < 2) {
-        throw new Error("Tournament needs at least 2 players");
-      }
-
-      // Generate round 1 pairings
-      const standings = playersData.map((p) => ({
-        id: p.id,
-        name: p.name,
-        matchPoints: 0,
-        wins: 0,
-        losses: 0,
-        draws: 0,
-        matchesPlayed: 0,
-        opponents: [],
-        byesReceived: 0,
-      }));
-
-      const pairingResult = generateSwissPairings(standings, 1, []);
-
-      if (!pairingResult.pairings || pairingResult.pairings.length === 0) {
-        throw new Error("Failed to generate pairings");
-      }
-
-      // Delete any existing round 1 matches
-      const { error: deleteError } = await supabase
-        .from("tournament_matches")
-        .delete()
-        .eq("tournament_id", tournament.id)
-        .eq("round_number", 1);
-
-      if (deleteError) {
-        throw new Error(
-          deleteError.message || "Failed to delete existing round 1 matches",
-        );
-      }
-
-      // Create new round 1 matches
-      // Byes are created as "ready" so the organiser can edit pairings before beginning the round.
-      // handleBeginRound will auto-complete them when the round starts.
-
-      // Build static seat map and assign table numbers
-      const staticSeatsR1 = new Map<string, number>();
-      playersData.forEach((p) => {
-        if (p.has_static_seating && p.static_seat_number != null) {
-          staticSeatsR1.set(p.id, p.static_seat_number);
-        }
-      });
-      const seatAssignmentsR1 = assignMatchNumbers(
-        pairingResult.pairings,
-        staticSeatsR1,
-      );
-      const seatWarningsR1 = seatAssignmentsR1
-        .map((a) => a.warning)
-        .filter(Boolean) as string[];
-      setSeatWarnings(seatWarningsR1);
-
-      const seatConflictsR1 = seatAssignmentsR1
-        .map((a) => a.conflict)
-        .filter(Boolean) as SeatConflict[];
-      if (seatConflictsR1.length > 0 && pairingResult.decisionLog) {
-        pairingResult.decisionLog.seatConflicts = seatConflictsR1;
-      }
-
-      const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
-        tournament_id: tournament.id,
-        workspace_id: workspaceId,
-        round_number: 1,
-        match_number: seatAssignmentsR1[index].matchNumber,
-        player1_id: pairing.player1Id,
-        player2_id: pairing.player2Id,
-        status: MATCH_STATUS.READY,
-        result: null,
-        winner_id: null,
-        pairing_decision_log:
-          index === 0 ? serializeDecisionLog(pairingResult.decisionLog) : null,
-      }));
-
-      const { error: insertError } = await supabase
-        .from("tournament_matches")
-        .insert(matchesToInsert);
-
-      if (insertError) {
-        throw new Error(
-          insertError.message || "Failed to create round 1 matches",
-        );
-      }
-
-      // Refresh matches
-      const { data: matchesData, error: matchesError } = await supabase
-        .from("tournament_matches")
-        .select("*")
-        .eq("tournament_id", tournament.id)
-        .order("round_number", { ascending: true })
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true });
-
-      if (matchesError) {
-        throw new Error(matchesError.message || "Failed to refresh matches");
-      }
-
-      // Fetch player names
-      const playerIds = new Set<string>();
-      matchesData?.forEach((match) => {
-        playerIds.add(match.player1_id);
-        if (match.player2_id) {
-          playerIds.add(match.player2_id);
-        }
-        if (match.winner_id) {
-          playerIds.add(match.winner_id);
-        }
-      });
-
-      const { data: updatedPlayersData } = await supabase
-        .from("tournament_players")
-        .select("id, name")
-        .in("id", Array.from(playerIds));
-
-      const playersMap = new Map<string, string>();
-      updatedPlayersData?.forEach((player) => {
-        playersMap.set(player.id, player.name);
-      });
-
-      const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
-        (match) => ({
-          ...match,
-          player1_name: playersMap.get(match.player1_id) || "Unknown",
-          player2_name: match.player2_id
-            ? playersMap.get(match.player2_id) || "Unknown"
-            : null,
-          winner_name: match.winner_id
-            ? playersMap.get(match.winner_id) || "Unknown"
-            : null,
-        }),
-      );
-
-      setMatches(matchesWithPlayers);
-
-      // Extract decision logs from refreshed matches (including the regenerated round 1)
-      const decisionLogsMap = new Map<number, PairingDecisionLog>();
-      const roundsProcessed = new Set<number>();
-
-      for (const match of matchesData || []) {
-        if (
-          match.pairing_decision_log &&
-          !roundsProcessed.has(match.round_number)
-        ) {
-          const log = match.pairing_decision_log as Omit<
-            PairingDecisionLog,
-            "floatReasons"
-          > & {
-            floatReasons: Map<string, string> | Record<string, string>;
-          };
-          // Convert floatReasons object back to Map if needed
-          const floatReasonsMap =
-            log.floatReasons instanceof Map
-              ? log.floatReasons
-              : new Map(Object.entries(log.floatReasons));
-          decisionLogsMap.set(match.round_number, {
-            ...log,
-            floatReasons: floatReasonsMap,
-          } as PairingDecisionLog);
-          roundsProcessed.add(match.round_number);
-        }
-      }
-
-      setRoundDecisionLogs(decisionLogsMap);
-      setSelectedRound(1);
-    } catch (e: unknown) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : "Failed to regenerate round 1 pairings",
-      );
-    } finally {
-      setProcessingRound(false);
-    }
-  };
-
-  const handleAddRound = async () => {
-    if (!tournament || !user) return;
-    const current = tournament.num_rounds ?? 0;
-    if (current >= 20) return;
-    const finalRoundMatches = matches.filter((m) => m.round_number === current);
-    if (
-      finalRoundMatches.length > 0 &&
-      finalRoundMatches.every(
-        (m) => m.status === "completed" || m.status === "bye",
-      )
-    )
-      return;
-    const next = current + 1;
-    const { data, error } = await supabase
-      .from("tournaments")
-      .update({ num_rounds: next })
-      .eq("id", tournament.id)
-      .eq("workspace_id", workspaceId ?? "")
-      .select(
-        "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
-      )
-      .maybeSingle();
-    if (!error && data) setTournament(data as TournamentSummary);
-  };
-
-  const handleDeleteRound = async (roundNumber: number) => {
-    if (!tournament || !user) return;
-    if (roundNumber !== tournament.num_rounds) return; // only last round
-    if (matches.some((m) => m.round_number === roundNumber)) return; // has matches
-    const newCount = roundNumber - 1;
-    if (newCount < 1) return;
-    const { data, error } = await supabase
-      .from("tournaments")
-      .update({ num_rounds: newCount })
-      .eq("id", tournament.id)
-      .eq("workspace_id", workspaceId ?? "")
-      .select(
-        "id, name, status, tournament_type, num_rounds, created_at, created_by",
-      )
-      .maybeSingle();
-    if (!error && data) {
-      setTournament(data as TournamentSummary);
-      if (typeof selectedRound === "number" && selectedRound > newCount) {
-        setSelectedRound(newCount);
-      }
-    }
-  };
-
-  const handleNextRound = async () => {
-    if (!tournament || !user) return;
-
-    try {
-      setProcessingRound(true);
-      setError(null);
-      setSeatWarnings([]);
-
-      // Save all pending results before generating next round
-      await savePendingResults();
-
-      if (typeof selectedRound !== "number") return;
-      const nextRoundNumber = selectedRound + 1;
-      if (tournament.num_rounds && nextRoundNumber > tournament.num_rounds) {
-        throw new Error("Maximum number of rounds reached");
-      }
-
-      // Refetch matches so standings use the just-saved results (state may not have updated yet)
-      const { data: currentMatchesData, error: fetchErr } = await supabase
-        .from("tournament_matches")
-        .select("*")
-        .eq("tournament_id", tournament.id)
-        .order("round_number", { ascending: true })
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true });
-      if (fetchErr)
-        throw new Error(fetchErr.message || "Failed to refresh matches");
-      const currentMatchesRaw = (currentMatchesData ?? []) as Match[];
-
-      const playerIdsForNames = new Set<string>();
-      currentMatchesRaw.forEach((m) => {
-        playerIdsForNames.add(m.player1_id);
-        if (m.player2_id) playerIdsForNames.add(m.player2_id);
-        if (m.winner_id) playerIdsForNames.add(m.winner_id);
-      });
-      const { data: namesData } = await supabase
-        .from("tournament_players")
-        .select("id, name")
-        .in("id", Array.from(playerIdsForNames));
-      const namesMap = new Map<string, string>();
-      namesData?.forEach((p: { id: string; name: string }) =>
-        namesMap.set(p.id, p.name),
-      );
-      const currentMatches: MatchWithPlayers[] = currentMatchesRaw.map((m) => ({
-        ...m,
-        player1_name: namesMap.get(m.player1_id) ?? "Unknown",
-        player2_name: m.player2_id
-          ? (namesMap.get(m.player2_id) ?? "Unknown")
-          : null,
-        winner_name: m.winner_id
-          ? (namesMap.get(m.winner_id) ?? "Unknown")
-          : null,
-      }));
-
-      // If next round already exists, just navigate to it (do NOT create duplicates)
-      const nextRoundAlreadyExists = currentMatches.some(
-        (m) => m.round_number === nextRoundNumber,
-      );
-      if (nextRoundAlreadyExists) {
-        setSelectedRound(nextRoundNumber);
-        return;
-      }
-
-      // Ensure all matches in the current round are completed or bye before proceeding
-      const currentRoundMatches = currentMatches.filter(
-        (m) => m.round_number === selectedRound,
-      );
-      const incompleteMatches = currentRoundMatches.filter(
-        (m) => m.status !== "completed" && m.status !== "bye",
-      );
-      if (incompleteMatches.length > 0) {
-        throw new Error(
-          `${incompleteMatches.length} match${incompleteMatches.length > 1 ? "es" : ""} in round ${selectedRound} still need${incompleteMatches.length === 1 ? "s" : ""} a result before advancing`,
-        );
-      }
-
-      // Calculate standings from all previous rounds (using refetched matches)
-      const allPreviousMatches = currentMatches.filter(
-        (m) => m.round_number < nextRoundNumber,
-      );
-
-      // Get all players
-      const playerIds = new Set<string>();
-      currentMatches.forEach((match) => {
-        playerIds.add(match.player1_id);
-        if (match.player2_id) {
-          playerIds.add(match.player2_id);
-        }
-      });
-
-      // Fetch all tournament players (including drop status) so we can seed
-      // standings correctly and exclude dropped players from the next round.
-      const { data: playersData } = await supabase
-        .from("tournament_players")
-        .select(
-          "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, deck_pokemon1, deck_pokemon2",
-        )
-        .eq("tournament_id", tournament.id);
-
-      const playersMap = new Map<string, string>();
-      playersData?.forEach((player) => {
-        playersMap.set(player.id, player.name);
-      });
-
-      // Calculate standings from all previous matches, seeding from full player list
-      const standings = buildStandingsFromMatches(
-        allPreviousMatches,
-        playersData ?? [],
-      );
-
-      // Get previous pairings to avoid rematches (deterministic order: by round, then id)
-      const sortedPrevious = [...allPreviousMatches].sort(
-        (a, b) =>
-          a.round_number - b.round_number ||
-          (a.id ?? "").localeCompare(b.id ?? ""),
-      );
-      const previousPairings: Pairing[] = sortedPrevious.map((match) => ({
-        player1Id: match.player1_id,
-        player1Name: match.player1_name,
-        player2Id: match.player2_id,
-        player2Name: match.player2_name,
-        roundNumber: match.round_number,
-      }));
-
-      // For single-elimination, only undefeated players advance to the next round
-      const standingsForPairing =
-        tournament.tournament_type === "single_elimination" &&
-        nextRoundNumber > 1
-          ? standings.filter((s) => s.losses === 0)
-          : standings;
-
-      // Exclude dropped players from the pairing pool
-      const droppedIds = new Set(
-        playersData?.filter((p) => p.dropped).map((p) => p.id) ?? [],
-      );
-      const standingsToUse = standingsForPairing.filter(
-        (s) => !droppedIds.has(s.id),
-      );
-
-      if (standingsToUse.length < 2) {
-        throw new Error(
-          "Not enough active (non-dropped) players remaining to generate pairings",
-        );
-      }
-
-      // Generate pairings for next round
-      const pairingResult = generateSwissPairings(
-        standingsToUse,
-        nextRoundNumber,
-        previousPairings,
-      );
-
-      // Create matches in database
-      // Pairings are already sorted with byes at the end by generateSwissPairings
-      // Store decision log on the first match of the round.
-      // Byes are created as "ready" so the organiser can edit pairings before beginning the round.
-
-      // Build static seat map and assign table numbers
-      const staticSeats = new Map<string, number>();
-      playersData?.forEach((p) => {
-        if (p.has_static_seating && p.static_seat_number != null) {
-          staticSeats.set(p.id, p.static_seat_number);
-        }
-      });
-      const seatAssignments = assignMatchNumbers(
-        pairingResult.pairings,
-        staticSeats,
-      );
-      const seatWarningsNext = seatAssignments
-        .map((a) => a.warning)
-        .filter(Boolean) as string[];
-      setSeatWarnings(seatWarningsNext);
-
-      const seatConflictsNext = seatAssignments
-        .map((a) => a.conflict)
-        .filter(Boolean) as SeatConflict[];
-      if (seatConflictsNext.length > 0 && pairingResult.decisionLog) {
-        pairingResult.decisionLog.seatConflicts = seatConflictsNext;
-      }
-
-      const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
-        tournament_id: tournament.id,
-        workspace_id: workspaceId,
-        round_number: nextRoundNumber,
-        match_number: seatAssignments[index].matchNumber,
-        player1_id: pairing.player1Id,
-        player2_id: pairing.player2Id,
-        status: MATCH_STATUS.READY,
-        result: null,
-        winner_id: null,
-        pairing_decision_log:
-          index === 0 ? serializeDecisionLog(pairingResult.decisionLog) : null,
-      }));
-
-      const { error: insertError } = await supabase
-        .from("tournament_matches")
-        .insert(matchesToInsert);
-
-      if (insertError) {
-        throw new Error(insertError.message || "Failed to create next round");
-      }
-
-      // Clear the round timer so the new round starts without a running clock
-      await supabase
-        .from("tournaments")
-        .update({ current_round_started_at: null, round_elapsed_seconds: 0, round_is_paused: false })
-        .eq("id", tournament.id);
-      setTournament((prev) =>
-        prev
-          ? { ...prev, current_round_started_at: null, round_elapsed_seconds: 0, round_is_paused: false }
-          : prev,
-      );
-
-      // Refresh matches
-      const { data: matchesData, error: matchesError } = await supabase
-        .from("tournament_matches")
-        .select("*")
-        .eq("tournament_id", tournament.id)
-        .order("round_number", { ascending: true })
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true });
-
-      if (matchesError) {
-        throw new Error(matchesError.message || "Failed to refresh matches");
-      }
-
-      // Fetch updated player names
-      const allPlayerIds = new Set<string>();
-      matchesData?.forEach((match) => {
-        allPlayerIds.add(match.player1_id);
-        if (match.player2_id) {
-          allPlayerIds.add(match.player2_id);
-        }
-        if (match.winner_id) {
-          allPlayerIds.add(match.winner_id);
-        }
-      });
-
-      const { data: allPlayersData } = await supabase
-        .from("tournament_players")
-        .select("id, name")
-        .in("id", Array.from(allPlayerIds));
-
-      const allPlayersMap = new Map<string, string>();
-      allPlayersData?.forEach((player) => {
-        allPlayersMap.set(player.id, player.name);
-      });
-
-      const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
-        (match) => ({
-          ...match,
-          player1_name: allPlayersMap.get(match.player1_id) || "Unknown",
-          player2_name: match.player2_id
-            ? allPlayersMap.get(match.player2_id) || "Unknown"
-            : null,
-          winner_name: match.winner_id
-            ? allPlayersMap.get(match.winner_id) || "Unknown"
-            : null,
-        }),
-      );
-
-      setMatches(matchesWithPlayers);
-
-      // Extract decision logs from refreshed matches (including the newly created round)
-      const decisionLogsMap = new Map<number, PairingDecisionLog>();
-      const roundsProcessed = new Set<number>();
-
-      for (const match of matchesData || []) {
-        if (
-          match.pairing_decision_log &&
-          !roundsProcessed.has(match.round_number)
-        ) {
-          const log = match.pairing_decision_log as Omit<
-            PairingDecisionLog,
-            "floatReasons"
-          > & {
-            floatReasons: Map<string, string> | Record<string, string>;
-          };
-          // Convert floatReasons object back to Map if needed
-          const floatReasonsMap =
-            log.floatReasons instanceof Map
-              ? log.floatReasons
-              : new Map(Object.entries(log.floatReasons));
-          decisionLogsMap.set(match.round_number, {
-            ...log,
-            floatReasons: floatReasonsMap,
-          } as PairingDecisionLog);
-          roundsProcessed.add(match.round_number);
-        }
-      }
-
-      setRoundDecisionLogs(decisionLogsMap);
-      setSelectedRound(nextRoundNumber);
-    } catch (e: unknown) {
-      setError(
-        e instanceof Error ? e.message : "Failed to generate next round",
-      );
-    } finally {
-      setProcessingRound(false);
-    }
-  };
 
   if (authLoading || loading || matchesLoading) {
     return (
