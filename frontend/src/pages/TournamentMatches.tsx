@@ -624,11 +624,13 @@ const TournamentMatches: React.FC = () => {
   // Refresh reports map and keep it in sync via realtime + fallback poll
   useEffect(() => {
     if (!tournament?.id) return;
+    let isMounted = true;
 
     const fetchReports = async () => {
       const { data } = await supabase.rpc("get_match_result_reports", {
         p_tournament_id: tournament.id,
       });
+      if (!isMounted) return;
       const map = new Map<string, MatchReportRow>();
       (data as MatchReportRow[] ?? []).forEach((r) => map.set(r.match_id, r));
       setMatchReports(map);
@@ -696,6 +698,7 @@ const TournamentMatches: React.FC = () => {
       .subscribe();
 
     return () => {
+      isMounted = false;
       clearInterval(pollId);
       void supabase.removeChannel(channel);
     };

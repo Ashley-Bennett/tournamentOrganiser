@@ -97,6 +97,8 @@ const TournamentPairings: React.FC = () => {
       return;
     }
 
+    let isMounted = true;
+
     const load = async () => {
       let tData: Tournament | null = null;
 
@@ -111,6 +113,7 @@ const TournamentPairings: React.FC = () => {
           )
           .eq("id", id)
           .maybeSingle();
+        if (!isMounted) return;
         if (tErr || !data) {
           setError("Tournament not found or you do not have access.");
           setLoading(false);
@@ -127,6 +130,7 @@ const TournamentPairings: React.FC = () => {
           .eq("public_slug", publicSlug!)
           .eq("is_public", true)
           .single();
+        if (!isMounted) return;
         if (tErr || !data) {
           setError(
             "This tournament is not available. It may be private or the link may be invalid.",
@@ -149,6 +153,7 @@ const TournamentPairings: React.FC = () => {
         .select("id, name, dropped, dropped_at_round, deck_pokemon1, deck_pokemon2")
         .eq("tournament_id", tournamentId);
 
+      if (!isMounted) return;
       if (pErr) {
         setError("Failed to load players.");
         setLoading(false);
@@ -168,6 +173,7 @@ const TournamentPairings: React.FC = () => {
         .order("round_number", { ascending: true })
         .order("match_number", { ascending: true });
 
+      if (!isMounted) return;
       if (mErr) {
         setError("Failed to load matches.");
         setLoading(false);
@@ -251,7 +257,7 @@ const TournamentPairings: React.FC = () => {
         )
         .eq("id", tid)
         .maybeSingle();
-      if (!data) return;
+      if (!isMounted || !data) return;
       setTournament((prev) =>
         prev
           ? {
@@ -342,6 +348,7 @@ const TournamentPairings: React.FC = () => {
       .subscribe();
 
     return () => {
+      isMounted = false;
       clearInterval(timerPollId);
       clearInterval(dataPollId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
