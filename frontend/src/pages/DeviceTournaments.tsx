@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  Alert,
   Box,
   Typography,
   Paper,
@@ -32,15 +33,20 @@ export default function DeviceTournaments() {
   const entries = useMemo(() => getAllEntries(), []);
   const [summaries, setSummaries] = useState<TournamentSummary[]>([]);
   const [loading, setLoading] = useState(entries.length > 0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (entries.length === 0) return;
     void (async () => {
-      const { data } = await supabase.rpc("get_tournaments_summary", {
+      const { data, error: rpcError } = await supabase.rpc("get_tournaments_summary", {
         p_tournament_ids: entries.map((e) => e.tournamentId),
         p_player_ids: entries.map((e) => e.playerId),
       });
-      setSummaries((data as TournamentSummary[]) ?? []);
+      if (rpcError) {
+        setError(rpcError.message);
+      } else {
+        setSummaries((data as TournamentSummary[]) ?? []);
+      }
       setLoading(false);
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -86,6 +92,8 @@ export default function DeviceTournaments() {
         <Box display="flex" justifyContent="center" py={4}>
           <CircularProgress size={24} />
         </Box>
+      ) : error ? (
+        <Alert severity="error">{error}</Alert>
       ) : (
         <Stack spacing={1.5}>
           {rows.map((row) => {

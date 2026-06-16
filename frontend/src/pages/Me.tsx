@@ -92,11 +92,16 @@ const Me = () => {
   // Player entries (tournaments I'm linked to as a player)
   const [playerEntries, setPlayerEntries] = useState<PlayerEntry[]>([]);
   const [playerEntriesLoading, setPlayerEntriesLoading] = useState(true);
+  const [playerEntriesError, setPlayerEntriesError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const { data } = await supabase.rpc("get_my_player_entries");
-      setPlayerEntries((data as PlayerEntry[]) ?? []);
+      const { data, error } = await supabase.rpc("get_my_player_entries");
+      if (error) {
+        setPlayerEntriesError(error.message);
+      } else {
+        setPlayerEntries((data as PlayerEntry[]) ?? []);
+      }
       setPlayerEntriesLoading(false);
     })();
   }, []);
@@ -634,11 +639,16 @@ const Me = () => {
         <Typography variant="h6">My Tournaments</Typography>
       </Stack>
 
+      {playerEntriesError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {playerEntriesError}
+        </Alert>
+      )}
       {playerEntriesLoading ? (
         <Box display="flex" justifyContent="center" py={3}>
           <CircularProgress size={24} />
         </Box>
-      ) : playerEntries.length === 0 ? (
+      ) : playerEntriesError ? null : playerEntries.length === 0 ? (
         <Paper
           variant="outlined"
           sx={{ p: 4, textAlign: "center", backgroundColor: "action.hover" }}
