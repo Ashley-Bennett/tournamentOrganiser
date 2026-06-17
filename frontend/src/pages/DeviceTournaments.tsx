@@ -59,6 +59,7 @@ export default function DeviceTournaments() {
   const [dbEntries, setDbEntries] = useState<DbEntry[]>([]);
   const [summaries, setSummaries] = useState<TournamentSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [claimErrors, setClaimErrors] = useState<Record<string, string>>({});
@@ -66,17 +67,24 @@ export default function DeviceTournaments() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const results = await Promise.all([
-      user ? supabase.rpc("get_my_player_entries") : Promise.resolve({ data: [] }),
+    setLoadError(null);
+    const [entriesResult, summariesResult] = await Promise.all([
+      user ? supabase.rpc("get_my_player_entries") : Promise.resolve({ data: [], error: null }),
       deviceEntries.length > 0
         ? supabase.rpc("get_tournaments_summary", {
             p_tournament_ids: deviceEntries.map((e) => e.tournamentId),
             p_player_ids: deviceEntries.map((e) => e.playerId),
           })
-        : Promise.resolve({ data: [] }),
+        : Promise.resolve({ data: [], error: null }),
     ]);
-    setDbEntries((results[0].data as DbEntry[]) ?? []);
-    setSummaries((results[1].data as TournamentSummary[]) ?? []);
+    if (entriesResult.error) {
+      setLoadError(entriesResult.error.message);
+    } else if (summariesResult.error) {
+      setLoadError(summariesResult.error.message);
+    } else {
+      setDbEntries((entriesResult.data as DbEntry[]) ?? []);
+      setSummaries((summariesResult.data as TournamentSummary[]) ?? []);
+    }
     setLoading(false);
   }, [user, deviceEntries]);
 
@@ -154,6 +162,10 @@ export default function DeviceTournaments() {
           My Tournaments
         </Typography>
       </Stack>
+
+      {loadError && (
+        <Alert severity="error" sx={{ mb: 3 }}>{loadError}</Alert>
+      )}
 
       {/* Nudge: anonymous user with device entries */}
       {!user && deviceEntries.length > 0 && (
