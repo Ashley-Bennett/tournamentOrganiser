@@ -989,10 +989,16 @@ const TournamentMatches: React.FC = () => {
           <Typography variant="subtitle1" gutterBottom>
             No Matches Yet
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Matches will appear here once the tournament has been started and
-            round 1 pairings have been generated.
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Start the tournament and generate round 1 pairings to see matches here.
           </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => navigate(wPath(`/tournaments/${id}`))}
+          >
+            Go to tournament setup
+          </Button>
         </Paper>
       ) : (
         <Paper sx={{ overflow: "hidden" }}>

@@ -290,9 +290,19 @@ const Tournaments: React.FC = () => {
               </Card>
             ))
           ) : filteredTournaments.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-              No tournaments found. Create your first tournament!
-            </Typography>
+            <Box display="flex" flexDirection="column" alignItems="center" gap={1.5} py={4}>
+              <Typography variant="body2" color="text.secondary">
+                No tournaments found.
+              </Typography>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() => setCreateOpen(true)}
+              >
+                Create your first tournament
+              </Button>
+            </Box>
           ) : (
             filteredTournaments.map((tournament) => (
               <Card key={tournament.id} variant="outlined">
@@ -362,9 +372,19 @@ const Tournaments: React.FC = () => {
                 ) : filteredTournaments.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} align="center">
-                      <Typography variant="body2" color="text.secondary">
-                        No tournaments found. Create your first tournament!
-                      </Typography>
+                      <Box display="flex" flexDirection="column" alignItems="center" gap={1.5} py={2}>
+                        <Typography variant="body2" color="text.secondary">
+                          No tournaments found.
+                        </Typography>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={() => setCreateOpen(true)}
+                        >
+                          Create your first tournament
+                        </Button>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ) : (

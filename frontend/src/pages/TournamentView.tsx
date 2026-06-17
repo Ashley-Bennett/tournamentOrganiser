@@ -1056,9 +1056,19 @@ const handleSetRoundDuration = async (minutes: number | null) => {
             <CircularProgress size={24} />
           </Box>
         ) : players.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            No players added yet. Add your first player above.
-          </Typography>
+          <Box display="flex" flexDirection="column" alignItems="flex-start" gap={1}>
+            <Typography variant="body2" color="text.secondary">
+              No players added yet.
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={() => playerNameInputRef.current?.focus()}
+            >
+              Add your first player
+            </Button>
+          </Box>
         ) : (
           <>
             <Box display="flex" alignItems="center" gap={1} mb={1}>
