@@ -18,6 +18,8 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
@@ -42,6 +44,8 @@ const TournamentPairings: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [timerExpanded, setTimerExpanded] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const didInitRoundRef = useRef(false);
   const initialRoundsLoadedRef = useRef(false);
   const prevRoundCountRef = useRef(0);
@@ -606,64 +610,19 @@ const TournamentPairings: React.FC = () => {
         </Typography>
       </Box>
       <Divider />
-      <TableContainer sx={{ overflowX: "auto" }}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell
-                sx={{
-                  width: 36,
-                  fontWeight: 600,
-                  fontSize: "0.75rem",
-                  color: "text.secondary",
-                }}
-              >
-                Table
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: 600,
-                  fontSize: "0.75rem",
-                  color: "text.secondary",
-                }}
-              >
-                Player 1
-              </TableCell>
-              <TableCell
-                sx={{
-                  width: 24,
-                  textAlign: "center",
-                  fontSize: "0.75rem",
-                  color: "text.secondary",
-                  px: 0,
-                }}
-              >
-                vs
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: 600,
-                  fontSize: "0.75rem",
-                  color: "text.secondary",
-                }}
-              >
-                Player 2
-              </TableCell>
-              <TableCell
-                sx={{
-                  width: 68,
-                  textAlign: "right",
-                  fontWeight: 600,
-                  fontSize: "0.75rem",
-                  color: "text.secondary",
-                }}
-              >
-                Result
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {roundMatches.map((m) => {
+      {isMobile ? (
+        // ── Mobile: card-per-match layout ──────────────────────────────────
+        <Box>
+          {roundMatches.length === 0 ? (
+            <Typography
+              variant="body2"
+              color="text.disabled"
+              sx={{ textAlign: "center", py: 3 }}
+            >
+              No pairings for this round yet.
+            </Typography>
+          ) : (
+            roundMatches.map((m) => {
               const isBye = m.status === "bye" || m.player2_id === null;
               const isCompleted = m.status === "completed";
               const isPending = m.status === "pending";
@@ -673,105 +632,184 @@ const TournamentPairings: React.FC = () => {
               const p1Won = displayWinnerId === m.player1_id;
               const p2Won = displayWinnerId === m.player2_id;
 
+              const resultChip = isBye ? (
+                <Chip label="BYE" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+              ) : isCompleted || hasTempResult ? (
+                <Typography
+                  variant="caption"
+                  sx={{ fontWeight: 600, fontSize: "0.82rem", opacity: hasTempResult ? 0.6 : 1 }}
+                >
+                  {displayResult ?? "—"}
+                </Typography>
+              ) : isPending ? (
+                <Chip label="Playing" color="primary" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+              ) : (
+                <Chip label="Waiting" size="small" variant="outlined" sx={{ fontSize: "0.65rem", height: 20 }} />
+              );
+
               return (
-                <TableRow key={m.id} hover>
-                  <TableCell
+                <Box
+                  key={m.id}
+                  sx={{ borderBottom: "1px solid", borderColor: "divider", px: 2, py: 1.25 }}
+                >
+                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.75}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                      Table {m.match_number ?? "—"}
+                    </Typography>
+                    {resultChip}
+                  </Box>
+                  <Box
                     sx={{
-                      color: "text.secondary",
-                      fontSize: "0.85rem",
-                      fontWeight: 500,
+                      px: 1,
+                      py: 0.5,
+                      borderRadius: 1,
+                      bgcolor: p1Won ? "rgba(76, 175, 80, 0.1)" : "transparent",
                     }}
                   >
-                    {m.match_number ?? "—"}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontSize: "0.9rem",
-                      fontWeight: p1Won ? 700 : 400,
-                      bgcolor: p1Won ? "rgba(76, 175, 80, 0.1)" : "inherit",
-                      maxWidth: 0,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {m.player1_name}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      textAlign: "center",
-                      color: "text.disabled",
-                      fontSize: "0.75rem",
-                      px: 0,
-                    }}
+                    <Typography
+                      variant="body2"
+                      fontWeight={p1Won ? 700 : 400}
+                      noWrap
+                    >
+                      {m.player1_name}
+                    </Typography>
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    color="text.disabled"
+                    sx={{ display: "block", px: 1, lineHeight: 1.6 }}
                   >
                     vs
-                  </TableCell>
-                  <TableCell
+                  </Typography>
+                  <Box
                     sx={{
-                      fontSize: "0.9rem",
-                      fontWeight: p2Won ? 700 : 400,
-                      color: isBye ? "text.disabled" : "inherit",
-                      fontStyle: isBye ? "italic" : "normal",
-                      bgcolor: p2Won ? "rgba(76, 175, 80, 0.1)" : "inherit",
-                      maxWidth: 0,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      px: 1,
+                      py: 0.5,
+                      borderRadius: 1,
+                      bgcolor: p2Won ? "rgba(76, 175, 80, 0.1)" : "transparent",
                     }}
                   >
-                    {isBye ? "Bye" : m.player2_name}
-                  </TableCell>
-                  <TableCell sx={{ textAlign: "right" }}>
-                    {isBye ? (
-                      <Chip
-                        label="BYE"
-                        size="small"
-                        sx={{ fontSize: "0.65rem", height: 20 }}
-                      />
-                    ) : isCompleted || hasTempResult ? (
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: "0.82rem",
-                          opacity: hasTempResult ? 0.6 : 1,
-                        }}
-                      >
-                        {displayResult ?? "—"}
-                      </Typography>
-                    ) : isPending ? (
-                      <Chip
-                        label="Playing"
-                        color="primary"
-                        size="small"
-                        sx={{ fontSize: "0.65rem", height: 20 }}
-                      />
-                    ) : (
-                      <Chip
-                        label="Waiting"
-                        size="small"
-                        variant="outlined"
-                        sx={{ fontSize: "0.65rem", height: 20 }}
-                      />
-                    )}
-                  </TableCell>
-                </TableRow>
+                    <Typography
+                      variant="body2"
+                      fontWeight={p2Won ? 700 : 400}
+                      color={isBye ? "text.disabled" : "inherit"}
+                      fontStyle={isBye ? "italic" : "normal"}
+                      noWrap
+                    >
+                      {isBye ? "Bye" : m.player2_name}
+                    </Typography>
+                  </Box>
+                </Box>
               );
-            })}
-            {roundMatches.length === 0 && (
+            })
+          )}
+        </Box>
+      ) : (
+        // ── Desktop: compact table ──────────────────────────────────────────
+        <TableContainer sx={{ overflowX: "auto" }}>
+          <Table size="small">
+            <TableHead>
               <TableRow>
                 <TableCell
-                  colSpan={5}
-                  sx={{ textAlign: "center", color: "text.disabled", py: 3 }}
+                  sx={{ width: 36, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}
                 >
-                  No pairings for this round yet.
+                  Table
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+                  Player 1
+                </TableCell>
+                <TableCell
+                  sx={{ width: 24, textAlign: "center", fontSize: "0.75rem", color: "text.secondary", px: 0 }}
+                >
+                  vs
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+                  Player 2
+                </TableCell>
+                <TableCell
+                  sx={{ width: 68, textAlign: "right", fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}
+                >
+                  Result
                 </TableCell>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {roundMatches.map((m) => {
+                const isBye = m.status === "bye" || m.player2_id === null;
+                const isCompleted = m.status === "completed";
+                const isPending = m.status === "pending";
+                const displayWinnerId = m.winner_id ?? m.temp_winner_id;
+                const displayResult = m.result ?? m.temp_result;
+                const hasTempResult = isPending && !!m.temp_result;
+                const p1Won = displayWinnerId === m.player1_id;
+                const p2Won = displayWinnerId === m.player2_id;
+
+                return (
+                  <TableRow key={m.id} hover>
+                    <TableCell sx={{ color: "text.secondary", fontSize: "0.85rem", fontWeight: 500 }}>
+                      {m.match_number ?? "—"}
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: p1Won ? 700 : 400,
+                        bgcolor: p1Won ? "rgba(76, 175, 80, 0.1)" : "inherit",
+                        maxWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {m.player1_name}
+                    </TableCell>
+                    <TableCell sx={{ textAlign: "center", color: "text.disabled", fontSize: "0.75rem", px: 0 }}>
+                      vs
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: p2Won ? 700 : 400,
+                        color: isBye ? "text.disabled" : "inherit",
+                        fontStyle: isBye ? "italic" : "normal",
+                        bgcolor: p2Won ? "rgba(76, 175, 80, 0.1)" : "inherit",
+                        maxWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {isBye ? "Bye" : m.player2_name}
+                    </TableCell>
+                    <TableCell sx={{ textAlign: "right" }}>
+                      {isBye ? (
+                        <Chip label="BYE" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                      ) : isCompleted || hasTempResult ? (
+                        <Typography
+                          variant="caption"
+                          sx={{ fontWeight: 600, fontSize: "0.82rem", opacity: hasTempResult ? 0.6 : 1 }}
+                        >
+                          {displayResult ?? "—"}
+                        </Typography>
+                      ) : isPending ? (
+                        <Chip label="Playing" color="primary" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                      ) : (
+                        <Chip label="Waiting" size="small" variant="outlined" sx={{ fontSize: "0.65rem", height: 20 }} />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {roundMatches.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} sx={{ textAlign: "center", color: "text.disabled", py: 3 }}>
+                    No pairings for this round yet.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </Paper>
   );
 

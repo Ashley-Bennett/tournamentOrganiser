@@ -95,10 +95,10 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
             <TableCell sx={{ fontWeight: "bold" }} align="right">
               Pts
             </TableCell>
-            <TableCell sx={{ fontWeight: "bold" }} align="right">
+            <TableCell sx={{ fontWeight: "bold", display: { xs: "none", sm: "table-cell" } }} align="right">
               OMW%
             </TableCell>
-            <TableCell sx={{ fontWeight: "bold" }} align="right">
+            <TableCell sx={{ fontWeight: "bold", display: { xs: "none", sm: "table-cell" } }} align="right">
               OOMW%
             </TableCell>
           </TableRow>
@@ -221,12 +221,12 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                     {player.matchPoints}
                   </Typography>
                 </TableCell>
-                <TableCell align="right">
+                <TableCell align="right" sx={{ display: { xs: "none", sm: "table-cell" } }}>
                   <Typography variant="body2">
                     {(player.opponentMatchWinPercentage * 100).toFixed(1)}%
                   </Typography>
                 </TableCell>
-                <TableCell align="right">
+                <TableCell align="right" sx={{ display: { xs: "none", sm: "table-cell" } }}>
                   <Typography variant="body2">
                     {(player.opponentOpponentMatchWinPercentage * 100).toFixed(1)}%
                   </Typography>
