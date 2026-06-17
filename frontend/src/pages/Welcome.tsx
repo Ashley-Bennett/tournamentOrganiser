@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import {
   EmojiEvents as TrophyIcon,
-  PersonOutline as PersonIcon,
+  QrCodeScanner as JoinIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
@@ -31,16 +31,19 @@ const Welcome = () => {
 
   const handlePlayerChoice = async () => {
     await updateProfile({ onboarding_intent: "player" });
-    navigate("/me");
+    navigate("/join");
   };
 
   return (
     <Box maxWidth={600} mx="auto" mt={8} textAlign="center">
-      <Typography variant="h4" gutterBottom>
-        Welcome, {displayName}
+      <Typography variant="h4" fontWeight={700} gutterBottom>
+        Welcome, {displayName}!
       </Typography>
-      <Typography variant="body1" color="text.secondary" mb={5}>
-        You can run events or track your results — or both, with one account.
+      <Typography variant="body1" color="text.secondary" mb={1}>
+        What brings you to Matchamp?
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={5}>
+        Tell us why you're here so we can point you in the right direction.
       </Typography>
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={3} justifyContent="center">
@@ -52,10 +55,10 @@ const Welcome = () => {
             <CardContent>
               <TrophyIcon sx={{ fontSize: 48, color: "primary.main", mb: 1 }} />
               <Typography variant="h6" gutterBottom>
-                Run a tournament
+                I'm running a tournament
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Create and manage tournaments, pair players, and track results in your workspace.
+                Create and manage events, pair players, and track results.
               </Typography>
             </CardContent>
           </CardActionArea>
@@ -67,12 +70,12 @@ const Welcome = () => {
             sx={{ p: 3, height: "100%" }}
           >
             <CardContent>
-              <PersonIcon sx={{ fontSize: 48, color: "primary.main", mb: 1 }} />
+              <JoinIcon sx={{ fontSize: 48, color: "primary.main", mb: 1 }} />
               <Typography variant="h6" gutterBottom>
-                Join or track tournaments
+                I'm playing in a tournament
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                View your match history and stats across tournaments you participate in.
+                Enter the room code from your organiser to find your tournament and view your matches.
               </Typography>
             </CardContent>
           </CardActionArea>
@@ -85,7 +88,7 @@ const Welcome = () => {
           onClick={() => navigate("/dashboard")}
           sx={{ color: "text.secondary" }}
         >
-          Skip for now
+          Not sure yet — skip for now
         </Button>
       </Box>
     </Box>
