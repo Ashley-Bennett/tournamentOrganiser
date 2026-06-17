@@ -10,7 +10,7 @@ CREATE TABLE public.workspace_invites (
   email        TEXT        NOT NULL,
   role         TEXT        NOT NULL DEFAULT 'admin' CHECK (role IN ('admin')),
   invited_by   UUID        NOT NULL REFERENCES auth.users(id),
-  token        TEXT        NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(32), 'hex'),
+  token        TEXT        NOT NULL UNIQUE DEFAULT encode(extensions.gen_random_bytes(32), 'hex'),
   status       TEXT        NOT NULL DEFAULT 'pending'
                  CHECK (status IN ('pending', 'accepted', 'revoked', 'expired')),
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),

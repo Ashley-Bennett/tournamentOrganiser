@@ -10,7 +10,7 @@ CREATE TABLE public.tournament_player_claims (
   id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   tournament_player_id UUID        NOT NULL REFERENCES public.tournament_players(id) ON DELETE CASCADE,
   workspace_id         UUID        NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
-  token                TEXT        NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(32), 'hex'),
+  token                TEXT        NOT NULL UNIQUE DEFAULT encode(extensions.gen_random_bytes(32), 'hex'),
   created_by           UUID        NOT NULL REFERENCES auth.users(id),
   status               TEXT        NOT NULL DEFAULT 'pending'
                        CHECK (status IN ('pending', 'accepted', 'revoked', 'expired')),
