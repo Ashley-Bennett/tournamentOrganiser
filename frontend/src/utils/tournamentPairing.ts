@@ -67,6 +67,12 @@ export interface PairingDecisionLog {
     playerPoints: number;
     reason: string;
   }>;
+  rematchPairs?: Array<{
+    player1Id: string;
+    player1Name: string;
+    player2Id: string;
+    player2Name: string;
+  }>;
   seatConflicts?: Array<{
     movedPlayerName: string;
     movedPlayerOriginalSeat: number;
@@ -1234,13 +1240,16 @@ export function generateSwissPairings(
 
   // FIX 6: count actual rematches (not just boolean), and compute meaningful stageUsed
   let rematchCount = 0;
+  const rematchPairs: Array<{ player1Id: string; player1Name: string; player2Id: string; player2Name: string }> = [];
   let maxDownFloatUsed = 0;
   let hasMultiStepFloat = false;
 
   for (const p of pairings) {
     if (p.player2Id) {
-      if (havePlayedBefore(p.player1Id, p.player2Id, previousPairings))
+      if (havePlayedBefore(p.player1Id, p.player2Id, previousPairings)) {
         rematchCount++;
+        rematchPairs.push({ player1Id: p.player1Id, player1Name: p.player1Name, player2Id: p.player2Id, player2Name: p.player2Name! });
+      }
       const a = standingsById.get(p.player1Id);
       const b = standingsById.get(p.player2Id);
       if (a && b) {
@@ -1349,6 +1358,7 @@ export function generateSwissPairings(
     rematchCount, // FIX 6: real count
     stageUsed, // FIX 6: meaningful value
     floatDetails,
+    rematchPairs: rematchPairs.length > 0 ? rematchPairs : undefined,
   };
 
   return { pairings: out, decisionLog };
