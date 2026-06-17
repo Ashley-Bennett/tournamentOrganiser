@@ -52,7 +52,7 @@ interface Row {
   deviceToken?: string;
 }
 
-export default function DeviceTournaments() {
+export default function DeviceTournaments({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const deviceEntries = useMemo(() => getAllEntries(), []);
 
@@ -155,13 +155,15 @@ export default function DeviceTournaments() {
   const isEmpty = !loading && rows.length === 0;
 
   return (
-    <Box maxWidth={560} mx="auto" mt={4}>
-      <Stack direction="row" spacing={1} alignItems="center" mb={3}>
-        <TrophyIcon sx={{ color: "text.secondary" }} />
-        <Typography variant="h5" fontWeight={700}>
-          My Tournaments
-        </Typography>
-      </Stack>
+    <Box maxWidth={embedded ? undefined : 560} mx={embedded ? undefined : "auto"} mt={embedded ? 0 : 4}>
+      {!embedded && (
+        <Stack direction="row" spacing={1} alignItems="center" mb={3}>
+          <TrophyIcon sx={{ color: "text.secondary" }} />
+          <Typography variant="h5" fontWeight={700}>
+            My Tournaments
+          </Typography>
+        </Stack>
+      )}
 
       {loadError && (
         <Alert severity="error" sx={{ mb: 3 }}>{loadError}</Alert>

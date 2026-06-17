@@ -40,7 +40,7 @@ import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
 import { TournamentSummary } from "../types/tournament";
 
-const Tournaments: React.FC = () => {
+const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -233,9 +233,11 @@ const Tournaments: React.FC = () => {
         justifyContent="space-between"
         alignItems="center"
       >
-        <Typography variant="h4" component="h1">
-          Tournaments
-        </Typography>
+        {!embedded && (
+          <Typography variant="h4" component="h1">
+            Tournaments
+          </Typography>
+        )}
         <Button
           variant="contained"
           startIcon={<AddIcon />}

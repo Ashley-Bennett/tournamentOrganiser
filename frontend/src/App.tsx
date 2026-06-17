@@ -4,6 +4,7 @@ import { Box, Container } from "@mui/material";
 import Header from "./components/Header";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Dashboard from "./pages/Dashboard";
+import Home from "./pages/Home";
 import Tournaments from "./pages/Tournaments";
 import CreateTournament from "./pages/CreateTournament";
 import TournamentView from "./pages/TournamentView";
@@ -41,7 +42,7 @@ function RedirectToWorkspace() {
   const { workspaces, loading } = useWorkspace();
   if (loading) return null;
   if (workspaces.length > 0) {
-    return <Navigate to={`/w/${workspaces[0].slug}/tournaments`} replace />;
+    return <Navigate to={`/w/${workspaces[0].slug}/dashboard`} replace />;
   }
   return <Navigate to="/workspaces/new" replace />;
 }
@@ -169,7 +170,7 @@ function App() {
                   path="/w/:workspaceSlug/dashboard"
                   element={
                     <RequireAuth>
-                      <Dashboard />
+                      <Home />
                     </RequireAuth>
                   }
                 />

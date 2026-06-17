@@ -43,10 +43,10 @@ const Welcome = () => {
 
   const handleOrganiserChoice = async () => {
     await updateProfile({ onboarding_intent: "organiser" });
-    if (workspaces.length > 0) {
-      navigate(`/w/${workspaces[0].slug}/tournaments`, { state: { openCreate: true } });
-    } else {
+    if (workspaces.length === 0) {
       navigate("/workspaces/new");
+    } else {
+      navigate("/dashboard");
     }
   };
 
@@ -79,7 +79,7 @@ const Welcome = () => {
     }
     setClaimedIds(newClaimed);
     setClaimLoading(false);
-    navigate("/join");
+    navigate("/dashboard");
   };
 
   if (step === "claim") {
@@ -107,7 +107,7 @@ const Welcome = () => {
           </Button>
           <Button
             variant="text"
-            onClick={() => navigate("/join")}
+            onClick={() => navigate("/dashboard")}
             sx={{ color: "text.secondary" }}
           >
             Skip for now
@@ -200,7 +200,7 @@ const Welcome = () => {
           onClick={() => navigate("/dashboard")}
           sx={{ color: "text.secondary" }}
         >
-          Not sure yet — skip for now
+          Not sure yet
         </Button>
       </Box>
     </Box>
