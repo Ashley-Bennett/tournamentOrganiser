@@ -85,12 +85,19 @@ const TournamentMatches: React.FC = () => {
   const [lateEntryName, setLateEntryName] = useState("");
   const [addingLateEntry, setAddingLateEntry] = useState(false);
   const [savingTimer, setSavingTimer] = useState(false);
+  const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
+
+  const makeRetryable = (fn: () => void): (() => void) => () => {
+    setRetryAction(() => fn);
+    fn();
+  };
   const [timerDurationInput, setTimerDurationInput] = useState<string | null>(
     null,
   );
   const [timerEditorOpen, setTimerEditorOpen] = useState(false);
   const [roundNoteInput, setRoundNoteInput] = useState<string>("");
   const noteInputFocusedRef = useRef(false);
+
 
   const {
     matches,
@@ -881,7 +888,7 @@ const TournamentMatches: React.FC = () => {
     );
   }
 
-  if (error || !tournament) {
+  if (!tournament) {
     return (
       <Box>
         <Box display="flex" alignItems="center" mb={3}>
@@ -943,7 +950,25 @@ const TournamentMatches: React.FC = () => {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            retryAction ? (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => {
+                  const fn = retryAction;
+                  setRetryAction(null);
+                  fn();
+                }}
+              >
+                Retry
+              </Button>
+            ) : undefined
+          }
+        >
           {error}
         </Alert>
       )}
@@ -1291,17 +1316,17 @@ const TournamentMatches: React.FC = () => {
                           savingTimer={savingTimer}
                           wPath={wPath}
                           onCancelEditPairings={handleCancelEditPairings}
-                          onSavePairingEdits={() => void handleSavePairingEdits()}
+                          onSavePairingEdits={makeRetryable(() => void handleSavePairingEdits())}
                           onEditPairings={handleEditPairings}
-                          onPublishPairings={() => void handlePublishPairings()}
-                          onBeginRound={() => void handleBeginRound()}
-                          onSubmitResults={() => void savePendingResults()}
+                          onPublishPairings={makeRetryable(() => void handlePublishPairings())}
+                          onBeginRound={makeRetryable(() => void handleBeginRound())}
+                          onSubmitResults={makeRetryable(() => void savePendingResults())}
                           onPauseTimer={() => void handlePauseTimer()}
                           onResumeTimer={() => void handleResumeTimer()}
                           onToggleTimerEditor={() => setTimerEditorOpen((v) => !v)}
                           onAddTimer={() => { void handleSetRoundDuration(50); setTimerEditorOpen(true); }}
-                          onNextRound={() => void handleNextRound()}
-                          onCompleteTournament={() => void handleCompleteTournament()}
+                          onNextRound={makeRetryable(() => void handleNextRound())}
+                          onCompleteTournament={makeRetryable(() => void handleCompleteTournament())}
                           onManagePlayers={() => setDropDialogOpen(true)}
                         />
                         {timerEditorOpen && (
@@ -1424,7 +1449,7 @@ const TournamentMatches: React.FC = () => {
                             <Button
                               variant="contained"
                               color="primary"
-                              onClick={handleRegenerateRound1}
+                              onClick={makeRetryable(() => void handleRegenerateRound1())}
                               disabled={processingRound}
                               startIcon={<PlayArrowIcon />}
                             >
