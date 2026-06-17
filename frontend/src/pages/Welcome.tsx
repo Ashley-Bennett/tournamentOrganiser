@@ -96,11 +96,29 @@ const Welcome = () => {
           Link {localEntries.length !== 1 ? "them" : "it"} to your account so your history is never lost.
         </Typography>
 
+        <Stack direction="row" spacing={2} alignItems="center" mb={3}>
+          <Button
+            variant="contained"
+            onClick={() => void handleClaimAll()}
+            disabled={claimLoading}
+            startIcon={claimLoading ? <CircularProgress size={16} color="inherit" /> : undefined}
+          >
+            {claimLoading ? "Linking…" : "Link to my account"}
+          </Button>
+          <Button
+            variant="text"
+            onClick={() => navigate("/join")}
+            sx={{ color: "text.secondary" }}
+          >
+            Skip for now
+          </Button>
+        </Stack>
+
         {claimError && (
           <Alert severity="warning" sx={{ mb: 2 }}>{claimError}</Alert>
         )}
 
-        <Stack spacing={1.5} mb={4}>
+        <Stack spacing={1.5}>
           {localEntries.map((entry) => (
             <Paper
               key={entry.tournamentId}
@@ -123,24 +141,6 @@ const Welcome = () => {
               )}
             </Paper>
           ))}
-        </Stack>
-
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Button
-            variant="contained"
-            onClick={() => void handleClaimAll()}
-            disabled={claimLoading}
-            startIcon={claimLoading ? <CircularProgress size={16} color="inherit" /> : undefined}
-          >
-            {claimLoading ? "Linking…" : "Link to my account"}
-          </Button>
-          <Button
-            variant="text"
-            onClick={() => navigate("/join")}
-            sx={{ color: "text.secondary" }}
-          >
-            Skip for now
-          </Button>
         </Stack>
       </Box>
     );
