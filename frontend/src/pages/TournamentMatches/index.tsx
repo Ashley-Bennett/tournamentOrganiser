@@ -62,6 +62,7 @@ const TournamentMatches: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const initialTournamentLoadDoneRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [sortBy, setSortBy] = useState<"match" | "status" | "record">("record");
@@ -223,14 +224,15 @@ const TournamentMatches: React.FC = () => {
     }
 
     const fetchTournament = async () => {
+      const isInitialLoad = !initialTournamentLoadDoneRef.current;
       try {
-        setLoading(true);
+        if (isInitialLoad) setLoading(true);
         setError(null);
 
         const { data, error } = await supabase
           .from("tournaments")
           .select(
-            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused",
+            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
           )
           .eq("id", id)
           .eq("workspace_id", workspaceId ?? "")
@@ -254,7 +256,7 @@ const TournamentMatches: React.FC = () => {
           const { data: retryData, error: retryError } = await supabase
             .from("tournaments")
             .select(
-              "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused",
+              "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
             )
             .eq("id", id)
             .maybeSingle();
@@ -270,11 +272,12 @@ const TournamentMatches: React.FC = () => {
         } else {
           setTournament(data as TournamentSummary);
         }
+        initialTournamentLoadDoneRef.current = true;
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed to load tournament");
         setTournament(null);
       } finally {
-        setLoading(false);
+        if (isInitialLoad) setLoading(false);
       }
     };
 
