@@ -40,7 +40,7 @@ const ACCENT = "#dc004e";
 type ViewMode = "organiser" | "player";
 
 function viewModeKey(userId: string) {
-  return `tj_view_mode_${userId}`;
+  return `matchamp_view_mode_${userId}`;
 }
 
 const Header: React.FC = () => {
