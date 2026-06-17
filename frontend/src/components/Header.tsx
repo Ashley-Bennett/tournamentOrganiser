@@ -6,10 +6,7 @@ import {
   Container,
   Typography,
   Stack,
-  Chip,
   IconButton,
-  Menu,
-  MenuItem,
   Divider,
   Drawer,
   List,
@@ -19,8 +16,6 @@ import {
   Tooltip,
 } from "@mui/material";
 import {
-  WorkspacesOutlined as WorkspaceIcon,
-  ArrowDropDown as ArrowDropDownIcon,
   Menu as MenuIcon,
   LightMode as LightModeIcon,
   DarkMode as DarkModeIcon,
@@ -35,13 +30,10 @@ const ACCENT = "#dc004e";
 
 const Header: React.FC = () => {
   const { user, displayName, logout } = useAuth();
-  const { workspace, workspaces, lastWorkspace, wPath } = useWorkspace();
+  const { wPath } = useWorkspace();
   const { mode, toggleTheme } = useThemeMode();
   const navigate = useNavigate();
-  const [wsMenuAnchor, setWsMenuAnchor] = useState<null | HTMLElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-
-  const activeWorkspace = workspace ?? lastWorkspace;
 
   const handleLogout = () => {
     logout();
@@ -53,11 +45,7 @@ const Header: React.FC = () => {
     setDrawerOpen(false);
   };
 
-  const homeHref = user
-    ? activeWorkspace
-      ? wPath("/dashboard")
-      : "/dashboard"
-    : "/";
+  const homeHref = user ? wPath("/dashboard") : "/";
 
   const navBtnSx = {
     color: TEXT_MUTED,
@@ -65,16 +53,6 @@ const Header: React.FC = () => {
     fontWeight: 500,
     fontSize: "0.95rem",
     "&:hover": { color: "white", bgcolor: "transparent" },
-  };
-
-  const chipSx = {
-    color: TEXT_MUTED,
-    borderColor: "rgba(255,255,255,0.2)",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-    "& .MuiChip-icon": { color: TEXT_MUTED },
-    "& .MuiChip-deleteIcon": { color: "rgba(255,255,255,0.4)" },
-    "&:hover": { borderColor: "rgba(255,255,255,0.45)", color: "white" },
   };
 
   return (
@@ -96,66 +74,20 @@ const Header: React.FC = () => {
           justifyContent="space-between"
           sx={{ py: 1.5 }}
         >
-          {/* ── Logo + workspace chip ─────────────────────── */}
-          <Stack direction="row" alignItems="center" spacing={2}>
-            <Box component={RouterLink} to={homeHref} sx={{ textDecoration: "none" }}>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 900,
-                  letterSpacing: "-0.02em",
-                  color: "white",
-                  fontSize: "1.2rem",
-                }}
-              >
-                Matchamp
-              </Typography>
-            </Box>
-
-            {user && activeWorkspace && (
-              <>
-                <Chip
-                  icon={<WorkspaceIcon sx={{ fontSize: "0.95rem !important" }} />}
-                  label={activeWorkspace.name}
-                  deleteIcon={<ArrowDropDownIcon />}
-                  onDelete={(e) => setWsMenuAnchor(e.currentTarget as HTMLElement)}
-                  onClick={(e) => setWsMenuAnchor(e.currentTarget)}
-                  size="small"
-                  variant="outlined"
-                  sx={chipSx}
-                />
-                <Menu
-                  anchorEl={wsMenuAnchor}
-                  open={Boolean(wsMenuAnchor)}
-                  onClose={() => setWsMenuAnchor(null)}
-                  anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-                  transformOrigin={{ vertical: "top", horizontal: "left" }}
-                >
-                  {workspaces.map((ws) => (
-                    <MenuItem
-                      key={ws.id}
-                      selected={ws.id === activeWorkspace?.id}
-                      onClick={() => {
-                        navigate(`/w/${ws.slug}/dashboard`);
-                        setWsMenuAnchor(null);
-                      }}
-                    >
-                      {ws.name}
-                    </MenuItem>
-                  ))}
-                  <Divider />
-                  <MenuItem
-                    onClick={() => {
-                      navigate("/workspaces/new");
-                      setWsMenuAnchor(null);
-                    }}
-                  >
-                    + New workspace
-                  </MenuItem>
-                </Menu>
-              </>
-            )}
-          </Stack>
+          {/* ── Logo ─────────────────────────────────────── */}
+          <Box component={RouterLink} to={homeHref} sx={{ textDecoration: "none" }}>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 900,
+                letterSpacing: "-0.02em",
+                color: "white",
+                fontSize: "1.2rem",
+              }}
+            >
+              Matchamp
+            </Typography>
+          </Box>
 
           {/* ── Right side ──────────────────────────────── */}
           {user ? (
@@ -167,13 +99,15 @@ const Header: React.FC = () => {
                 spacing={0.5}
                 sx={{ display: { xs: "none", sm: "flex" } }}
               >
+                <Button component={RouterLink} to={wPath("/dashboard")} sx={navBtnSx}>
+                  Dashboard
+                </Button>
                 <Button component={RouterLink} to="/me" sx={navBtnSx}>
                   Account
                 </Button>
                 <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
                   What&apos;s New
                 </Button>
-
                 <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                   <IconButton
                     onClick={toggleTheme}
@@ -183,7 +117,6 @@ const Header: React.FC = () => {
                     {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
                   </IconButton>
                 </Tooltip>
-
                 <Button onClick={handleLogout} sx={navBtnSx}>
                   Logout
                 </Button>
@@ -219,6 +152,11 @@ const Header: React.FC = () => {
                   )}
                   <Divider />
                   <List disablePadding>
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => handleNavClick(wPath("/dashboard"))}>
+                        <ListItemText primary="Dashboard" />
+                      </ListItemButton>
+                    </ListItem>
                     <ListItem disablePadding>
                       <ListItemButton onClick={() => handleNavClick("/me")}>
                         <ListItemText primary="Account" />
@@ -326,10 +264,7 @@ const Header: React.FC = () => {
                       </ListItemButton>
                     </ListItem>
                     <ListItem disablePadding>
-                      <ListItemButton
-                        onClick={() => handleNavClick("/register")}
-                        sx={{ color: ACCENT, fontWeight: 600 }}
-                      >
+                      <ListItemButton onClick={() => handleNavClick("/register")}>
                         <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 600, color: ACCENT }} />
                       </ListItemButton>
                     </ListItem>
