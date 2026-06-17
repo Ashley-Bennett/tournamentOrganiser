@@ -23,6 +23,8 @@ import {
 } from "@mui/material";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
+import PrintIcon from "@mui/icons-material/Print";
+import PrintView from "../components/PrintView";
 import { supabase } from "../supabaseClient";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
@@ -443,16 +445,29 @@ const TournamentPairings: React.FC = () => {
     (!!tournament.current_round_started_at || !!tournament.round_is_paused) &&
     roundMatches.some((m) => m.status === "pending");
 
+  const roundLabel = tournament.num_rounds
+    ? `Round ${selectedRound} of ${tournament.num_rounds}`
+    : `Round ${selectedRound}`;
+
   const header = (
-    <Box mb={isPreRound ? 2 : 1.5} textAlign="center">
+    <Box mb={isPreRound ? 2 : 1.5} sx={{ position: "relative", textAlign: "center" }}>
       <Typography variant={isPreRound ? "h4" : "h5"} fontWeight={700}>
         {tournament.name}
       </Typography>
       <Typography variant="body1" color="text.secondary">
         {isStandings
           ? "Final Standings"
-          : `${tournament.num_rounds ? `Round ${selectedRound} of ${tournament.num_rounds}` : `Round ${selectedRound}`}${!isPreRound && totalMatchCount > 0 ? ` · ${completedMatchCount}/${totalMatchCount} complete` : ""}`}
+          : `${roundLabel}${!isPreRound && totalMatchCount > 0 ? ` · ${completedMatchCount}/${totalMatchCount} complete` : ""}`}
       </Typography>
+      <Tooltip title="Print">
+        <IconButton
+          size="small"
+          onClick={() => window.print()}
+          sx={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)" }}
+        >
+          <PrintIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
     </Box>
   );
 
@@ -494,6 +509,12 @@ const TournamentPairings: React.FC = () => {
           />
         </Box>
         {footer}
+        <PrintView
+          mode="standings"
+          tournamentName={tournament.name}
+          standings={standings}
+          droppedMap={droppedMap}
+        />
       </Box>
     );
   }
@@ -594,6 +615,12 @@ const TournamentPairings: React.FC = () => {
           })}
         </Box>
         {footer}
+        <PrintView
+          mode="pairings"
+          tournamentName={tournament.name}
+          roundLabel={roundLabel}
+          matches={roundMatches}
+        />
       </Box>
     );
   }
@@ -896,6 +923,12 @@ const TournamentPairings: React.FC = () => {
       )}
 
       {footer}
+      <PrintView
+        mode="pairings"
+        tournamentName={tournament.name}
+        roundLabel={roundLabel}
+        matches={roundMatches}
+      />
     </Box>
   );
 };
