@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.5.0] - 2026-06-17
+
+### Added
+- Live indicator badge on pairings and player view pages so participants know the page is actively tracking the tournament.
+- Print / PDF export for round pairings and standings — organiser can export any round directly from the UI.
+- Collapsible pairing decision log on the pairings page showing per-rematch player names so organisers can audit why a pair was generated.
+- Supabase connectivity errors are now detected and surfaced on startup rather than silently failing.
+- Duplicate names are now blocked on the tournament join page with an inline error.
+- Retry button added to the error alert shown when a round operation fails.
+- React error boundaries added throughout the app to prevent a single component crash from blanking the whole page.
+- GitHub Actions workflow to ping the Supabase project on a schedule and prevent it from pausing due to inactivity.
+- Dev console tools for component inspection and query logging (dev/preview builds only, gated by `VITE_DEV_TOOLS`).
+
+### Fixed
+- Confirmation dialogs added for all destructive tournament actions (delete round, clear results, etc.).
+- Copy-to-clipboard actions now show a toast notification confirming the copy succeeded.
+- Empty states across the app now have actionable CTAs rather than plain "nothing here" messages.
+- Pairings and standings tables have improved responsive mobile layouts.
+- Switching away from and back to the tournament page no longer resets tournament state or flashes a loading skeleton.
+- Pages with async data no longer flash the loading skeleton when the browser tab is refocused.
+- Errors on the Me and Device Tournaments pages are now surfaced to the user instead of silently swallowed.
+- Missing fields in `tournament` and `rounds` update selects that could cause stale UI state after mutations.
+
+### Changed
+- Reverted the announcement / round note redesign introduced in a prior branch; `round_note` behaviour restored to its previous state.
+
+### Refactored
+- `TournamentMatches.tsx` split into focused hooks (`useMatchData`, `useMatchReports`, `usePendingResults`, `usePairingEditor`, `useRoundLifecycle`) and components (`ScoreDialog`, `DeleteRoundDialog`, `LateEntryDialog`, `RoundNoteField`, `PairingDecisionAlert`, `TimerEditor`, `RoundTabs`, `RoundActionBar`, `PlayerManagementDialog`).
+- Consolidated `Match`, `Tournament`, and `Player` types into a shared `types/` directory.
+- Qualified `gen_random_bytes` as `extensions.gen_random_bytes` in migrations so they run portably outside the Supabase hosted environment.
+
+---
+
 ## [0.4.3] - 2026-05-31
 
 ### Fixed

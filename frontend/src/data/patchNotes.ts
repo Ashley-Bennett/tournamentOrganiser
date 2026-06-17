@@ -9,6 +9,34 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.5.0",
+    date: "2026-06-17",
+    entries: [
+      {
+        category: "New Features",
+        items: [
+          "Pairings and player view pages now show a live indicator so everyone knows the page is actively tracking the tournament.",
+          "You can now print or export round pairings and standings as a PDF directly from the tournament page.",
+          "The pairing decision log is now collapsible and shows each player's name when a rematch was unavoidable — useful for auditing generated pairs.",
+          "Duplicate names are now blocked when joining a tournament, with a clear error message.",
+          "A retry button now appears when a round operation fails, so you don't have to refresh the whole page.",
+          "If the app can't reach the server on startup, it now tells you clearly instead of silently failing.",
+        ],
+      },
+      {
+        category: "Fixes & Polish",
+        items: [
+          "Destructive actions — like deleting a round or clearing results — now ask for confirmation before proceeding.",
+          "Copying text to clipboard now shows a confirmation toast so you know it worked.",
+          "Empty states across the app now have helpful buttons so you know what to do next.",
+          "Pairings and standings tables are easier to read on mobile.",
+          "Switching tabs and coming back to the tournament no longer resets the page or flashes a loading spinner.",
+          "Error messages now appear on the My Tournaments and Device Tournaments pages when something goes wrong.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.4.3",
     date: "2026-05-31",
     entries: [
