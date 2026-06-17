@@ -19,14 +19,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  RadioGroup,
   FormControlLabel,
-  Radio,
-  FormControl,
-  FormLabel,
-  InputAdornment,
-  OutlinedInput,
-  InputLabel,
   TableSortLabel,
   Tooltip,
   Select,
@@ -69,12 +62,16 @@ import {
   type Match,
   type MatchWithPlayers,
   MATCH_STATUS,
-  humanizeByeReason,
-  humanizeFloatReason,
 } from "../types/match";
 import StandingsTable from "../components/StandingsTable";
 import RoundTimer from "../components/RoundTimer";
 import ErrorBoundary from "../components/ErrorBoundary";
+import ScoreDialog from "./TournamentMatches/ScoreDialog";
+import DeleteRoundDialog from "./TournamentMatches/DeleteRoundDialog";
+import LateEntryDialog from "./TournamentMatches/LateEntryDialog";
+import RoundNoteField from "./TournamentMatches/RoundNoteField";
+import PairingDecisionAlert from "./TournamentMatches/PairingDecisionAlert";
+import TimerEditor from "./TournamentMatches/TimerEditor";
 
 const TournamentMatches: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -1480,132 +1477,10 @@ const TournamentMatches: React.FC = () => {
 
                     return hasMatches ? (
                       <Box>
-                        {decisionLog && (
-                          <Alert severity="info" sx={{ mb: 2 }} icon={false}>
-                            <Typography
-                              variant="subtitle2"
-                              gutterBottom
-                              fontWeight={600}
-                            >
-                              Pairing notes — Round{" "}
-                              {typeof selectedRound === "number"
-                                ? selectedRound
-                                : "N/A"}
-                            </Typography>
-
-                            {/* Bye */}
-                            {decisionLog.byeReason &&
-                              decisionLog.byePlayerName && (
-                                <Typography variant="body2" sx={{ mb: 1 }}>
-                                  <strong>{decisionLog.byePlayerName}</strong>{" "}
-                                  received a bye (free win) this round
-                                  {decisionLog.byePlayerPoints !== undefined &&
-                                    ` · ${decisionLog.byePlayerPoints} pts`}
-                                  {" — "}
-                                  {humanizeByeReason(decisionLog.byeReason)}
-                                </Typography>
-                              )}
-
-                            {/* Score group adjustments (floats) */}
-                            {(() => {
-                              const visibleFloats = (
-                                decisionLog.floatDetails ?? []
-                              ).filter(
-                                (d) =>
-                                  !d.reason.startsWith("DISSOLVE:") &&
-                                  !d.reason.includes("bye (last bracket"),
-                              );
-                              return visibleFloats.length > 0 ? (
-                                <Box sx={{ mb: 1 }}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: "bold" }}
-                                  >
-                                    Score group adjustments:
-                                  </Typography>
-                                  <Box
-                                    component="ul"
-                                    sx={{ mt: 0.5, mb: 0, pl: 2 }}
-                                  >
-                                    {visibleFloats.map((detail) => (
-                                      <li key={detail.playerId}>
-                                        <Typography
-                                          variant="body2"
-                                          component="span"
-                                        >
-                                          <strong>{detail.playerName}</strong> (
-                                          {detail.playerPoints} pts) —{" "}
-                                          {humanizeFloatReason(detail.reason)}
-                                        </Typography>
-                                      </li>
-                                    ))}
-                                  </Box>
-                                </Box>
-                              ) : null;
-                            })()}
-
-                            {/* Table assignment adjustments */}
-                            {decisionLog.seatConflicts &&
-                              decisionLog.seatConflicts.length > 0 && (
-                                <Box sx={{ mb: 1 }}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: "bold" }}
-                                  >
-                                    Table assignments adjusted:
-                                  </Typography>
-                                  <Box
-                                    component="ul"
-                                    sx={{ mt: 0.5, mb: 0, pl: 2 }}
-                                  >
-                                    {decisionLog.seatConflicts.map((sc, i) => (
-                                      <li key={i}>
-                                        <Typography
-                                          variant="body2"
-                                          component="span"
-                                        >
-                                          <strong>{sc.movedPlayerName}</strong>{" "}
-                                          moved to table {sc.resolvedSeat} (was
-                                          table {sc.movedPlayerOriginalSeat}) to
-                                          avoid a table conflict with{" "}
-                                          <strong>{sc.opponentName}</strong>
-                                        </Typography>
-                                      </li>
-                                    ))}
-                                  </Box>
-                                </Box>
-                              )}
-
-                            {/* Rematches */}
-                            {decisionLog.rematchCount > 0 && (
-                              <Typography variant="body2" sx={{ mb: 0.5 }}>
-                                ⚠ {decisionLog.rematchCount} rematch
-                                {decisionLog.rematchCount !== 1
-                                  ? "es"
-                                  : ""}{" "}
-                                this round — unavoidable given current standings
-                              </Typography>
-                            )}
-                            {decisionLog.rematchCount === 0 && (
-                              <Typography variant="body2" color="success.main">
-                                ✓ No player faced the same opponent twice
-                              </Typography>
-                            )}
-
-                            {/* Largest score gap — only show if non-zero */}
-                            {decisionLog.maxFloatDistance > 0 && (
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{ mt: 0.5, fontSize: "0.78rem" }}
-                              >
-                                Largest score gap between paired players:{" "}
-                                {decisionLog.maxFloatDistance} pt
-                                {decisionLog.maxFloatDistance !== 1 ? "s" : ""}
-                              </Typography>
-                            )}
-                          </Alert>
-                        )}
+                        <PairingDecisionAlert
+                          decisionLog={decisionLog}
+                          selectedRound={selectedRound}
+                        />
                         {(showPrePublish ||
                           showBeginRound ||
                           (hasPendingMatches && !allCompletedInDB) ||
@@ -1912,115 +1787,24 @@ const TournamentMatches: React.FC = () => {
                           </Box>
                         )}
                         {timerEditorOpen && (
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              flexWrap: "wrap",
-                              mt: 1,
-                              mb: 1,
-                            }}
-                          >
-                            <Switch
-                              checked={!!tournament.round_duration_minutes}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  void handleSetRoundDuration(50);
-                                } else {
-                                  void handleSetRoundDuration(null);
-                                }
-                              }}
-                              disabled={savingTimer}
-                              size="small"
-                            />
-                            <Typography variant="body2" color="text.secondary">
-                              Round timer
-                            </Typography>
-                            {!!tournament.round_duration_minutes && (
-                              <>
-                                <TextField
-                                  type="number"
-                                  size="small"
-                                  label="Duration (minutes)"
-                                  value={
-                                    timerDurationInput ??
-                                    tournament.round_duration_minutes.toString()
-                                  }
-                                  onChange={(e) =>
-                                    setTimerDurationInput(e.target.value)
-                                  }
-                                  onBlur={(e) => {
-                                    const v = parseInt(e.target.value, 10);
-                                    setTimerDurationInput(null);
-                                    if (
-                                      !isNaN(v) &&
-                                      v >= 1 &&
-                                      v <= 180 &&
-                                      v !== tournament.round_duration_minutes
-                                    ) {
-                                      void handleSetRoundDuration(v);
-                                    }
-                                  }}
-                                  onWheel={(e) => e.currentTarget.blur()}
-                                  inputProps={{ min: 1, max: 180, step: 1 }}
-                                  sx={{ width: 160 }}
-                                  disabled={savingTimer}
-                                />
-                                {([-10, -1, 1, 10] as const).map((delta) => {
-                                  const next =
-                                    (tournament.round_duration_minutes ?? 0) +
-                                    delta;
-                                  const disabled =
-                                    savingTimer || next < 1 || next > 180;
-                                  return (
-                                    <Button
-                                      key={delta}
-                                      size="small"
-                                      variant="outlined"
-                                      disabled={disabled}
-                                      onClick={() =>
-                                        void handleSetRoundDuration(next)
-                                      }
-                                      sx={{ minWidth: 0, px: 1 }}
-                                    >
-                                      {delta > 0 ? `+${delta}m` : `${delta}m`}
-                                    </Button>
-                                  );
-                                })}
-                              </>
-                            )}
-                            <Tooltip title="Close">
-                              <IconButton
-                                size="small"
-                                onClick={() => setTimerEditorOpen(false)}
-                              >
-                                <CloseIcon sx={{ fontSize: "1rem" }} />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
+                          <TimerEditor
+                            durationMinutes={tournament.round_duration_minutes}
+                            durationInput={timerDurationInput}
+                            setDurationInput={setTimerDurationInput}
+                            saving={savingTimer}
+                            onSetDuration={(v) => void handleSetRoundDuration(v)}
+                            onClose={() => setTimerEditorOpen(false)}
+                          />
                         )}
                         {hasPendingMatches && !allCompletedInDB && (
-                          <TextField
-                            size="small"
-                            fullWidth
-                            placeholder="Add a note for players… (e.g. timer paused for judge call)"
+                          <RoundNoteField
                             value={roundNoteInput}
-                            onChange={(e) => setRoundNoteInput(e.target.value)}
-                            onFocus={() => {
-                              noteInputFocusedRef.current = true;
-                            }}
-                            onBlur={() => {
+                            onChange={setRoundNoteInput}
+                            onFocus={() => { noteInputFocusedRef.current = true; }}
+                            onBlur={(v) => {
                               noteInputFocusedRef.current = false;
-                              void handleSaveRoundNote(roundNoteInput);
+                              void handleSaveRoundNote(v);
                             }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.currentTarget.blur();
-                              }
-                            }}
-                            inputProps={{ maxLength: 280 }}
-                            sx={{ mt: 1, mb: 0.5 }}
                           />
                         )}
                         {/* Conflict notification */}
@@ -3379,156 +3163,21 @@ const TournamentMatches: React.FC = () => {
         </Paper>
       )}
 
-      {/* Score Entry Dialog */}
-      <Dialog
+      <ScoreDialog
         open={scoreDialogOpen}
+        match={selectedMatch}
+        selectedWinner={selectedWinner}
+        setSelectedWinner={setSelectedWinner}
+        player1Wins={player1Wins}
+        setPlayer1Wins={setPlayer1Wins}
+        player2Wins={player2Wins}
+        setPlayer2Wins={setPlayer2Wins}
+        updatingMatch={updatingMatch}
+        getScoreValidationError={getScoreValidationError}
+        onSave={handleSaveMatchResult}
         onClose={handleCloseScoreDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Record Match Result</DialogTitle>
-        <DialogContent>
-          {selectedMatch && (
-            <Box sx={{ pt: 2 }}>
-              <Typography variant="body1" gutterBottom>
-                <strong>Match:</strong> {selectedMatch.player1_name} vs{" "}
-                {selectedMatch.player2_name || "Bye"}
-              </Typography>
-              <FormControl component="fieldset" sx={{ mt: 3, mb: 2 }}>
-                <FormLabel component="legend">Select Winner</FormLabel>
-                <RadioGroup
-                  value={selectedWinner}
-                  onChange={(e) => {
-                    setSelectedWinner(e.target.value);
-                    setError(null); // Clear error when winner changes
-                  }}
-                >
-                  {selectedMatch.player2_id && (
-                    <>
-                      <FormControlLabel
-                        value="player1"
-                        control={<Radio />}
-                        label={selectedMatch.player1_name}
-                      />
-                      <FormControlLabel
-                        value="player2"
-                        control={<Radio />}
-                        label={selectedMatch.player2_name}
-                      />
-                      <FormControlLabel
-                        value="draw"
-                        control={<Radio />}
-                        label="Draw"
-                      />
-                    </>
-                  )}
-                  {!selectedMatch.player2_id && (
-                    <FormControlLabel
-                      value="player1"
-                      control={<Radio />}
-                      label={`${selectedMatch.player1_name} (Bye)`}
-                      checked={true}
-                    />
-                  )}
-                </RadioGroup>
-              </FormControl>
-              {selectedMatch.player2_id && selectedWinner !== "draw" && (
-                <Box sx={{ mt: 3 }}>
-                  <FormLabel component="legend" sx={{ mb: 2 }}>
-                    Game Wins
-                  </FormLabel>
-                  <Box display="flex" gap={2} alignItems="center">
-                    <FormControl variant="outlined" sx={{ flex: 1 }}>
-                      <InputLabel>{selectedMatch.player1_name}</InputLabel>
-                      <OutlinedInput
-                        type="number"
-                        value={player1Wins}
-                        onChange={(e) => {
-                          setPlayer1Wins(
-                            Math.min(
-                              2,
-                              Math.max(0, parseInt(e.target.value, 10) || 0),
-                            ),
-                          );
-                          setError(null); // Clear error on change
-                        }}
-                        inputProps={{ min: 0, max: 2 }}
-                        endAdornment={
-                          <InputAdornment position="end">wins</InputAdornment>
-                        }
-                        label={selectedMatch.player1_name}
-                        error={
-                          selectedWinner === "player1" &&
-                          player1Wins <= player2Wins &&
-                          player1Wins + player2Wins > 0
-                        }
-                      />
-                    </FormControl>
-                    <Typography variant="h6">-</Typography>
-                    <FormControl variant="outlined" sx={{ flex: 1 }}>
-                      <InputLabel>{selectedMatch.player2_name}</InputLabel>
-                      <OutlinedInput
-                        type="number"
-                        value={player2Wins}
-                        onChange={(e) => {
-                          setPlayer2Wins(
-                            Math.min(
-                              2,
-                              Math.max(0, parseInt(e.target.value, 10) || 0),
-                            ),
-                          );
-                          setError(null); // Clear error on change
-                        }}
-                        inputProps={{ min: 0, max: 2 }}
-                        endAdornment={
-                          <InputAdornment position="end">wins</InputAdornment>
-                        }
-                        label={selectedMatch.player2_name}
-                        error={
-                          selectedWinner === "player2" &&
-                          player2Wins <= player1Wins &&
-                          player1Wins + player2Wins > 0
-                        }
-                      />
-                    </FormControl>
-                  </Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
-                    Score will be displayed as: {player1Wins}-{player2Wins}
-                  </Typography>
-                  {(() => {
-                    const validationError = getScoreValidationError();
-                    return validationError ? (
-                      <Alert severity="error" sx={{ mt: 2 }}>
-                        {validationError}
-                      </Alert>
-                    ) : null;
-                  })()}
-                </Box>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseScoreDialog} disabled={updatingMatch}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSaveMatchResult}
-            variant="contained"
-            disabled={
-              updatingMatch ||
-              !selectedWinner ||
-              getScoreValidationError() !== null
-            }
-          >
-            {updatingMatch ? "Saving..." : "Save Result"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        setError={setError}
+      />
 
       {/* Player management dialog (drops + static seating) */}
       <Dialog
@@ -3668,132 +3317,23 @@ const TournamentMatches: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Late entry dialog */}
-      {(() => {
-        const maxRound =
-          matches.length > 0
-            ? Math.max(...matches.map((m) => m.round_number))
-            : 1;
-        const currentRoundMs = matches.filter(
-          (m) => m.round_number === maxRound,
-        );
-        const roundHasBegun = currentRoundMs.some(
-          (m) =>
-            m.status === MATCH_STATUS.PENDING ||
-            (m.status === MATCH_STATUS.COMPLETED && m.player2_id !== null),
-        );
-        const roundComplete =
-          currentRoundMs.length > 0 &&
-          currentRoundMs.every(
-            (m) =>
-              m.status === MATCH_STATUS.COMPLETED ||
-              m.status === MATCH_STATUS.BYE,
-          );
-        const preBeginRound =
-          currentRoundMs.length > 0 && !roundHasBegun && !roundComplete;
-        const existingByeInRound = !roundComplete
-          ? currentRoundMs.find((m) => !m.player2_id)
-          : null;
-
-        let infoMessage: string;
-        if (preBeginRound) {
-          if (existingByeInRound) {
-            infoMessage = `Round ${maxRound} hasn't started yet. The player will be paired with ${existingByeInRound.player1_name}, who currently has a bye.`;
-          } else {
-            infoMessage = `Round ${maxRound} hasn't started yet. The player will be added as the bye for this round and enter the bracket from round ${maxRound + 1} onward.`;
-          }
-        } else if (roundHasBegun && !roundComplete) {
-          if (existingByeInRound) {
-            infoMessage = `Round ${maxRound} is in progress. The player will be paired with ${existingByeInRound.player1_name}, who currently has a bye.`;
-          } else {
-            infoMessage = `Round ${maxRound} is in progress. This player will receive a bye for round ${maxRound} and enter the bracket from round ${maxRound + 1} onward.`;
-          }
-        } else {
-          infoMessage = `This player will join with 0 points and be included in the next round's pairings.`;
-        }
-
-        return (
-          <>
-            <Dialog
-              open={lateEntryDialogOpen}
-              onClose={() => {
-                setLateEntryDialogOpen(false);
-                setLateEntryName("");
-              }}
-              maxWidth="sm"
-              fullWidth
-            >
-              <DialogTitle>Add Late Entry</DialogTitle>
-              <DialogContent>
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  {infoMessage}
-                </Alert>
-                <TextField
-                  autoFocus
-                  fullWidth
-                  label="Player Name"
-                  value={lateEntryName}
-                  onChange={(e) => setLateEntryName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && lateEntryName.trim()) {
-                      void handleAddLateEntry();
-                    }
-                  }}
-                />
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  onClick={() => {
-                    setLateEntryDialogOpen(false);
-                    setLateEntryName("");
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={() => void handleAddLateEntry()}
-                  disabled={!lateEntryName.trim() || addingLateEntry}
-                >
-                  {addingLateEntry ? "Adding…" : "Add Player"}
-                </Button>
-              </DialogActions>
-            </Dialog>
-
-            {/* Delete round confirmation */}
-            <Dialog
-              open={deleteRoundConfirmRound !== null}
-              onClose={() => setDeleteRoundConfirmRound(null)}
-            >
-              <DialogTitle>Remove Round {deleteRoundConfirmRound}?</DialogTitle>
-              <DialogContent>
-                <Typography>
-                  This will permanently remove Round {deleteRoundConfirmRound}{" "}
-                  from the tournament. The tournament will end after Round{" "}
-                  {(deleteRoundConfirmRound ?? 1) - 1}.
-                </Typography>
-              </DialogContent>
-              <DialogActions>
-                <Button onClick={() => setDeleteRoundConfirmRound(null)}>
-                  Cancel
-                </Button>
-                <Button
-                  color="error"
-                  variant="contained"
-                  onClick={() => {
-                    if (deleteRoundConfirmRound !== null) {
-                      handleDeleteRound(deleteRoundConfirmRound);
-                      setDeleteRoundConfirmRound(null);
-                    }
-                  }}
-                >
-                  Remove Round
-                </Button>
-              </DialogActions>
-            </Dialog>
-          </>
-        );
-      })()}
+      <LateEntryDialog
+        open={lateEntryDialogOpen}
+        name={lateEntryName}
+        setName={setLateEntryName}
+        matches={matches}
+        adding={addingLateEntry}
+        onSubmit={handleAddLateEntry}
+        onClose={() => {
+          setLateEntryDialogOpen(false);
+          setLateEntryName("");
+        }}
+      />
+      <DeleteRoundDialog
+        roundNumber={deleteRoundConfirmRound}
+        onConfirm={handleDeleteRound}
+        onClose={() => setDeleteRoundConfirmRound(null)}
+      />
       <Snackbar
         open={autoSaveWarning}
         autoHideDuration={5000}
