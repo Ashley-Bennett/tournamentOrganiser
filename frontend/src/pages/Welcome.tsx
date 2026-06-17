@@ -51,8 +51,8 @@ const Welcome = () => {
   };
 
   const handlePlayerChoice = async () => {
-    await updateProfile({ onboarding_intent: "player" });
     const entries = getAllEntries();
+    await updateProfile({ onboarding_intent: "player" });
     if (entries.length === 0) {
       navigate("/join");
       return;
