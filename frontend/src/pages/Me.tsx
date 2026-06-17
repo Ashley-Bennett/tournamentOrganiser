@@ -17,6 +17,7 @@ import {
   DialogContentText,
   DialogActions,
   CircularProgress,
+  Snackbar,
 } from "@mui/material";
 import {
   PersonOutline as PersonIcon,
@@ -117,6 +118,7 @@ const Me = () => {
   const [inviteError, setInviteError] = useState<Record<string, string>>({});
   const [inviteSuccess, setInviteSuccess] = useState<Record<string, string>>({});
   const [copySuccess, setCopySuccess] = useState<Record<string, boolean>>({});
+  const [copyToast, setCopyToast] = useState<string | null>(null);
 
   const handleNameSave = async () => {
     if (editName === null) return;
@@ -246,8 +248,10 @@ const Me = () => {
         () => setCopySuccess((prev) => ({ ...prev, [inviteId]: false })),
         2000
       );
+      setCopyToast("Copied!");
     } catch {
       setInviteError((prev) => ({ ...prev, [inviteId]: "Failed to copy link." }));
+      setCopyToast("Failed to copy — please try again.");
     }
   };
 
@@ -748,6 +752,13 @@ const Me = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={copyToast !== null}
+        autoHideDuration={2000}
+        onClose={() => setCopyToast(null)}
+        message={copyToast}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      />
     </Box>
   );
 };

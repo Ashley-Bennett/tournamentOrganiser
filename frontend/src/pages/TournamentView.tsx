@@ -27,6 +27,7 @@ import {
   TableRow,
   TableSortLabel,
   InputAdornment,
+  Snackbar,
 } from "@mui/material";
 import SeatIcon from "@mui/icons-material/EventSeat";
 import { PlayArrow as PlayArrowIcon, Add as AddIcon, Remove as RemoveIcon } from "@mui/icons-material";
@@ -150,6 +151,7 @@ const TournamentView: React.FC = () => {
 
   // ── Self-registration toggle ─────────────────────────────────────────────
   const [copiedJoinLink, setCopiedJoinLink] = useState(false);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
 
   // ── Inline name editing ───────────────────────────────────────────────────
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
@@ -924,8 +926,10 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                   void navigator.clipboard.writeText(text).then(() => {
                     setCopiedPlayerList(true);
                     setTimeout(() => setCopiedPlayerList(false), 2000);
+                    setCopyToast("Copied!");
                   }).catch(() => {
                     setPlayersError("Failed to copy player list to clipboard.");
+                    setCopyToast("Failed to copy — please try again.");
                   });
                 }}
               >
@@ -965,6 +969,9 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                         ).then(() => {
                           setCopiedJoinLink(true);
                           setTimeout(() => setCopiedJoinLink(false), 2000);
+                          setCopyToast("Copied!");
+                        }).catch(() => {
+                          setCopyToast("Failed to copy — please try again.");
                         });
                       }}
                     >
@@ -1320,6 +1327,13 @@ const handleSetRoundDuration = async (minutes: number | null) => {
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={copyToast !== null}
+        autoHideDuration={2000}
+        onClose={() => setCopyToast(null)}
+        message={copyToast}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      />
     </Box>
   );
 };
