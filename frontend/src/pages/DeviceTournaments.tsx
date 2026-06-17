@@ -10,7 +10,7 @@ import {
   Chip,
   CircularProgress,
 } from "@mui/material";
-import { EmojiEventsOutlined as TrophyIcon } from "@mui/icons-material";
+import { EmojiEventsOutlined as TrophyIcon, Add as AddIcon } from "@mui/icons-material";
 import { getAllEntries } from "../utils/playerStorage";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
@@ -156,14 +156,19 @@ export default function DeviceTournaments({ embedded = false }: { embedded?: boo
 
   return (
     <Box maxWidth={embedded ? undefined : 560} mx={embedded ? undefined : "auto"} mt={embedded ? 0 : 4}>
-      {!embedded && (
-        <Stack direction="row" spacing={1} alignItems="center" mb={3}>
-          <TrophyIcon sx={{ color: "text.secondary" }} />
-          <Typography variant="h5" fontWeight={700}>
-            My Tournaments
-          </Typography>
-        </Stack>
-      )}
+      <Box display="flex" flexWrap="wrap" gap={2} mb={2} justifyContent="space-between" alignItems="center">
+        {!embedded && (
+          <Stack direction="row" spacing={1} alignItems="center">
+            <TrophyIcon sx={{ color: "text.secondary" }} />
+            <Typography variant="h5" fontWeight={700}>
+              My Tournaments
+            </Typography>
+          </Stack>
+        )}
+        <Button component={Link} to="/join" variant="contained" startIcon={<AddIcon />}>
+          Join Tournament
+        </Button>
+      </Box>
 
       {loadError && (
         <Alert severity="error" sx={{ mb: 3 }}>{loadError}</Alert>
@@ -286,11 +291,6 @@ export default function DeviceTournaments({ embedded = false }: { embedded?: boo
         </Stack>
       )}
 
-      <Box mt={3}>
-        <Button component={Link} to="/join" size="small" color="inherit">
-          + Join another tournament
-        </Button>
-      </Box>
     </Box>
   );
 }
