@@ -28,6 +28,7 @@ import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import StandingsTable from "../components/StandingsTable";
 import RoundTimer from "../components/RoundTimer";
+import LiveIndicator from "../components/LiveIndicator";
 import { TournamentSummary, TournamentPlayer } from "../types/tournament";
 import { MatchWithPlayers } from "../types/match";
 
@@ -44,6 +45,7 @@ const TournamentPairings: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [timerExpanded, setTimerExpanded] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<string>("connecting");
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const didInitRoundRef = useRef(false);
@@ -315,7 +317,7 @@ const TournamentPairings: React.FC = () => {
           }
         },
       )
-      .subscribe();
+      .subscribe((status) => setLiveStatus(status));
 
     return () => {
       isMounted = false;
@@ -474,9 +476,7 @@ const TournamentPairings: React.FC = () => {
 
   const footer = (
     <Box textAlign="center" mt={2}>
-      <Typography variant="caption" color="text.disabled">
-        Updates automatically
-      </Typography>
+      <LiveIndicator isLive={liveStatus === "SUBSCRIBED"} />
     </Box>
   );
 

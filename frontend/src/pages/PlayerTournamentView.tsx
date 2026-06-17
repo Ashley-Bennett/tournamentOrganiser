@@ -26,6 +26,7 @@ import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { getSpriteUrl } from "../utils/pokemonCache";
 import StandingsTable from "../components/StandingsTable";
 import DeckPickerDialog from "../components/DeckPickerDialog";
+import LiveIndicator from "../components/LiveIndicator";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -313,6 +314,7 @@ const PlayerTournamentView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [deckPickerOpen, setDeckPickerOpen] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<string>("connecting");
 
   const didInitRoundRef = useRef(false);
   const initialRoundsLoadedRef = useRef(false);
@@ -421,7 +423,7 @@ const PlayerTournamentView: React.FC = () => {
           void load();
         },
       )
-      .subscribe();
+      .subscribe((status) => setLiveStatus(status));
 
     return () => {
       clearInterval(dataPollId);
@@ -684,7 +686,7 @@ const PlayerTournamentView: React.FC = () => {
         {roundTabs}
         <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap} currentPlayerId={entry?.playerId} />
         <Box textAlign="center" mt={2}>
-          <Typography variant="caption" color="text.disabled">Updates automatically</Typography>
+          <LiveIndicator isLive={liveStatus === "SUBSCRIBED"} />
         </Box>
         <DeckPickerDialog
           open={deckPickerOpen}
