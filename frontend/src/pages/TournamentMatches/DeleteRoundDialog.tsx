@@ -13,14 +13,19 @@ interface Props {
   onClose: () => void;
 }
 
-export default function DeleteRoundDialog({ roundNumber, onConfirm, onClose }: Props) {
+export default function DeleteRoundDialog({
+  roundNumber,
+  onConfirm,
+  onClose,
+}: Props) {
   return (
     <Dialog open={roundNumber !== null} onClose={onClose}>
       <DialogTitle>Remove Round {roundNumber}?</DialogTitle>
       <DialogContent>
         <Typography>
-          This will permanently remove Round {roundNumber} from the tournament.
-          The tournament will end after Round {(roundNumber ?? 1) - 1}.
+          This will permanently delete all pairings and match results for Round{" "}
+          {roundNumber}. The tournament will end after Round{" "}
+          {(roundNumber ?? 1) - 1}.
         </Typography>
       </DialogContent>
       <DialogActions>

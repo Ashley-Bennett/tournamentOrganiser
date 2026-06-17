@@ -1,6 +1,12 @@
+import { useState } from "react";
 import {
   Box,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   IconButton,
   Tooltip,
 } from "@mui/material";
@@ -91,6 +97,7 @@ export default function RoundActionBar({
   onCompleteTournament,
   onManagePlayers,
 }: Props) {
+  const [savePairingsConfirmOpen, setSavePairingsConfirmOpen] = useState(false);
   const showBar =
     showPrePublish ||
     showBeginRound ||
@@ -127,7 +134,7 @@ export default function RoundActionBar({
                 variant="contained"
                 color="success"
                 disabled={!pairingEditsValid || savingPairings}
-                onClick={onSavePairingEdits}
+                onClick={() => setSavePairingsConfirmOpen(true)}
               >
                 Save Pairings
               </Button>
@@ -287,6 +294,35 @@ export default function RoundActionBar({
           )}
         </>
       )}
+
+      <Dialog
+        open={savePairingsConfirmOpen}
+        onClose={() => setSavePairingsConfirmOpen(false)}
+      >
+        <DialogTitle>Save manual pairings?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Manually edited pairings can affect Swiss algorithm correctness for
+            future rounds — repeat-opponent and colour-balance checks won't
+            account for swaps made here. Only continue if you're sure.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSavePairingsConfirmOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            color="warning"
+            variant="contained"
+            onClick={() => {
+              setSavePairingsConfirmOpen(false);
+              onSavePairingEdits();
+            }}
+          >
+            Save Pairings
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

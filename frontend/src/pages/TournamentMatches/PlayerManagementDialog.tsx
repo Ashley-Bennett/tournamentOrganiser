@@ -6,6 +6,7 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   FormControlLabel,
   Switch,
@@ -47,6 +48,7 @@ export default function PlayerManagementDialog({
   onUpdateStaticSeat,
 }: Props) {
   const [seatInputs, setSeatInputs] = useState<Map<string, string>>(new Map());
+  const [pendingDropId, setPendingDropId] = useState<string | null>(null);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -93,7 +95,11 @@ export default function PlayerManagementDialog({
                   size="small"
                   variant="outlined"
                   color={player.dropped ? "success" : "error"}
-                  onClick={() => onToggleDrop(player.id, player.dropped)}
+                  onClick={() =>
+                    player.dropped
+                      ? onToggleDrop(player.id, true)
+                      : setPendingDropId(player.id)
+                  }
                   disabled={!!togglingDrop}
                   sx={{ ml: 2, minWidth: 80 }}
                 >
@@ -165,6 +171,35 @@ export default function PlayerManagementDialog({
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
+
+      <Dialog open={pendingDropId !== null} onClose={() => setPendingDropId(null)}>
+        <DialogTitle>Drop player?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {(() => {
+              const p = players.find((pl) => pl.id === pendingDropId);
+              return p
+                ? `Drop "${p.name}" from the tournament? They will keep their record but be excluded from future pairings.`
+                : "Drop this player from the tournament?";
+            })()}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingDropId(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              if (pendingDropId !== null) {
+                onToggleDrop(pendingDropId, false);
+                setPendingDropId(null);
+              }
+            }}
+          >
+            Drop Player
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }

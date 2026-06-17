@@ -27,7 +27,7 @@ import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import StandingsTable from "../components/StandingsTable";
 import RoundTimer from "../components/RoundTimer";
 import { TournamentSummary, TournamentPlayer } from "../types/tournament";
-import { Match, MatchWithPlayers } from "../types/match";
+import { MatchWithPlayers } from "../types/match";
 
 const TournamentPairings: React.FC = () => {
   // Handles two routes:
@@ -111,7 +111,9 @@ const TournamentPairings: React.FC = () => {
       // Fetch players
       const { data: pData, error: pErr } = await supabase
         .from("tournament_players")
-        .select("id, name, created_at, dropped, dropped_at_round, deck_pokemon1, deck_pokemon2")
+        .select(
+          "id, name, created_at, dropped, dropped_at_round, deck_pokemon1, deck_pokemon2",
+        )
         .eq("tournament_id", tournamentId);
 
       if (!isMounted) return;
@@ -144,8 +146,12 @@ const TournamentPairings: React.FC = () => {
       const allEnriched: MatchWithPlayers[] = (mData ?? []).map((m) => ({
         ...m,
         player1_name: playerMap.get(m.player1_id) ?? "Unknown",
-        player2_name: m.player2_id ? (playerMap.get(m.player2_id) ?? "Unknown") : null,
-        winner_name: m.winner_id ? (playerMap.get(m.winner_id) ?? "Unknown") : null,
+        player2_name: m.player2_id
+          ? (playerMap.get(m.player2_id) ?? "Unknown")
+          : null,
+        winner_name: m.winner_id
+          ? (playerMap.get(m.winner_id) ?? "Unknown")
+          : null,
       }));
 
       // Only expose matches that have been published or are in progress/complete
@@ -477,7 +483,11 @@ const TournamentPairings: React.FC = () => {
         {header}
         {roundTabs}
         <Box sx={{ flex: 1, minHeight: 0 }}>
-          <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap.size > 0 ? deckMap : undefined} />
+          <StandingsTable
+            standings={standings}
+            droppedMap={droppedMap}
+            deckMap={deckMap.size > 0 ? deckMap : undefined}
+          />
         </Box>
         {footer}
       </Box>
@@ -492,7 +502,9 @@ const TournamentPairings: React.FC = () => {
         {roundTabs}
         {tournament.round_note && (
           <Alert severity="info" sx={{ mb: 2, alignItems: "center" }}>
-            <Typography variant="h6" fontWeight={400}>{tournament.round_note}</Typography>
+            <Typography variant="h6" fontWeight={400}>
+              {tournament.round_note}
+            </Typography>
           </Alert>
         )}
         <Box
@@ -770,7 +782,9 @@ const TournamentPairings: React.FC = () => {
 
       {tournament.round_note && (
         <Alert severity="info" sx={{ mb: 1.5, alignItems: "center" }}>
-          <Typography variant="h6" fontWeight={400}>{tournament.round_note}</Typography>
+          <Typography variant="h6" fontWeight={400}>
+            {tournament.round_note}
+          </Typography>
         </Alert>
       )}
 
