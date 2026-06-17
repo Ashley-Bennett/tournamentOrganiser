@@ -18,6 +18,8 @@ import {
   DialogActions,
   CircularProgress,
   Snackbar,
+  ToggleButtonGroup,
+  ToggleButton,
 } from "@mui/material";
 import {
   PersonOutline as PersonIcon,
@@ -65,6 +67,26 @@ const Me = () => {
   const [nameLoading, setNameLoading] = useState(false);
   const [nameError, setNameError] = useState("");
   const [nameSuccess, setNameSuccess] = useState("");
+
+  // Preferred role toggle
+  const [intentLoading, setIntentLoading] = useState(false);
+  const [intentError, setIntentError] = useState("");
+
+  const handleIntentChange = async (_: React.MouseEvent, value: "player" | "organiser" | null) => {
+    if (!value || value === profile?.onboarding_intent) return;
+    setIntentLoading(true);
+    setIntentError("");
+    try {
+      await updateProfile({ onboarding_intent: value });
+      if (user) {
+        localStorage.setItem(`matchamp_view_mode_${user.id}`, value);
+      }
+    } catch (err) {
+      setIntentError(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setIntentLoading(false);
+    }
+  };
 
   // Workspace edit state — keyed by workspace id
   const [wsEdit, setWsEdit] = useState<Record<string, string>>({});
@@ -306,6 +328,38 @@ const Me = () => {
             {nameSuccess}
           </Alert>
         )}
+
+        <Divider sx={{ my: 2 }} />
+
+        <Stack spacing={1}>
+          <Typography variant="body2" color="text.secondary">
+            Preferred role:{" "}
+            {profile?.onboarding_intent ? (
+              <Typography component="span" variant="body2" fontWeight={600} color="text.primary">
+                {profile.onboarding_intent.charAt(0).toUpperCase() + profile.onboarding_intent.slice(1)}
+              </Typography>
+            ) : (
+              <Typography component="span" variant="body2" fontStyle="italic">
+                not set
+              </Typography>
+            )}
+          </Typography>
+          <ToggleButtonGroup
+            value={profile?.onboarding_intent ?? null}
+            exclusive
+            onChange={(e, v) => void handleIntentChange(e, v)}
+            disabled={intentLoading}
+            size="small"
+          >
+            <ToggleButton value="player">Player</ToggleButton>
+            <ToggleButton value="organiser">Organiser</ToggleButton>
+          </ToggleButtonGroup>
+          {intentError && (
+            <Alert severity="error" sx={{ mt: 0.5 }}>
+              {intentError}
+            </Alert>
+          )}
+        </Stack>
       </Paper>
 
       {/* ── Workspaces ──────────────────────────────────────── */}
