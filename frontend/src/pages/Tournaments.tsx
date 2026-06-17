@@ -49,6 +49,7 @@ const Tournaments: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [tournaments, setTournaments] = useState<TournamentSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const initialLoadDoneRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -84,8 +85,9 @@ const Tournaments: React.FC = () => {
   }, [location.state]);
 
   const fetchTournaments = useCallback(async () => {
+    const isInitialLoad = !initialLoadDoneRef.current;
     try {
-      setLoading(true);
+      if (isInitialLoad) setLoading(true);
       if (!user) {
         logout();
         navigate("/login");
@@ -104,6 +106,7 @@ const Tournaments: React.FC = () => {
       }
 
       setTournaments(data || []);
+      initialLoadDoneRef.current = true;
     } catch (error: unknown) {
       setError(
         error instanceof Error
@@ -111,7 +114,7 @@ const Tournaments: React.FC = () => {
           : "Network error. Please try again.",
       );
     } finally {
-      setLoading(false);
+      if (isInitialLoad) setLoading(false);
     }
   }, [user, logout, navigate, workspaceId]);
 

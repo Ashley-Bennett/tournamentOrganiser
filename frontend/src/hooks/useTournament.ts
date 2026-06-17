@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../supabaseClient";
 import type { TournamentSummary } from "../types/tournament";
 import type { User } from "@supabase/supabase-js";
@@ -12,11 +12,13 @@ export function useTournament(
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const initialLoadDoneRef = useRef(false);
 
   const fetchTournament = useCallback(async () => {
     if (!id || !user) return;
+    const isInitialLoad = !initialLoadDoneRef.current;
     try {
-      setLoading(true);
+      if (isInitialLoad) setLoading(true);
       setError(null);
 
       let query = supabase
@@ -41,12 +43,13 @@ export function useTournament(
         setTournament(null);
       } else {
         setTournament(data);
+        initialLoadDoneRef.current = true;
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load tournament");
       setTournament(null);
     } finally {
-      setLoading(false);
+      if (isInitialLoad) setLoading(false);
     }
   }, [id, user, workspaceId]);
 

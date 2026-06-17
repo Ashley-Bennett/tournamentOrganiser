@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -28,6 +28,7 @@ const TournamentLeaderboard: React.FC = () => {
   const [players, setPlayers] = useState<TournamentPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const initialLoadDoneRef = useRef(false);
 
   useEffect(() => {
     if (!id) {
@@ -42,8 +43,9 @@ const TournamentLeaderboard: React.FC = () => {
     }
 
     const fetchData = async () => {
+      const isInitialLoad = !initialLoadDoneRef.current;
       try {
-        setLoading(true);
+        if (isInitialLoad) setLoading(true);
         setError(null);
 
         const { data: tournamentData, error: tournamentError } = await supabase
@@ -63,7 +65,7 @@ const TournamentLeaderboard: React.FC = () => {
         if (!tournamentData) {
           setError("Tournament not found");
           setTournament(null);
-          setLoading(false);
+          if (isInitialLoad) setLoading(false);
           return;
         }
 
@@ -83,7 +85,7 @@ const TournamentLeaderboard: React.FC = () => {
 
         if (!matchesData || matchesData.length === 0) {
           setMatches([]);
-          setLoading(false);
+          if (isInitialLoad) setLoading(false);
           return;
         }
 
@@ -128,10 +130,11 @@ const TournamentLeaderboard: React.FC = () => {
         );
 
         setMatches(matchesWithPlayers);
+        initialLoadDoneRef.current = true;
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed to load data");
       } finally {
-        setLoading(false);
+        if (isInitialLoad) setLoading(false);
       }
     };
 
