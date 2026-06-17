@@ -38,15 +38,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
-
-interface Tournament {
-  id: string;
-  name: string;
-  status: "draft" | "active" | "completed";
-  tournament_type: "swiss" | "single_elimination";
-  created_at: string;
-  created_by: string;
-}
+import { TournamentSummary } from "../types/tournament";
 
 const Tournaments: React.FC = () => {
   const navigate = useNavigate();
@@ -55,7 +47,7 @@ const Tournaments: React.FC = () => {
   const { workspaceId, wPath } = useWorkspace();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);

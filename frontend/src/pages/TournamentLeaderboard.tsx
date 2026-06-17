@@ -14,35 +14,9 @@ import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
-import { TournamentSummary } from "../types/tournament";
+import { TournamentSummary, TournamentPlayer } from "../types/tournament";
+import { Match, MatchWithPlayers } from "../types/match";
 import StandingsTable from "../components/StandingsTable";
-
-interface Match {
-  id: string;
-  tournament_id: string;
-  round_number: number;
-  player1_id: string;
-  player2_id: string | null;
-  winner_id: string | null;
-  result: string | null;
-  status: "ready" | "pending" | "completed" | "bye";
-  created_at: string;
-}
-
-interface MatchWithPlayers extends Match {
-  player1_name: string;
-  player2_name: string | null;
-  winner_name: string | null;
-}
-
-interface LeaderboardPlayer {
-  id: string;
-  name: string;
-  dropped: boolean;
-  dropped_at_round: number | null;
-  deck_pokemon1: number | null;
-  deck_pokemon2: number | null;
-}
 
 const TournamentLeaderboard: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -51,7 +25,7 @@ const TournamentLeaderboard: React.FC = () => {
   const { workspaceId, wPath } = useWorkspace();
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
   const [matches, setMatches] = useState<MatchWithPlayers[]>([]);
-  const [players, setPlayers] = useState<LeaderboardPlayer[]>([]);
+  const [players, setPlayers] = useState<TournamentPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -138,7 +112,7 @@ const TournamentLeaderboard: React.FC = () => {
           .from("tournament_players")
           .select("id, name, dropped, dropped_at_round, deck_pokemon1, deck_pokemon2")
           .eq("tournament_id", id);
-        setPlayers((allPlayersData as LeaderboardPlayer[]) ?? []);
+        setPlayers((allPlayersData as TournamentPlayer[]) ?? []);
 
         const matchesWithPlayers: MatchWithPlayers[] = matchesData.map(
           (match) => ({
@@ -167,7 +141,7 @@ const TournamentLeaderboard: React.FC = () => {
   const droppedMap = useMemo(() => {
     const m = new Map<string, number | null>();
     players.forEach((p) => {
-      if (p.dropped) m.set(p.id, p.dropped_at_round);
+      if (p.dropped) m.set(p.id, p.dropped_at_round ?? null);
     });
     return m;
   }, [players]);
@@ -176,7 +150,7 @@ const TournamentLeaderboard: React.FC = () => {
     const m = new Map<string, [number | null, number | null]>();
     players.forEach((p) => {
       if (p.deck_pokemon1 != null || p.deck_pokemon2 != null) {
-        m.set(p.id, [p.deck_pokemon1, p.deck_pokemon2]);
+        m.set(p.id, [p.deck_pokemon1 ?? null, p.deck_pokemon2 ?? null]);
       }
     });
     return m;

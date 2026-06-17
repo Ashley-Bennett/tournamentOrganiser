@@ -26,48 +26,8 @@ import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import StandingsTable from "../components/StandingsTable";
 import RoundTimer from "../components/RoundTimer";
-
-interface Tournament {
-  id: string;
-  name: string;
-  status: string;
-  num_rounds: number | null;
-  is_public: boolean;
-  round_duration_minutes?: number | null;
-  current_round_started_at?: string | null;
-  round_elapsed_seconds?: number | null;
-  round_is_paused?: boolean | null;
-  round_note?: string | null;
-}
-
-interface Player {
-  id: string;
-  name: string;
-  dropped: boolean;
-  dropped_at_round: number | null;
-  deck_pokemon1: number | null;
-  deck_pokemon2: number | null;
-}
-
-interface Match {
-  id: string;
-  tournament_id: string;
-  round_number: number;
-  match_number: number | null;
-  player1_id: string;
-  player2_id: string | null;
-  winner_id: string | null;
-  result: string | null;
-  temp_winner_id: string | null;
-  temp_result: string | null;
-  pairings_published: boolean;
-  status: "ready" | "pending" | "completed" | "bye";
-}
-
-interface MatchWithPlayers extends Match {
-  player1_name: string;
-  player2_name: string | null;
-}
+import { TournamentSummary, TournamentPlayer } from "../types/tournament";
+import { Match, MatchWithPlayers } from "../types/match";
 
 const TournamentPairings: React.FC = () => {
   // Handles two routes:
@@ -75,8 +35,8 @@ const TournamentPairings: React.FC = () => {
   //   /w/:workspaceSlug/tournaments/:id/pairings — authenticated workspace member
   const { publicSlug, id } = useParams<{ publicSlug?: string; id?: string }>();
   const navigate = useNavigate();
-  const [tournament, setTournament] = useState<Tournament | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [tournament, setTournament] = useState<TournamentSummary | null>(null);
+  const [players, setPlayers] = useState<TournamentPlayer[]>([]);
   const [matches, setMatches] = useState<MatchWithPlayers[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +60,7 @@ const TournamentPairings: React.FC = () => {
     let isMounted = true;
 
     const load = async () => {
-      let tData: Tournament | null = null;
+      let tData: TournamentSummary | null = null;
 
       if (id) {
         // Authenticated route — workspace membership RLS handles access (any privacy).
@@ -109,7 +69,7 @@ const TournamentPairings: React.FC = () => {
         const { data, error: tErr } = await supabase
           .from("tournaments")
           .select(
-            "id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
+            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
           )
           .eq("id", id)
           .maybeSingle();
@@ -125,7 +85,7 @@ const TournamentPairings: React.FC = () => {
         const { data, error: tErr } = await supabase
           .from("tournaments")
           .select(
-            "id, name, status, num_rounds, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
+            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
           )
           .eq("public_slug", publicSlug!)
           .eq("is_public", true)
@@ -141,6 +101,7 @@ const TournamentPairings: React.FC = () => {
         tData = data;
       }
 
+      if (!tData) return;
       setTournament(tData);
       resolvedTournamentIdRef.current = tData.id;
 
@@ -150,7 +111,7 @@ const TournamentPairings: React.FC = () => {
       // Fetch players
       const { data: pData, error: pErr } = await supabase
         .from("tournament_players")
-        .select("id, name, dropped, dropped_at_round, deck_pokemon1, deck_pokemon2")
+        .select("id, name, created_at, dropped, dropped_at_round, deck_pokemon1, deck_pokemon2")
         .eq("tournament_id", tournamentId);
 
       if (!isMounted) return;
@@ -167,7 +128,7 @@ const TournamentPairings: React.FC = () => {
       const { data: mData, error: mErr } = await supabase
         .from("tournament_matches")
         .select(
-          "id, tournament_id, round_number, match_number, player1_id, player2_id, winner_id, result, temp_winner_id, temp_result, pairings_published, status",
+          "id, tournament_id, round_number, match_number, player1_id, player2_id, winner_id, result, temp_winner_id, temp_result, pairings_published, status, confirmed_by, created_at",
         )
         .eq("tournament_id", tournamentId)
         .order("round_number", { ascending: true })
@@ -183,9 +144,8 @@ const TournamentPairings: React.FC = () => {
       const allEnriched: MatchWithPlayers[] = (mData ?? []).map((m) => ({
         ...m,
         player1_name: playerMap.get(m.player1_id) ?? "Unknown",
-        player2_name: m.player2_id
-          ? (playerMap.get(m.player2_id) ?? "Unknown")
-          : null,
+        player2_name: m.player2_id ? (playerMap.get(m.player2_id) ?? "Unknown") : null,
+        winner_name: m.winner_id ? (playerMap.get(m.winner_id) ?? "Unknown") : null,
       }));
 
       // Only expose matches that have been published or are in progress/complete
@@ -402,7 +362,7 @@ const TournamentPairings: React.FC = () => {
   const droppedMap = useMemo(() => {
     const m = new Map<string, number | null>();
     players.forEach((p) => {
-      if (p.dropped) m.set(p.id, p.dropped_at_round);
+      if (p.dropped) m.set(p.id, p.dropped_at_round ?? null);
     });
     return m;
   }, [players]);
@@ -411,7 +371,7 @@ const TournamentPairings: React.FC = () => {
     const m = new Map<string, [number | null, number | null]>();
     players.forEach((p) => {
       if (p.deck_pokemon1 != null || p.deck_pokemon2 != null) {
-        m.set(p.id, [p.deck_pokemon1, p.deck_pokemon2]);
+        m.set(p.id, [p.deck_pokemon1 ?? null, p.deck_pokemon2 ?? null]);
       }
     });
     return m;

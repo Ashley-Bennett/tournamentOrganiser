@@ -7,7 +7,7 @@ export interface TournamentSummary {
   name: string;
   status: string;
   tournament_type: "swiss" | "single_elimination";
-  num_rounds: number | null;
+  num_rounds?: number | null;
   created_at: string;
   created_by: string;
   is_public?: boolean;
