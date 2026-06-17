@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -16,6 +16,7 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
+  ListItemIcon,
   Tooltip,
 } from "@mui/material";
 import {
@@ -24,6 +25,9 @@ import {
   Menu as MenuIcon,
   LightMode as LightModeIcon,
   DarkMode as DarkModeIcon,
+  EmojiEventsOutlined as OrgIcon,
+  PersonOutline as PlayerIcon,
+  SwapHoriz as SwitchIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
@@ -33,13 +37,45 @@ const BORDER = "rgba(255,255,255,0.08)";
 const TEXT_MUTED = "rgba(255,255,255,0.6)";
 const ACCENT = "#dc004e";
 
+type ViewMode = "organiser" | "player";
+
+function viewModeKey(userId: string) {
+  return `tj_view_mode_${userId}`;
+}
+
 const Header: React.FC = () => {
-  const { user, logout, displayName } = useAuth();
+  const { user, profile, logout, displayName } = useAuth();
   const { workspace, workspaces, lastWorkspace, wPath } = useWorkspace();
   const { mode, toggleTheme } = useThemeMode();
   const navigate = useNavigate();
   const [wsMenuAnchor, setWsMenuAnchor] = useState<null | HTMLElement>(null);
+  const [modeMenuAnchor, setModeMenuAnchor] = useState<null | HTMLElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("organiser");
+
+  // Initialise view mode from localStorage, falling back to onboarding_intent
+  useEffect(() => {
+    if (!user) return;
+    const stored = localStorage.getItem(viewModeKey(user.id)) as ViewMode | null;
+    if (stored === "organiser" || stored === "player") {
+      setViewMode(stored);
+    } else {
+      setViewMode(profile?.onboarding_intent === "player" ? "player" : "organiser");
+    }
+  }, [user, profile?.onboarding_intent]);
+
+  const switchViewMode = (next: ViewMode) => {
+    if (!user) return;
+    setViewMode(next);
+    localStorage.setItem(viewModeKey(user.id), next);
+    setModeMenuAnchor(null);
+    setDrawerOpen(false);
+    if (next === "player") {
+      navigate("/my-tournaments");
+    } else {
+      navigate(activeWorkspace ? wPath("/tournaments") : "/dashboard");
+    }
+  };
 
   const activeWorkspace = workspace ?? lastWorkspace;
 
@@ -53,7 +89,13 @@ const Header: React.FC = () => {
     setDrawerOpen(false);
   };
 
-  const homeHref = activeWorkspace ? wPath("/tournaments") : "/dashboard";
+  const homeHref = user
+    ? viewMode === "player"
+      ? "/my-tournaments"
+      : activeWorkspace
+        ? wPath("/tournaments")
+        : "/dashboard"
+    : "/";
 
   const navBtnSx = {
     color: TEXT_MUTED,
@@ -61,6 +103,16 @@ const Header: React.FC = () => {
     fontWeight: 500,
     fontSize: "0.95rem",
     "&:hover": { color: "white", bgcolor: "transparent" },
+  };
+
+  const chipSx = {
+    color: TEXT_MUTED,
+    borderColor: "rgba(255,255,255,0.2)",
+    cursor: "pointer",
+    fontSize: "0.8rem",
+    "& .MuiChip-icon": { color: TEXT_MUTED },
+    "& .MuiChip-deleteIcon": { color: "rgba(255,255,255,0.4)" },
+    "&:hover": { borderColor: "rgba(255,255,255,0.45)", color: "white" },
   };
 
   return (
@@ -82,13 +134,9 @@ const Header: React.FC = () => {
           justifyContent="space-between"
           sx={{ py: 1.5 }}
         >
-          {/* ── Logo ────────────────────────────────────── */}
+          {/* ── Logo + context chips ─────────────────────── */}
           <Stack direction="row" alignItems="center" spacing={2}>
-            <Box
-              component={RouterLink}
-              to={user ? homeHref : "/"}
-              sx={{ textDecoration: "none" }}
-            >
+            <Box component={RouterLink} to={homeHref} sx={{ textDecoration: "none" }}>
               <Typography
                 variant="h6"
                 sx={{
@@ -102,8 +150,50 @@ const Header: React.FC = () => {
               </Typography>
             </Box>
 
-            {/* ── Workspace switcher ───────────────────── */}
-            {activeWorkspace && (
+            {/* ── View mode switcher (logged in only) ─── */}
+            {user && (
+              <>
+                <Chip
+                  icon={
+                    viewMode === "organiser"
+                      ? <OrgIcon sx={{ fontSize: "0.95rem !important" }} />
+                      : <PlayerIcon sx={{ fontSize: "0.95rem !important" }} />
+                  }
+                  label={viewMode === "organiser" ? "Organiser" : "Player"}
+                  deleteIcon={<ArrowDropDownIcon />}
+                  onDelete={(e) => setModeMenuAnchor(e.currentTarget as HTMLElement)}
+                  onClick={(e) => setModeMenuAnchor(e.currentTarget)}
+                  size="small"
+                  variant="outlined"
+                  sx={chipSx}
+                />
+                <Menu
+                  anchorEl={modeMenuAnchor}
+                  open={Boolean(modeMenuAnchor)}
+                  onClose={() => setModeMenuAnchor(null)}
+                  anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                  transformOrigin={{ vertical: "top", horizontal: "left" }}
+                >
+                  <MenuItem
+                    selected={viewMode === "organiser"}
+                    onClick={() => switchViewMode("organiser")}
+                  >
+                    <ListItemIcon><OrgIcon fontSize="small" /></ListItemIcon>
+                    Organiser
+                  </MenuItem>
+                  <MenuItem
+                    selected={viewMode === "player"}
+                    onClick={() => switchViewMode("player")}
+                  >
+                    <ListItemIcon><PlayerIcon fontSize="small" /></ListItemIcon>
+                    Player
+                  </MenuItem>
+                </Menu>
+              </>
+            )}
+
+            {/* ── Workspace switcher (organiser mode only) ─ */}
+            {user && viewMode === "organiser" && activeWorkspace && (
               <>
                 <Chip
                   icon={<WorkspaceIcon sx={{ fontSize: "0.95rem !important" }} />}
@@ -113,15 +203,7 @@ const Header: React.FC = () => {
                   onClick={(e) => setWsMenuAnchor(e.currentTarget)}
                   size="small"
                   variant="outlined"
-                  sx={{
-                    color: TEXT_MUTED,
-                    borderColor: "rgba(255,255,255,0.2)",
-                    cursor: "pointer",
-                    fontSize: "0.8rem",
-                    "& .MuiChip-icon": { color: TEXT_MUTED },
-                    "& .MuiChip-deleteIcon": { color: "rgba(255,255,255,0.4)" },
-                    "&:hover": { borderColor: "rgba(255,255,255,0.45)", color: "white" },
-                  }}
+                  sx={chipSx}
                 />
                 <Menu
                   anchorEl={wsMenuAnchor}
@@ -166,34 +248,52 @@ const Header: React.FC = () => {
                 spacing={0.5}
                 sx={{ display: { xs: "none", sm: "flex" } }}
               >
-                <Button component={RouterLink} to={wPath("/dashboard")} sx={navBtnSx}>
-                  Dashboard
-                </Button>
-                <Button component={RouterLink} to={wPath("/tournaments")} sx={navBtnSx}>
-                  Tournaments
-                </Button>
-                <Button component={RouterLink} to="/me" sx={navBtnSx}>
-                  My Profile
-                </Button>
-                <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
-                  What&apos;s New
-                </Button>
-
-                <Button
-                  variant="contained"
-                  onClick={() => navigate(wPath("/tournaments"), { state: { openCreate: true } })}
-                  sx={{
-                    ml: 1,
-                    bgcolor: ACCENT,
-                    "&:hover": { bgcolor: "#b8003f" },
-                    textTransform: "none",
-                    fontWeight: 600,
-                    borderRadius: "8px",
-                    fontSize: "0.9rem",
-                  }}
-                >
-                  Create Tournament
-                </Button>
+                {viewMode === "organiser" ? (
+                  <>
+                    <Button component={RouterLink} to={wPath("/dashboard")} sx={navBtnSx}>
+                      Dashboard
+                    </Button>
+                    <Button component={RouterLink} to={wPath("/tournaments")} sx={navBtnSx}>
+                      Tournaments
+                    </Button>
+                    <Button component={RouterLink} to="/me" sx={navBtnSx}>
+                      Account
+                    </Button>
+                    <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
+                      What&apos;s New
+                    </Button>
+                    <Button
+                      variant="contained"
+                      onClick={() => navigate(wPath("/tournaments"), { state: { openCreate: true } })}
+                      sx={{
+                        ml: 1,
+                        bgcolor: ACCENT,
+                        "&:hover": { bgcolor: "#b8003f" },
+                        textTransform: "none",
+                        fontWeight: 600,
+                        borderRadius: "8px",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      Create Tournament
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button component={RouterLink} to="/my-tournaments" sx={navBtnSx}>
+                      My Tournaments
+                    </Button>
+                    <Button component={RouterLink} to="/join" sx={navBtnSx}>
+                      Join Tournament
+                    </Button>
+                    <Button component={RouterLink} to="/me" sx={navBtnSx}>
+                      Account
+                    </Button>
+                    <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
+                      What&apos;s New
+                    </Button>
+                  </>
+                )}
 
                 <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                   <IconButton
@@ -240,35 +340,72 @@ const Header: React.FC = () => {
                   )}
                   <Divider />
                   <List disablePadding>
-                    <ListItem disablePadding>
-                      <ListItemButton onClick={() => handleNavClick(wPath("/dashboard"))}>
-                        <ListItemText primary="Dashboard" />
-                      </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                      <ListItemButton onClick={() => handleNavClick(wPath("/tournaments"))}>
-                        <ListItemText primary="Tournaments" />
-                      </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                      <ListItemButton onClick={() => handleNavClick("/me")}>
-                        <ListItemText primary="My Profile" />
-                      </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                      <ListItemButton onClick={() => handleNavClick("/whats-new")}>
-                        <ListItemText primary="What's New" />
-                      </ListItemButton>
-                    </ListItem>
+                    {viewMode === "organiser" ? (
+                      <>
+                        <ListItem disablePadding>
+                          <ListItemButton onClick={() => handleNavClick(wPath("/dashboard"))}>
+                            <ListItemText primary="Dashboard" />
+                          </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding>
+                          <ListItemButton onClick={() => handleNavClick(wPath("/tournaments"))}>
+                            <ListItemText primary="Tournaments" />
+                          </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding>
+                          <ListItemButton onClick={() => handleNavClick("/me")}>
+                            <ListItemText primary="Account" />
+                          </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding>
+                          <ListItemButton onClick={() => handleNavClick("/whats-new")}>
+                            <ListItemText primary="What's New" />
+                          </ListItemButton>
+                        </ListItem>
+                        <Divider sx={{ my: 1 }} />
+                        <ListItem disablePadding>
+                          <ListItemButton
+                            onClick={() => {
+                              setDrawerOpen(false);
+                              navigate(wPath("/tournaments"), { state: { openCreate: true } });
+                            }}
+                          >
+                            <ListItemText primary="Create Tournament" />
+                          </ListItemButton>
+                        </ListItem>
+                      </>
+                    ) : (
+                      <>
+                        <ListItem disablePadding>
+                          <ListItemButton onClick={() => handleNavClick("/my-tournaments")}>
+                            <ListItemText primary="My Tournaments" />
+                          </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding>
+                          <ListItemButton onClick={() => handleNavClick("/join")}>
+                            <ListItemText primary="Join Tournament" />
+                          </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding>
+                          <ListItemButton onClick={() => handleNavClick("/me")}>
+                            <ListItemText primary="Account" />
+                          </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding>
+                          <ListItemButton onClick={() => handleNavClick("/whats-new")}>
+                            <ListItemText primary="What's New" />
+                          </ListItemButton>
+                        </ListItem>
+                      </>
+                    )}
                     <Divider sx={{ my: 1 }} />
                     <ListItem disablePadding>
-                      <ListItemButton
-                        onClick={() => {
-                          setDrawerOpen(false);
-                          navigate(wPath("/tournaments"), { state: { openCreate: true } });
-                        }}
-                      >
-                        <ListItemText primary="Create Tournament" />
+                      <ListItemButton onClick={() => switchViewMode(viewMode === "organiser" ? "player" : "organiser")}>
+                        <ListItemIcon><SwitchIcon fontSize="small" /></ListItemIcon>
+                        <ListItemText
+                          primary={viewMode === "organiser" ? "Switch to Player view" : "Switch to Organiser view"}
+                          primaryTypographyProps={{ fontSize: "0.9rem" }}
+                        />
                       </ListItemButton>
                     </ListItem>
                     <Divider sx={{ my: 1 }} />

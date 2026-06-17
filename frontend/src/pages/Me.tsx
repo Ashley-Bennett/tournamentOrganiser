@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Box,
   Typography,
@@ -21,7 +21,6 @@ import {
 } from "@mui/material";
 import {
   PersonOutline as PersonIcon,
-  EmojiEventsOutlined as TrophyIcon,
   WorkspacesOutlined as WorkspaceIcon,
   DeleteOutlined as DeleteIcon,
   PeopleOutlined as PeopleIcon,
@@ -32,18 +31,6 @@ import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 import { supabase } from "../supabaseClient";
-
-interface PlayerEntry {
-  tournament_player_id: string;
-  tournament_id: string;
-  tournament_name: string;
-  tournament_status: string;
-  workspace_id: string;
-  workspace_name: string;
-  workspace_slug: string;
-  player_name: string;
-  joined_at: string;
-}
 
 interface MemberRow {
   user_id: string;
@@ -89,23 +76,6 @@ const Me = () => {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-
-  // Player entries (tournaments I'm linked to as a player)
-  const [playerEntries, setPlayerEntries] = useState<PlayerEntry[]>([]);
-  const [playerEntriesLoading, setPlayerEntriesLoading] = useState(true);
-  const [playerEntriesError, setPlayerEntriesError] = useState<string | null>(null);
-
-  useEffect(() => {
-    void (async () => {
-      const { data, error } = await supabase.rpc("get_my_player_entries");
-      if (error) {
-        setPlayerEntriesError(error.message);
-      } else {
-        setPlayerEntries((data as PlayerEntry[]) ?? []);
-      }
-      setPlayerEntriesLoading(false);
-    })();
-  }, []);
 
   // Members panel state — keyed by workspace id
   const [membersOpen, setMembersOpen] = useState<Record<string, boolean>>({});
@@ -275,7 +245,7 @@ const Me = () => {
   return (
     <Box maxWidth={640} mx="auto" mt={4}>
       <Typography variant="h4" gutterBottom>
-        My Profile
+        My Account
       </Typography>
 
       {/* ── Account ─────────────────────────────────────────── */}
@@ -634,80 +604,6 @@ const Me = () => {
           + New workspace
         </Button>
       </Stack>
-
-      <Divider sx={{ mb: 3 }} />
-
-      {/* ── My Tournaments ──────────────────────────────────── */}
-      <Stack id="my-tournaments" direction="row" spacing={1} alignItems="center" mb={2}>
-        <TrophyIcon sx={{ color: "text.secondary" }} />
-        <Typography variant="h6">My Tournaments</Typography>
-      </Stack>
-
-      {playerEntriesError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {playerEntriesError}
-        </Alert>
-      )}
-      {playerEntriesLoading ? (
-        <Box display="flex" justifyContent="center" py={3}>
-          <CircularProgress size={24} />
-        </Box>
-      ) : playerEntriesError ? null : playerEntries.length === 0 ? (
-        <Paper
-          variant="outlined"
-          sx={{ p: 4, textAlign: "center", backgroundColor: "action.hover" }}
-        >
-          <Typography variant="body1" color="text.secondary" gutterBottom>
-            No tournament history yet.
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Your entries will appear here once an organiser links you, or you
-            claim an entry from a link they send you.
-          </Typography>
-        </Paper>
-      ) : (
-        <Stack spacing={1.5} mb={3}>
-          {[...playerEntries]
-            .sort((a, b) => (a.tournament_status === "active" ? -1 : b.tournament_status === "active" ? 1 : 0))
-            .map((entry) => {
-              const isActive = entry.tournament_status === "active";
-              return (
-                <Paper
-                  key={entry.tournament_player_id}
-                  variant="outlined"
-                  component={RouterLink}
-                  to={`/t/${entry.tournament_id}/me`}
-                  sx={{
-                    p: 2,
-                    textDecoration: "none",
-                    display: "block",
-                    borderColor: isActive ? "primary.main" : undefined,
-                    "&:hover": { borderColor: "primary.main", bgcolor: "action.hover" },
-                    transition: "border-color 0.15s, background-color 0.15s",
-                  }}
-                >
-                  <Stack direction="row" alignItems="center" spacing={1.5}>
-                    <Box flexGrow={1}>
-                      <Typography variant="subtitle2" fontWeight={500}>
-                        {entry.tournament_name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {entry.workspace_name}
-                      </Typography>
-                    </Box>
-                    <Chip label="Player" size="small" color="info" />
-                    <Chip
-                      label={entry.tournament_status}
-                      size="small"
-                      color={isActive ? "success" : "default"}
-                      variant={isActive ? "filled" : "outlined"}
-                    />
-                  </Stack>
-                </Paper>
-              );
-            })}
-        </Stack>
-      )}
 
       {/* ── Delete confirmation dialog ───────────────────────── */}
       <Dialog

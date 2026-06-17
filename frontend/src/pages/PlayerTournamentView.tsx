@@ -21,6 +21,7 @@ import {
 import CatchingPokemonIcon from "@mui/icons-material/CatchingPokemon";
 import { supabase } from "../supabaseClient";
 import { getEntry, getAllEntries } from "../utils/playerStorage";
+import { useAuth } from "../AuthContext";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { getSpriteUrl } from "../utils/pokemonCache";
@@ -308,6 +309,7 @@ function MyMatchCard({
 
 const PlayerTournamentView: React.FC = () => {
   const { tournamentId } = useParams<{ tournamentId: string }>();
+  const { user } = useAuth();
 
   const [viewData, setViewData] = useState<ViewData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -703,6 +705,27 @@ const PlayerTournamentView: React.FC = () => {
   return (
     <Box>
       {header}
+
+      {!user && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2 }}
+          action={
+            <Box display="flex" gap={1} alignItems="center" flexShrink={0}>
+              <Button component={Link} to="/register" size="small" color="inherit" variant="outlined">
+                Sign up
+              </Button>
+              <Button component={Link} to="/login" size="small" color="inherit">
+                Log in
+              </Button>
+            </Box>
+          }
+        >
+          Your match history is saved on this device only — it may be cleared after 7 days.
+          Sign up to keep it forever.
+        </Alert>
+      )}
+
       {roundTabs}
 
       {tournament.round_note && (
