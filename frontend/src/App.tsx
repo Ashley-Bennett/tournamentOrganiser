@@ -2,6 +2,7 @@ import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Box, Container } from "@mui/material";
 import Header from "./components/Header";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Dashboard from "./pages/Dashboard";
 import Tournaments from "./pages/Tournaments";
 import CreateTournament from "./pages/CreateTournament";
@@ -72,7 +73,9 @@ function AppLayout({ children }: { children: React.ReactNode }) {
             minHeight: "100%",
           }}
         >
-          {children}
+          <ErrorBoundary section="page">
+            {children}
+          </ErrorBoundary>
         </Container>
       </Box>
     </Box>

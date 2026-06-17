@@ -74,6 +74,7 @@ import {
 } from "../types/match";
 import StandingsTable from "../components/StandingsTable";
 import RoundTimer from "../components/RoundTimer";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 const TournamentMatches: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -1198,6 +1199,7 @@ const TournamentMatches: React.FC = () => {
                     }
                   />
                 </Tabs>
+                <ErrorBoundary section="matches">
                 <Box sx={{ p: 3 }}>
                   {((): ReactNode => {
                     // Standings tab
@@ -3370,6 +3372,7 @@ const TournamentMatches: React.FC = () => {
                     );
                   })()}
                 </Box>
+                </ErrorBoundary>
               </>
             );
           })()}
