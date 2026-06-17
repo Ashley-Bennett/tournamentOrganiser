@@ -1,4 +1,7 @@
 import "@fontsource/roboto/300.css";
+if (import.meta.env.DEV) {
+  import("./devTools").then(({ installDevTools }) => installDevTools());
+}
 import "@fontsource/roboto/400.css";
 import "@fontsource/roboto/500.css";
 import "@fontsource/roboto/700.css";
