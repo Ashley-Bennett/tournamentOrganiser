@@ -334,8 +334,11 @@ interface DbEntry {
   tournament_status: string;
   workspace_name: string;
   player_name: string;
+  joined_at: string;
   player_position: number | null;
   total_players: number | null;
+  match_wins: number;
+  total_matches: number;
   deck_pokemon1: number | null;
   deck_pokemon2: number | null;
 }
@@ -358,6 +361,9 @@ interface PlayerRow {
   status: string | null;
   playerPosition: number | null;
   totalPlayers: number | null;
+  joinedAt: string | null;
+  matchWins: number;
+  totalMatches: number;
   isLinked: boolean;
   playerId?: string;
   deviceToken?: string;
@@ -374,9 +380,6 @@ const PlayerDashboard: React.FC = () => {
   const [summaries, setSummaries] = useState<PlayerTournamentSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [claimingId, setClaimingId] = useState<string | null>(null);
-  const [claimErrors, setClaimErrors] = useState<Record<string, string>>({});
-  const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
   const initialLoadDoneRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -418,12 +421,15 @@ const PlayerDashboard: React.FC = () => {
       status: e.tournament_status,
       playerPosition: e.player_position ?? null,
       totalPlayers: e.total_players ?? null,
+      joinedAt: e.joined_at,
+      matchWins: e.match_wins,
+      totalMatches: e.total_matches,
       isLinked: true,
       deckPokemon1: e.deck_pokemon1 ?? null,
       deckPokemon2: e.deck_pokemon2 ?? null,
     }));
     const deviceRows: PlayerRow[] = deviceEntries.flatMap((e) => {
-      if (linkedIds.has(e.tournamentId) || claimedIds.has(e.tournamentId)) return [];
+      if (linkedIds.has(e.tournamentId)) return [];
       const summary = summaries.find((s) => s.tournament_id === e.tournamentId);
       if (!loading && !summary) return [];
       return [{
@@ -433,6 +439,9 @@ const PlayerDashboard: React.FC = () => {
         status: summary?.status ?? null,
         playerPosition: summary?.player_position ?? null,
         totalPlayers: summary?.total_players ?? null,
+        joinedAt: e.joinedAt,
+        matchWins: 0,
+        totalMatches: 0,
         isLinked: false,
         playerId: e.playerId,
         deviceToken: e.deviceToken,
@@ -445,32 +454,21 @@ const PlayerDashboard: React.FC = () => {
       if (b.status === "active" && a.status !== "active") return 1;
       return 0;
     });
-  }, [dbEntries, deviceEntries, summaries, linkedIds, claimedIds, loading]);
-
-  const handleClaim = async (row: PlayerRow) => {
-    if (!row.playerId || !row.deviceToken) return;
-    setClaimingId(row.tournamentId);
-    setClaimErrors((prev) => ({ ...prev, [row.tournamentId]: "" }));
-    const { error: claimErr } = await supabase.rpc("self_claim_player_entry", {
-      p_tournament_player_id: row.playerId,
-      p_device_token: row.deviceToken,
-    });
-    setClaimingId(null);
-    if (claimErr && !claimErr.message.includes("already linked")) {
-      setClaimErrors((prev) => ({ ...prev, [row.tournamentId]: claimErr.message }));
-      return;
-    }
-    setClaimedIds((prev) => new Set([...prev, row.tournamentId]));
-    void load();
-  };
+  }, [dbEntries, deviceEntries, summaries, linkedIds, loading]);
 
   const activeRow = rows.find((r) => r.status === "active") ?? null;
-  const recentRows = rows.slice(0, 5);
+  const recentRows = useMemo(() =>
+    [...rows]
+      .sort((a, b) => (b.joinedAt ?? "").localeCompare(a.joinedAt ?? ""))
+      .slice(0, 5),
+    [rows],
+  );
   const completedRows = rows.filter((r) => r.status === "completed");
   const totalCompleted = completedRows.length;
   const totalWins = completedRows.filter((r) => r.playerPosition === 1).length;
-  const winRate = totalCompleted > 0 ? Math.round((totalWins / totalCompleted) * 100) : null;
-  const unlinkedCount = rows.filter((r) => !r.isLinked).length;
+  const allMatchWins = rows.reduce((sum, r) => sum + r.matchWins, 0);
+  const allTotalMatches = rows.reduce((sum, r) => sum + r.totalMatches, 0);
+  const winRate = allTotalMatches > 0 ? Math.round((allMatchWins / allTotalMatches) * 100) : null;
 
   const favDeck = useMemo(() => {
     const counts = new Map<string, { count: number; p1: number | null; p2: number | null }>();
@@ -523,11 +521,6 @@ const PlayerDashboard: React.FC = () => {
         </Alert>
       )}
 
-      {user && !loading && unlinkedCount > 0 && (
-        <Alert severity="info" sx={{ mb: 3 }}>
-          {unlinkedCount} tournament{unlinkedCount !== 1 ? "s are" : " is"} saved on this device only — link {unlinkedCount !== 1 ? "them" : "it"} to keep your history safe.
-        </Alert>
-      )}
 
       {/* Active tournament spotlight */}
       {(loading || activeRow) && (
@@ -566,19 +559,7 @@ const PlayerDashboard: React.FC = () => {
                         )}
                       </Box>
                     </Box>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <Chip label="Active" color="success" size="small" />
-                      {!activeRow.isLinked && user && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          disabled={claimingId === activeRow.tournamentId}
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); void handleClaim(activeRow); }}
-                        >
-                          {claimingId === activeRow.tournamentId ? "Linking…" : "Link"}
-                        </Button>
-                      )}
-                    </Box>
+                    <Chip label="Active" color="success" size="small" />
                   </Box>
                 </CardContent>
               </CardActionArea>
@@ -611,7 +592,6 @@ const PlayerDashboard: React.FC = () => {
             recentRows.map((row, i) => {
               const isCompleted = row.status === "completed";
               const hasPosition = isCompleted && row.playerPosition != null && row.totalPlayers != null;
-              const claimError = claimErrors[row.tournamentId];
               return (
                 <React.Fragment key={row.tournamentId}>
                   <CardActionArea
@@ -626,30 +606,16 @@ const PlayerDashboard: React.FC = () => {
                           {row.workspaceName ?? ""}
                           {hasPosition ? ` · ${row.playerPosition}${ordinal(row.playerPosition!)} of ${row.totalPlayers}` : ""}
                         </Typography>
-                        {claimError && (
-                          <Typography variant="caption" color="error">{claimError}</Typography>
-                        )}
                       </Box>
-                      <Box display="flex" alignItems="center" gap={1} flexShrink={0}>
-                        {row.status && (
-                          <Chip
-                            label={row.status}
-                            size="small"
-                            color={row.status === "active" ? "success" : "default"}
-                            variant={row.status === "active" ? "filled" : "outlined"}
-                          />
-                        )}
-                        {!row.isLinked && user && (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            disabled={claimingId === row.tournamentId}
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); void handleClaim(row); }}
-                          >
-                            {claimingId === row.tournamentId ? "Linking…" : "Link"}
-                          </Button>
-                        )}
-                      </Box>
+                      {row.status && (
+                        <Chip
+                          label={row.status}
+                          size="small"
+                          color={row.status === "active" ? "success" : "default"}
+                          variant={row.status === "active" ? "filled" : "outlined"}
+                          sx={{ flexShrink: 0 }}
+                        />
+                      )}
                     </Box>
                   </CardActionArea>
                   {i < recentRows.length - 1 && <Divider />}
