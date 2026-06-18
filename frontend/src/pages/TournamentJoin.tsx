@@ -19,12 +19,14 @@ import {
   saveEntry,
   clearEntry,
 } from "../utils/playerStorage";
+import { useAuth } from "../AuthContext";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function TournamentJoin() {
   const { tournamentId } = useParams<{ tournamentId: string }>();
   const navigate = useNavigate();
+  const { profile } = useAuth();
 
   const [pageState, setPageState] = useState<
     "loading" | "open" | "closed" | "not_found"
@@ -81,9 +83,10 @@ export default function TournamentJoin() {
         return;
       }
 
-      // Pre-fill name from device profile
-      const profile = getProfile();
-      if (profile.name) setNameInput(profile.name);
+      // Pre-fill name: prefer logged-in display name, fall back to device profile
+      const deviceProfile = getProfile();
+      const prefill = profile?.display_name || deviceProfile.name;
+      if (prefill) setNameInput(prefill);
 
       setPageState("open");
     })();
@@ -94,12 +97,12 @@ export default function TournamentJoin() {
     setSubmitting(true);
     setError(null);
 
-    const profile = getProfile();
+    const deviceProfile = getProfile();
 
     const { data, error: rpcError } = await supabase.rpc("self_join_tournament", {
       p_tournament_id: tournamentId,
       p_player_name: nameInput.trim(),
-      p_device_id: profile.deviceId,
+      p_device_id: deviceProfile.deviceId,
     });
 
     if (rpcError) {
@@ -117,7 +120,7 @@ export default function TournamentJoin() {
     };
 
     saveEntry(tournamentId, entry);
-    saveProfile(nameInput.trim(), (profile as TjProfile).deviceId);
+    saveProfile(nameInput.trim(), (deviceProfile as TjProfile).deviceId);
 
     navigate(`/t/${tournamentId}/me`, { replace: true });
   };
