@@ -24,7 +24,9 @@ import {
   OpenInNew as OpenInNewIcon,
   PlayArrow as ResumeIcon,
   Ballot as TotalIcon,
-  SportsScore as ActivePlayerIcon,
+  WorkspacePremium as WinIcon,
+  ShowChart as WinRateIcon,
+  Style as DeckIcon,
 } from "@mui/icons-material";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
@@ -33,6 +35,8 @@ import { useAuth } from "../AuthContext";
 import { TournamentSummary } from "../types/tournament";
 import { formatDate } from "../utils/format";
 import { getAllEntries } from "../utils/playerStorage";
+import { getSpriteUrl } from "../utils/pokemonCache";
+import NormalizedSprite from "../components/NormalizedSprite";
 
 type View = "organiser" | "player";
 
@@ -330,6 +334,10 @@ interface DbEntry {
   tournament_status: string;
   workspace_name: string;
   player_name: string;
+  player_position: number | null;
+  total_players: number | null;
+  deck_pokemon1: number | null;
+  deck_pokemon2: number | null;
 }
 
 interface PlayerTournamentSummary {
@@ -339,6 +347,8 @@ interface PlayerTournamentSummary {
   status: string;
   player_position: number | null;
   total_players: number | null;
+  deck_pokemon1: number | null;
+  deck_pokemon2: number | null;
 }
 
 interface PlayerRow {
@@ -351,6 +361,8 @@ interface PlayerRow {
   isLinked: boolean;
   playerId?: string;
   deviceToken?: string;
+  deckPokemon1: number | null;
+  deckPokemon2: number | null;
 }
 
 const PlayerDashboard: React.FC = () => {
@@ -404,9 +416,11 @@ const PlayerDashboard: React.FC = () => {
       tournamentName: e.tournament_name,
       workspaceName: e.workspace_name,
       status: e.tournament_status,
-      playerPosition: null,
-      totalPlayers: null,
+      playerPosition: e.player_position ?? null,
+      totalPlayers: e.total_players ?? null,
       isLinked: true,
+      deckPokemon1: e.deck_pokemon1 ?? null,
+      deckPokemon2: e.deck_pokemon2 ?? null,
     }));
     const deviceRows: PlayerRow[] = deviceEntries.flatMap((e) => {
       if (linkedIds.has(e.tournamentId) || claimedIds.has(e.tournamentId)) return [];
@@ -422,6 +436,8 @@ const PlayerDashboard: React.FC = () => {
         isLinked: false,
         playerId: e.playerId,
         deviceToken: e.deviceToken,
+        deckPokemon1: summary?.deck_pokemon1 ?? null,
+        deckPokemon2: summary?.deck_pokemon2 ?? null,
       }];
     });
     return [...dbRows, ...deviceRows].sort((a, b) => {
@@ -450,9 +466,23 @@ const PlayerDashboard: React.FC = () => {
 
   const activeRow = rows.find((r) => r.status === "active") ?? null;
   const recentRows = rows.slice(0, 5);
-  const totalActive = rows.filter((r) => r.status === "active").length;
-  const totalCompleted = rows.filter((r) => r.status === "completed").length;
+  const completedRows = rows.filter((r) => r.status === "completed");
+  const totalCompleted = completedRows.length;
+  const totalWins = completedRows.filter((r) => r.playerPosition === 1).length;
+  const winRate = totalCompleted > 0 ? Math.round((totalWins / totalCompleted) * 100) : null;
   const unlinkedCount = rows.filter((r) => !r.isLinked).length;
+
+  const favDeck = useMemo(() => {
+    const counts = new Map<string, { count: number; p1: number | null; p2: number | null }>();
+    for (const row of rows) {
+      if (row.deckPokemon1 == null && row.deckPokemon2 == null) continue;
+      const key = `${row.deckPokemon1 ?? ""}_${row.deckPokemon2 ?? ""}`;
+      const entry = counts.get(key);
+      if (entry) entry.count++;
+      else counts.set(key, { count: 1, p1: row.deckPokemon1, p2: row.deckPokemon2 });
+    }
+    return [...counts.values()].sort((a, b) => b.count - a.count)[0] ?? null;
+  }, [rows]);
 
   return (
     <Box>
@@ -635,52 +665,66 @@ const PlayerDashboard: React.FC = () => {
         Stats
       </Typography>
       <Grid container spacing={2}>
-        {[
+        {([
           {
-            label: "Tournaments Joined",
-            value: rows.length,
-            icon: <TotalIcon />,
-            color: "text.primary" as const,
-          },
-          {
-            label: "Active",
-            value: totalActive,
-            icon: <ActivePlayerIcon color="success" />,
+            label: "Completed",
+            value: String(totalCompleted),
+            icon: <TrophyIcon color="success" />,
             color: "success.main" as const,
           },
           {
-            label: "Completed",
-            value: totalCompleted,
-            icon: <TrophyIcon color="warning" />,
+            label: "Won",
+            value: String(totalWins),
+            icon: <WinIcon color="warning" />,
             color: "warning.main" as const,
           },
           {
-            label: "On This Device",
-            value: deviceEntries.length,
-            icon: <PeopleIcon color="secondary" />,
-            color: "secondary.main" as const,
+            label: "Win Rate",
+            value: winRate != null ? `${winRate}%` : "—",
+            icon: <WinRateIcon color="info" />,
+            color: winRate != null ? "info.main" as const : "text.disabled" as const,
           },
-        ].map(({ label, value, icon, color }) => (
+        ] as const).map(({ label, value, icon, color }) => (
           <Grid item xs={6} sm={3} key={label}>
             <Card variant="outlined" sx={{ height: "100%" }}>
               <CardContent sx={{ pb: "16px !important" }}>
                 <Box display="flex" alignItems="center" gap={1} mb={1}>
                   {icon}
-                  <Typography variant="body2" color="text.secondary">
-                    {label}
-                  </Typography>
+                  <Typography variant="body2" color="text.secondary">{label}</Typography>
                 </Box>
                 {loading ? (
                   <Skeleton variant="text" width={48} height={44} />
                 ) : (
-                  <Typography variant="h4" fontWeight="bold" color={color}>
-                    {value}
-                  </Typography>
+                  <Typography variant="h4" fontWeight="bold" color={color}>{value}</Typography>
                 )}
               </CardContent>
             </Card>
           </Grid>
         ))}
+        <Grid item xs={6} sm={3}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
+            <CardContent sx={{ pb: "16px !important" }}>
+              <Box display="flex" alignItems="center" gap={1} mb={1}>
+                <DeckIcon color="secondary" />
+                <Typography variant="body2" color="text.secondary">Favourite Deck</Typography>
+              </Box>
+              {loading ? (
+                <Skeleton variant="text" width={72} height={44} />
+              ) : favDeck ? (
+                <Box display="flex" alignItems="center" gap={0.5} mt={0.5}>
+                  {favDeck.p1 != null && (
+                    <NormalizedSprite src={getSpriteUrl(favDeck.p1)} size={40} />
+                  )}
+                  {favDeck.p2 != null && (
+                    <NormalizedSprite src={getSpriteUrl(favDeck.p2)} size={40} />
+                  )}
+                </Box>
+              ) : (
+                <Typography variant="h4" fontWeight="bold" color="text.disabled">—</Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
     </Box>
   );
