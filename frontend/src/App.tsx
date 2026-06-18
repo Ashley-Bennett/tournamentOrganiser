@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Box, Container } from "@mui/material";
 import Header from "./components/Header";
@@ -28,6 +28,37 @@ import JoinLanding from "./pages/JoinLanding";
 import WhatsNew from "./pages/WhatsNew";
 import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
+import { getAllEntries } from "./utils/playerStorage";
+import { supabase } from "./supabaseClient";
+
+// Silently claims any localStorage tournament entries for the logged-in user.
+// Runs once per session per user — guards against re-running with sessionStorage.
+// This ensures entries are saved to the account regardless of which onboarding
+// path the user took (e.g., chose "organiser" and never saw the claim prompt).
+function AutoClaimer() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    const sessionKey = `auto_claimed_${user.id}`;
+    if (sessionStorage.getItem(sessionKey)) return;
+    sessionStorage.setItem(sessionKey, "1");
+
+    const entries = getAllEntries();
+    if (entries.length === 0) return;
+
+    void (async () => {
+      for (const entry of entries) {
+        await supabase.rpc("self_claim_player_entry", {
+          p_tournament_player_id: entry.playerId,
+          p_device_token: entry.deviceToken,
+        });
+      }
+    })();
+  }, [user]);
+
+  return null;
+}
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
@@ -85,6 +116,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <WorkspaceProvider>
+      <AutoClaimer />
       <Routes>
         {/* ── Landing: full-screen, own nav ───────────────────────── */}
         <Route path="/" element={<RootRoute />} />
