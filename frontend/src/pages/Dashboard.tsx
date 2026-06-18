@@ -468,7 +468,7 @@ const PlayerDashboard: React.FC = () => {
   const totalWins = completedRows.filter((r) => r.playerPosition === 1).length;
   const allMatchWins = rows.reduce((sum, r) => sum + r.matchWins, 0);
   const allTotalMatches = rows.reduce((sum, r) => sum + r.totalMatches, 0);
-  const winRate = allTotalMatches > 0 ? Math.round((allMatchWins / allTotalMatches) * 100) : null;
+  const winRate = allTotalMatches > 0 ? parseFloat(((allMatchWins / allTotalMatches) * 100).toFixed(1)) : null;
 
   const favDeck = useMemo(() => {
     const counts = new Map<string, { count: number; p1: number | null; p2: number | null }>();
@@ -696,6 +696,13 @@ const PlayerDashboard: React.FC = () => {
   );
 };
 
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
+
 const Dashboard: React.FC = () => {
   const { user, profile } = useAuth();
   const intent: View = profile?.onboarding_intent ?? "organiser";
@@ -725,8 +732,13 @@ const Dashboard: React.FC = () => {
   const tabIndex = tabs.findIndex((t) => t.view === activeView);
   const currentTabIndex = tabIndex === -1 ? 0 : tabIndex;
 
+  const name = profile?.display_name ?? user?.email?.split("@")[0] ?? null;
+
   return (
     <Box>
+      <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
+        {getGreeting()}{name ? `, ${name}` : ""}
+      </Typography>
       <Tabs
         value={currentTabIndex}
         onChange={handleTabChange}

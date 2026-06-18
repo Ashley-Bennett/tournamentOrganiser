@@ -614,9 +614,7 @@ const PlayerTournamentView: React.FC = () => {
         to="/my-tournaments"
         sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { textDecoration: "underline" }, mb: 0.75, display: "inline-block" }}
       >
-        {otherTournaments.length > 0
-          ? `← My tournaments (${otherTournaments.length + 1} on this device)`
-          : "← My tournaments"}
+        ← My tournaments
       </Typography>
       <Box display="flex" alignItems="center" gap={1} mb={0.25}>
         <Typography variant="h5" fontWeight={700}>
@@ -686,7 +684,7 @@ const PlayerTournamentView: React.FC = () => {
       <Box>
         {header}
         {roundTabs}
-        <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap} currentPlayerId={entry?.playerId} />
+        <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap} currentPlayerId={entry?.playerId} showTiebreakers={tournamentStatus === "completed"} />
         <Box textAlign="center" mt={2}>
           <LiveIndicator isLive={liveStatus === "SUBSCRIBED"} />
         </Box>

@@ -26,6 +26,8 @@ interface Props {
   deckMap?: Map<string, [number | null, number | null]>;
   /** Optional: highlight this player's row as "you" */
   currentPlayerId?: string;
+  /** Show OMW%/OOMW% columns on mobile (always visible on sm+) */
+  showTiebreakers?: boolean;
 }
 
 const getRankDisplay = (rank: number): string => {
@@ -61,6 +63,7 @@ interface ChunkTableProps {
   /** horizontal cell padding override (MUI spacing units) */
   cellPx?: number;
   currentPlayerId?: string;
+  showTiebreakers?: boolean;
 }
 
 const ChunkTable: React.FC<ChunkTableProps> = ({
@@ -72,6 +75,7 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
   cellPy,
   cellPx,
   currentPlayerId,
+  showTiebreakers,
 }) => (
   <Paper sx={{ overflow: "hidden", height: "100%" }}>
     <TableContainer>
@@ -95,10 +99,10 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
             <TableCell sx={{ fontWeight: "bold" }} align="right">
               Pts
             </TableCell>
-            <TableCell sx={{ fontWeight: "bold", display: { xs: "none", sm: "table-cell" } }} align="right">
+            <TableCell sx={{ fontWeight: "bold", display: { xs: showTiebreakers ? "table-cell" : "none", sm: "table-cell" } }} align="right">
               OMW%
             </TableCell>
-            <TableCell sx={{ fontWeight: "bold", display: { xs: "none", sm: "table-cell" } }} align="right">
+            <TableCell sx={{ fontWeight: "bold", display: { xs: showTiebreakers ? "table-cell" : "none", sm: "table-cell" } }} align="right">
               OOMW%
             </TableCell>
           </TableRow>
@@ -221,12 +225,12 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                     {player.matchPoints}
                   </Typography>
                 </TableCell>
-                <TableCell align="right" sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                <TableCell align="right" sx={{ display: { xs: showTiebreakers ? "table-cell" : "none", sm: "table-cell" } }}>
                   <Typography variant="body2">
                     {(player.opponentMatchWinPercentage * 100).toFixed(1)}%
                   </Typography>
                 </TableCell>
-                <TableCell align="right" sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                <TableCell align="right" sx={{ display: { xs: showTiebreakers ? "table-cell" : "none", sm: "table-cell" } }}>
                   <Typography variant="body2">
                     {(player.opponentOpponentMatchWinPercentage * 100).toFixed(1)}%
                   </Typography>
@@ -240,7 +244,7 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
   </Paper>
 );
 
-const StandingsTable: React.FC<Props> = ({ standings, droppedMap, deckMap, currentPlayerId }) => {
+const StandingsTable: React.FC<Props> = ({ standings, droppedMap, deckMap, currentPlayerId, showTiebreakers }) => {
   const theme = useTheme();
   const isMd = useMediaQuery(theme.breakpoints.up("md"));
   const isLg = useMediaQuery(theme.breakpoints.up("lg"));
@@ -285,6 +289,7 @@ const StandingsTable: React.FC<Props> = ({ standings, droppedMap, deckMap, curre
             cellPy={cellPy}
             cellPx={cellPx}
             currentPlayerId={currentPlayerId}
+            showTiebreakers={showTiebreakers}
           />
         </Box>
       ))}
