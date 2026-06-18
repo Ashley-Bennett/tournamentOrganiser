@@ -82,6 +82,12 @@ interface ViewData {
 
 type SubmitStatus = "submitted" | "agreed" | "conflict" | null;
 
+interface InsightsData {
+  went_first: boolean | null;
+  opponent_deck_pokemon1: number | null;
+  opponent_deck_pokemon2: number | null;
+}
+
 // ── MyMatchCard ───────────────────────────────────────────────────────────────
 
 function MyMatchCard({
@@ -90,28 +96,24 @@ function MyMatchCard({
   myReport,
   entry,
   onRefresh,
-  opponentDeckP1,
-  opponentDeckP2,
+  existingInsights,
+  onOpenInsights,
+  showInsightsPrompt,
 }: {
   match: MatchWithNames | null;
   playerId: string;
   myReport: { reported_outcome: "win" | "loss" | "draw" } | null;
   entry: { playerId: string; deviceToken: string } | null;
   onRefresh: () => void;
-  opponentDeckP1: number | null;
-  opponentDeckP2: number | null;
+  existingInsights: InsightsData | null;
+  onOpenInsights: () => void;
+  showInsightsPrompt: boolean;
 }) {
-  const { user } = useAuth();
   const [selectedOutcome, setSelectedOutcome] = useState<"win" | "loss" | "draw" | null>(null);
   const [undone, setUndone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [insightsOpen, setInsightsOpen] = useState(false);
-
-  const insightsDismissed = match
-    ? localStorage.getItem(`insights_dismissed_${match.id}`) === "1"
-    : true;
 
   const prevReportOutcomeRef = useRef(myReport?.reported_outcome);
 
@@ -261,16 +263,23 @@ function MyMatchCard({
                 <Button size="small" variant="outlined" onClick={handleUndo}>
                   Undo
                 </Button>
-                {user && !insightsDismissed && (
-                  <Button
-                    size="small"
-                    variant="text"
-                    color="secondary"
-                    onClick={() => setInsightsOpen(true)}
-                    sx={{ fontStyle: "italic" }}
-                  >
-                    Want better stats? Answer 2 quick questions →
-                  </Button>
+                {showInsightsPrompt && (
+                  existingInsights
+                    ? (
+                      <Button size="small" variant="text" color="secondary" onClick={onOpenInsights}>
+                        Edit answers
+                      </Button>
+                    ) : (
+                      <Button
+                        size="small"
+                        variant="text"
+                        color="secondary"
+                        onClick={onOpenInsights}
+                        sx={{ fontStyle: "italic" }}
+                      >
+                        Want better stats? Answer 2 quick questions →
+                      </Button>
+                    )
                 )}
               </Box>
             </Box>
@@ -315,29 +324,29 @@ function MyMatchCard({
       )}
 
       {isCompleted && (
-        <Typography variant="body2" color="text.secondary">
-          Result confirmed by your organiser.
-        </Typography>
+        <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
+          <Typography variant="body2" color="text.secondary">
+            Result confirmed by your organiser.
+          </Typography>
+          {showInsightsPrompt && (
+            existingInsights
+              ? (
+                <Button size="small" variant="text" color="secondary" onClick={onOpenInsights}>
+                  Edit answers
+                </Button>
+              ) : (
+                <Button size="small" variant="text" color="secondary" onClick={onOpenInsights} sx={{ fontStyle: "italic" }}>
+                  Add match insights →
+                </Button>
+              )
+          )}
+        </Box>
       )}
 
       {match.status === "ready" && (
         <Typography variant="body2" color="text.secondary">
           Waiting for round to start…
         </Typography>
-      )}
-
-      {user && (
-        <MatchInsightsModal
-          open={insightsOpen}
-          matchId={match.id}
-          opponentPrefilledPokemon1={opponentDeckP1}
-          opponentPrefilledPokemon2={opponentDeckP2}
-          onClose={() => setInsightsOpen(false)}
-          onDismiss={() => {
-            localStorage.setItem(`insights_dismissed_${match.id}`, "1");
-            setInsightsOpen(false);
-          }}
-        />
       )}
     </Paper>
   );
@@ -355,6 +364,14 @@ const PlayerTournamentView: React.FC = () => {
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [deckPickerOpen, setDeckPickerOpen] = useState(false);
   const [liveStatus, setLiveStatus] = useState<string>("connecting");
+  const [insightsMap, setInsightsMap] = useState<Map<string, InsightsData>>(new Map());
+  const [insightsTarget, setInsightsTarget] = useState<{
+    matchId: string;
+    wentFirst: boolean | null;
+    oppP1: number | null;
+    oppP2: number | null;
+    isEditing: boolean;
+  } | null>(null);
 
   const didInitRoundRef = useRef(false);
   const initialRoundsLoadedRef = useRef(false);
@@ -519,6 +536,29 @@ const PlayerTournamentView: React.FC = () => {
     });
     if (fresh) setViewData(fresh as ViewData);
   }, [tournamentId, entry]);
+
+  const loadInsights = useCallback(async (matchIds: string[]) => {
+    if (!user || matchIds.length === 0) return;
+    const { data } = await supabase
+      .from("match_insights")
+      .select("match_id, went_first, opponent_deck_pokemon1, opponent_deck_pokemon2")
+      .in("match_id", matchIds);
+    const map = new Map<string, InsightsData>();
+    (data ?? []).forEach((row: { match_id: string; went_first: boolean | null; opponent_deck_pokemon1: number | null; opponent_deck_pokemon2: number | null }) => {
+      map.set(row.match_id, {
+        went_first: row.went_first,
+        opponent_deck_pokemon1: row.opponent_deck_pokemon1,
+        opponent_deck_pokemon2: row.opponent_deck_pokemon2,
+      });
+    });
+    setInsightsMap(map);
+  }, [user]);
+
+  useEffect(() => {
+    if (!viewData || !user) return;
+    const ids = viewData.matches.map((m) => m.id);
+    void loadInsights(ids);
+  }, [viewData, user, loadInsights]);
 
   // ── Derived state (all hooks must be before any conditional returns) ─────────
 
@@ -777,24 +817,24 @@ const PlayerTournamentView: React.FC = () => {
         myReport={my_report}
         entry={entry}
         onRefresh={() => void handleRefresh()}
-        opponentDeckP1={
-          myRoundMatch
-            ? (deckMap.get(
-                myRoundMatch.player1_id === player.id
-                  ? (myRoundMatch.player2_id ?? "")
-                  : myRoundMatch.player1_id
-              )?.[0] ?? null)
-            : null
-        }
-        opponentDeckP2={
-          myRoundMatch
-            ? (deckMap.get(
-                myRoundMatch.player1_id === player.id
-                  ? (myRoundMatch.player2_id ?? "")
-                  : myRoundMatch.player1_id
-              )?.[1] ?? null)
-            : null
-        }
+        existingInsights={myRoundMatch ? (insightsMap.get(myRoundMatch.id) ?? null) : null}
+        showInsightsPrompt={!!user && !!myRoundMatch && myRoundMatch.player2_id !== null && myRoundMatch.status !== "bye"}
+        onOpenInsights={() => {
+          if (!myRoundMatch) return;
+          const oppId = myRoundMatch.player1_id === player.id
+            ? (myRoundMatch.player2_id ?? "")
+            : myRoundMatch.player1_id;
+          const existing = insightsMap.get(myRoundMatch.id) ?? null;
+          const tournamentOppP1 = deckMap.get(oppId)?.[0] ?? null;
+          const tournamentOppP2 = deckMap.get(oppId)?.[1] ?? null;
+          setInsightsTarget({
+            matchId: myRoundMatch.id,
+            wentFirst: existing?.went_first ?? null,
+            oppP1: existing?.opponent_deck_pokemon1 ?? tournamentOppP1,
+            oppP2: existing?.opponent_deck_pokemon2 ?? tournamentOppP2,
+            isEditing: existing !== null,
+          });
+        }}
       />
 
       {/* Full pairings */}
@@ -907,9 +947,32 @@ const PlayerTournamentView: React.FC = () => {
                       {isBye ? (
                         <Chip label="BYE" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
                       ) : isCompleted || hasTempResult ? (
-                        <Typography variant="caption" sx={{ fontWeight: 600, fontSize: "0.82rem", opacity: hasTempResult ? 0.7 : 1 }}>
-                          {displayResult ?? "—"}
-                        </Typography>
+                        <Box display="flex" flexDirection="column" alignItems="flex-end" gap={0.5}>
+                          <Typography variant="caption" sx={{ fontWeight: 600, fontSize: "0.82rem", opacity: hasTempResult ? 0.7 : 1 }}>
+                            {displayResult ?? "—"}
+                          </Typography>
+                          {isMyRow && !isBye && isCompleted && user && (
+                            <Button
+                              size="small"
+                              variant="text"
+                              color={insightsMap.has(m.id) ? "secondary" : "inherit"}
+                              onClick={() => {
+                                const oppId = m.player1_id === player.id ? (m.player2_id ?? "") : m.player1_id;
+                                const existing = insightsMap.get(m.id) ?? null;
+                                setInsightsTarget({
+                                  matchId: m.id,
+                                  wentFirst: existing?.went_first ?? null,
+                                  oppP1: existing?.opponent_deck_pokemon1 ?? deckMap.get(oppId)?.[0] ?? null,
+                                  oppP2: existing?.opponent_deck_pokemon2 ?? deckMap.get(oppId)?.[1] ?? null,
+                                  isEditing: existing !== null,
+                                });
+                              }}
+                              sx={{ fontSize: "0.65rem", height: 18, minWidth: 0, px: 0.75, py: 0, lineHeight: 1 }}
+                            >
+                              {insightsMap.has(m.id) ? "Edit insights" : "Add insights"}
+                            </Button>
+                          )}
+                        </Box>
                       ) : isConflict ? (
                         <Chip
                           label="Conflict"
@@ -966,6 +1029,23 @@ const PlayerTournamentView: React.FC = () => {
         initialPokemon2={viewData?.player.deck_pokemon2 ?? null}
         onSave={handleSaveDeck}
       />
+
+      {user && insightsTarget && (
+        <MatchInsightsModal
+          open={true}
+          matchId={insightsTarget.matchId}
+          initialWentFirst={insightsTarget.wentFirst}
+          initialOppPokemon1={insightsTarget.oppP1}
+          initialOppPokemon2={insightsTarget.oppP2}
+          isEditing={insightsTarget.isEditing}
+          onClose={() => {
+            const ids = viewData?.matches.map((m) => m.id) ?? [];
+            void loadInsights(ids);
+            setInsightsTarget(null);
+          }}
+          onDismiss={() => setInsightsTarget(null)}
+        />
+      )}
     </Box>
   );
 };

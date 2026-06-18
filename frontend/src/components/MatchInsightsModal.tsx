@@ -19,8 +19,6 @@ import {
   type PokemonEntry,
 } from "../utils/pokemonCache";
 
-// ── Inline Pokemon slot (read-only display) ───────────────────────────────────
-
 function PokemonSlot({
   label,
   pokemonId,
@@ -82,24 +80,26 @@ function PokemonSlot({
   );
 }
 
-// ── Props ──────────────────────────────────────────────────────────────────────
-
 interface Props {
   open: boolean;
   matchId: string;
-  opponentPrefilledPokemon1: number | null;
-  opponentPrefilledPokemon2: number | null;
+  // Pre-fill values — pass existing saved insights if any; opponent tournament entry as fallback for deck
+  initialWentFirst: boolean | null;
+  initialOppPokemon1: number | null;
+  initialOppPokemon2: number | null;
+  // True when we're editing existing saved answers (changes the title/note)
+  isEditing: boolean;
   onClose: () => void;
   onDismiss: () => void;
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
-
 const MatchInsightsModal: React.FC<Props> = ({
   open,
   matchId,
-  opponentPrefilledPokemon1,
-  opponentPrefilledPokemon2,
+  initialWentFirst,
+  initialOppPokemon1,
+  initialOppPokemon2,
+  isEditing,
   onClose,
   onDismiss,
 }) => {
@@ -112,19 +112,15 @@ const MatchInsightsModal: React.FC<Props> = ({
   const [listLoading, setListLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [prefilledNote, setPrefilledNote] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setWentFirst(null);
+    setWentFirst(initialWentFirst);
+    setOppP1(initialOppPokemon1);
+    setOppP2(initialOppPokemon2);
     setError(null);
     setSearch("");
-
-    const hadPrefill = opponentPrefilledPokemon1 != null || opponentPrefilledPokemon2 != null;
-    setOppP1(opponentPrefilledPokemon1);
-    setOppP2(opponentPrefilledPokemon2);
-    setPrefilledNote(hadPrefill);
-    setActiveSlot(hadPrefill ? 1 : 1);
+    setActiveSlot(1);
 
     if (allPokemon.length > 0) return;
     setListLoading(true);
@@ -179,12 +175,14 @@ const MatchInsightsModal: React.FC<Props> = ({
   return (
     <Dialog open={open} onClose={onDismiss} maxWidth="xs" fullWidth>
       <DialogTitle sx={{ pb: 0.5 }}>
-        Improve your stats
+        {isEditing ? "Edit match insights" : "Improve your stats"}
       </DialogTitle>
       <DialogContent>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Answer two quick questions to unlock richer stats — first/second win rates, matchup data, and more.
-        </Typography>
+        {!isEditing && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Answer two quick questions to unlock richer stats — first/second win rates, matchup data, and more.
+          </Typography>
+        )}
 
         {/* Q1: went first */}
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -207,7 +205,7 @@ const MatchInsightsModal: React.FC<Props> = ({
         <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
           What deck did your opponent play?
         </Typography>
-        {prefilledNote && (
+        {!isEditing && (initialOppPokemon1 != null || initialOppPokemon2 != null) && (
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
             Pre-filled from their entry — correct it if wrong.
           </Typography>
@@ -274,7 +272,7 @@ const MatchInsightsModal: React.FC<Props> = ({
 
       <DialogActions sx={{ px: 2, pb: 2, justifyContent: "space-between" }}>
         <Button onClick={onDismiss} color="inherit" size="small">
-          Skip for now
+          {isEditing ? "Cancel" : "Skip for now"}
         </Button>
         <Button
           variant="contained"
