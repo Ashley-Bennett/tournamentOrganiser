@@ -627,9 +627,14 @@ const PlayerDashboard: React.FC = () => {
       </Box>
 
       {/* Stats */}
-      <Typography variant="overline" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-        Stats
-      </Typography>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+        <Typography variant="overline" color="text.secondary">
+          Stats
+        </Typography>
+        <Button component={Link} to="/stats" size="small" variant="text" color="primary">
+          View full stats
+        </Button>
+      </Box>
       <Grid container spacing={2}>
         {([
           {

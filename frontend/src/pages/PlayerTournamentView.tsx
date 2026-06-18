@@ -28,6 +28,7 @@ import { getSpriteUrl } from "../utils/pokemonCache";
 import StandingsTable from "../components/StandingsTable";
 import DeckPickerDialog from "../components/DeckPickerDialog";
 import LiveIndicator from "../components/LiveIndicator";
+import MatchInsightsModal from "../components/MatchInsightsModal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -89,18 +90,28 @@ function MyMatchCard({
   myReport,
   entry,
   onRefresh,
+  opponentDeckP1,
+  opponentDeckP2,
 }: {
   match: MatchWithNames | null;
   playerId: string;
   myReport: { reported_outcome: "win" | "loss" | "draw" } | null;
   entry: { playerId: string; deviceToken: string } | null;
   onRefresh: () => void;
+  opponentDeckP1: number | null;
+  opponentDeckP2: number | null;
 }) {
+  const { user } = useAuth();
   const [selectedOutcome, setSelectedOutcome] = useState<"win" | "loss" | "draw" | null>(null);
   const [undone, setUndone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [insightsOpen, setInsightsOpen] = useState(false);
+
+  const insightsDismissed = match
+    ? localStorage.getItem(`insights_dismissed_${match.id}`) === "1"
+    : true;
 
   const prevReportOutcomeRef = useRef(myReport?.reported_outcome);
 
@@ -246,9 +257,22 @@ function MyMatchCard({
                   Waiting for the organiser to confirm…
                 </Typography>
               )}
-              <Button size="small" variant="outlined" onClick={handleUndo}>
-                Undo
-              </Button>
+              <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                <Button size="small" variant="outlined" onClick={handleUndo}>
+                  Undo
+                </Button>
+                {user && !insightsDismissed && (
+                  <Button
+                    size="small"
+                    variant="text"
+                    color="secondary"
+                    onClick={() => setInsightsOpen(true)}
+                    sx={{ fontStyle: "italic" }}
+                  >
+                    Want better stats? Answer 2 quick questions →
+                  </Button>
+                )}
+              </Box>
             </Box>
           ) : (
             /* ── Selection mode ── */
@@ -300,6 +324,20 @@ function MyMatchCard({
         <Typography variant="body2" color="text.secondary">
           Waiting for round to start…
         </Typography>
+      )}
+
+      {user && (
+        <MatchInsightsModal
+          open={insightsOpen}
+          matchId={match.id}
+          opponentPrefilledPokemon1={opponentDeckP1}
+          opponentPrefilledPokemon2={opponentDeckP2}
+          onClose={() => setInsightsOpen(false)}
+          onDismiss={() => {
+            localStorage.setItem(`insights_dismissed_${match.id}`, "1");
+            setInsightsOpen(false);
+          }}
+        />
       )}
     </Paper>
   );
@@ -739,6 +777,24 @@ const PlayerTournamentView: React.FC = () => {
         myReport={my_report}
         entry={entry}
         onRefresh={() => void handleRefresh()}
+        opponentDeckP1={
+          myRoundMatch
+            ? (deckMap.get(
+                myRoundMatch.player1_id === player.id
+                  ? (myRoundMatch.player2_id ?? "")
+                  : myRoundMatch.player1_id
+              )?.[0] ?? null)
+            : null
+        }
+        opponentDeckP2={
+          myRoundMatch
+            ? (deckMap.get(
+                myRoundMatch.player1_id === player.id
+                  ? (myRoundMatch.player2_id ?? "")
+                  : myRoundMatch.player1_id
+              )?.[1] ?? null)
+            : null
+        }
       />
 
       {/* Full pairings */}

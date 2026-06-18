@@ -26,6 +26,7 @@ import PlayerTournamentView from "./pages/PlayerTournamentView";
 import DeviceTournaments from "./pages/DeviceTournaments";
 import JoinLanding from "./pages/JoinLanding";
 import WhatsNew from "./pages/WhatsNew";
+import PlayerStats from "./pages/PlayerStats";
 import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 import { getAllEntries } from "./utils/playerStorage";
@@ -147,6 +148,16 @@ function App() {
 
                 {/* ── What's New ───────────────────────────────── */}
                 <Route path="/whats-new" element={<WhatsNew />} />
+
+                {/* ── Player stats ─────────────────────────────── */}
+                <Route
+                  path="/stats"
+                  element={
+                    <RequireAuth>
+                      <PlayerStats />
+                    </RequireAuth>
+                  }
+                />
 
                 {/* ── Post-signup onboarding ───────────────────── */}
                 <Route
