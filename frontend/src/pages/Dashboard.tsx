@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Grid,
   Card,
@@ -89,11 +89,13 @@ const OrganiserDashboard: React.FC = () => {
   const [activeTournament, setActiveTournament] = useState<TournamentSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const initialLoadDoneRef = useRef(false);
 
   const fetchDashboard = useCallback(async () => {
     if (!workspaceId) return;
+    const isInitialLoad = !initialLoadDoneRef.current;
     try {
-      setLoading(true);
+      if (isInitialLoad) setLoading(true);
       setError(null);
 
       const [{ data: tournaments, error: tErr }, { count: totalParticipants, error: pErr }] =
@@ -130,10 +132,11 @@ const OrganiserDashboard: React.FC = () => {
         completedTournaments: completed.length,
         totalTournaments: all.length,
       });
+      initialLoadDoneRef.current = true;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard");
     } finally {
-      setLoading(false);
+      if (isInitialLoad) setLoading(false);
     }
   }, [workspaceId]);
 
@@ -141,7 +144,7 @@ const OrganiserDashboard: React.FC = () => {
     if (!workspaceLoading) void fetchDashboard();
   }, [workspaceLoading, fetchDashboard]);
 
-  const isLoading = workspaceLoading || loading;
+  const isLoading = loading;
 
   return (
     <Box>
@@ -362,9 +365,11 @@ const PlayerDashboard: React.FC = () => {
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [claimErrors, setClaimErrors] = useState<Record<string, string>>({});
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
+  const initialLoadDoneRef = useRef(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const isInitialLoad = !initialLoadDoneRef.current;
+    if (isInitialLoad) setLoading(true);
     setError(null);
     const [entriesResult, summariesResult] = await Promise.all([
       user
@@ -384,8 +389,9 @@ const PlayerDashboard: React.FC = () => {
     } else {
       setDbEntries((entriesResult.data as DbEntry[]) ?? []);
       setSummaries((summariesResult.data as PlayerTournamentSummary[]) ?? []);
+      initialLoadDoneRef.current = true;
     }
-    setLoading(false);
+    if (isInitialLoad) setLoading(false);
   }, [user, deviceEntries]);
 
   useEffect(() => { void load(); }, [load]);
@@ -513,8 +519,7 @@ const PlayerDashboard: React.FC = () => {
               }}
             >
               <CardActionArea
-                component={activeRow.isLinked || !user ? Link : "div"}
-                to={activeRow.isLinked || !user ? `/t/${activeRow.tournamentId}/me` : undefined}
+                onClick={() => navigate(`/t/${activeRow.tournamentId}/me`)}
               >
                 <CardContent>
                   <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
@@ -580,8 +585,7 @@ const PlayerDashboard: React.FC = () => {
               return (
                 <React.Fragment key={row.tournamentId}>
                   <CardActionArea
-                    component={row.isLinked || !user ? Link : "div"}
-                    to={row.isLinked || !user ? `/t/${row.tournamentId}/me` : undefined}
+                    onClick={() => navigate(`/t/${row.tournamentId}/me`)}
                   >
                     <Box px={2} py={1.5} display="flex" alignItems="center" justifyContent="space-between" gap={1}>
                       <Box minWidth={0}>
