@@ -4,7 +4,6 @@ import { Box, Container } from "@mui/material";
 import Header from "./components/Header";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Dashboard from "./pages/Dashboard";
-import Home from "./pages/Home";
 import Tournaments from "./pages/Tournaments";
 import CreateTournament from "./pages/CreateTournament";
 import TournamentView from "./pages/TournamentView";
@@ -170,7 +169,7 @@ function App() {
                   path="/w/:workspaceSlug/dashboard"
                   element={
                     <RequireAuth>
-                      <Home />
+                      <Dashboard />
                     </RequireAuth>
                   }
                 />
