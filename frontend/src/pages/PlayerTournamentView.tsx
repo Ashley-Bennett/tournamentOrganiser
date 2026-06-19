@@ -326,6 +326,7 @@ const PlayerTournamentView: React.FC = () => {
   const [deckPickerOpen, setDeckPickerOpen] = useState(false);
   const [liveStatus, setLiveStatus] = useState<string>("connecting");
   const [insightsMap, setInsightsMap] = useState<Map<string, InsightsData>>(new Map());
+  const [oppWentFirstMap, setOppWentFirstMap] = useState<Map<string, boolean | null>>(new Map());
   const [insightsTarget, setInsightsTarget] = useState<{
     matchId: string;
     wentFirst: boolean | null;
@@ -501,12 +502,15 @@ const PlayerTournamentView: React.FC = () => {
 
   const loadInsights = useCallback(async (matchIds: string[]) => {
     if (!user || matchIds.length === 0) return;
-    const { data } = await supabase
-      .from("match_insights")
-      .select("match_id, went_first, opponent_deck_pokemon1, opponent_deck_pokemon2")
-      .in("match_id", matchIds);
+    const [{ data: myData }, { data: oppData }] = await Promise.all([
+      supabase
+        .from("match_insights")
+        .select("match_id, went_first, opponent_deck_pokemon1, opponent_deck_pokemon2")
+        .in("match_id", matchIds),
+      supabase.rpc("get_opponent_went_first", { p_match_ids: matchIds }),
+    ]);
     const map = new Map<string, InsightsData>();
-    (data ?? []).forEach((row: { match_id: string; went_first: boolean | null; opponent_deck_pokemon1: number | null; opponent_deck_pokemon2: number | null }) => {
+    (myData ?? []).forEach((row: { match_id: string; went_first: boolean | null; opponent_deck_pokemon1: number | null; opponent_deck_pokemon2: number | null }) => {
       map.set(row.match_id, {
         went_first: row.went_first,
         opponent_deck_pokemon1: row.opponent_deck_pokemon1,
@@ -514,6 +518,11 @@ const PlayerTournamentView: React.FC = () => {
       });
     });
     setInsightsMap(map);
+    const oppMap = new Map<string, boolean | null>();
+    (oppData ?? []).forEach((row: { match_id: string; went_first: boolean | null }) => {
+      oppMap.set(row.match_id, row.went_first);
+    });
+    setOppWentFirstMap(oppMap);
   }, [user]);
 
   useEffect(() => {
@@ -781,8 +790,9 @@ const PlayerTournamentView: React.FC = () => {
         onRefresh={() => void handleRefresh()}
       />
 
-      {/* Match insights prompt — shown after player submits a result, between match card and pairings */}
-      {user && my_report && myRoundMatch && myRoundMatch.player2_id !== null && myRoundMatch.status !== "bye" && (() => {
+      {/* Match insights prompt — shown after player submits a result (or match is already completed for past rounds) */}
+      {user && myRoundMatch && myRoundMatch.player2_id !== null && myRoundMatch.status !== "bye"
+        && (my_report !== null || myRoundMatch.status === "completed") && (() => {
         const oppId = myRoundMatch.player1_id === player.id
           ? (myRoundMatch.player2_id ?? "")
           : myRoundMatch.player1_id;
@@ -790,10 +800,13 @@ const PlayerTournamentView: React.FC = () => {
         const matchCompleted = myRoundMatch.status === "completed";
         const oppHasDeck = (deckMap.get(oppId)?.[0] ?? null) !== null || (deckMap.get(oppId)?.[1] ?? null) !== null;
         const oppDeckLocked = oppHasDeck && !matchCompleted;
+        // Derive went_first from opponent's saved insight (inverted) if we haven't set our own yet
+        const oppWentFirst = oppWentFirstMap.get(myRoundMatch.id) ?? null;
+        const derivedWentFirst = existing?.went_first ?? (oppWentFirst !== null ? !oppWentFirst : null);
         const openInsights = () => {
           setInsightsTarget({
             matchId: myRoundMatch.id,
-            wentFirst: existing?.went_first ?? null,
+            wentFirst: derivedWentFirst,
             // Don't pre-fill from deckMap while opponent deck is locked — only use player's own saved values
             oppP1: existing?.opponent_deck_pokemon1 ?? (oppDeckLocked ? null : deckMap.get(oppId)?.[0] ?? null),
             oppP2: existing?.opponent_deck_pokemon2 ?? (oppDeckLocked ? null : deckMap.get(oppId)?.[1] ?? null),
