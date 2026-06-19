@@ -96,18 +96,12 @@ function MyMatchCard({
   myReport,
   entry,
   onRefresh,
-  existingInsights,
-  onOpenInsights,
-  showInsightsPrompt,
 }: {
   match: MatchWithNames | null;
   playerId: string;
   myReport: { reported_outcome: "win" | "loss" | "draw" } | null;
   entry: { playerId: string; deviceToken: string } | null;
   onRefresh: () => void;
-  existingInsights: InsightsData | null;
-  onOpenInsights: () => void;
-  showInsightsPrompt: boolean;
 }) {
   const [selectedOutcome, setSelectedOutcome] = useState<"win" | "loss" | "draw" | null>(null);
   const [undone, setUndone] = useState(false);
@@ -259,29 +253,9 @@ function MyMatchCard({
                   Waiting for the organiser to confirm…
                 </Typography>
               )}
-              <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-                <Button size="small" variant="outlined" onClick={handleUndo}>
-                  Undo
-                </Button>
-                {showInsightsPrompt && (
-                  existingInsights
-                    ? (
-                      <Button size="small" variant="text" color="secondary" onClick={onOpenInsights}>
-                        Edit answers
-                      </Button>
-                    ) : (
-                      <Button
-                        size="small"
-                        variant="text"
-                        color="secondary"
-                        onClick={onOpenInsights}
-                        sx={{ fontStyle: "italic" }}
-                      >
-                        Want better stats? Answer 2 quick questions →
-                      </Button>
-                    )
-                )}
-              </Box>
+              <Button size="small" variant="outlined" onClick={handleUndo}>
+                Undo
+              </Button>
             </Box>
           ) : (
             /* ── Selection mode ── */
@@ -324,23 +298,9 @@ function MyMatchCard({
       )}
 
       {isCompleted && (
-        <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
-          <Typography variant="body2" color="text.secondary">
-            Result confirmed by your organiser.
-          </Typography>
-          {showInsightsPrompt && (
-            existingInsights
-              ? (
-                <Button size="small" variant="text" color="secondary" onClick={onOpenInsights}>
-                  Edit answers
-                </Button>
-              ) : (
-                <Button size="small" variant="text" color="secondary" onClick={onOpenInsights} sx={{ fontStyle: "italic" }}>
-                  Add match insights →
-                </Button>
-              )
-          )}
-        </Box>
+        <Typography variant="body2" color="text.secondary">
+          Result confirmed by your organiser.
+        </Typography>
       )}
 
       {match.status === "ready" && (
@@ -817,25 +777,50 @@ const PlayerTournamentView: React.FC = () => {
         myReport={my_report}
         entry={entry}
         onRefresh={() => void handleRefresh()}
-        existingInsights={myRoundMatch ? (insightsMap.get(myRoundMatch.id) ?? null) : null}
-        showInsightsPrompt={!!user && !!myRoundMatch && myRoundMatch.player2_id !== null && myRoundMatch.status !== "bye"}
-        onOpenInsights={() => {
-          if (!myRoundMatch) return;
-          const oppId = myRoundMatch.player1_id === player.id
-            ? (myRoundMatch.player2_id ?? "")
-            : myRoundMatch.player1_id;
-          const existing = insightsMap.get(myRoundMatch.id) ?? null;
-          const tournamentOppP1 = deckMap.get(oppId)?.[0] ?? null;
-          const tournamentOppP2 = deckMap.get(oppId)?.[1] ?? null;
+      />
+
+      {/* Match insights prompt — shown between match card and pairings when eligible */}
+      {user && myRoundMatch && myRoundMatch.player2_id !== null && myRoundMatch.status !== "bye" && (() => {
+        const oppId = myRoundMatch.player1_id === player.id
+          ? (myRoundMatch.player2_id ?? "")
+          : myRoundMatch.player1_id;
+        const existing = insightsMap.get(myRoundMatch.id) ?? null;
+        const openInsights = () => {
           setInsightsTarget({
             matchId: myRoundMatch.id,
             wentFirst: existing?.went_first ?? null,
-            oppP1: existing?.opponent_deck_pokemon1 ?? tournamentOppP1,
-            oppP2: existing?.opponent_deck_pokemon2 ?? tournamentOppP2,
+            oppP1: existing?.opponent_deck_pokemon1 ?? deckMap.get(oppId)?.[0] ?? null,
+            oppP2: existing?.opponent_deck_pokemon2 ?? deckMap.get(oppId)?.[1] ?? null,
             isEditing: existing !== null,
           });
-        }}
-      />
+        };
+        return (
+          <Paper
+            variant="outlined"
+            sx={{ px: 2.5, py: 1.5, mb: 2, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}
+          >
+            {existing ? (
+              <>
+                <Typography variant="body2" color="text.secondary">
+                  Match insights saved{existing.went_first !== null ? ` · Went ${existing.went_first ? "first" : "second"}` : ""}
+                </Typography>
+                <Button size="small" variant="text" color="secondary" onClick={openInsights}>
+                  Edit insights
+                </Button>
+              </>
+            ) : (
+              <>
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                  Want better stats? Answer 2 quick questions
+                </Typography>
+                <Button size="small" variant="outlined" color="secondary" onClick={openInsights}>
+                  Add insights
+                </Button>
+              </>
+            )}
+          </Paper>
+        );
+      })()}
 
       {/* Full pairings */}
       <Paper variant="outlined">
@@ -947,32 +932,9 @@ const PlayerTournamentView: React.FC = () => {
                       {isBye ? (
                         <Chip label="BYE" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
                       ) : isCompleted || hasTempResult ? (
-                        <Box display="flex" flexDirection="column" alignItems="flex-end" gap={0.5}>
-                          <Typography variant="caption" sx={{ fontWeight: 600, fontSize: "0.82rem", opacity: hasTempResult ? 0.7 : 1 }}>
-                            {displayResult ?? "—"}
-                          </Typography>
-                          {isMyRow && !isBye && isCompleted && user && (
-                            <Button
-                              size="small"
-                              variant="text"
-                              color={insightsMap.has(m.id) ? "secondary" : "inherit"}
-                              onClick={() => {
-                                const oppId = m.player1_id === player.id ? (m.player2_id ?? "") : m.player1_id;
-                                const existing = insightsMap.get(m.id) ?? null;
-                                setInsightsTarget({
-                                  matchId: m.id,
-                                  wentFirst: existing?.went_first ?? null,
-                                  oppP1: existing?.opponent_deck_pokemon1 ?? deckMap.get(oppId)?.[0] ?? null,
-                                  oppP2: existing?.opponent_deck_pokemon2 ?? deckMap.get(oppId)?.[1] ?? null,
-                                  isEditing: existing !== null,
-                                });
-                              }}
-                              sx={{ fontSize: "0.65rem", height: 18, minWidth: 0, px: 0.75, py: 0, lineHeight: 1 }}
-                            >
-                              {insightsMap.has(m.id) ? "Edit insights" : "Add insights"}
-                            </Button>
-                          )}
-                        </Box>
+                        <Typography variant="caption" sx={{ fontWeight: 600, fontSize: "0.82rem", opacity: hasTempResult ? 0.7 : 1 }}>
+                          {displayResult ?? "—"}
+                        </Typography>
                       ) : isConflict ? (
                         <Chip
                           label="Conflict"
