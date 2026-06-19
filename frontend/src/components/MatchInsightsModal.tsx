@@ -89,6 +89,8 @@ interface Props {
   initialOppPokemon2: number | null;
   // True when we're editing existing saved answers (changes the title/note)
   isEditing: boolean;
+  // True when opponent has a registered deck that is hidden until the round result is confirmed
+  oppDeckLocked: boolean;
   onClose: () => void;
   onDismiss: () => void;
 }
@@ -100,6 +102,7 @@ const MatchInsightsModal: React.FC<Props> = ({
   initialOppPokemon1,
   initialOppPokemon2,
   isEditing,
+  oppDeckLocked,
   onClose,
   onDismiss,
 }) => {
@@ -205,67 +208,91 @@ const MatchInsightsModal: React.FC<Props> = ({
         <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
           What deck did your opponent play?
         </Typography>
-        {!isEditing && (initialOppPokemon1 != null || initialOppPokemon2 != null) && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-            Pre-filled from their entry — correct it if wrong.
-          </Typography>
-        )}
 
-        <Box display="flex" gap={1} mb={1.5}>
-          <PokemonSlot
-            label="Slot 1"
-            pokemonId={oppP1}
-            pokemonName={getName(oppP1)}
-            active={activeSlot === 1}
-            onClick={() => setActiveSlot(1)}
-            onClear={() => { setOppP1(null); setActiveSlot(1); }}
-          />
-          <PokemonSlot
-            label="Slot 2"
-            pokemonId={oppP2}
-            pokemonName={getName(oppP2)}
-            active={activeSlot === 2}
-            onClick={() => setActiveSlot(2)}
-            onClear={() => { setOppP2(null); setActiveSlot(2); }}
-          />
-        </Box>
-
-        <input
-          placeholder={`Search slot ${activeSlot}…`}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            width: "100%", padding: "6px 10px", boxSizing: "border-box",
-            border: "1px solid #ccc", borderRadius: 4, fontSize: 14,
-          }}
-        />
-
-        <Box mt={0.5} minHeight={40}>
-          {listLoading && (
-            <Box display="flex" justifyContent="center" py={1}>
-              <CircularProgress size={18} />
-            </Box>
-          )}
-          {!listLoading && searchResults.map((entry) => (
-            <Box
-              key={entry.id}
-              onClick={() => handleSelect(entry)}
-              sx={{
-                display: "flex", alignItems: "center", gap: 1,
-                px: 1, py: 0.5, cursor: "pointer", borderRadius: 1,
-                "&:hover": { bgcolor: "action.hover" },
-              }}
-            >
-              <img src={getSpriteUrl(entry.id)} alt="" style={{ width: 28, height: 28, imageRendering: "pixelated" }} />
-              <Typography variant="body2">{entry.displayName}</Typography>
-            </Box>
-          ))}
-          {!listLoading && search.trim().length > 0 && searchResults.length === 0 && (
-            <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
-              No Pokémon found.
+        {oppDeckLocked ? (
+          <Box
+            sx={{
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 2,
+              px: 2,
+              py: 1.5,
+              mb: 1.5,
+              bgcolor: "action.hover",
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>
+              🔒 Opponent's deck is hidden until the round result is confirmed. You can add it here afterwards.
             </Typography>
-          )}
-        </Box>
+          </Box>
+        ) : (
+          <>
+            {!isEditing && (initialOppPokemon1 != null || initialOppPokemon2 != null) && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                Pre-filled from their entry — correct it if wrong.
+              </Typography>
+            )}
+
+            <Box display="flex" gap={1} mb={1.5}>
+              <PokemonSlot
+                label="Slot 1"
+                pokemonId={oppP1}
+                pokemonName={getName(oppP1)}
+                active={activeSlot === 1}
+                onClick={() => setActiveSlot(1)}
+                onClear={() => { setOppP1(null); setActiveSlot(1); }}
+              />
+              <PokemonSlot
+                label="Slot 2"
+                pokemonId={oppP2}
+                pokemonName={getName(oppP2)}
+                active={activeSlot === 2}
+                onClick={() => setActiveSlot(2)}
+                onClear={() => { setOppP2(null); setActiveSlot(2); }}
+              />
+            </Box>
+
+            <input
+              placeholder={`Search slot ${activeSlot}…`}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                width: "100%", padding: "6px 10px", boxSizing: "border-box",
+                border: "1px solid #ccc", borderRadius: 4, fontSize: 14,
+              }}
+            />
+
+            <Box mt={0.5} minHeight={40}>
+              {listLoading && (
+                <Box display="flex" justifyContent="center" py={1}>
+                  <CircularProgress size={18} />
+                </Box>
+              )}
+              {!listLoading && searchResults.map((entry) => (
+                <Box
+                  key={entry.id}
+                  onClick={() => handleSelect(entry)}
+                  sx={{
+                    display: "flex", alignItems: "center", gap: 1,
+                    px: 1, py: 0.5, cursor: "pointer", borderRadius: 1,
+                    "&:hover": { bgcolor: "action.hover" },
+                  }}
+                >
+                  <img src={getSpriteUrl(entry.id)} alt="" style={{ width: 28, height: 28, imageRendering: "pixelated" }} />
+                  <Typography variant="body2">{entry.displayName}</Typography>
+                </Box>
+              ))}
+              {!listLoading && search.trim().length > 0 && searchResults.length === 0 && (
+                <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
+                  No Pokémon found.
+                </Typography>
+              )}
+            </Box>
+          </>
+        )}
 
         {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
       </DialogContent>

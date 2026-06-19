@@ -29,6 +29,7 @@ import StandingsTable from "../components/StandingsTable";
 import DeckPickerDialog from "../components/DeckPickerDialog";
 import LiveIndicator from "../components/LiveIndicator";
 import MatchInsightsModal from "../components/MatchInsightsModal";
+import NormalizedSprite from "../components/NormalizedSprite";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -331,6 +332,7 @@ const PlayerTournamentView: React.FC = () => {
     oppP1: number | null;
     oppP2: number | null;
     isEditing: boolean;
+    oppDeckLocked: boolean;
   } | null>(null);
 
   const didInitRoundRef = useRef(false);
@@ -779,31 +781,52 @@ const PlayerTournamentView: React.FC = () => {
         onRefresh={() => void handleRefresh()}
       />
 
-      {/* Match insights prompt — shown between match card and pairings when eligible */}
-      {user && myRoundMatch && myRoundMatch.player2_id !== null && myRoundMatch.status !== "bye" && (() => {
+      {/* Match insights prompt — shown after player submits a result, between match card and pairings */}
+      {user && my_report && myRoundMatch && myRoundMatch.player2_id !== null && myRoundMatch.status !== "bye" && (() => {
         const oppId = myRoundMatch.player1_id === player.id
           ? (myRoundMatch.player2_id ?? "")
           : myRoundMatch.player1_id;
         const existing = insightsMap.get(myRoundMatch.id) ?? null;
+        const matchCompleted = myRoundMatch.status === "completed";
+        const oppHasDeck = (deckMap.get(oppId)?.[0] ?? null) !== null || (deckMap.get(oppId)?.[1] ?? null) !== null;
+        const oppDeckLocked = oppHasDeck && !matchCompleted;
         const openInsights = () => {
           setInsightsTarget({
             matchId: myRoundMatch.id,
             wentFirst: existing?.went_first ?? null,
-            oppP1: existing?.opponent_deck_pokemon1 ?? deckMap.get(oppId)?.[0] ?? null,
-            oppP2: existing?.opponent_deck_pokemon2 ?? deckMap.get(oppId)?.[1] ?? null,
+            // Don't pre-fill from deckMap while opponent deck is locked — only use player's own saved values
+            oppP1: existing?.opponent_deck_pokemon1 ?? (oppDeckLocked ? null : deckMap.get(oppId)?.[0] ?? null),
+            oppP2: existing?.opponent_deck_pokemon2 ?? (oppDeckLocked ? null : deckMap.get(oppId)?.[1] ?? null),
             isEditing: existing !== null,
+            oppDeckLocked: oppDeckLocked && existing?.opponent_deck_pokemon1 == null && existing?.opponent_deck_pokemon2 == null,
           });
         };
         return (
           <Paper
             variant="outlined"
-            sx={{ px: 2.5, py: 1.5, mb: 2, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}
+            sx={{ px: 2.5, py: 1.5, mb: 2, borderRadius: 2, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}
           >
             {existing ? (
               <>
-                <Typography variant="body2" color="text.secondary">
-                  Match insights saved{existing.went_first !== null ? ` · Went ${existing.went_first ? "first" : "second"}` : ""}
-                </Typography>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Match insights saved{existing.went_first !== null ? ` · Went ${existing.went_first ? "first" : "second"}` : ""}
+                  </Typography>
+                  {matchCompleted && (() => {
+                    const oppP1 = existing.opponent_deck_pokemon1 ?? deckMap.get(oppId)?.[0] ?? null;
+                    const oppP2 = existing.opponent_deck_pokemon2 ?? deckMap.get(oppId)?.[1] ?? null;
+                    if (oppP1 == null && oppP2 == null) return null;
+                    return (
+                      <Box display="flex" alignItems="center" gap={0.5} mt={0.5}>
+                        <Typography variant="caption" color="text.secondary">
+                          Played against
+                        </Typography>
+                        {oppP1 != null && <NormalizedSprite src={getSpriteUrl(oppP1)} size={32} />}
+                        {oppP2 != null && <NormalizedSprite src={getSpriteUrl(oppP2)} size={32} />}
+                      </Box>
+                    );
+                  })()}
+                </Box>
                 <Button size="small" variant="text" color="secondary" onClick={openInsights}>
                   Edit insights
                 </Button>
@@ -1000,6 +1023,7 @@ const PlayerTournamentView: React.FC = () => {
           initialOppPokemon1={insightsTarget.oppP1}
           initialOppPokemon2={insightsTarget.oppP2}
           isEditing={insightsTarget.isEditing}
+          oppDeckLocked={insightsTarget.oppDeckLocked}
           onClose={() => {
             const ids = viewData?.matches.map((m) => m.id) ?? [];
             void loadInsights(ids);
