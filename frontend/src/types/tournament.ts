@@ -25,6 +25,8 @@ export interface TournamentPlayer {
   id: string;
   name: string;
   created_at: string;
+  /** NULL for self-registered players (no organiser created the entry) */
+  created_by?: string | null;
   has_static_seating?: boolean;
   static_seat_number?: number | null;
   user_id?: string | null;
@@ -32,8 +34,6 @@ export interface TournamentPlayer {
   dropped_at_round?: number | null;
   is_late_entry?: boolean;
   late_entry_round?: number | null;
-  device_token?: string | null;
-  device_id?: string | null;
   deck_pokemon1?: number | null;
   deck_pokemon2?: number | null;
 }

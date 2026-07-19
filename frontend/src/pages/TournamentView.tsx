@@ -1179,7 +1179,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                                   )}
                                 </>
                               )}
-                              {player.device_token && (
+                              {player.created_by === null && (
                                 <Tooltip title="Self-registered via join link">
                                   <Chip label="Self-reg" size="small" variant="outlined" sx={{ fontSize: "0.65rem", height: 18 }} />
                                 </Tooltip>
