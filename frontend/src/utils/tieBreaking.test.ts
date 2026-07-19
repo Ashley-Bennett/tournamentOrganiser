@@ -20,6 +20,7 @@ function player(
   opponentResults: Record<string, "win" | "loss" | "draw"> = {},
   gameWins = 0,
   gameLosses = 0,
+  byesReceived = 0,
 ): PlayerStanding {
   return {
     id,
@@ -33,6 +34,7 @@ function player(
     opponentResults,
     gameWins,
     gameLosses,
+    byesReceived,
   };
 }
 
@@ -59,17 +61,17 @@ describe("calculateOpponentMatchWinPercentage", () => {
   });
 
   it("averages across multiple opponents", () => {
-    const strong = player("B", 3, 0, 0); // 1.0 → capped to 0.75
+    const strong = player("B", 3, 0, 0); // 1.0 (no cap for active players)
     const weak = player("C", 0, 3, 0); // 0.0 → floored to 0.25
     const p = player("A", 0, 0, 0, ["B", "C"]);
-    expect(calculateOpponentMatchWinPercentage(p, map(p, strong, weak))).toBeCloseTo(0.5);
+    expect(calculateOpponentMatchWinPercentage(p, map(p, strong, weak))).toBeCloseTo(0.625);
   });
 
-  it("counts draws as 0.5 wins per Pokemon TCG rules", () => {
-    // Ged: 2-1-1 → winValue = 2 + 0.5*1 = 2.5, matchesPlayed = 4 → 2.5/4 = 0.625
+  it("counts draws as rounds played but not as wins (handbook §5.3.3.1)", () => {
+    // Ged: 2-1-1 → 2 wins / 4 rounds = 0.5 (the draw adds a round, not half a win)
     const ged = player("Ged", 2, 1, 1);
     const ethan = player("Ethan", 3, 1, 0, ["Ged"]);
-    expect(calculateOpponentMatchWinPercentage(ethan, map(ethan, ged))).toBeCloseTo(0.625);
+    expect(calculateOpponentMatchWinPercentage(ethan, map(ethan, ged))).toBeCloseTo(0.5);
   });
 
   it("applies 25% floor to opponents with very poor records", () => {
@@ -78,10 +80,25 @@ describe("calculateOpponentMatchWinPercentage", () => {
     expect(calculateOpponentMatchWinPercentage(p, map(p, terrible))).toBeCloseTo(0.25);
   });
 
-  it("applies 75% cap to opponents with perfect records", () => {
-    const perfect = player("B", 4, 0, 0); // 4/4 = 100% → capped to 0.75
+  it("does not cap active opponents with perfect records", () => {
+    const perfect = player("B", 4, 0, 0); // 4/4 = 100% — completed the event, cap is 100%
     const p = player("A", 1, 0, 0, ["B"]);
-    expect(calculateOpponentMatchWinPercentage(p, map(p, perfect))).toBeCloseTo(0.75);
+    expect(calculateOpponentMatchWinPercentage(p, map(p, perfect))).toBeCloseTo(1.0);
+  });
+
+  it("caps dropped opponents at 75% (handbook §5.3.3.1)", () => {
+    const droppedPerfect = player("B", 4, 0, 0); // 100% but dropped → capped to 0.75
+    const p = player("A", 1, 0, 0, ["B"]);
+    expect(
+      calculateOpponentMatchWinPercentage(p, map(p, droppedPerfect), new Set(["B"])),
+    ).toBeCloseTo(0.75);
+  });
+
+  it("excludes bye rounds from an opponent's win percentage", () => {
+    // B: 3 wins over 4 rounds, one win was a bye → 2 wins / 3 rounds
+    const byeWinner = player("B", 3, 1, 0, [], {}, 0, 0, 1);
+    const p = player("A", 1, 0, 0, ["B"]);
+    expect(calculateOpponentMatchWinPercentage(p, map(p, byeWinner))).toBeCloseTo(2 / 3);
   });
 
   it("skips opponents with 0 matches played (avoids divide-by-zero)", () => {
@@ -96,10 +113,10 @@ describe("calculateOpponentMatchWinPercentage", () => {
   });
 
   it("only counts opponents found in map when some are missing", () => {
-    const real = player("B", 2, 0, 0); // 1.0 → capped to 0.75
+    const real = player("B", 2, 0, 0); // 2/2 = 1.0
     const p = player("A", 0, 0, 0, ["B", "ghost"]);
-    // Only B is counted, so result = 0.75 (capped)
-    expect(calculateOpponentMatchWinPercentage(p, map(p, real))).toBeCloseTo(0.75);
+    // Only B is counted, so result = 1.0
+    expect(calculateOpponentMatchWinPercentage(p, map(p, real))).toBeCloseTo(1.0);
   });
 });
 
@@ -114,28 +131,28 @@ describe("calculateOpponentOpponentMatchWinPercentage", () => {
   });
 
   it("computes OOMW% as the average of each opponent's OMW%", () => {
-    // Chain: A → B → C (C has 100% win rate, capped to 0.75)
+    // Chain: A → B → C (C has a 100% win rate; no cap for active players)
     const c = player("C", 3, 0, 0);
     const b = player("B", 1, 0, 0, ["C"]);
     const a = player("A", 1, 0, 0, ["B"]);
     const standings = map(a, b, c);
-    // B's OMW% = 0.75 (capped), so A's OOMW% = 0.75
+    // B's OMW% = 1.0, so A's OOMW% = 1.0
     expect(
       calculateOpponentOpponentMatchWinPercentage(a, standings),
-    ).toBeCloseTo(0.75);
+    ).toBeCloseTo(1.0);
   });
 
   it("averages when the player has multiple opponents with different OMW%s", () => {
     const c = player("C", 3, 0, 0); // strong
     const d = player("D", 0, 3, 0); // weak
-    const b1 = player("B1", 1, 0, 0, ["C"]); // OMW% = 0.75 (capped)
+    const b1 = player("B1", 1, 0, 0, ["C"]); // OMW% = 1.0
     const b2 = player("B2", 1, 0, 0, ["D"]); // OMW% = 0.25 (floored)
     const a = player("A", 0, 0, 0, ["B1", "B2"]);
     const standings = map(a, b1, b2, c, d);
-    // OOMW% = (0.75 + 0.25) / 2 = 0.5
+    // OOMW% = (1.0 + 0.25) / 2 = 0.625
     expect(
       calculateOpponentOpponentMatchWinPercentage(a, standings),
-    ).toBeCloseTo(0.5);
+    ).toBeCloseTo(0.625);
   });
 });
 
@@ -210,15 +227,35 @@ describe("sortByTieBreakers", () => {
     expect(sorted[1].id).toBe("Bob");
   });
 
-  it("uses head-to-head to break ties when match points and percentages are equal", () => {
-    // A and B both have 3 points (1 win) and no third opponents, so OMW% = 0 for both.
-    // A beat B directly; B lost to A.
-    const a = player("A", 1, 0, 0, ["B"], { B: "win" });
-    const b = player("B", 0, 1, 0, ["A"], { A: "loss" });
-    // A has more match points (3 vs 0) so this isn't really a tie, but confirms
-    // the sort function handles opponentResults without throwing.
-    const sorted = sortByTieBreakers([b, a]);
-    expect(sorted[0].id).toBe("A");
+  it("uses head-to-head when exactly two players are tied on all percentages", () => {
+    // Zed and Amy each went 1-1 against the other (double round) → identical
+    // match points and identical OMW%/OOMW%. Their most recent head-to-head
+    // has Zed beating Amy, so Zed ranks first despite alphabetical order.
+    const zed = player("Zed", 1, 1, 0, ["Amy", "Amy"], { Amy: "win" });
+    const amy = player("Amy", 1, 1, 0, ["Zed", "Zed"], { Zed: "loss" });
+    const sorted = sortByTieBreakers([amy, zed]);
+    expect(sorted[0].id).toBe("Zed");
+    expect(sorted[1].id).toBe("Amy");
+  });
+
+  it("does NOT apply head-to-head when three or more players are tied", () => {
+    // Rock-paper-scissors: A beat B, B beat C, C beat A — all 1-1, identical
+    // tiebreakers. Handbook: head-to-head only applies to exactly-two ties,
+    // so the deterministic (alphabetical) order stands.
+    const a = player("A", 1, 1, 0, ["B", "C"], { B: "win", C: "loss" });
+    const b = player("B", 1, 1, 0, ["A", "C"], { A: "loss", C: "win" });
+    const c = player("C", 1, 1, 0, ["A", "B"], { A: "win", B: "loss" });
+    const sorted = sortByTieBreakers([c, b, a]);
+    expect(sorted.map((p) => p.id)).toEqual(["A", "B", "C"]);
+  });
+
+  it("does not use game win percentage as a tiebreaker (not in the handbook)", () => {
+    // Bob has a far better game record than Alice, but with all handbook
+    // tiebreakers equal the order falls back to the deterministic name sort.
+    const alice = player("Alice", 1, 0, 0, [], {}, 2, 2);
+    const bob = player("Bob", 1, 0, 0, [], {}, 6, 0);
+    const sorted = sortByTieBreakers([bob, alice]);
+    expect(sorted[0].id).toBe("Alice");
   });
 
   it("produces a stable deterministic order across multiple calls", () => {

@@ -570,6 +570,9 @@ export function useRoundLifecycle({
         standingsToUse,
         nextRoundNumber,
         previousPairings,
+        // Full standings (incl. dropped players) so opponents' win percentages
+        // are computed from complete records with the dropped-player 75% cap.
+        { allStandings: standings, droppedIds },
       );
 
       const staticSeats = new Map<string, number>();

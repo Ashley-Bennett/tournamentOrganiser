@@ -25,6 +25,8 @@
  *     player first (which can force a rematch when the last two have already played each other).
  */
 
+import { calculateWinPercentage } from "./tieBreaking";
+
 export interface PlayerStanding {
   id: string;
   name: string;
@@ -976,31 +978,48 @@ function validatePairingsConsistency(
 
 /**
  * Computes OMW% and OOMW% for each player and returns enriched copies.
- * OMW% minimum is capped at 25% per Pokémon Tournament Rules.
+ * Win percentages follow handbook §5.3.3.1 via calculateWinPercentage:
+ * byes excluded, 25% floor, 75% cap for dropped opponents, 100% otherwise.
  * These values are consumed by floatPriority, pairingOrder, and compareForPairing.
+ *
+ * `allStandings` (when provided) supplies the records of players not in the
+ * pairing pool — e.g. dropped players — so opponents' win percentages are
+ * computed from complete data rather than defaulting to the 25% floor.
  */
-function enrichWithTiebreaks(standings: PlayerStanding[]): PlayerStanding[] {
+function enrichWithTiebreaks(
+  standings: PlayerStanding[],
+  allStandings?: PlayerStanding[],
+  droppedIds?: Set<string>,
+): PlayerStanding[] {
   const copy = standings.map((s) => ({ ...s }));
-  const byId = new Map(copy.map((s) => [s.id, s]));
+  const byId = new Map((allStandings ?? standings).map((s) => [s.id, s]));
+  // Pool players always take precedence over reference records
+  for (const s of standings) byId.set(s.id, s);
 
-  for (const s of copy) {
-    if (s.opponents.length === 0) {
-      s.omw = 0.25;
+  const winPct = (id: string): number => {
+    const opp = byId.get(id);
+    if (!opp || opp.matchesPlayed === 0) return 0.25;
+    return calculateWinPercentage(opp, droppedIds?.has(id) ?? false);
+  };
+
+  // OMW% for every known player (pool + reference), so OOMW% can average the
+  // OMW% of opponents who are no longer in the pairing pool.
+  const omwById = new Map<string, number>();
+  for (const [id, p] of byId) {
+    if (p.opponents.length === 0) {
+      omwById.set(id, 0.25);
     } else {
-      const rates = s.opponents.map((id) => {
-        const opp = byId.get(id);
-        if (!opp || opp.matchesPlayed === 0) return 0.25;
-        return Math.max(0.25, opp.wins / opp.matchesPlayed);
-      });
-      s.omw = rates.reduce((a, b) => a + b, 0) / rates.length;
+      const rates = p.opponents.map(winPct);
+      omwById.set(id, rates.reduce((a, b) => a + b, 0) / rates.length);
     }
   }
 
   for (const s of copy) {
+    s.omw = omwById.get(s.id) ?? 0.25;
     if (s.opponents.length === 0) {
       s.oomw = 0.25;
     } else {
-      const rates = s.opponents.map((id) => byId.get(id)?.omw ?? 0.25);
+      const rates = s.opponents.map((id) => omwById.get(id) ?? 0.25);
       s.oomw = rates.reduce((a, b) => a + b, 0) / rates.length;
     }
   }
@@ -1008,10 +1027,22 @@ function enrichWithTiebreaks(standings: PlayerStanding[]): PlayerStanding[] {
   return copy;
 }
 
+export interface SwissPairingOptions {
+  /**
+   * Full standings including players not in the pairing pool (e.g. dropped
+   * players). Used only for tiebreak lookups so opponents' win percentages
+   * reflect complete records.
+   */
+  allStandings?: PlayerStanding[];
+  /** Ids of dropped players — their win % is capped at 75% per §5.3.3.1 */
+  droppedIds?: Set<string>;
+}
+
 export function generateSwissPairings(
   standings: PlayerStanding[],
   roundNumber: number,
   previousPairings: Pairing[],
+  options?: SwissPairingOptions,
 ): PairingResult {
   const pairings: Pairing[] = [];
 
@@ -1117,7 +1148,11 @@ export function generateSwissPairings(
 
   const floatReasons = new Map<string, string>();
   // Enrich with OMW%/OOMW% so comparators rank players correctly within brackets.
-  const enrichedStandings = enrichWithTiebreaks(standings);
+  const enrichedStandings = enrichWithTiebreaks(
+    standings,
+    options?.allStandings,
+    options?.droppedIds,
+  );
   const groups = getScoreGroupsSorted(enrichedStandings);
   const groupsMutable = groups.map((g) => ({
     points: g.points,

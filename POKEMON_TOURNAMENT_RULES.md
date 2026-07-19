@@ -35,16 +35,26 @@ The following tie-breakers are used in order:
    - Draw/Tie = 1 point
    - Loss = 0 points
 
-2. **Opponent's Match Win Percentage** (OMW%)
-   - Average win percentage of all opponents played
-   - Formula: Sum of (opponent wins / opponent matches) / number of opponents
+2. **Opponents' Win Percentage** (OMW%) — handbook §5.3.3
+   - Average of the win percentages of all opponents played
+   - An opponent's win percentage = wins ÷ rounds played
+     - Ties count as rounds played but contribute **zero** wins (not half)
+     - Rounds in which the opponent received a bye are **excluded entirely**
+       (a bye counts as a win for match points but not for tiebreakers)
+   - Minimum win percentage: **25%**
+   - Maximum win percentage: **100%** if the opponent completed the event,
+     **75%** if the opponent dropped before it finished
 
-3. **Opponent's Opponent's Match Win Percentage** (OOMW%)
-   - Average win percentage of opponents' opponents
+3. **Opponents' Opponents' Win Percentage** (OOMW%)
+   - Average of the OMW% of all the player's opponents
    - Used when OMW% is tied
 
-4. **Head-to-Head** (if applicable)
-   - Direct match result between tied players
+4. **Head-to-Head** — handbook §5.5.1.1
+   - Applies only when **exactly two** players remain tied after the
+     percentage tiebreakers and they played each other during the event;
+     the winner of that match ranks higher
+   - Ties among three or more players (or two who never met) are ordered
+     randomly per the handbook; this app uses a deterministic name sort instead
 
 ## Implementation Notes
 
