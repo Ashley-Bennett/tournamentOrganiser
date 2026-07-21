@@ -25,6 +25,10 @@ BEGIN
     RAISE EXCEPTION 'Player name is required';
   END IF;
 
+  IF length(v_trimmed_name) > 50 THEN
+    RAISE EXCEPTION 'Player name is too long (max 50 characters)';
+  END IF;
+
   SELECT t.workspace_id, t.status, t.join_enabled, t.name
   INTO v_workspace_id, v_status, v_join_enabled, v_tournament_name
   FROM public.tournaments t

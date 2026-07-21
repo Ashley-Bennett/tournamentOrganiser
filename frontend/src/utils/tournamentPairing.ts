@@ -769,147 +769,24 @@ function processBracket(
         havePlayedBefore(p.player1Id, p.player2Id, previousPairings),
     );
 
-    if (hasRematch) {
-      // Pick the float candidate: the player involved in a rematch with lowest priority
-      // (floatPriority = most byes first, then highest id — the "worst" in the group).
-      // We look at all rematch participants and pick among them.
-      const rematchIds = new Set<string>();
-      for (const p of pairings) {
-        if (
-          p.player2Id &&
-          havePlayedBefore(p.player1Id, p.player2Id, previousPairings)
-        ) {
-          rematchIds.add(p.player1Id);
-          rematchIds.add(p.player2Id);
-        }
-      }
-      const rematchPlayers = pool.filter((p) => rematchIds.has(p.id));
-      const floatCandidate = [...rematchPlayers].sort(floatPriority)[0]!;
-
-      // Re-pair the bracket without the float candidate
-      const poolWithoutFloat = pool.filter((p) => p.id !== floatCandidate.id);
-
-      // Only proceed if re-pairing the remaining (now odd-minus-one = even-minus-one)
-      // pool is possible. poolWithoutFloat will be odd if pool was even — but we
-      // removed one player so it becomes (even - 1) = odd. We need to check if this
-      // remainder can be paired as an even group (it can only if poolWithoutFloat is even).
-      // Since pool.length is even and we remove 1, poolWithoutFloat is odd — but we're
-      // returning floatCandidate as floatDown, so the CALLER will merge them into the
-      // next bracket. The remainder (poolWithoutFloat) must itself be pairable as an
-      // even group. Since pool.length was even and we remove 1, poolWithoutFloat.length
-      // is odd — so we can only do this rescue float when pool.length >= 4 (leaving at
-      // least 3 in pool, but we need an even remainder for pairEvenPool).
-      // Actually: pool is even, remove 1 → odd remainder. That remainder can't be paired
-      // as-is. BUT the rescue only makes sense when removing the floater leaves an even
-      // remainder — which happens only if pool.length is even AND we remove 1... that's
-      // always odd. So we need pool.length >= 4 AND we accept that the remainder is odd
-      // only when pool.length === 2 (the exact draw case: 2 players, both rematched).
-      // For pool.length === 2: removing 1 leaves 1 player, which can't be paired — so
-      // the entire pool of 2 floats as: the one remaining player stays to be picked up
-      // by the next bracket via carryOver. But wait — we can only return ONE floatDown.
-      // For the pool-of-2 case we float the lower-priority player and the other player
-      // becomes a solo carryOver into the next bracket from the caller's perspective.
-      // Actually the cleanest solution: for pool.length === 2 with a rematch, float
-      // BOTH players by returning the lower one as floatDown and returning the pairing
-      // array empty — the upper player carries as the bracket's leftover from the PREVIOUS
-      // bracket's perspective. But processBracket can only return one floatDown...
-      //
-      // Simpler correct approach: treat the 2-player rematch bracket as if it were a
-      // 1-player odd bracket and float the lower player. The remaining single player
-      // becomes the new carryOver into the next bracket. We return pairings=[] and
-      // floatDown = lower player. The upper player is NOT in pairings, meaning they
-      // would be unaccounted for — which breaks invariants.
-      //
-      // The real fix: return BOTH as floatDown is not possible with the current signature.
-      // Instead, we treat this as: float lower player, add upper player to pairings as
-      // a "pending" floater — impossible cleanly here.
-      //
-      // CORRECT APPROACH: restructure. When pool.length === 2 and it's a rematch, we
-      // return { pairings: [], floatDown: lowerPlayer } and the caller must handle the
-      // remaining single player. But the remaining single player is not in floatDown...
-      //
-      // The cleanest fix that works within the existing signature: only attempt the
-      // rematch escape float when pool.length >= 4, leaving an even remainder that
-      // pairEvenPool can handle. For the pool-of-2 rematch case, we need a different
-      // approach: signal to the main loop that this bracket should be dissolved and
-      // both players merged into the next bracket.
-      //
-      // We handle this via a special return: { pairings: [], floatDown: pool[0] } is
-      // wrong. Instead we extend the signature with an optional `extraFloat` — but
-      // that ripples everywhere.
-      //
-      // Pragmatic solution that avoids signature changes: for pool.length === 2 rematch,
-      // treat the whole 2-player pool as a "merged carry" by returning pairings=[] and
-      // floatDown = the floatPriority loser, AND pre-inserting the winner into the next
-      // bracket by mutating groupsMutable — but processBracket doesn't have access to that.
-      //
-      // FINAL DECISION: handle pool-of-2 rematch as a special case right here.
-      // Return pairings = [] (no pairings made in this bracket), floatDown = one player,
-      // and separately signal the other player needs to float too. We do this by using
-      // a wrapper approach in the main loop in generateSwissPairings where, after each
-      // bracket, if pairings.length === 0 and there was a non-null floatDown, we know
-      // the remaining player from that bracket must also cascade. We track this with
-      // an `extraCarryOver` returned alongside floatDown.
-      //
-      // To avoid a large refactor, we use a simpler trick: for pool-of-2 rematch,
-      // return floatDown = lower player AND include the other player's data in floatReasons
-      // as a sentinel. The main loop checks for this sentinel. -- This is too hacky.
-      //
-      // CLEANEST solution without large refactor: change the return type to allow
-      // returning multiple floaters. We do this now.
-
-      if (poolWithoutFloat.length % 2 === 0 && poolWithoutFloat.length > 0) {
-        // Even remainder: re-pair without the floater, float them down
-        const rePaired = pairEvenPool(
-          poolWithoutFloat,
-          previousPairings,
-          roundNumber,
-          ctx,
-        );
-        const newRematchCount = rePaired.filter(
-          (p) =>
-            p.player2Id &&
-            havePlayedBefore(p.player1Id, p.player2Id, previousPairings),
-        ).length;
-        const oldRematchCount = pairings.filter(
-          (p) =>
-            p.player2Id &&
-            havePlayedBefore(p.player1Id, p.player2Id, previousPairings),
-        ).length;
-
-        // Only accept the float if it actually reduces rematches
-        if (newRematchCount < oldRematchCount) {
-          floatReasons.set(
-            floatCandidate.id,
-            `rematch-escape float: even bracket had rematch, floated to break it up`,
-          );
-          return { pairings: rePaired, floatDown: floatCandidate };
-        }
-      }
-      // Pool of 2 (or float didn't help): fall through to the dissolve approach below
-      if (pool.length === 2) {
-        // Both players have played each other. Dissolve the bracket entirely:
-        // float the lower-priority player down; the higher-priority player becomes
-        // an additional carryOver. We return them both as floatDown candidates via
-        // a two-element floatDown array trick — but our signature only allows one.
-        // Compromise: float BOTH by returning the lower as floatDown and appending
-        // the upper into floatReasons as a special "dissolve" marker. The main loop
-        // (generateSwissPairings) picks this up and treats both as carryOvers.
-        // We encode this with a special reason prefix "DISSOLVE:".
-        const [upper, lower] = [...pool].sort((a, b) => {
-          // upper = higher priority (floats second / stays longer), lower = floats first
-          return floatPriority(b, a); // reverse floatPriority: best stays, worst floats
-        });
-        floatReasons.set(
-          lower!.id,
-          `DISSOLVE:rematch-only bracket of 2, both float to next bracket`,
-        );
-        floatReasons.set(
-          upper!.id,
-          `DISSOLVE:rematch-only bracket of 2, both float to next bracket`,
-        );
-        return { pairings: [], floatDown: lower! };
-      }
+    // A 2-player bracket whose only pairing is a rematch is dissolved: the
+    // lower-priority player floats down as floatDown and the other follows via
+    // the DISSOLVE sentinel (picked up by generateSwissPairings), so the
+    // rematch can be broken up in the next bracket. Larger even brackets can't
+    // float a single player — removing one leaves an odd remainder — so their
+    // rematches are only avoided when backtracking finds a rematch-free
+    // matching within the bracket.
+    if (hasRematch && pool.length === 2) {
+      const [upper, lower] = [...pool].sort((a, b) => floatPriority(b, a));
+      floatReasons.set(
+        lower!.id,
+        `DISSOLVE:rematch-only bracket of 2, both float to next bracket`,
+      );
+      floatReasons.set(
+        upper!.id,
+        `DISSOLVE:rematch-only bracket of 2, both float to next bracket`,
+      );
+      return { pairings: [], floatDown: lower! };
     }
   }
 

@@ -57,7 +57,10 @@ export function getEntry(tournamentId: string): TjEntry | null {
 export function saveEntry(tournamentId: string, entry: TjEntry) {
   localStorage.setItem(entryKey(tournamentId), JSON.stringify(entry));
   const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
-  document.cookie = `${entryKey(tournamentId)}=${encodeURIComponent(JSON.stringify(entry))}; expires=${expires}; path=/; SameSite=Lax`;
+  // The cookie holds the device token — never send it over plain HTTP.
+  // (Secure is omitted on http://localhost so local dev keeps working.)
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${entryKey(tournamentId)}=${encodeURIComponent(JSON.stringify(entry))}; expires=${expires}; path=/; SameSite=Lax${secure}`;
 }
 
 /** Returns all stored tournament entries, each paired with its tournament ID. */

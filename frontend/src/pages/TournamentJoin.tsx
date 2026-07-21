@@ -178,6 +178,7 @@ export default function TournamentJoin() {
               fullWidth
               autoFocus
               value={nameInput}
+              inputProps={{ maxLength: 50 }}
               onChange={(e) => setNameInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void handleSubmit(); }}
               disabled={submitting}

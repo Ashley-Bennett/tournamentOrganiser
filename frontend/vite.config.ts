@@ -17,7 +17,8 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    sourcemap: true,
+    // Don't ship source maps publicly; enable locally when debugging a build.
+    sourcemap: false,
   },
   preview: {
     port: 5173,

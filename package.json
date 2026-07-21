@@ -17,7 +17,6 @@
     "install:all": "npm install && npm install --workspace=frontend && npm install --workspace=backend"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.10",
     "concurrently": "^8.2.2"
   },
   "keywords": [
@@ -28,11 +27,5 @@
     "express"
   ],
   "author": "",
-  "license": "MIT",
-  "dependencies": {
-    "jsonwebtoken": "^9.0.2",
-    "node-fetch": "^3.3.2",
-    "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0"
-  }
+  "license": "MIT"
 }
