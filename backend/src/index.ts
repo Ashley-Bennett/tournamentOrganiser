@@ -3,16 +3,9 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
-import path from "path";
-import jwt from "jsonwebtoken";
 
 // Load environment variables
 dotenv.config();
-
-const jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret && process.env.NODE_ENV === "production") {
-  throw new Error("JWT_SECRET environment variable must be set in production");
-}
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -60,39 +53,7 @@ app.get("/api", (req, res) => {
   });
 });
 
-// Very simple, non-persistent auth endpoints so the frontend can still log in/register.
-// These DO NOT store anything; they just validate input and issue a dummy JWT.
-
-app.post("/api/users", (req, res) => {
-  const { name, email, password } = req.body || {};
-  if (!name || !email || !password) {
-    return res
-      .status(400)
-      .json({ error: "Name, email, and password are required" });
-  }
-
-  // Pretend we created a user successfully
-  res.status(201).json({
-    id: 1,
-    message: "User created successfully (no database, demo only)",
-  });
-});
-
-app.post("/api/login", (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
-  }
-
-  // Issue a dummy JWT payload so the frontend can treat the user as logged in
-  const token = jwt.sign(
-    { id: 1, email, name: email.split("@")[0] || "User" },
-    jwtSecret ?? "devsecret-not-for-production",
-    { expiresIn: "12h" },
-  );
-
-  res.json({ token });
-});
+// Auth and all data live in Supabase; this service only answers health checks.
 
 // Fallback for all other API routes: explicitly state that the database is disabled
 app.all("/api/*", (req, res) => {

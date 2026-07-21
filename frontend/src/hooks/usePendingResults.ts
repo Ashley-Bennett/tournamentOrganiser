@@ -29,9 +29,12 @@ export function usePendingResults({
     didRestoreRef.current = true;
     const toRestore = new Map<string, { winnerId: string | null; result: string }>();
     for (const match of matches) {
+      // Conflicted matches carry the LAST submitter's claim in temp_result;
+      // never pre-fill those — the organiser must resolve the dispute explicitly.
       if (
         match.status !== "completed" &&
         match.status !== "bye" &&
+        match.confirmed_by !== "conflict" &&
         match.temp_result
       ) {
         toRestore.set(match.id, {

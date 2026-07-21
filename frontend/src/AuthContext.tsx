@@ -127,12 +127,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         } else {
           setProfile(null);
         }
-        // Mirror access token into localStorage so existing API helper can keep sending it if needed.
-        if (newSession?.access_token) {
-          localStorage.setItem("token", newSession.access_token);
-        } else {
-          localStorage.removeItem("token");
-        }
       });
 
       // Assign subscription immediately after the call, not inside the callback
@@ -167,16 +161,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) {
       throw new Error(error.message || "Login failed");
-    }
-    // Session change handler will update state + localStorage token
-    if (data.session?.access_token) {
-      localStorage.setItem("token", data.session.access_token);
     }
   }, []);
 
@@ -200,6 +190,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = useCallback(() => {
     void supabase.auth.signOut();
+    // Clear the legacy mirrored-token key left behind by older builds
     localStorage.removeItem("token");
   }, []);
 

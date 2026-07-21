@@ -75,19 +75,45 @@ BEGIN
     FROM my_entries me
     LEFT JOIN my_matches mm ON mm.tournament_id = me.tournament_id AND mm.my_player_id = me.player_id
   ),
-  -- Standings for completed tournaments — for top-N finishes
-  standings AS (
+  -- Standings for completed tournaments — for top-N finishes.
+  -- tournament_standings is never populated by the app, so positions are
+  -- derived from match results (same scoring as get_my_player_entries),
+  -- ranking the FULL field of each tournament — a rank/field computed only
+  -- over the caller's own row is always 1/1.
+  completed_points AS (
     SELECT
-      me.tournament_id,
-      me.player_id,
-      RANK() OVER (
-        PARTITION BY me.tournament_id
-        ORDER BY ts.match_points DESC
-      )::INT AS position,
-      COUNT(*) OVER (PARTITION BY me.tournament_id)::INT AS field_size
-    FROM my_entries me
-    JOIN public.tournament_standings ts ON ts.tournament_id = me.tournament_id AND ts.player_id = me.player_id
-    JOIN public.tournaments t ON t.id = me.tournament_id AND t.status = 'completed'
+      tp.tournament_id,
+      tp.id AS player_id,
+      COALESCE(SUM(
+        CASE
+          WHEN tm2.status = 'bye'                                                           THEN 3
+          WHEN tm2.player2_id IS NULL AND tm2.result = 'loss' AND tm2.status = 'completed'  THEN 0
+          WHEN tm2.status = 'completed' AND tm2.winner_id = tp.id                           THEN 3
+          WHEN tm2.status = 'completed' AND tm2.winner_id IS NULL                           THEN 1
+          WHEN tm2.status = 'completed'                                                     THEN 0
+          ELSE 0
+        END
+      ), 0) AS match_points
+    FROM public.tournament_players tp
+    JOIN public.tournaments t ON t.id = tp.tournament_id AND t.status = 'completed'
+    LEFT JOIN public.tournament_matches tm2
+      ON  tm2.tournament_id = tp.tournament_id
+      AND (tm2.player1_id = tp.id OR tm2.player2_id = tp.id)
+    WHERE tp.tournament_id IN (SELECT me2.tournament_id FROM my_entries me2)
+    GROUP BY tp.tournament_id, tp.id
+  ),
+  ranked_field AS (
+    SELECT
+      cp.tournament_id,
+      cp.player_id,
+      RANK() OVER (PARTITION BY cp.tournament_id ORDER BY cp.match_points DESC)::INT AS position,
+      COUNT(*) OVER (PARTITION BY cp.tournament_id)::INT AS field_size
+    FROM completed_points cp
+  ),
+  standings AS (
+    SELECT rf.tournament_id, rf.player_id, rf.position, rf.field_size
+    FROM ranked_field rf
+    JOIN my_entries me ON me.tournament_id = rf.tournament_id AND me.player_id = rf.player_id
   ),
   top_finishes AS (
     SELECT
@@ -272,12 +298,34 @@ BEGIN
     FROM my_entries me
     JOIN public.tournaments t ON t.id = me.tournament_id AND t.status = 'completed'
     JOIN (
+      -- tournament_standings is never populated; rank the full field from
+      -- match results (same scoring as get_my_player_entries).
       SELECT
-        ts.tournament_id,
-        ts.player_id,
-        RANK() OVER (PARTITION BY ts.tournament_id ORDER BY ts.match_points DESC)::INT AS position,
-        COUNT(*) OVER (PARTITION BY ts.tournament_id)::INT AS field_size
-      FROM public.tournament_standings ts
+        cp.tournament_id,
+        cp.player_id,
+        RANK() OVER (PARTITION BY cp.tournament_id ORDER BY cp.match_points DESC)::INT AS position,
+        COUNT(*) OVER (PARTITION BY cp.tournament_id)::INT AS field_size
+      FROM (
+        SELECT
+          tp.tournament_id,
+          tp.id AS player_id,
+          COALESCE(SUM(
+            CASE
+              WHEN tm2.status = 'bye'                                                           THEN 3
+              WHEN tm2.player2_id IS NULL AND tm2.result = 'loss' AND tm2.status = 'completed'  THEN 0
+              WHEN tm2.status = 'completed' AND tm2.winner_id = tp.id                           THEN 3
+              WHEN tm2.status = 'completed' AND tm2.winner_id IS NULL                           THEN 1
+              WHEN tm2.status = 'completed'                                                     THEN 0
+              ELSE 0
+            END
+          ), 0) AS match_points
+        FROM public.tournament_players tp
+        LEFT JOIN public.tournament_matches tm2
+          ON  tm2.tournament_id = tp.tournament_id
+          AND (tm2.player1_id = tp.id OR tm2.player2_id = tp.id)
+        WHERE tp.tournament_id IN (SELECT me2.tournament_id FROM my_entries me2)
+        GROUP BY tp.tournament_id, tp.id
+      ) cp
     ) pos ON pos.tournament_id = me.tournament_id AND pos.player_id = me.player_id
     GROUP BY me.deck_pokemon1, me.deck_pokemon2
   ),

@@ -42,7 +42,8 @@
       "mcp__5e1ac459-ce64-4967-aef8-a8d6a77381dd__execute_sql",
       "Bash(python -c ' *)",
       "Bash(python -c \"import pypdf\")",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "mcp__5e1ac459-ce64-4967-aef8-a8d6a77381dd__apply_migration"
     ],
     "additionalDirectories": [
       "c:\\Users\\ashle\\Code\\tournamentOrganiser\\frontend\\src\\pages",
