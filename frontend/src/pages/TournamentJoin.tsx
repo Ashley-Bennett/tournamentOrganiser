@@ -8,8 +8,11 @@ import {
   Typography,
   Alert,
   Paper,
+  Divider,
 } from "@mui/material";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { supabase } from "../supabaseClient";
+import DeckPicker from "../components/DeckPicker";
 import {
   TjEntry,
   TjProfile,
@@ -34,6 +37,8 @@ export default function TournamentJoin() {
   const [tournamentName, setTournamentName] = useState("");
   const [registeredNames, setRegisteredNames] = useState<string[]>([]);
   const [nameInput, setNameInput] = useState("");
+  const [deckPokemon1, setDeckPokemon1] = useState<number | null>(null);
+  const [deckPokemon2, setDeckPokemon2] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,7 +109,7 @@ export default function TournamentJoin() {
   }, [tournamentId, navigate]);
 
   const handleSubmit = async () => {
-    if (!tournamentId || !nameInput.trim() || nameTaken) return;
+    if (!tournamentId || !nameInput.trim() || nameTaken || deckPokemon1 == null) return;
     setSubmitting(true);
     setError(null);
 
@@ -114,6 +119,8 @@ export default function TournamentJoin() {
       p_tournament_id: tournamentId,
       p_player_name: nameInput.trim(),
       p_device_id: deviceProfile.deviceId,
+      p_pokemon1: deckPokemon1,
+      p_pokemon2: deckPokemon2,
     });
 
     if (rpcError) {
@@ -191,21 +198,55 @@ export default function TournamentJoin() {
               value={nameInput}
               inputProps={{ maxLength: 50 }}
               onChange={(e) => setNameInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") void handleSubmit(); }}
               disabled={submitting}
               error={nameTaken}
               helperText={nameTaken ? "This name is already taken — please use a different name." : " "}
-              sx={{ mb: 2 }}
+              sx={{ mb: 1 }}
             />
+
+            <Divider sx={{ mb: 2 }} />
+
+            <Typography variant="subtitle2" gutterBottom>
+              Choose your deck
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={1.5}>
+              Pick at least one Pokémon to represent your deck. This is required to join.
+            </Typography>
+
+            <DeckPicker
+              pokemon1={deckPokemon1}
+              pokemon2={deckPokemon2}
+              onChange={(p1, p2) => { setDeckPokemon1(p1); setDeckPokemon2(p2); }}
+            />
+
+            <Box
+              display="flex"
+              alignItems="flex-start"
+              gap={1}
+              sx={{ mt: 1, mb: 2.5, color: "text.secondary" }}
+            >
+              <LockOutlinedIcon sx={{ fontSize: "1.1rem", mt: "1px" }} />
+              <Typography variant="caption">
+                Your deck stays private. Other players can&apos;t see your picks
+                while the tournament is running — decklists are only revealed in
+                the final standings once the event is over.
+              </Typography>
+            </Box>
+
             <Button
               variant="contained"
               fullWidth
               size="large"
               onClick={() => void handleSubmit()}
-              disabled={submitting || !nameInput.trim() || nameTaken}
+              disabled={submitting || !nameInput.trim() || nameTaken || deckPokemon1 == null}
             >
               {submitting ? <CircularProgress size={22} /> : "Join Tournament"}
             </Button>
+            {deckPokemon1 == null && (
+              <Typography variant="caption" color="text.secondary" display="block" textAlign="center" mt={1}>
+                Choose at least one Pokémon to join.
+              </Typography>
+            )}
           </>
         )}
       </Paper>
