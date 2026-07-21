@@ -27,6 +27,8 @@ import DeviceTournaments from "./pages/DeviceTournaments";
 import JoinLanding from "./pages/JoinLanding";
 import WhatsNew from "./pages/WhatsNew";
 import PlayerStats from "./pages/PlayerStats";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 import { getAllEntries } from "./utils/playerStorage";
@@ -133,6 +135,8 @@ function App() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
 
                 {/* ── Public pairings (no auth required) ──────── */}
                 <Route path="/public/t/:publicSlug" element={<TournamentPairings />} />

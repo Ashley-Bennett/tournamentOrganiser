@@ -986,6 +986,23 @@ export default function Landing() {
           © {new Date().getFullYear()} Matchamp · Made for tournament organisers
           everywhere
         </Typography>
+        <Typography sx={{ color: footerText, fontSize: "0.82rem", mt: 0.5 }}>
+          <Box
+            component={Link}
+            to="/privacy"
+            sx={{ color: "inherit", textDecoration: "underline" }}
+          >
+            Privacy
+          </Box>
+          {" · "}
+          <Box
+            component={Link}
+            to="/terms"
+            sx={{ color: "inherit", textDecoration: "underline" }}
+          >
+            Terms
+          </Box>
+        </Typography>
       </Box>
     </Box>
   );

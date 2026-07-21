@@ -7,8 +7,9 @@ import {
   Alert,
   Stack,
   LinearProgress,
+  Link as MuiLink,
 } from "@mui/material";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 
 const Register = () => {
@@ -133,6 +134,17 @@ const Register = () => {
           >
             {loading ? "Registering..." : "Register"}
           </Button>
+          <Typography variant="caption" color="text.secondary" textAlign="center">
+            By creating an account you agree to the{" "}
+            <MuiLink component={RouterLink} to="/terms">
+              Terms of Service
+            </MuiLink>{" "}
+            and{" "}
+            <MuiLink component={RouterLink} to="/privacy">
+              Privacy Policy
+            </MuiLink>
+            .
+          </Typography>
         </Stack>
       </form>
     </Box>

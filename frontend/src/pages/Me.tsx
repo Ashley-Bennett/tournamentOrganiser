@@ -29,7 +29,7 @@ import {
   ContentCopy as CopyIcon,
   PersonRemoveOutlined as RemovePersonIcon,
 } from "@mui/icons-material";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 import { supabase } from "../supabaseClient";
@@ -59,8 +59,9 @@ const ROLE_COLOR: Record<Role, "primary" | "secondary" | "info" | "default"> = {
 };
 
 const Me = () => {
-  const { user, profile, displayName, updateProfile } = useAuth();
+  const { user, profile, displayName, updateProfile, logout } = useAuth();
   const { workspaces, roleFor, refreshWorkspaces } = useWorkspace();
+  const navigate = useNavigate();
 
   // Account edit state
   const [editName, setEditName] = useState<string | null>(null);
@@ -98,6 +99,12 @@ const Me = () => {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+
+  // Account deletion
+  const [accountDeleteOpen, setAccountDeleteOpen] = useState(false);
+  const [accountDeleteConfirm, setAccountDeleteConfirm] = useState("");
+  const [accountDeleteLoading, setAccountDeleteLoading] = useState(false);
+  const [accountDeleteError, setAccountDeleteError] = useState("");
 
   // Members panel state — keyed by workspace id
   const [membersOpen, setMembersOpen] = useState<Record<string, boolean>>({});
@@ -245,6 +252,20 @@ const Me = () => {
       setInviteError((prev) => ({ ...prev, [inviteId]: "Failed to copy link." }));
       setCopyToast("Failed to copy — please try again.");
     }
+  };
+
+  const handleAccountDelete = async () => {
+    setAccountDeleteLoading(true);
+    setAccountDeleteError("");
+    const { error } = await supabase.rpc("delete_account");
+    if (error) {
+      setAccountDeleteLoading(false);
+      setAccountDeleteError(error.message);
+      return;
+    }
+    // The auth user no longer exists — clear the local session and leave.
+    logout();
+    navigate("/");
   };
 
   const handleDeleteConfirm = async () => {
@@ -658,6 +679,83 @@ const Me = () => {
           + New workspace
         </Button>
       </Stack>
+
+      {/* ── Danger zone ──────────────────────────────────────── */}
+      <Paper
+        variant="outlined"
+        sx={{ p: 3, mb: 4, borderColor: "error.main" }}
+      >
+        <Typography variant="h6" color="error" gutterBottom>
+          Danger zone
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mb={2}>
+          Deleting your account permanently removes your profile, workspaces
+          only you own (including all their tournaments), and activity history.
+          Tournaments in workspaces you share with other owners are handed
+          over to them. This cannot be undone.
+        </Typography>
+        <Button
+          variant="outlined"
+          color="error"
+          onClick={() => {
+            setAccountDeleteOpen(true);
+            setAccountDeleteConfirm("");
+            setAccountDeleteError("");
+          }}
+        >
+          Delete my account
+        </Button>
+      </Paper>
+
+      {/* ── Account delete confirmation dialog ───────────────── */}
+      <Dialog
+        open={accountDeleteOpen}
+        onClose={() => {
+          if (!accountDeleteLoading) setAccountDeleteOpen(false);
+        }}
+      >
+        <DialogTitle>Delete your account?</DialogTitle>
+        <DialogContent>
+          {accountDeleteError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {accountDeleteError}
+            </Alert>
+          )}
+          <DialogContentText sx={{ mb: 2 }}>
+            This permanently deletes your account, your profile, and every
+            workspace only you own — including{" "}
+            <strong>all tournaments, matches, and player data</strong> inside
+            them. This cannot be undone.
+          </DialogContentText>
+          <DialogContentText sx={{ mb: 2 }}>
+            Type <strong>DELETE</strong> to confirm.
+          </DialogContentText>
+          <TextField
+            size="small"
+            fullWidth
+            value={accountDeleteConfirm}
+            onChange={(e) => setAccountDeleteConfirm(e.target.value)}
+            placeholder="DELETE"
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setAccountDeleteOpen(false)}
+            disabled={accountDeleteLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={accountDeleteLoading || accountDeleteConfirm !== "DELETE"}
+            onClick={() => void handleAccountDelete()}
+          >
+            {accountDeleteLoading ? "Deleting…" : "Delete account"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── Delete confirmation dialog ───────────────────────── */}
       <Dialog
