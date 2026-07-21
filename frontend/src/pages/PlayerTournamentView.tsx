@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Box,
   Button,
@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import CatchingPokemonIcon from "@mui/icons-material/CatchingPokemon";
 import { supabase } from "../supabaseClient";
-import { getEntry, getAllEntries } from "../utils/playerStorage";
+import { getEntry, getAllEntries, clearEntry } from "../utils/playerStorage";
 import { useAuth } from "../AuthContext";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
@@ -317,6 +317,7 @@ function MyMatchCard({
 
 const PlayerTournamentView: React.FC = () => {
   const { tournamentId } = useParams<{ tournamentId: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const [viewData, setViewData] = useState<ViewData | null>(null);
@@ -366,6 +367,14 @@ const PlayerTournamentView: React.FC = () => {
       );
 
       if (rpcError) {
+        // Player row no longer exists — the organiser removed this player.
+        // Clear the cached credentials and send them back to the join form
+        // as if they'd never registered.
+        if (rpcError.message.includes("Invalid player credentials")) {
+          clearEntry(tournamentId);
+          navigate(`/join/${tournamentId}`, { replace: true });
+          return;
+        }
         setError("Failed to load tournament data.");
         setLoading(false);
         return;
@@ -450,7 +459,7 @@ const PlayerTournamentView: React.FC = () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       void supabase.removeChannel(channel);
     };
-  }, [tournamentId, entry]);
+  }, [tournamentId, entry, navigate]);
 
   // Auto-switch to standings when tournament completes
   const tournamentStatus = viewData?.tournament.status ?? null;

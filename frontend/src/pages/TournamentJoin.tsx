@@ -71,11 +71,22 @@ export default function TournamentJoin() {
         return;
       }
 
-      // Check for existing registration
+      // Check for existing registration — verify it server-side first, since
+      // the organiser may have removed this player after we cached the entry.
       const existing = getEntry(tournamentId);
       if (existing) {
-        navigate(`/t/${tournamentId}/me`, { replace: true });
-        return;
+        const { error: verifyError } = await supabase.rpc("get_player_tournament_view", {
+          p_tournament_id: tournamentId,
+          p_player_id: existing.playerId,
+          p_device_token: existing.deviceToken,
+        });
+        if (verifyError?.message.includes("Invalid player credentials")) {
+          // Stale registration (player deleted) — clear it and fall through to the join form
+          clearEntry(tournamentId);
+        } else {
+          navigate(`/t/${tournamentId}/me`, { replace: true });
+          return;
+        }
       }
 
       if (!joinEnabled || status !== "draft") {
