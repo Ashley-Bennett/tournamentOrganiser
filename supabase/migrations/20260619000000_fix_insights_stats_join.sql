@@ -46,7 +46,9 @@ BEGIN
     JOIN my_entries me ON me.tournament_id = tm.tournament_id
       AND (tm.player1_id = me.player_id OR tm.player2_id = me.player_id)
     WHERE tm.status = 'completed' AND tm.player2_id IS NOT NULL
-      AND (p_deck_pokemon1 IS NULL OR (
+      -- Filter is active when EITHER slot is provided — decks can legitimately
+      -- have a NULL first slot, and p1-only checks would silently disable the filter.
+      AND ((p_deck_pokemon1 IS NULL AND p_deck_pokemon2 IS NULL) OR (
         me.deck_pokemon1 IS NOT DISTINCT FROM p_deck_pokemon1
         AND me.deck_pokemon2 IS NOT DISTINCT FROM p_deck_pokemon2
       ))
@@ -127,7 +129,8 @@ BEGIN
       AND mi.went_first IS NOT NULL
       AND tm.status = 'completed'
       AND tm.player2_id IS NOT NULL
-      AND (p_deck_pokemon1 IS NULL OR (
+      -- Same either-slot filter semantics as get_player_matchup_matrix.
+      AND ((p_deck_pokemon1 IS NULL AND p_deck_pokemon2 IS NULL) OR (
         me.deck_pokemon1 IS NOT DISTINCT FROM p_deck_pokemon1
         AND me.deck_pokemon2 IS NOT DISTINCT FROM p_deck_pokemon2
       ))

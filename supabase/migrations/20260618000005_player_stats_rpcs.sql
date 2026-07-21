@@ -164,22 +164,25 @@ BEGIN
       MAX(streak_len) FILTER (WHERE outcome = 'loss')::INT AS longest_loss
     FROM streak_lengths
   ),
-  -- Current streak: count from the end
-  recent_outcomes AS (
-    SELECT outcome, rn FROM match_outcomes ORDER BY rn DESC
+  -- Current streak: consecutive same-outcome matches counting back from the
+  -- most recent one — i.e. every match after the last match whose outcome
+  -- differs from the final outcome. (The previous rn - ROW_NUMBER() DESC
+  -- formula only equalled 0 for a single-match history, so the streak was
+  -- permanently stuck at 0.)
+  final_outcome AS (
+    SELECT outcome FROM match_outcomes ORDER BY rn DESC LIMIT 1
   ),
   current_streak_calc AS (
     SELECT
-      (SELECT outcome FROM recent_outcomes LIMIT 1) AS last_outcome,
+      (SELECT outcome FROM final_outcome) AS last_outcome,
       COUNT(*)::INT AS cnt
-    FROM (
-      SELECT outcome, rn,
-             rn - ROW_NUMBER() OVER (ORDER BY rn DESC) AS grp
-      FROM recent_outcomes
-    ) sub
-    WHERE grp = 0
-      AND outcome = (SELECT outcome FROM recent_outcomes LIMIT 1)
-      AND outcome IN ('win', 'loss')
+    FROM match_outcomes mo
+    WHERE mo.outcome = (SELECT outcome FROM final_outcome)
+      AND mo.outcome IN ('win', 'loss')
+      AND mo.rn > COALESCE((
+        SELECT MAX(x.rn) FROM match_outcomes x
+        WHERE x.outcome <> (SELECT outcome FROM final_outcome)
+      ), 0)
   ),
   -- Head-to-head: opponent player names, win/loss counts
   h2h AS (

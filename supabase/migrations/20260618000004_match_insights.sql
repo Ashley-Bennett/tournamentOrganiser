@@ -56,7 +56,10 @@ BEGIN
       AND (tm.player1_id = me.id OR tm.player2_id = me.id)
     WHERE tm.id = p_match_id
   ) THEN
-    RAISE EXCEPTION 'You are not a participant in this match';
+    -- Surfaced verbatim in MatchInsightsModal — keep it actionable. Insights
+    -- from unlinked entries never reach the stats RPCs anyway (they all join
+    -- through user_id-linked tournament_players rows).
+    RAISE EXCEPTION 'This tournament entry is not linked to your account yet — claim it from your dashboard, then save insights';
   END IF;
 
   INSERT INTO public.match_insights (match_id, player_id, went_first, opponent_deck_pokemon1, opponent_deck_pokemon2)

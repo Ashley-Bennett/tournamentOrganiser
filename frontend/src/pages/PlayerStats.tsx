@@ -230,7 +230,8 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
     <>
       <Grid container spacing={2} mb={2}>
         <Grid item xs={6} sm={4} md={2}>
-          <StatCard label="Win Rate" value={winRate} sub={data ? `${data.total_match_wins}W / ${data.total_matches - data.total_match_wins}L` : undefined} loading={loading} color="info.main" />
+          {/* "of N" rather than "/ NL": the remainder includes draws, not just losses */}
+          <StatCard label="Win Rate" value={winRate} sub={data ? `${data.total_match_wins}W of ${data.total_matches}` : undefined} loading={loading} color="info.main" />
         </Grid>
         <Grid item xs={6} sm={4} md={2}>
           <StatCard label="Win Rate (no byes)" value={winRateNoByes} sub={data ? `${data.matches_no_byes} matches` : undefined} loading={loading} />
@@ -331,7 +332,7 @@ function DeckStatsSection({ data, loading, nameMap }: { data: DeckStat[]; loadin
                     <Typography variant="body2" fontWeight={600}>{pct(d.match_wins, d.total_matches)}</Typography>
                   </td>
                   <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2">{d.match_wins}W / {d.total_matches - d.match_wins}L</Typography>
+                    <Typography variant="body2">{d.match_wins}W of {d.total_matches}</Typography>
                   </td>
                   <td style={{ padding: "10px 12px" }}>
                     <Typography variant="body2">{d.top3_count}</Typography>
@@ -392,7 +393,7 @@ function FirstSecondSection({
           <StatCard
             label="Going First"
             value={firstRate}
-            sub={data ? `${data.went_first_wins}W / ${data.went_first_total - data.went_first_wins}L` : undefined}
+            sub={data ? `${data.went_first_wins}W of ${data.went_first_total}` : undefined}
             loading={loading}
             color="primary.main"
           />
@@ -401,7 +402,7 @@ function FirstSecondSection({
           <StatCard
             label="Going Second"
             value={secondRate}
-            sub={data ? `${data.went_second_wins}W / ${data.went_second_total - data.went_second_wins}L` : undefined}
+            sub={data ? `${data.went_second_wins}W of ${data.went_second_total}` : undefined}
             loading={loading}
           />
         </Grid>
