@@ -16,13 +16,22 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [invalid, setInvalid] = useState(false);
   const navigate = useNavigate();
 
-  // Supabase fires PASSWORD_RECOVERY once the token in the URL hash is exchanged
+  // supabase-js processes the recovery token in the URL during client init —
+  // which can happen before this page mounts, so the transient PASSWORD_RECOVERY
+  // event may fire before we subscribe. INITIAL_SESSION is replayed to every new
+  // subscriber after init completes, so we key off the resulting session instead:
+  // a session present means the link was valid; INITIAL_SESSION with no session
+  // means the token was missing, already used, or expired.
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         setReady(true);
+      } else if (event === "INITIAL_SESSION") {
+        if (session) setReady(true);
+        else setInvalid(true);
       }
     });
     return () => subscription.unsubscribe();
@@ -48,6 +57,19 @@ const ResetPassword = () => {
       navigate("/login", { replace: true, state: { passwordReset: true } });
     }
   };
+
+  if (invalid) {
+    return (
+      <Box maxWidth={400} mx="auto" mt={8}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          This password reset link is invalid or has expired.
+        </Alert>
+        <Button variant="contained" onClick={() => navigate("/forgot-password")}>
+          Request a new link
+        </Button>
+      </Box>
+    );
+  }
 
   if (!ready) {
     return (
