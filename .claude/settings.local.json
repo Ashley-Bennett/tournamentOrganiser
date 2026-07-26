@@ -50,7 +50,9 @@
       "Bash(cp supabase/.temp/project-ref /tmp/dev-project-ref.bak && echo \"saved dev ref: $\\(cat supabase/.temp/project-ref\\)\" && echo \"--- attempting link to prod ---\" && timeout 60 npx supabase link --project-ref ahkycovfuesrynrwodzp 2>&1 | tail -15)",
       "mcp__5e1ac459-ce64-4967-aef8-a8d6a77381dd__get_advisors",
       "WebFetch(domain:dns.google)",
-      "Bash(awk '/FUNCTION public.get_player_tournament_view/,/^\\\\$\\\\$;/' supabase/migrations/20260719211839_medium_severity_fixes.sql)"
+      "Bash(awk '/FUNCTION public.get_player_tournament_view/,/^\\\\$\\\\$;/' supabase/migrations/20260719211839_medium_severity_fixes.sql)",
+      "Bash(awk '/FUNCTION public.get_tournament_for_join/,/^\\\\$\\\\$;/' supabase/migrations/20260719211839_medium_severity_fixes.sql)",
+      "Bash(awk '/FUNCTION public.get_tournaments_summary/,/^\\\\$\\\\$;/' supabase/migrations/20260618000000_player_dashboard_stats.sql)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ashle\\Code\\tournamentOrganiser\\frontend\\src\\pages",

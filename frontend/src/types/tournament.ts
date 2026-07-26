@@ -19,6 +19,10 @@ export interface TournamentSummary {
   round_note?: string | null;
   join_enabled?: boolean;
   join_code?: string | null;
+  starts_at?: string | null;
+  game_format?: string | null;
+  location?: string | null;
+  description?: string | null;
 }
 
 export interface TournamentPlayer {

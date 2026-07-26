@@ -109,6 +109,22 @@ const AddPlayerInput: React.FC<AddPlayerInputProps> = ({ onAdd, disabled, inputR
   );
 };
 
+/** ISO timestamp → value for a <input type="datetime-local"> (local time). */
+function isoToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** datetime-local value (local time) → ISO timestamp, or null if empty/invalid. */
+function localInputToIso(v: string): string | null {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 const TournamentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -144,6 +160,12 @@ const TournamentView: React.FC = () => {
   const [savingTimer, setSavingTimer] = useState(false);
   const [timerDurationInput, setTimerDurationInput] = useState<string | null>(null);
   const [numRounds, setNumRounds] = useState<number | null>(null);
+  const [startsAtInput, setStartsAtInput] = useState("");
+  const [formatInput, setFormatInput] = useState("");
+  const [locationInput, setLocationInput] = useState("");
+  const [descriptionInput, setDescriptionInput] = useState("");
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
   const playerNameInputRef = useRef<HTMLInputElement>(null);
 
@@ -172,6 +194,10 @@ const TournamentView: React.FC = () => {
   useEffect(() => {
     if (tournament) {
       setNumRounds(tournament.num_rounds ?? 3);
+      setStartsAtInput(isoToLocalInput(tournament.starts_at));
+      setFormatInput(tournament.game_format ?? "");
+      setLocationInput(tournament.location ?? "");
+      setDescriptionInput(tournament.description ?? "");
     }
   }, [tournament]);
 
@@ -463,7 +489,7 @@ const TournamentView: React.FC = () => {
       .eq("id", tournament.id)
       .eq("workspace_id", workspaceId ?? "")
       .select(
-        "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
+        "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description",
       )
       .maybeSingle();
     if (!error && data) setTournament(data as TournamentSummary);
@@ -471,6 +497,30 @@ const TournamentView: React.FC = () => {
 
   const handleRoundStep = (delta: number) => {
     void handleSetRounds((numRounds ?? 3) + delta);
+  };
+
+  const handleSaveDetails = async () => {
+    if (!tournament || !workspaceId) return;
+    setSavingDetails(true);
+    setDetailsError("");
+    const updates = {
+      starts_at: localInputToIso(startsAtInput),
+      game_format: formatInput.trim() || null,
+      location: locationInput.trim() || null,
+      description: descriptionInput.trim() || null,
+    };
+    const { error } = await supabase
+      .from("tournaments")
+      .update(updates)
+      .eq("id", tournament.id)
+      .eq("workspace_id", workspaceId);
+    setSavingDetails(false);
+    if (error) {
+      setDetailsError(error.message);
+      return;
+    }
+    setTournament({ ...tournament, ...updates });
+    setCopyToast("Details saved");
   };
 
   // Swiss convention: ceil(log2(players)) rounds. Suggested only as a hint.
@@ -607,7 +657,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
         .eq("id", tournament.id)
         .eq("workspace_id", workspaceId)
         .select(
-          "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
+          "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description",
         )
         .maybeSingle();
 
@@ -761,6 +811,25 @@ const handleSetRoundDuration = async (minutes: number | null) => {
           <Typography variant="body2" color="text.secondary">Created</Typography>
           <Typography variant="body2">{formatDateTime(tournament.created_at)}</Typography>
 
+          {tournament.starts_at && (
+            <>
+              <Typography variant="body2" color="text.secondary">Date</Typography>
+              <Typography variant="body2">{formatDateTime(tournament.starts_at)}</Typography>
+            </>
+          )}
+          {tournament.game_format && (
+            <>
+              <Typography variant="body2" color="text.secondary">Format</Typography>
+              <Typography variant="body2">{tournament.game_format}</Typography>
+            </>
+          )}
+          {tournament.location && (
+            <>
+              <Typography variant="body2" color="text.secondary">Location</Typography>
+              <Typography variant="body2">{tournament.location}</Typography>
+            </>
+          )}
+
           {tournament.num_rounds && tournament.status !== "draft" && (
             <>
               <Typography variant="body2" color="text.secondary">Rounds</Typography>
@@ -768,6 +837,17 @@ const handleSetRoundDuration = async (minutes: number | null) => {
             </>
           )}
         </Box>
+
+        {tournament.description && (
+          <Box sx={{ mt: 1.5 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Description
+            </Typography>
+            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+              {tournament.description}
+            </Typography>
+          </Box>
+        )}
 
         {tournament.status !== "draft" && (
           <Button
@@ -785,6 +865,66 @@ const handleSetRoundDuration = async (minutes: number | null) => {
           <>
             <Divider sx={{ my: 2 }} />
             <Box display="flex" flexDirection="column" gap={2}>
+              {/* Event details */}
+              <Box display="flex" flexDirection="column" gap={1.5}>
+                <Typography variant="subtitle2">Details</Typography>
+                <TextField
+                  label="Date & time"
+                  type="datetime-local"
+                  size="small"
+                  value={startsAtInput}
+                  onChange={(e) => setStartsAtInput(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                />
+                <TextField
+                  label="Format"
+                  size="small"
+                  value={formatInput}
+                  onChange={(e) => setFormatInput(e.target.value)}
+                  placeholder="e.g. Standard, Expanded, GLC"
+                  inputProps={{ maxLength: 50 }}
+                  fullWidth
+                />
+                <TextField
+                  label="Location"
+                  size="small"
+                  value={locationInput}
+                  onChange={(e) => setLocationInput(e.target.value)}
+                  placeholder="Venue or 'Online'"
+                  inputProps={{ maxLength: 120 }}
+                  fullWidth
+                />
+                <TextField
+                  label="Description"
+                  size="small"
+                  value={descriptionInput}
+                  onChange={(e) => setDescriptionInput(e.target.value)}
+                  placeholder="Entry fee, prizes, what to bring…"
+                  multiline
+                  minRows={2}
+                  inputProps={{ maxLength: 2000 }}
+                  fullWidth
+                />
+                {detailsError && <Alert severity="error">{detailsError}</Alert>}
+                <Box>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => void handleSaveDetails()}
+                    disabled={
+                      savingDetails ||
+                      (startsAtInput === isoToLocalInput(tournament.starts_at) &&
+                        formatInput === (tournament.game_format ?? "") &&
+                        locationInput === (tournament.location ?? "") &&
+                        descriptionInput === (tournament.description ?? ""))
+                    }
+                  >
+                    {savingDetails ? "Saving…" : "Save details"}
+                  </Button>
+                </Box>
+              </Box>
+              <Divider />
               {/* Round count stepper */}
               <Box display="flex" flexDirection="column" gap={0.75}>
                 <Typography variant="subtitle2">Number of Rounds</Typography>

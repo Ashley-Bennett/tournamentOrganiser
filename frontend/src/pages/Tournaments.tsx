@@ -97,7 +97,7 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
 
       const { data, error } = await supabase
         .from("tournaments")
-        .select("id, name, status, tournament_type, created_at, created_by")
+        .select("id, name, status, tournament_type, created_at, created_by, starts_at, game_format")
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
 
@@ -323,7 +323,7 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                     />
                   </Box>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    {getTournamentTypeLabel(tournament.tournament_type)} · {formatDate(tournament.created_at)}
+                    {tournament.game_format || getTournamentTypeLabel(tournament.tournament_type)} · {formatDate(tournament.starts_at ?? tournament.created_at)}
                   </Typography>
                 </CardContent>
                 <CardActions sx={{ pt: 0.5, px: 2, pb: 1.5 }}>
@@ -357,9 +357,9 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
               <TableHead>
                 <TableRow>
                   <TableCell>Name</TableCell>
-                  <TableCell>Type</TableCell>
+                  <TableCell>Format</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell>Created</TableCell>
+                  <TableCell>Date</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -397,7 +397,7 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                     <TableRow key={tournament.id}>
                       <TableCell>{tournament.name}</TableCell>
                       <TableCell>
-                        {getTournamentTypeLabel(tournament.tournament_type)}
+                        {tournament.game_format || getTournamentTypeLabel(tournament.tournament_type)}
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -406,7 +406,7 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                           size="small"
                         />
                       </TableCell>
-                      <TableCell>{formatDate(tournament.created_at)}</TableCell>
+                      <TableCell>{formatDate(tournament.starts_at ?? tournament.created_at)}</TableCell>
                       <TableCell>
                         <Button
                           size="small"

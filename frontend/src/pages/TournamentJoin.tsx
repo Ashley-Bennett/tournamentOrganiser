@@ -23,6 +23,7 @@ import {
   clearEntry,
 } from "../utils/playerStorage";
 import { useAuth } from "../AuthContext";
+import { formatDateTime } from "../utils/format";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,10 @@ export default function TournamentJoin() {
   const [deckPokemon2, setDeckPokemon2] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [startsAt, setStartsAt] = useState<string | null>(null);
+  const [gameFormat, setGameFormat] = useState<string | null>(null);
+  const [location, setLocation] = useState<string | null>(null);
+  const [description, setDescription] = useState<string | null>(null);
 
   const nameTaken = useMemo(
     () => registeredNames.some((n) => n.toLowerCase() === nameInput.trim().toLowerCase()),
@@ -68,6 +73,17 @@ export default function TournamentJoin() {
 
       setTournamentName(name);
       setRegisteredNames(names);
+
+      const details = row as {
+        starts_at: string | null;
+        game_format: string | null;
+        location: string | null;
+        description: string | null;
+      };
+      setStartsAt(details.starts_at ?? null);
+      setGameFormat(details.game_format ?? null);
+      setLocation(details.location ?? null);
+      setDescription(details.description ?? null);
 
       // Expire cache if tournament is completed
       if (status === "completed") {
@@ -183,9 +199,34 @@ export default function TournamentJoin() {
             <Typography variant="h5" gutterBottom fontWeight={600}>
               {tournamentName}
             </Typography>
-            <Typography variant="body2" color="text.secondary" mb={3}>
+            <Typography variant="body2" color="text.secondary" mb={2}>
               Enter your name to join the tournament.
             </Typography>
+
+            {(startsAt || gameFormat || location || description) && (
+              <Box sx={{ mb: 2.5, p: 1.5, borderRadius: 1, bgcolor: "action.hover" }}>
+                {startsAt && (
+                  <Typography variant="body2">
+                    <strong>When:</strong> {formatDateTime(startsAt)}
+                  </Typography>
+                )}
+                {gameFormat && (
+                  <Typography variant="body2">
+                    <strong>Format:</strong> {gameFormat}
+                  </Typography>
+                )}
+                {location && (
+                  <Typography variant="body2">
+                    <strong>Where:</strong> {location}
+                  </Typography>
+                )}
+                {description && (
+                  <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>
+                    {description}
+                  </Typography>
+                )}
+              </Box>
+            )}
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}

@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - New users are auto-provisioned a default personal workspace on first login instead of being sent to the create-workspace page. `RedirectToWorkspace` (`App.tsx`) now calls `create_workspace` when the user has no memberships (named from `display_name`, falling back to the email local-part), retries on slug collision, and falls back to `/workspaces/new` only if the RPC errors. The onboarding "organiser" choice (`Welcome.tsx`) routes through the same path. `/workspaces/new` is retained for additional workspaces and as the error fallback.
+- **Tournament metadata** (Phase 1): tournaments gain optional `starts_at`, `game_format`, `location`, and `description` fields. Editable via a new Details section on the draft tournament page; surfaced read-only once the event is live. The tournaments list and dashboard now show format + scheduled date (falling back to created date), and the player join page shows when/where/format/notes before a player joins. `get_tournament_for_join` extended to return the new fields to anonymous joiners; length-capped by CHECK constraints. No capacity limit and no public discovery page in this phase.
 
 ### Fixed
 - Password-reset page no longer hangs on "Verifying reset link…". `ResetPassword.tsx` keyed off the transient `PASSWORD_RECOVERY` event, which supabase-js fires during client init before the page mounts; it now recognises the recovery session via `INITIAL_SESSION` + session presence, and shows an "invalid or expired link" state (with a re-request button) instead of hanging when no session is established.
@@ -24,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Migrations
 - `20260726212718_fix_self_join_pokemon_id_range` — widen `self_join_tournament` deck ID validation to 1–99999.
 - `20260726214422_player_flow_fixes` — restore `self_join_tournament` auto-link; add `get_my_tournament_entry`; default `profiles.onboarding_intent` to `'player'`.
+- `20260726223324_tournament_metadata` — add `starts_at`/`game_format`/`location`/`description` columns (+ length CHECKs); extend `get_tournament_for_join` to return them.
 
 ### Ops / Config (no code)
 - Enabled prod auth with email verification; configured custom SMTP via Resend (sender on the verified `notifications.matchamp.win` subdomain) to lift the built-in 2/hour email cap.
