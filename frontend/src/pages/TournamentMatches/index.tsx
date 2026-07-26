@@ -1035,7 +1035,7 @@ const TournamentMatches: React.FC = () => {
                             mb={2}
                           >
                             <Typography variant="h6">
-                              Final Standings
+                              {tournament.status === "completed" ? "Final Standings" : "Standings"}
                             </Typography>
                             <Button
                               size="small"

@@ -110,6 +110,12 @@ export default function MatchTableDesktop({
         <TableBody>
           {matches.map((match) => {
             const canEdit = match.status === "pending" && match.player2_id !== null;
+            // Only surface the result chips once the round is live (editable) or
+            // to display a finished result — never as dead, clickable-looking
+            // buttons in the pre-"Begin round" Ready state.
+            const showResultChips =
+              match.player2_id !== null &&
+              (canEdit || match.status === MATCH_STATUS.COMPLETED);
             const matchNumber = matchNumberById.get(match.id) ?? 0;
             const pendingResult = pendingResults.get(match.id);
             const report = matchReports.get(match.id);
@@ -212,7 +218,7 @@ export default function MatchTableDesktop({
                           {getStandingLabel(match.player1_id)}
                         </Typography>
                       </Box>
-                      {match.player2_id && (
+                      {showResultChips && (
                         <Box display="flex" gap={0.5} flexWrap="wrap">
                           <Chip
                             label="1-0"
@@ -312,6 +318,7 @@ export default function MatchTableDesktop({
                           {match.player2_id ? getStandingLabel(match.player2_id) : ""}
                         </Typography>
                       </Box>
+                      {showResultChips && (
                       <Box display="flex" gap={0.5} flexWrap="wrap">
                         {/* P2 perspective: "1-0" = P2 wins, "0-1" = P1 wins */}
                         <Chip
@@ -385,6 +392,7 @@ export default function MatchTableDesktop({
                           disabled={!canEdit || updatingMatch}
                         />
                       </Box>
+                      )}
                     </Box>
                   ) : (
                     <Chip label="Bye" size="small" color="info" variant="outlined" />

@@ -452,11 +452,10 @@ const TournamentView: React.FC = () => {
     }
   };
 
-  const handleRoundStep = async (delta: number) => {
+  const handleSetRounds = async (target: number) => {
     if (!tournament || tournament.status !== "draft" || !user) return;
-    const current = numRounds ?? 3;
-    const next = Math.min(20, Math.max(1, current + delta));
-    if (next === current) return;
+    const next = Math.min(20, Math.max(1, target));
+    if (next === numRounds) return;
     setNumRounds(next);
     const { data, error } = await supabase
       .from("tournaments")
@@ -469,6 +468,14 @@ const TournamentView: React.FC = () => {
       .maybeSingle();
     if (!error && data) setTournament(data as TournamentSummary);
   };
+
+  const handleRoundStep = (delta: number) => {
+    void handleSetRounds((numRounds ?? 3) + delta);
+  };
+
+  // Swiss convention: ceil(log2(players)) rounds. Suggested only as a hint.
+  const suggestedRounds =
+    players.length >= 2 ? Math.max(1, Math.ceil(Math.log2(players.length))) : null;
 
 const handleSetRoundDuration = async (minutes: number | null) => {
     if (!tournament || !workspaceId) return;
@@ -806,6 +813,21 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                     <AddIcon fontSize="small" />
                   </IconButton>
                 </Box>
+                {suggestedRounds !== null && suggestedRounds !== numRounds && (
+                  <Box display="flex" alignItems="center" gap={0.5} flexWrap="wrap">
+                    <Typography variant="caption" color="text.secondary">
+                      Suggested: {suggestedRounds} for {players.length} players
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="text"
+                      sx={{ minWidth: 0, py: 0, px: 0.5 }}
+                      onClick={() => void handleSetRounds(suggestedRounds)}
+                    >
+                      Use {suggestedRounds}
+                    </Button>
+                  </Box>
+                )}
               </Box>
 
 <Box>

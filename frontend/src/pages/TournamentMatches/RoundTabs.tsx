@@ -175,7 +175,7 @@ export default function RoundTabs({
           />
         )}
       <Tab
-        label="Final Standings"
+        label={tournament.status === "completed" ? "Final Standings" : "Standings"}
         value="standings"
         disabled={!hasMatchesForStandings}
         sx={
