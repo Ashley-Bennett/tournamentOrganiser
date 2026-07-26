@@ -9,6 +9,42 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.6.0",
+    date: "2026-07-26",
+    entries: [
+      {
+        category: "New Features",
+        items: [
+          "New player stats page: see your overall record, a matchup matrix, deck history, round-by-round performance, and how you're trending over time.",
+          "After a match you can now record whether you went first and what deck your opponent played — these feed straight into your stats.",
+          "Redesigned dashboard: a spotlight for your active tournament, your five most recent tournaments, quick stats, and a friendly time-of-day greeting.",
+          "Your dashboard now shows meaningful stats at a glance — tournaments completed, wins, win rate, and your favourite deck.",
+          "Switch between Organising and Playing with tabs on the home page, so the app shows what matters for how you're using it.",
+          "You can now set whether you prefer the player or organiser view from your account page.",
+        ],
+      },
+      {
+        category: "Tournaments",
+        items: [
+          "You now pick your deck when you join a tournament, so your stats are captured from the very first round. Your deck stays hidden from opponents until the event ends.",
+          "Standings tiebreakers now follow the official Play! Pokémon rules more closely — byes are excluded from win percentage and the rules for draws and dropped players match the handbook.",
+          "If an organiser removes you by mistake, you can now rejoin a tournament you'd self-registered for.",
+        ],
+      },
+      {
+        category: "Fixes & Polish",
+        items: [
+          "When you sign in, tournaments you joined on this device are now linked to your account automatically — no manual claiming needed.",
+          "Your name is pre-filled from your profile when joining a tournament.",
+          "Win rate now counts byes as wins and shows one decimal place, matching the standings.",
+          "Your current streak and deck filters on the stats page now calculate correctly.",
+          "Dashboards no longer flash a loading spinner when you switch browser tabs and come back.",
+          "Added a privacy policy, terms page, and the ability to delete your account and its data yourself.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.5.0",
     date: "2026-06-17",
     entries: [

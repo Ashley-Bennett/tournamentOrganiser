@@ -43,7 +43,12 @@
       "Bash(python -c ' *)",
       "Bash(python -c \"import pypdf\")",
       "Bash(pip install *)",
-      "mcp__5e1ac459-ce64-4967-aef8-a8d6a77381dd__apply_migration"
+      "mcp__5e1ac459-ce64-4967-aef8-a8d6a77381dd__apply_migration",
+      "Bash(env)",
+      "Bash(npx supabase *)",
+      "mcp__5e1ac459-ce64-4967-aef8-a8d6a77381dd__list_migrations",
+      "Bash(cp supabase/.temp/project-ref /tmp/dev-project-ref.bak && echo \"saved dev ref: $\\(cat supabase/.temp/project-ref\\)\" && echo \"--- attempting link to prod ---\" && timeout 60 npx supabase link --project-ref ahkycovfuesrynrwodzp 2>&1 | tail -15)",
+      "mcp__5e1ac459-ce64-4967-aef8-a8d6a77381dd__get_advisors"
     ],
     "additionalDirectories": [
       "c:\\Users\\ashle\\Code\\tournamentOrganiser\\frontend\\src\\pages",

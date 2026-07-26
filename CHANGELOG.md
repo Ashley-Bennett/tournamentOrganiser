@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.0] - 2026-07-26
+
+### Added
+- **Player stats page** (`/stats`) with an overview panel, deck history, matchup matrix, round-by-round performance, and a quarterly trend chart.
+- **Post-game insights**: players can record whether they went first and which deck their opponent played after a match. Backed by a new `match_insights` table and `upsert_match_insights` RPC (validates match participation and Pokémon IDs).
+- Six player-stat RPCs: `get_player_overview_stats`, `get_player_deck_stats`, `get_player_matchup_matrix`, `get_player_round_performance`, `get_player_trend`, `get_player_first_second_stats`.
+- `get_opponent_went_first` RPC — safely reads the opponent's went-first answer for matches you participated in, so a player's own answer can be pre-filled by inversion.
+- **Snapshot dashboard** redesign: active-tournament spotlight, recent-5 tournaments list, headline stat row (joined / active / completed / on-device), and a contextual time-of-day greeting.
+- Player stats surfaced on the dashboard (completed, won, win rate, favourite deck); `get_my_player_entries` and `get_tournaments_summary` extended to return position, match wins/totals, and deck data.
+- **Organiser/Player view switcher** in the header, later unified into Organising/Playing home tabs (`Home.tsx`) defaulting by `onboarding_intent`.
+- **Player self-claim onboarding**: `self_claim_player_entry` RPC (device-token account linking) and an `AutoClaimer` that silently claims localStorage entries on login; sign-up nudge banners for anonymous players.
+- Unified `/my-tournaments` view merging DB-linked and device entries with inline claim buttons.
+- Preferred-role toggle on the account page (saved to `profiles.onboarding_intent`).
+- Deck selection required when self-registering — inline `DeckPicker` (extracted from `DeckPickerDialog`); `self_join_tournament` extended to store the deck on insert.
+- **GDPR compliance**: privacy policy and terms pages, self-serve account deletion with shared-workspace handover, and a daily `pg_cron` purge of old audit logs and spent invite emails.
+
+### Fixed
+- Tiebreakers aligned with the Play! Pokémon handbook §5.3.3/§5.5.1.1: win % is now wins÷rounds with byes excluded, draws no longer count as half-wins, the 75% floor applies only to dropped players, and head-to-head is restricted to exactly-two-player ties. Standings and pairing now share one win-percentage formula.
+- Insights gated on result submission; opponent's deck stays locked until the match is confirmed complete, then unlocks and pre-fills automatically.
+- Corrected `match_insights.player_id` joins (it references `auth.users.id`, not `tournament_players.id`) that were silently dropping insights from every stats calculation.
+- Current-streak now counts back from the latest result; deck filter activates when either slot is set; draw-inclusive captions no longer mislabel draws as losses.
+- Win rate counts byes as wins and shows one decimal place; auto-linking sets `user_id = auth.uid()` when joining while authenticated.
+- Self-registered players can rejoin after an organiser removes them; removed players are redirected back to the join form.
+- Dashboards no longer flash the loading skeleton on tab refocus (`initialLoadDoneRef`; removed `workspaceLoading` from `isLoading`).
+
+### Security
+- Revoked `SELECT` on `tournament_players.device_token`/`device_id` and `EXECUTE` on `purge_unclaimed_player_entries`/`cleanup_audit_log` from anon + authenticated roles; Self-reg chip now derived from `created_by`.
+- Scoped `tournament_matches` anon SELECT to self-registration tournaments and `match_result_reports` SELECT to workspace members (was `USING(true)`); `accept_workspace_invite` now verifies caller email.
+- Pinned `search_path` on remaining SECURITY DEFINER functions; capped self-registration names at 50 chars; stopped shipping production source maps; `Secure` flag on the device-token cookie.
+- Removed the stale `tournament-organizer-backend.onrender.com` origin from the CSP `connect-src` — all data access is via Supabase.
+
+### Refactored / Removed
+- Split player match history (`/my-tournaments`) from account management (`/me`, "My Account"); removed the workspace dropdown from the header and added a Dashboard nav link.
+- Removed dead dummy-auth endpoints, the `apiCall` helper and JWT plumbing, an unused rematch-escape branch in pairing, and unused `jwt`/`passport`/`node-fetch` deps from the root `package.json`.
+
+### Migrations
+- `20260421000000_self_claim_player_entry`, `20260618000000`–`20260618000005` (dashboard stats, autolink, win-rate, `match_insights`, stats RPCs), `20260619000000`/`20260619000001` (insights join fix, opponent-went-first), `20260721120312_self_join_with_deck`.
+
+---
+
 ## [0.5.0] - 2026-06-17
 
 ### Added
