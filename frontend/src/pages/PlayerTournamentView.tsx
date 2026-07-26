@@ -22,6 +22,7 @@ import CatchingPokemonIcon from "@mui/icons-material/CatchingPokemon";
 import { supabase } from "../supabaseClient";
 import { getEntry, clearEntry, saveEntry, type TjEntry } from "../utils/playerStorage";
 import { useAuth } from "../AuthContext";
+import Breadcrumbs from "../components/Breadcrumbs";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { getSpriteUrl } from "../utils/pokemonCache";
@@ -694,14 +695,13 @@ const PlayerTournamentView: React.FC = () => {
 
   const header = (
     <Box mb={2}>
-      <Typography
-        variant="caption"
-        component={Link}
-        to="/my-tournaments"
-        sx={{ color: "text.secondary", textDecoration: "none", "&:hover": { textDecoration: "underline" }, mb: 0.75, display: "inline-block" }}
-      >
-        ← My tournaments
-      </Typography>
+      <Breadcrumbs
+        items={[
+          { label: "Dashboard", to: "/dashboard" },
+          { label: "My tournaments", to: "/my-tournaments" },
+          { label: tournament.name },
+        ]}
+      />
       <Box display="flex" alignItems="center" gap={1} mb={0.25}>
         <Typography variant="h5" fontWeight={700}>
           {tournament.name}

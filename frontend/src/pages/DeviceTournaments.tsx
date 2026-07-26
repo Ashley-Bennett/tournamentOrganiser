@@ -14,6 +14,7 @@ import { EmojiEventsOutlined as TrophyIcon, Add as AddIcon } from "@mui/icons-ma
 import { getAllEntries } from "../utils/playerStorage";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
+import Breadcrumbs from "../components/Breadcrumbs";
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -156,6 +157,14 @@ export default function DeviceTournaments({ embedded = false }: { embedded?: boo
 
   return (
     <Box maxWidth={embedded ? undefined : 560} mx={embedded ? undefined : "auto"} mt={embedded ? 0 : 4}>
+      {!embedded && (
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "My tournaments" },
+          ]}
+        />
+      )}
       <Box display="flex" flexWrap="wrap" gap={2} mb={2} justifyContent="space-between" alignItems="center">
         {!embedded && (
           <Stack direction="row" spacing={1} alignItems="center">

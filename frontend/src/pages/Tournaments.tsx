@@ -39,6 +39,7 @@ import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
 import { TournamentSummary } from "../types/tournament";
+import Breadcrumbs from "../components/Breadcrumbs";
 
 const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const navigate = useNavigate();
@@ -225,6 +226,14 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
 
   return (
     <Box>
+      {!embedded && (
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "Tournaments" },
+          ]}
+        />
+      )}
       <Box
         display="flex"
         flexWrap="wrap"

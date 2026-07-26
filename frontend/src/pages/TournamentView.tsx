@@ -39,7 +39,7 @@ import QrCode2Icon from "@mui/icons-material/QrCode2";
 import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
-import TournamentPageHeader from "../components/TournamentPageHeader";
+import Breadcrumbs from "../components/Breadcrumbs";
 import { useTournament } from "../hooks/useTournament";
 import { useWorkspace } from "../WorkspaceContext";
 import { useTournamentPlayers } from "../hooks/useTournamentPlayers";
@@ -754,9 +754,12 @@ const handleSetRoundDuration = async (minutes: number | null) => {
   if (error || !tournament) {
     return (
       <Box>
-        <TournamentPageHeader
-          title="Tournament"
-          onBack={() => navigate(wPath("/tournaments"))}
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "Tournaments", to: wPath("/tournaments") },
+            { label: "Tournament" },
+          ]}
         />
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -769,10 +772,16 @@ const handleSetRoundDuration = async (minutes: number | null) => {
 
   return (
     <Box>
-      <TournamentPageHeader
-        title={tournament.name}
-        onBack={() => navigate(wPath("/tournaments"))}
+      <Breadcrumbs
+        items={[
+          { label: "Dashboard", to: "/dashboard" },
+          { label: "Tournaments", to: wPath("/tournaments") },
+          { label: tournament.name },
+        ]}
       />
+      <Typography variant="h4" component="h1" sx={{ mb: 3 }}>
+        {tournament.name}
+      </Typography>
 
       <Paper sx={{ p: 3, mb: 3 }}>
         {/* Status chip */}

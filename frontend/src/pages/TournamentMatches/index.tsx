@@ -17,7 +17,7 @@ import {
   useTheme,
   useMediaQuery,
 } from "@mui/material";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import Breadcrumbs from "../../components/Breadcrumbs";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import CloseIcon from "@mui/icons-material/Close";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -894,18 +894,14 @@ const TournamentMatches: React.FC = () => {
   if (!tournament) {
     return (
       <Box>
-        <Box display="flex" alignItems="center" mb={3}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate(wPath(`/tournaments/${id ?? ""}`))}
-            sx={{ mr: 2 }}
-          >
-            Back to tournament
-          </Button>
-          <Typography variant="h4" component="h1">
-            Matches
-          </Typography>
-        </Box>
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", to: "/dashboard" },
+            { label: "Tournaments", to: wPath("/tournaments") },
+            { label: "Tournament", to: wPath(`/tournaments/${id ?? ""}`) },
+            { label: "Matches" },
+          ]}
+        />
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
@@ -917,13 +913,15 @@ const TournamentMatches: React.FC = () => {
 
   return (
     <Box>
+      <Breadcrumbs
+        items={[
+          { label: "Dashboard", to: "/dashboard" },
+          { label: "Tournaments", to: wPath("/tournaments") },
+          { label: tournament.name, to: wPath(`/tournaments/${tournament.id}`) },
+          { label: "Matches" },
+        ]}
+      />
       <Box display="flex" flexWrap="wrap" alignItems="center" gap={1} mb={3}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(wPath(`/tournaments/${tournament.id}`))}
-        >
-          Back
-        </Button>
         <Typography
           variant="h5"
           component="h1"
