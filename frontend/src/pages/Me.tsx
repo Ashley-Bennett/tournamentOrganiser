@@ -355,18 +355,15 @@ const Me = () => {
         <Stack spacing={1}>
           <Typography variant="body2" color="text.secondary">
             Preferred role:{" "}
-            {profile?.onboarding_intent ? (
-              <Typography component="span" variant="body2" fontWeight={600} color="text.primary">
-                {profile.onboarding_intent.charAt(0).toUpperCase() + profile.onboarding_intent.slice(1)}
-              </Typography>
-            ) : (
-              <Typography component="span" variant="body2" fontStyle="italic">
-                not set
-              </Typography>
-            )}
+            <Typography component="span" variant="body2" fontWeight={600} color="text.primary">
+              {(() => {
+                const role = profile?.onboarding_intent ?? "player";
+                return role.charAt(0).toUpperCase() + role.slice(1);
+              })()}
+            </Typography>
           </Typography>
           <ToggleButtonGroup
-            value={profile?.onboarding_intent ?? null}
+            value={profile?.onboarding_intent ?? "player"}
             exclusive
             onChange={(e, v) => void handleIntentChange(e, v)}
             disabled={intentLoading}

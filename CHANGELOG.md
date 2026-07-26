@@ -14,9 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - Password-reset page no longer hangs on "Verifying reset link…". `ResetPassword.tsx` keyed off the transient `PASSWORD_RECOVERY` event, which supabase-js fires during client init before the page mounts; it now recognises the recovery session via `INITIAL_SESSION` + session presence, and shows an "invalid or expired link" state (with a re-request button) instead of hanging when no session is established.
 - Self-registration with a Mega/regional/Gigantamax Pokémon no longer fails with "Invalid pokemon id". `self_join_tournament` capped deck IDs at 1025, but PokéAPI assigns form IDs from 10001+ (e.g. Mega Venusaur = 10033); aligned its bound with `set_player_deck` (1–99999).
+- Restored auto-linking on `self_join_tournament`. The deck migration (`20260721120312`) rewrote the function and dropped `user_id = auth.uid()` from the INSERT, so joining while logged in created an unlinked entry — it never appeared in the account and forced a manual "Link" step on the My Tournaments page.
+- Player tournament view (`/t/:id/me`) no longer shows "Not registered" for a signed-in owner viewing from a device without the local device token. Added `get_my_tournament_entry` RPC to recover the owner's `player_id` + `device_token` (authorised by `user_id = auth.uid()`), which `PlayerTournamentView` caches locally and reuses.
+- New accounts now default their preferred role to **Player** (`profiles.onboarding_intent` default + account page shows Player selected when unset).
 
 ### Migrations
 - `20260726212718_fix_self_join_pokemon_id_range` — widen `self_join_tournament` deck ID validation to 1–99999.
+- `20260726214422_player_flow_fixes` — restore `self_join_tournament` auto-link; add `get_my_tournament_entry`; default `profiles.onboarding_intent` to `'player'`.
 
 ### Ops / Config (no code)
 - Enabled prod auth with email verification; configured custom SMTP via Resend (sender on the verified `notifications.matchamp.win` subdomain) to lift the built-in 2/hour email cap.

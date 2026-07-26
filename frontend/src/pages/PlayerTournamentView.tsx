@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import CatchingPokemonIcon from "@mui/icons-material/CatchingPokemon";
 import { supabase } from "../supabaseClient";
-import { getEntry, getAllEntries, clearEntry } from "../utils/playerStorage";
+import { getEntry, clearEntry, saveEntry, type TjEntry } from "../utils/playerStorage";
 import { useAuth } from "../AuthContext";
 import { sortByTieBreakers } from "../utils/tieBreaking";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
@@ -342,16 +342,36 @@ const PlayerTournamentView: React.FC = () => {
   const prevRoundCountRef = useRef(0);
   const prevTournamentStatusRef = useRef<string | null>(null);
 
-  // Get the player's credentials from localStorage
-  const entry = useMemo(
+  // Get the player's credentials from localStorage. A signed-in user who owns
+  // this entry but lacks the local device token (e.g. joined on another device)
+  // recovers it from the server below, so the view works on any device.
+  const [entry, setEntry] = useState<TjEntry | null>(
     () => (tournamentId ? getEntry(tournamentId) : null),
-    [tournamentId],
   );
+  const [recovering, setRecovering] = useState(false);
 
-  const otherTournaments = useMemo(
-    () => getAllEntries().filter((e) => e.tournamentId !== tournamentId),
-    [tournamentId],
-  );
+  useEffect(() => {
+    if (entry || !tournamentId || !user) return;
+    let active = true;
+    setRecovering(true);
+    void (async () => {
+      const { data } = await supabase.rpc("get_my_tournament_entry", {
+        p_tournament_id: tournamentId,
+      });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (active && row?.device_token) {
+        const recovered: TjEntry = {
+          playerId: row.player_id as string,
+          deviceToken: row.device_token as string,
+          joinedAt: new Date().toISOString(),
+        };
+        saveEntry(tournamentId, recovered);
+        setEntry(recovered);
+      }
+      if (active) setRecovering(false);
+    })();
+    return () => { active = false; };
+  }, [entry, tournamentId, user]);
 
   useEffect(() => {
     if (!tournamentId || !entry) return;
@@ -619,6 +639,14 @@ const PlayerTournamentView: React.FC = () => {
   // ── Early returns ──────────────────────────────────────────────────────────
 
   if (!entry) {
+    // Still trying to recover a linked entry for a signed-in owner
+    if (recovering) {
+      return (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+          <CircularProgress />
+        </Box>
+      );
+    }
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh" px={2}>
         <Paper sx={{ p: 4, maxWidth: 400, width: "100%", textAlign: "center" }}>
