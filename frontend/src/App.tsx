@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Box, Container } from "@mui/material";
 import Header from "./components/Header";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -33,6 +33,7 @@ import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 import { getAllEntries } from "./utils/playerStorage";
 import { supabase } from "./supabaseClient";
+import { slugify, randomSuffix } from "./utils/slugify";
 
 // Silently claims any localStorage tournament entries for the logged-in user.
 // Runs once per session per user — guards against re-running with sessionStorage.
@@ -71,13 +72,69 @@ function RequireAuth({ children }: { children: JSX.Element }) {
   return children;
 }
 
+/**
+ * Entry point after login (`/dashboard`). If the user already belongs to a
+ * workspace, send them straight into it. If they have none — a brand-new
+ * account — silently provision a default personal workspace and drop them in,
+ * so users never see a workspace-creation wall. Only if provisioning errors do
+ * we fall back to the manual create page.
+ */
 function RedirectToWorkspace() {
-  const { workspaces, loading } = useWorkspace();
+  const { workspaces, loading, refreshWorkspaces } = useWorkspace();
+  const { profile, user } = useAuth();
+  const navigate = useNavigate();
+  const creatingRef = useRef(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (loading || workspaces.length > 0 || creatingRef.current) return;
+    creatingRef.current = true;
+
+    void (async () => {
+      const base =
+        profile?.display_name?.trim() ||
+        user?.email?.split("@")[0] ||
+        "My";
+      const wsName = `${base}'s workspace`;
+      const baseSlug = slugify(wsName) || `workspace-${randomSuffix()}`;
+      let slug = baseSlug;
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const { data, error } = await supabase.rpc("create_workspace", {
+          p_name: wsName,
+          p_slug: slug,
+          p_type: "personal",
+          p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        });
+        if (!error) {
+          refreshWorkspaces();
+          navigate(`/w/${(data as { slug: string }).slug}/dashboard`, {
+            replace: true,
+          });
+          return;
+        }
+        // Unique-slug collision — retry with a random suffix
+        if (error.code === "23505") {
+          slug = `${baseSlug}-${randomSuffix()}`;
+          continue;
+        }
+        // Unexpected failure — let the user create one manually
+        setFailed(true);
+        return;
+      }
+      setFailed(true);
+    })();
+  }, [loading, workspaces, profile, user, navigate, refreshWorkspaces]);
+
   if (loading) return null;
   if (workspaces.length > 0) {
     return <Navigate to={`/w/${workspaces[0].slug}/dashboard`} replace />;
   }
-  return <Navigate to="/workspaces/new" replace />;
+  if (failed) {
+    return <Navigate to="/workspaces/new" replace />;
+  }
+  // Provisioning in progress
+  return null;
 }
 
 function RootRoute() {

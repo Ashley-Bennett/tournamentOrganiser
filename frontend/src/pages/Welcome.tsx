@@ -19,7 +19,6 @@ import {
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
-import { useWorkspace } from "../WorkspaceContext";
 import { getAllEntries } from "../utils/playerStorage";
 import { supabase } from "../supabaseClient";
 
@@ -33,7 +32,6 @@ interface LocalEntry {
 const Welcome = () => {
   const navigate = useNavigate();
   const { displayName, updateProfile } = useAuth();
-  const { workspaces } = useWorkspace();
 
   const [step, setStep] = useState<"choose" | "claim">("choose");
   const [localEntries, setLocalEntries] = useState<LocalEntry[]>([]);
@@ -43,11 +41,9 @@ const Welcome = () => {
 
   const handleOrganiserChoice = async () => {
     await updateProfile({ onboarding_intent: "organiser" });
-    if (workspaces.length === 0) {
-      navigate("/workspaces/new");
-    } else {
-      navigate("/dashboard");
-    }
+    // /dashboard auto-provisions a workspace if the user has none, so there's
+    // no separate create-workspace step in the onboarding flow.
+    navigate("/dashboard");
   };
 
   const handlePlayerChoice = async () => {
