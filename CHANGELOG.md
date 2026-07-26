@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.1] - 2026-07-26
+
+### Added
+- New users are auto-provisioned a default personal workspace on first login instead of being sent to the create-workspace page. `RedirectToWorkspace` (`App.tsx`) now calls `create_workspace` when the user has no memberships (named from `display_name`, falling back to the email local-part), retries on slug collision, and falls back to `/workspaces/new` only if the RPC errors. The onboarding "organiser" choice (`Welcome.tsx`) routes through the same path. `/workspaces/new` is retained for additional workspaces and as the error fallback.
+
+### Fixed
+- Password-reset page no longer hangs on "Verifying reset link…". `ResetPassword.tsx` keyed off the transient `PASSWORD_RECOVERY` event, which supabase-js fires during client init before the page mounts; it now recognises the recovery session via `INITIAL_SESSION` + session presence, and shows an "invalid or expired link" state (with a re-request button) instead of hanging when no session is established.
+
+### Ops / Config (no code)
+- Enabled prod auth with email verification; configured custom SMTP via Resend (sender on the verified `notifications.matchamp.win` subdomain) to lift the built-in 2/hour email cap.
+- Set Site URL to `https://matchamp.win` and redirect allow-list to `https://matchamp.win/**`.
+- Branded the "Confirm signup" and "Reset password" email templates (navy/crimson, table-based inline HTML).
+- Added a DMARC record (`_dmarc.matchamp.win` → `v=DMARC1; p=none;`) in Cloudflare to stop reset emails landing in spam.
+
+---
+
 ## [0.6.0] - 2026-07-26
 
 ### Added
