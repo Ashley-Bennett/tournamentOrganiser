@@ -39,7 +39,17 @@ const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:hello@matchamp.win";
 
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+// Configure VAPID lazily so the function boots cleanly even before its secrets
+// are set (web-push throws on empty keys). Returns false when unconfigured.
+let vapidConfigured = false;
+function ensureVapid(): boolean {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return false;
+  if (!vapidConfigured) {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    vapidConfigured = true;
+  }
+  return true;
+}
 
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
   auth: { persistSession: false },
@@ -51,6 +61,9 @@ Deno.serve(async (req) => {
   }
   if (!SHARED_SECRET || req.headers.get("Authorization") !== `Bearer ${SHARED_SECRET}`) {
     return new Response("Unauthorized", { status: 401 });
+  }
+  if (!ensureVapid()) {
+    return new Response("Push not configured", { status: 503 });
   }
 
   let payload: Payload;
