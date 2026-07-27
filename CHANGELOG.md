@@ -6,13 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [0.6.1] - 2026-07-26
+## [0.6.1] - 2026-07-27
 
 ### Added
+- **Web push notifications** (Phase 2): players can opt in to OS-level push for the events that matter — a new round paired, the round timer running out, and final standings ready. Backed by a `send-push` Supabase edge function, a `push_subscriptions` table with player/organiser-targeting RPCs, and `pg_net` triggers/cron that fire on the relevant events. The app is now an installable PWA (manifest, service worker, icons) so the notifications work on iOS and Android home-screen installs. Opt-in prompts appear on the player and tournament views.
+- **In-app alerts**: a new `PlayerNotifications` provider watches every tournament you've joined and raises a snackbar — with a one-tap link straight to your round — on any page. New `useAttentionAlert` hook adds a device vibration and a tab-title flash. Alerts fire once per round, personalised with your table/opponent, and stale time-up alerts are suppressed on late page loads. When OS push is granted the in-app toast is suppressed so foreground users see just one notification.
 - New users are auto-provisioned a default personal workspace on first login instead of being sent to the create-workspace page. `RedirectToWorkspace` (`App.tsx`) now calls `create_workspace` when the user has no memberships (named from `display_name`, falling back to the email local-part), retries on slug collision, and falls back to `/workspaces/new` only if the RPC errors. The onboarding "organiser" choice (`Welcome.tsx`) routes through the same path. `/workspaces/new` is retained for additional workspaces and as the error fallback.
 - **Tournament metadata** (Phase 1): tournaments gain optional `starts_at`, `game_format`, `location`, and `description` fields. Editable via a new Details section on the draft tournament page; surfaced read-only once the event is live. The tournaments list and dashboard now show format + scheduled date (falling back to created date), and the player join page shows when/where/format/notes before a player joins. `get_tournament_for_join` extended to return the new fields to anonymous joiners; length-capped by CHECK constraints. No capacity limit and no public discovery page in this phase.
+- Branded favicon, social share previews (OpenGraph/Twitter meta + a 1200×630 share image), page title/description/`theme-color`/canonical URL, and "Sign up" / "Log in" cross-links between the auth pages.
 
 ### Fixed
+- **Final placings were wrong for anything below the top spots.** Player-facing RPCs derived position from a points-only `RANK()`, so tied players collapsed (e.g. 5th showed as 3rd). Final standings — computed with the real tiebreakers — are now persisted on completion, and every player RPC (`get_my_player_entries`, `get_tournaments_summary`, overview, deck stats, top-finishes) reads the stored `position`. Added a backfill for existing completed tournaments.
+- Signup could create **duplicate personal workspaces** when the DB signup trigger and the client auto-provision raced (or the client double-fired). Added an idempotent `ensure_personal_workspace()` RPC guarded by a per-user advisory lock; it returns the existing personal workspace if one is present, and the client now calls it instead of `create_workspace`.
+- Entry-link handling: email/in-app browsers are steered to open in Chrome or install the PWA (so push/PWA features work), the "link" redirect loop is stopped, and an entry that belongs to another account now says so instead of silently failing to link.
+- Push polish: pushes always show a visible notification (silent pushes were tripping Chrome's "possible spam" flag), the badge icon is monochrome so Android renders the "M" rather than a square, tapping a notification routes straight to the player's pairing page, and the title now leads with the opponent/round.
 - Password-reset page no longer hangs on "Verifying reset link…". `ResetPassword.tsx` keyed off the transient `PASSWORD_RECOVERY` event, which supabase-js fires during client init before the page mounts; it now recognises the recovery session via `INITIAL_SESSION` + session presence, and shows an "invalid or expired link" state (with a re-request button) instead of hanging when no session is established.
 - Self-registration with a Mega/regional/Gigantamax Pokémon no longer fails with "Invalid pokemon id". `self_join_tournament` capped deck IDs at 1025, but PokéAPI assigns form IDs from 10001+ (e.g. Mega Venusaur = 10033); aligned its bound with `set_player_deck` (1–99999).
 - Restored auto-linking on `self_join_tournament`. The deck migration (`20260721120312`) rewrote the function and dropped `user_id = auth.uid()` from the INSERT, so joining while logged in created an unlinked entry — it never appeared in the account and forced a manual "Link" step on the My Tournaments page.
@@ -28,12 +35,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `20260726212718_fix_self_join_pokemon_id_range` — widen `self_join_tournament` deck ID validation to 1–99999.
 - `20260726214422_player_flow_fixes` — restore `self_join_tournament` auto-link; add `get_my_tournament_entry`; default `profiles.onboarding_intent` to `'player'`.
 - `20260726223324_tournament_metadata` — add `starts_at`/`game_format`/`location`/`description` columns (+ length CHECKs); extend `get_tournament_for_join` to return them.
+- `20260727090000_ensure_personal_workspace` — idempotent `ensure_personal_workspace()` RPC with per-user advisory lock.
+- `20260727100000_web_push` — `push_subscriptions` table, player/organiser-targeting RPCs, and `pg_net` triggers/cron for pairing / round time-up / standings-ready push events.
+- `20260727120000_persist_standings` — persist final standings (real tiebreakers) on completion; player RPCs read the stored `position`.
+- `20260727130000_stats_top_finishes_from_standings` — top-finishes/placing stats read from stored standings.
 
 ### Ops / Config (no code)
 - Enabled prod auth with email verification; configured custom SMTP via Resend (sender on the verified `notifications.matchamp.win` subdomain) to lift the built-in 2/hour email cap.
 - Set Site URL to `https://matchamp.win` and redirect allow-list to `https://matchamp.win/**`.
 - Branded the "Confirm signup" and "Reset password" email templates (navy/crimson, table-based inline HTML).
 - Added a DMARC record (`_dmarc.matchamp.win` → `v=DMARC1; p=none;`) in Cloudflare to stop reset emails landing in spam.
+- Deployed the `send-push` edge function and set VAPID secrets for web push (the function boots cleanly before the secrets are configured).
 
 ---
 

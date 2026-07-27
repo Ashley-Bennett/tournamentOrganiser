@@ -9,6 +9,45 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.6.1",
+    date: "2026-07-27",
+    entries: [
+      {
+        category: "New Features",
+        items: [
+          "Push notifications: get alerted when a new round is paired, when the round timer runs out, and when final standings are ready — even when the app isn't open. Add the app to your home screen for the best experience.",
+          "In-app alerts: on any page, you'll now get a heads-up — with a quick link straight to your table — when your next round is ready, along with a vibrate and a flashing tab so you don't miss it.",
+          "Tournament details: organisers can add a date and time, game format, location, and notes to a tournament, and players see them before they join.",
+        ],
+      },
+      {
+        category: "Workspaces",
+        items: [
+          "New accounts now get a personal workspace set up automatically on first sign-in — no more create-workspace step just to get going.",
+        ],
+      },
+      {
+        category: "Tournaments",
+        items: [
+          "Final placings now show correctly — tied players no longer collapse to the wrong spot (for example, 5th showing as 3rd).",
+          "Entering a result on mobile now asks \"Who won?\" with buttons labelled by the actual player names, instead of abstract score chips.",
+        ],
+      },
+      {
+        category: "Fixes & Polish",
+        items: [
+          "New breadcrumb navigation across the tournament pages, so your dashboard is one tap away from anywhere.",
+          "Standings now read \"Standings\" while a tournament is in progress and \"Final Standings\" once it's done.",
+          "When setting up a tournament, we now suggest a sensible round count for the number of players.",
+          "The password-reset link no longer gets stuck on \"Verifying reset link…\".",
+          "Joining with a Mega, regional, or Gigantamax Pokémon deck now works.",
+          "Tournaments you join while signed in are linked to your account automatically, and an entry that belongs to someone else now says so clearly.",
+          "A branded app icon plus nicer previews when you share a link to the app, and quick sign-up / log-in links between the auth pages.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.6.0",
     date: "2026-07-26",
     entries: [
