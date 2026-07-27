@@ -145,8 +145,15 @@ export default function DeviceTournaments({ embedded = false }: { embedded?: boo
       p_device_token: row.deviceToken,
     });
     setClaimingId(null);
-    if (error && !error.message.includes("already linked")) {
-      setClaimErrors((prev) => ({ ...prev, [row.tournamentId]: error.message }));
+    if (error) {
+      // "Already linked" means the entry belongs to an account — if it were
+      // THIS account it would already show as linked, so it's a different one.
+      // Surface that clearly instead of silently hiding it (which looped: the
+      // row vanished, then reappeared unlinked on the next refresh).
+      const msg = error.message.toLowerCase().includes("already linked")
+        ? "This entry is linked to a different account, so it can't be added here."
+        : error.message;
+      setClaimErrors((prev) => ({ ...prev, [row.tournamentId]: msg }));
       return;
     }
     setClaimedIds((prev) => new Set([...prev, row.tournamentId]));

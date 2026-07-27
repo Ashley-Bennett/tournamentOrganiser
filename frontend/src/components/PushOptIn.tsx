@@ -31,6 +31,7 @@ export default function PushOptIn({
     supported,
     permission,
     iosNeedsInstall,
+    inApp,
     subscribing,
     subscribeAsPlayer,
     subscribeAsOrganiser,
@@ -41,12 +42,30 @@ export default function PushOptIn({
   );
   const [done, setDone] = useState(false);
 
-  if (!supported || permission !== "default" || dismissed || done) return null;
+  if (dismissed || done) return null;
 
   const dismiss = () => {
     localStorage.setItem(dismissKey(variant, tournamentId), "1");
     setDismissed(true);
   };
+
+  // In-app / email browsers: push either isn't supported or won't persist and
+  // never carries to the real browser — steer them out instead of a dead prompt.
+  if (inApp) {
+    return (
+      <Alert
+        severity="info"
+        icon={<NotificationsActiveIcon fontSize="inherit" />}
+        onClose={dismiss}
+        sx={{ mb: 2 }}
+      >
+        For match notifications, open this page in your browser — tap the menu
+        (⋮) and choose “Open in Chrome”, or add Matchamp to your Home Screen.
+      </Alert>
+    );
+  }
+
+  if (!supported || permission !== "default") return null;
 
   // iOS: can't subscribe until installed — guide instead of prompting.
   if (iosNeedsInstall) {

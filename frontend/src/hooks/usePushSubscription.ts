@@ -24,6 +24,21 @@ function detectStandalone(): boolean {
 
 const isIos = () => /iphone|ipad|ipod/i.test(window.navigator.userAgent);
 
+// Heuristic: are we inside an embedded/in-app browser (email/social webview)?
+// Web push can't be enabled reliably there, and never carries to the user's
+// real browser — so we steer them out rather than offer a dead "Enable".
+function isInAppBrowser(): boolean {
+  const ua = window.navigator.userAgent || "";
+  if (/(FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|Snapchat|WhatsApp|MicroMessenger|GSA\/)/i.test(ua))
+    return true;
+  if (/; wv\)/.test(ua) || /\bwv\b/.test(ua)) return true; // Android WebView
+  // iOS WKWebView: iOS, not standalone, and missing the Safari token.
+  const standalone =
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+  if (isIos() && !standalone && !/Safari/.test(ua)) return true;
+  return false;
+}
+
 interface Keys {
   endpoint: string;
   p256dh: string;
@@ -60,6 +75,7 @@ export function usePushSubscription() {
     isIos() &&
     !standalone &&
     "serviceWorker" in navigator;
+  const inApp = typeof window !== "undefined" && isInAppBrowser();
 
   const doSubscribe = useCallback(async (): Promise<Keys | null> => {
     if (!supported) return null;
@@ -136,6 +152,7 @@ export function usePushSubscription() {
     permission,
     standalone,
     iosNeedsInstall,
+    inApp,
     subscribing,
     subscribeAsPlayer,
     subscribeAsOrganiser,
