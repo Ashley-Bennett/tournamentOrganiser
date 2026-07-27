@@ -40,6 +40,7 @@ import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
 import Breadcrumbs from "../components/Breadcrumbs";
+import PushOptIn from "../components/PushOptIn";
 import { useTournament } from "../hooks/useTournament";
 import { useWorkspace } from "../WorkspaceContext";
 import { useTournamentPlayers } from "../hooks/useTournamentPlayers";
@@ -782,6 +783,8 @@ const handleSetRoundDuration = async (minutes: number | null) => {
       <Typography variant="h4" component="h1" sx={{ mb: 3 }}>
         {tournament.name}
       </Typography>
+
+      <PushOptIn variant="organiser" tournamentId={tournament.id} />
 
       <Paper sx={{ p: 3, mb: 3 }}>
         {/* Status chip */}

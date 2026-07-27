@@ -31,6 +31,7 @@ import DeckPickerDialog from "../components/DeckPickerDialog";
 import LiveIndicator from "../components/LiveIndicator";
 import MatchInsightsModal from "../components/MatchInsightsModal";
 import NormalizedSprite from "../components/NormalizedSprite";
+import PushOptIn from "../components/PushOptIn";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -817,6 +818,13 @@ const PlayerTournamentView: React.FC = () => {
           {tournament.round_note}
         </Alert>
       )}
+
+      <PushOptIn
+        variant="player"
+        tournamentId={tournamentId!}
+        playerId={entry.playerId}
+        deviceToken={entry.deviceToken}
+      />
 
       {/* Player's own match */}
       <MyMatchCard

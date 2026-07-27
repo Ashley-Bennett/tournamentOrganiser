@@ -364,6 +364,11 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# send-push is called server-to-server by Postgres (pg_net) and authenticates
+# with its own shared secret, not a Supabase JWT — so gateway JWT checks are off.
+[functions.send-push]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
