@@ -139,26 +139,39 @@ Deno.serve(async (req) => {
     const s = row.push_subscriptions;
     if (!s || toSend.has(s.endpoint)) continue;
 
-    let body: string | null = null;
+    // Title carries the key info (opponent / round) so it reads clearly even
+    // collapsed; body holds the supporting detail + a tap hint.
+    let title: string | null = null;
+    let body = "";
+
     if (type === "standings_ready") {
-      body = "All rounds complete — final standings are ready!";
+      title = "Final standings are ready";
+      body = "Tap to see how you placed.";
     } else if (type === "time_up") {
       if (row.is_organiser || (row.tournament_player_id && roundPlayerIds.has(row.tournament_player_id))) {
-        body = `Time's up for Round ${round}!`;
+        title = `Round ${round}: time's up!`;
+        body = "Please wrap up your current game.";
       }
     } else if (type === "pairing_up") {
       if (row.tournament_player_id && roundPlayerIds.has(row.tournament_player_id)) {
         const m = matchByPlayer.get(row.tournament_player_id);
-        if (!m) body = `Round ${round} pairings are up!`;
-        else if (m.bye) body = `Round ${round}: you have a bye this round.`;
-        else {
-          const where = m.table != null ? `Table ${m.table}` : "your table";
-          body = `Round ${round} is up — ${where} vs ${m.oppName ?? "your opponent"}`;
+        if (!m) {
+          title = `Round ${round} pairings are up`;
+          body = "Tap to view your table.";
+        } else if (m.bye) {
+          title = `Round ${round}: you have a bye`;
+          body = "No match this round — enjoy the break.";
+        } else {
+          title = `Round ${round}: vs ${m.oppName ?? "your opponent"}`;
+          body =
+            m.table != null
+              ? `Table ${m.table} — tap to view your pairing.`
+              : "Tap to view your pairing.";
         }
       }
     }
 
-    if (body) toSend.set(s.endpoint, { sub: s, title: "Matchamp", body });
+    if (title) toSend.set(s.endpoint, { sub: s, title, body });
   }
 
   if (toSend.size === 0) return json({ sent: 0 });

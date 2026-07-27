@@ -31,7 +31,7 @@ self.addEventListener("push", (event) => {
       await self.registration.showNotification(title, {
         body,
         icon: "/icon-192.png",
-        badge: "/icon-192.png",
+        badge: "/badge-96.png", // monochrome silhouette for the status bar
         data: { url },
         tag: url, // collapse repeats for the same round/tournament
         renotify: true,
@@ -50,19 +50,29 @@ self.addEventListener("notificationclick", (event) => {
         type: "window",
         includeUncontrolled: true,
       });
-      for (const c of all) {
-        if ("focus" in c) {
-          await c.focus();
-          if ("navigate" in c && c.url !== self.location.origin + url) {
-            try {
-              await c.navigate(url);
-            } catch {
-              /* navigation not permitted — ignore */
-            }
-          }
-          return;
+
+      // Already on the target page? Just focus it.
+      const exact = all.find((c) => {
+        try {
+          return new URL(c.url).pathname === url;
+        } catch {
+          return false;
         }
+      });
+      if (exact) {
+        await exact.focus();
+        return;
       }
+
+      // App open elsewhere — focus it and ask the SPA to route to the pairing.
+      const open = all.find((c) => "focus" in c);
+      if (open) {
+        await open.focus();
+        open.postMessage({ type: "matchamp:navigate", url });
+        return;
+      }
+
+      // App closed — open a new window straight at the pairing page.
       await self.clients.openWindow(url);
     })(),
   );

@@ -244,6 +244,21 @@ export default function PlayerNotifications() {
     [notify],
   );
 
+  // When a push notification is tapped, the service worker asks us to route to
+  // the pairing page (rather than leaving the player wherever they were).
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const onMessage = (e: MessageEvent) => {
+      const data = e.data as { type?: string; url?: string } | null;
+      if (data?.type === "matchamp:navigate" && typeof data.url === "string") {
+        navigate(data.url);
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () =>
+      navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, [navigate]);
+
   const goToRound = () => {
     if (alert) navigate(`/t/${alert.tournamentId}/me`);
     setAlert(null);
