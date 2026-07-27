@@ -11,6 +11,7 @@ import {
   assignMatchNumbers,
   type SeatConflict,
 } from "../utils/tournamentUtils";
+import { sortByTieBreakers } from "../utils/tieBreaking";
 import {
   MATCH_STATUS,
   serializeDecisionLog,
@@ -294,6 +295,61 @@ export function useRoundLifecycle({
         round_elapsed_seconds: 0,
         round_is_paused: false,
       });
+
+      // Persist the final standings using the same tiebreakers the app shows
+      // (OMW%/OOMW%/head-to-head), so player-facing placings match exactly.
+      // Best-effort: completion has already succeeded above.
+      try {
+        const [{ data: freshMatches }, { data: playerRows }] = await Promise.all([
+          supabase.from("tournament_matches").select("*").eq("tournament_id", tournament.id),
+          supabase
+            .from("tournament_players")
+            .select("id, name, dropped")
+            .eq("tournament_id", tournament.id),
+        ]);
+        const players = (playerRows ?? []) as {
+          id: string;
+          name: string;
+          dropped: boolean;
+        }[];
+        const nameOf = new Map(players.map((p) => [p.id, p.name]));
+        const enriched: MatchWithPlayers[] = ((freshMatches ?? []) as Match[]).map(
+          (m) => ({
+            ...m,
+            player1_name: nameOf.get(m.player1_id) ?? "Unknown",
+            player2_name: m.player2_id ? nameOf.get(m.player2_id) ?? "Unknown" : null,
+            winner_name: m.winner_id ? nameOf.get(m.winner_id) ?? "Unknown" : null,
+          }),
+        );
+        const completed = enriched.filter(
+          (m) => m.status === "completed" || m.status === "bye",
+        );
+        const raw = buildStandingsFromMatches(
+          completed,
+          players.map((p) => ({ id: p.id, name: p.name })),
+        );
+        const droppedIds = new Set(
+          players.filter((p) => p.dropped).map((p) => p.id),
+        );
+        const sorted = sortByTieBreakers(raw, droppedIds);
+        const p_rows = sorted.map((s, i) => ({
+          player_id: s.id,
+          position: i + 1,
+          match_points: s.matchPoints,
+          wins: s.wins,
+          losses: s.losses,
+          draws: s.draws,
+          matches_played: s.matchesPlayed,
+          byes_received: s.byesReceived ?? 0,
+        }));
+        await supabase.rpc("save_tournament_standings", {
+          p_tournament_id: tournament.id,
+          p_rows,
+        });
+      } catch {
+        /* best-effort — placings backfill can recover this later */
+      }
+
       setSelectedRound("standings");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to complete tournament");
