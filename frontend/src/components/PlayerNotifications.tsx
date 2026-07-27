@@ -238,6 +238,15 @@ export default function PlayerNotifications() {
 
   const handleAlert = useCallback(
     (a: PlayerAlert) => {
+      // When OS push is granted, the service worker shows the notification for
+      // every event (foreground included) — so skip the in-app toast to avoid
+      // doubling up. Non-push users still get the in-app cue.
+      if (
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted"
+      ) {
+        return;
+      }
       setAlert(a);
       notify(a.message);
     },

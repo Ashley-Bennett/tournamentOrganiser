@@ -15,28 +15,19 @@ self.addEventListener("push", (event) => {
   const body = data.body || "";
   const url = data.url || "/";
 
+  // Always show a notification for every push. Skipping it (even when the app
+  // is focused) is a silent push, which Chrome penalises as "possible spam".
+  // Foreground double-notify is avoided on the client side instead: the in-app
+  // toast is suppressed when OS push permission is granted.
   event.waitUntil(
-    (async () => {
-      // If the app is already open and focused, Phase 1's in-app toast has it
-      // covered — skip the OS notification to avoid double-notifying.
-      const clientsArr = await self.clients.matchAll({
-        type: "window",
-        includeUncontrolled: true,
-      });
-      const focused = clientsArr.some(
-        (c) => c.focused || c.visibilityState === "visible",
-      );
-      if (focused) return;
-
-      await self.registration.showNotification(title, {
-        body,
-        icon: "/icon-192.png",
-        badge: "/badge-96.png", // monochrome silhouette for the status bar
-        data: { url },
-        tag: url, // collapse repeats for the same round/tournament
-        renotify: true,
-      });
-    })(),
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icon-192.png",
+      badge: "/badge-96.png", // monochrome silhouette for the status bar
+      data: { url },
+      tag: url, // collapse repeats for the same round/tournament
+      renotify: true,
+    }),
   );
 });
 
