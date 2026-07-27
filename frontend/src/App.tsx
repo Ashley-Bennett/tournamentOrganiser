@@ -96,32 +96,25 @@ function RedirectToWorkspace() {
         user?.email?.split("@")[0] ||
         "My";
       const wsName = `${base}'s workspace`;
-      const baseSlug = slugify(wsName) || `workspace-${randomSuffix()}`;
-      let slug = baseSlug;
+      const slug = slugify(wsName) || `workspace-${randomSuffix()}`;
 
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const { data, error } = await supabase.rpc("create_workspace", {
-          p_name: wsName,
-          p_slug: slug,
-          p_type: "personal",
-          p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      // Idempotent: returns the user's existing personal workspace if
+      // one already exists, otherwise provisions a single new one.
+      // Safe against remounts / double-fires / concurrent tabs, so it
+      // can never create a duplicate personal workspace.
+      const { data, error } = await supabase.rpc("ensure_personal_workspace", {
+        p_name: wsName,
+        p_slug: slug,
+        p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+      if (!error && data) {
+        refreshWorkspaces();
+        navigate(`/w/${(data as { slug: string }).slug}/dashboard`, {
+          replace: true,
         });
-        if (!error) {
-          refreshWorkspaces();
-          navigate(`/w/${(data as { slug: string }).slug}/dashboard`, {
-            replace: true,
-          });
-          return;
-        }
-        // Unique-slug collision — retry with a random suffix
-        if (error.code === "23505") {
-          slug = `${baseSlug}-${randomSuffix()}`;
-          continue;
-        }
-        // Unexpected failure — let the user create one manually
-        setFailed(true);
         return;
       }
+      // Unexpected failure — let the user create one manually
       setFailed(true);
     })();
   }, [loading, workspaces, profile, user, navigate, refreshWorkspaces]);
