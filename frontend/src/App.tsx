@@ -29,6 +29,7 @@ import WhatsNew from "./pages/WhatsNew";
 import PlayerStats from "./pages/PlayerStats";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
+import PlayerNotifications from "./components/PlayerNotifications";
 import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 import { getAllEntries } from "./utils/playerStorage";
@@ -170,6 +171,7 @@ function App() {
   return (
     <WorkspaceProvider>
       <AutoClaimer />
+      <PlayerNotifications />
       <Routes>
         {/* ── Landing: full-screen, own nav ───────────────────────── */}
         <Route path="/" element={<RootRoute />} />

@@ -17,11 +17,9 @@ import {
   Tab,
   Typography,
   Alert,
-  Snackbar,
 } from "@mui/material";
 import CatchingPokemonIcon from "@mui/icons-material/CatchingPokemon";
 import { supabase } from "../supabaseClient";
-import { useAttentionAlert } from "../hooks/useAttentionAlert";
 import { getEntry, clearEntry, saveEntry, type TjEntry } from "../utils/playerStorage";
 import { useAuth } from "../AuthContext";
 import Breadcrumbs from "../components/Breadcrumbs";
@@ -345,19 +343,6 @@ const PlayerTournamentView: React.FC = () => {
   const prevRoundCountRef = useRef(0);
   const prevTournamentStatusRef = useRef<string | null>(null);
 
-  // ── Phase 1 notifications (page-open attention cues) ────────────────────────
-  const { notify } = useAttentionAlert();
-  const [alertMessage, setAlertMessage] = useState<string | null>(null);
-  const expiredAlertRoundRef = useRef<number | null>(null);
-
-  const fireAlert = useCallback(
-    (message: string) => {
-      setAlertMessage(message);
-      notify(message);
-    },
-    [notify],
-  );
-
   // Get the player's credentials from localStorage. A signed-in user who owns
   // this entry but lacks the local device token (e.g. joined on another device)
   // recovers it from the server below, so the view works on any device.
@@ -505,12 +490,9 @@ const PlayerTournamentView: React.FC = () => {
       prevTournamentStatusRef.current !== "completed"
     ) {
       setSelectedRound("standings");
-      if (prevTournamentStatusRef.current !== null) {
-        fireAlert("All rounds complete — final standings are ready!");
-      }
     }
     prevTournamentStatusRef.current = tournamentStatus;
-  }, [tournamentStatus, fireAlert]);
+  }, [tournamentStatus]);
 
   // Auto-switch to newly added rounds
   const rounds = useMemo(
@@ -533,67 +515,10 @@ const PlayerTournamentView: React.FC = () => {
       return;
     }
     if (rounds.length > prevRoundCountRef.current) {
-      const newRound = Math.max(...rounds);
-      setSelectedRound(newRound);
-
-      // Personalised alert — we know this player's own table and opponent.
-      const mine = (viewData?.matches ?? []).find(
-        (m) => m.is_my_match && m.round_number === newRound,
-      );
-      if (!mine) {
-        fireAlert(`Round ${newRound} pairings are up!`);
-      } else if (mine.player2_id === null || mine.status === "bye") {
-        fireAlert(`Round ${newRound}: you have a bye this round.`);
-      } else {
-        const oppName =
-          mine.player1_id === viewData?.player.id
-            ? mine.player2_name
-            : mine.player1_name;
-        const where =
-          mine.match_number != null ? `Table ${mine.match_number}` : "your table";
-        fireAlert(
-          `Round ${newRound} is up — ${where} vs ${oppName ?? "your opponent"}`,
-        );
-      }
+      setSelectedRound(Math.max(...rounds));
     }
     prevRoundCountRef.current = rounds.length;
-  }, [rounds, viewData, fireAlert]);
-
-  // The round whose timer is currently running (the active pending round).
-  const activeTimerRound = useMemo(() => {
-    const pending = (viewData?.matches ?? [])
-      .filter((m) => m.status === "pending")
-      .map((m) => m.round_number);
-    return pending.length > 0 ? Math.max(...pending) : null;
-  }, [viewData]);
-
-  // Alert once per round when the timer runs out; suppress for a page opened
-  // after time already expired (see the pairings page for the full rationale).
-  useEffect(() => {
-    const t = viewData?.tournament;
-    const dur = t?.round_duration_minutes;
-    const startedAt = t?.current_round_started_at;
-    if (!dur || !startedAt || t?.round_is_paused) return;
-    if (activeTimerRound == null) return;
-    if (expiredAlertRoundRef.current === activeTimerRound) return;
-
-    const totalElapsedMs =
-      (t?.round_elapsed_seconds ?? 0) * 1000 +
-      (Date.now() - new Date(startedAt).getTime());
-    const remainingMs = dur * 60_000 - totalElapsedMs;
-
-    if (remainingMs <= 0) {
-      expiredAlertRoundRef.current = activeTimerRound;
-      return;
-    }
-
-    const roundForAlert = activeTimerRound;
-    const timeoutId = window.setTimeout(() => {
-      expiredAlertRoundRef.current = roundForAlert;
-      fireAlert(`Time's up for Round ${roundForAlert}!`);
-    }, remainingMs);
-    return () => clearTimeout(timeoutId);
-  }, [viewData, activeTimerRound, fireAlert]);
+  }, [rounds]);
 
   const handleRefresh = useCallback(async () => {
     if (!tournamentId || !entry) return;
@@ -759,24 +684,6 @@ const PlayerTournamentView: React.FC = () => {
   const { tournament, player, my_report } = viewData;
   const isStandings = selectedRound === "standings";
 
-  const snackbar = (
-    <Snackbar
-      open={!!alertMessage}
-      autoHideDuration={6000}
-      onClose={() => setAlertMessage(null)}
-      anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-    >
-      <Alert
-        onClose={() => setAlertMessage(null)}
-        severity="info"
-        variant="filled"
-        sx={{ width: "100%" }}
-      >
-        {alertMessage}
-      </Alert>
-    </Snackbar>
-  );
-
   const statusChip =
     tournament.status === "completed" ? (
       <Chip label="Completed" size="small" />
@@ -874,7 +781,6 @@ const PlayerTournamentView: React.FC = () => {
           initialPokemon2={viewData?.player.deck_pokemon2 ?? null}
           onSave={handleSaveDeck}
         />
-        {snackbar}
       </Box>
     );
   }
@@ -1176,7 +1082,6 @@ const PlayerTournamentView: React.FC = () => {
           onDismiss={() => setInsightsTarget(null)}
         />
       )}
-      {snackbar}
     </Box>
   );
 };
