@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   Chip,
   IconButton,
   MenuItem,
@@ -270,63 +271,48 @@ export default function MatchCardMobile({
                 )}
               </Box>
             </Box>
-            {/* Quick result chips */}
+            {/* Result entry — tap who won (names, not abstract 1-0/0-1) */}
             {canEditCard && match.player2_id && !editingPairings && (
-              <Box display="flex" gap={0.5}>
-                <Chip
-                  label="1-0"
-                  size="small"
-                  variant={p1Wins ? "filled" : "outlined"}
-                  sx={{
-                    flex: 1,
-                    borderColor: "success.main",
-                    color: p1Wins ? "white" : "success.main",
-                    backgroundColor: p1Wins ? "success.main" : "transparent",
-                    cursor: "pointer",
-                    "&:hover": {
-                      backgroundColor: p1Wins ? "success.dark" : "success.light",
-                      color: "white",
-                    },
-                  }}
-                  onClick={() => handleQuickResult(match, "player1")}
-                  disabled={!!updatingMatch}
-                />
-                <Chip
-                  label="Draw"
-                  size="small"
-                  variant={isDrawCard ? "filled" : "outlined"}
-                  sx={{
-                    flex: 1,
-                    borderColor: "warning.main",
-                    color: isDrawCard ? "white" : "warning.main",
-                    backgroundColor: isDrawCard ? "warning.main" : "transparent",
-                    cursor: "pointer",
-                    "&:hover": {
-                      backgroundColor: isDrawCard ? "warning.dark" : "warning.light",
-                      color: "white",
-                    },
-                  }}
-                  onClick={() => handleQuickResult(match, "draw")}
-                  disabled={!!updatingMatch}
-                />
-                <Chip
-                  label="0-1"
-                  size="small"
-                  variant={p2Wins ? "filled" : "outlined"}
-                  sx={{
-                    flex: 1,
-                    borderColor: "error.main",
-                    color: p2Wins ? "white" : "error.main",
-                    backgroundColor: p2Wins ? "error.main" : "transparent",
-                    cursor: "pointer",
-                    "&:hover": {
-                      backgroundColor: p2Wins ? "error.dark" : "error.light",
-                      color: "white",
-                    },
-                  }}
-                  onClick={() => handleQuickResult(match, "player2")}
-                  disabled={!!updatingMatch}
-                />
+              <Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mb: 0.5 }}
+                >
+                  Who won?
+                </Typography>
+                <Box display="flex" gap={0.75} alignItems="stretch">
+                  <Button
+                    variant={p1Wins ? "contained" : "outlined"}
+                    color="success"
+                    size="small"
+                    onClick={() => handleQuickResult(match, "player1")}
+                    disabled={!!updatingMatch}
+                    sx={{ flex: 1, minWidth: 0, textTransform: "none", lineHeight: 1.2 }}
+                  >
+                    {match.player1_name}
+                  </Button>
+                  <Button
+                    variant={isDrawCard ? "contained" : "outlined"}
+                    color="warning"
+                    size="small"
+                    onClick={() => handleQuickResult(match, "draw")}
+                    disabled={!!updatingMatch}
+                    sx={{ flexShrink: 0, textTransform: "none" }}
+                  >
+                    Draw
+                  </Button>
+                  <Button
+                    variant={p2Wins ? "contained" : "outlined"}
+                    color="success"
+                    size="small"
+                    onClick={() => handleQuickResult(match, "player2")}
+                    disabled={!!updatingMatch}
+                    sx={{ flex: 1, minWidth: 0, textTransform: "none", lineHeight: 1.2 }}
+                  >
+                    {match.player2_name}
+                  </Button>
+                </Box>
               </Box>
             )}
             {/* Player-submitted result indicator */}

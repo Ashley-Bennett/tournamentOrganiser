@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The standings tab and panel now read "Standings" while a tournament is in progress and only "Final Standings" once it's completed.
 - The round-count stepper suggests a Swiss-appropriate round count (⌈log₂(players)⌉) with a one-click "Use N" when it differs from the current value.
 - Replaced the ad-hoc single "Back" buttons and hard-coded "← My tournaments" link with a consistent **breadcrumb trail** across the tournament flow (new `Breadcrumbs` component). Organiser pages show `Dashboard › Tournaments › {name}` (and `… › Matches`); player pages show `Dashboard › My tournaments › {name}`; the two list pages show `Dashboard › Tournaments` / `Dashboard › My tournaments`. The dashboard is now one click from anywhere, and the list pages are no longer a forced one-way waypoint. Removed the now-unused `TournamentPageHeader` component.
+- Mobile result entry (`MatchCardMobile`) replaced the abstract `1-0 / Draw / 0-1` green/yellow/red chips — which didn't map to either player — with a **"Who won?"** row of buttons labelled with the actual player names (`{p1} / Draw / {p2}`). Tapping a player fills their button green and highlights their card. Desktop is unchanged (its per-player chip rows are already unambiguous).
 
 ### Migrations
 - `20260726212718_fix_self_join_pokemon_id_range` — widen `self_join_tournament` deck ID validation to 1–99999.
