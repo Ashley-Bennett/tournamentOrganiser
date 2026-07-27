@@ -83,6 +83,16 @@ const Login = () => {
           >
             {loading ? "Logging in..." : "Login"}
           </Button>
+          <Typography variant="body2" color="text.secondary" textAlign="center">
+            Don't have an account?{" "}
+            <Link
+              component={RouterLink}
+              to="/register"
+              state={location.state}
+            >
+              Sign up
+            </Link>
+          </Typography>
         </Stack>
       </form>
     </Box>

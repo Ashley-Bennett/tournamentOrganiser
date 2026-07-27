@@ -134,6 +134,12 @@ const Register = () => {
           >
             {loading ? "Registering..." : "Register"}
           </Button>
+          <Typography variant="body2" color="text.secondary" textAlign="center">
+            Already have an account?{" "}
+            <MuiLink component={RouterLink} to="/login" state={location.state}>
+              Log in
+            </MuiLink>
+          </Typography>
           <Typography variant="caption" color="text.secondary" textAlign="center">
             By creating an account you agree to the{" "}
             <MuiLink component={RouterLink} to="/terms">
