@@ -18,6 +18,7 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
+  Snackbar,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
@@ -31,6 +32,7 @@ import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import StandingsTable from "../components/StandingsTable";
 import RoundTimer from "../components/RoundTimer";
 import LiveIndicator from "../components/LiveIndicator";
+import { useAttentionAlert } from "../hooks/useAttentionAlert";
 import { TournamentSummary, TournamentPlayer } from "../types/tournament";
 import { MatchWithPlayers } from "../types/match";
 
@@ -57,6 +59,21 @@ const TournamentPairings: React.FC = () => {
   // Stores the resolved tournament ID so the realtime callback can ignore events
   // for other tournaments (the subscription has no server-side filter on public routes).
   const resolvedTournamentIdRef = useRef<string | null>(null);
+
+  // ── Phase 1 notifications (page-open attention cues) ────────────────────────
+  const { notify } = useAttentionAlert();
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  // Tracks the round whose timer expiry we've already announced, so we alert
+  // at most once per round and never on a page opened after time already ran out.
+  const expiredAlertRoundRef = useRef<number | null>(null);
+
+  const fireAlert = React.useCallback(
+    (message: string) => {
+      setAlertMessage(message);
+      notify(message);
+    },
+    [notify],
+  );
 
   useEffect(() => {
     if (!publicSlug && !id) {
@@ -345,9 +362,13 @@ const TournamentPairings: React.FC = () => {
       prevTournamentStatusRef.current !== "completed"
     ) {
       setSelectedRound("standings");
+      // Don't fire on the very first load of an already-completed tournament.
+      if (prevTournamentStatusRef.current !== null) {
+        fireAlert("All rounds complete — final standings are ready!");
+      }
     }
     prevTournamentStatusRef.current = tournamentStatus;
-  }, [tournamentStatus]);
+  }, [tournamentStatus, fireAlert]);
 
   // Auto-switch to a newly added round tab
   useEffect(() => {
@@ -358,10 +379,56 @@ const TournamentPairings: React.FC = () => {
       return;
     }
     if (rounds.length > prevRoundCountRef.current) {
-      setSelectedRound(Math.max(...rounds));
+      const newRound = Math.max(...rounds);
+      setSelectedRound(newRound);
+      fireAlert(`Round ${newRound} pairings are up — check your table!`);
     }
     prevRoundCountRef.current = rounds.length;
-  }, [rounds]);
+  }, [rounds, fireAlert]);
+
+  // The round whose timer is currently running (the active pending round).
+  const activeTimerRound = useMemo(() => {
+    const pending = matches
+      .filter((m) => m.status === "pending")
+      .map((m) => m.round_number);
+    return pending.length > 0 ? Math.max(...pending) : null;
+  }, [matches]);
+
+  // Alert when the round timer runs out (players and organiser alike), at most
+  // once per round. Recomputed from absolute timer fields so it stays accurate
+  // across pause/resume; a page opened after time already expired is silently
+  // marked as alerted so late arrivals don't get a stale "time's up".
+  useEffect(() => {
+    const dur = tournament?.round_duration_minutes;
+    const startedAt = tournament?.current_round_started_at;
+    if (!dur || !startedAt || tournament?.round_is_paused) return;
+    if (activeTimerRound == null) return;
+    if (expiredAlertRoundRef.current === activeTimerRound) return;
+
+    const totalElapsedMs =
+      (tournament?.round_elapsed_seconds ?? 0) * 1000 +
+      (Date.now() - new Date(startedAt).getTime());
+    const remainingMs = dur * 60_000 - totalElapsedMs;
+
+    if (remainingMs <= 0) {
+      expiredAlertRoundRef.current = activeTimerRound; // already over — suppress
+      return;
+    }
+
+    const roundForAlert = activeTimerRound;
+    const timeoutId = window.setTimeout(() => {
+      expiredAlertRoundRef.current = roundForAlert;
+      fireAlert(`Time's up for Round ${roundForAlert}!`);
+    }, remainingMs);
+    return () => clearTimeout(timeoutId);
+  }, [
+    tournament?.round_duration_minutes,
+    tournament?.current_round_started_at,
+    tournament?.round_elapsed_seconds,
+    tournament?.round_is_paused,
+    activeTimerRound,
+    fireAlert,
+  ]);
 
   const roundMatches = useMemo(
     () =>
@@ -492,6 +559,21 @@ const TournamentPairings: React.FC = () => {
   const footer = (
     <Box textAlign="center" mt={2}>
       <LiveIndicator isLive={liveStatus === "SUBSCRIBED"} />
+      <Snackbar
+        open={!!alertMessage}
+        autoHideDuration={6000}
+        onClose={() => setAlertMessage(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setAlertMessage(null)}
+          severity="info"
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {alertMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 
