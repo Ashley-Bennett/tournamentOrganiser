@@ -41,6 +41,9 @@ import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
 import Breadcrumbs from "../components/Breadcrumbs";
 import PushOptIn from "../components/PushOptIn";
+import DeckPickerDialog from "../components/DeckPickerDialog";
+import NormalizedSprite from "../components/NormalizedSprite";
+import { getSpriteUrl } from "../utils/pokemonCache";
 import { useTournament } from "../hooks/useTournament";
 import { useWorkspace } from "../WorkspaceContext";
 import { useTournamentPlayers } from "../hooks/useTournamentPlayers";
@@ -179,6 +182,9 @@ const TournamentView: React.FC = () => {
   // ── Inline name editing ───────────────────────────────────────────────────
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
+
+  // ── Deck editing (organiser sets a deck on a player's behalf) ────────────
+  const [deckPlayerId, setDeckPlayerId] = useState<string | null>(null);
 
   // ── Player list search/sort ───────────────────────────────────────────────
   const [playerSearch, setPlayerSearch] = useState("");
@@ -615,6 +621,32 @@ const handleSetRoundDuration = async (minutes: number | null) => {
     } finally {
       setSavingSeat(null);
     }
+  };
+
+  // ── Deck ─────────────────────────────────────────────────────────────────
+  // Organisers can set a deck for any player, which matters most for players
+  // they added themselves — those players never see the self-registration
+  // deck picker, so their deck would otherwise stay empty.
+
+  const handleSaveDeck = async (
+    playerId: string,
+    pokemon1: number | null,
+    pokemon2: number | null,
+  ) => {
+    const { error } = await supabase
+      .from("tournament_players")
+      .update({ deck_pokemon1: pokemon1, deck_pokemon2: pokemon2 })
+      .eq("id", playerId)
+      .eq("tournament_id", tournament?.id ?? "");
+    if (error) throw new Error(error.message || "Failed to save deck");
+
+    setPlayers((prev) =>
+      prev.map((p) =>
+        p.id === playerId
+          ? { ...p, deck_pokemon1: pokemon1, deck_pokemon2: pokemon2 }
+          : p,
+      ),
+    );
   };
 
   // ── Rename player ────────────────────────────────────────────────────────
@@ -1309,6 +1341,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                           Joined
                         </TableSortLabel>
                       </TableCell>
+                      <TableCell>Deck</TableCell>
                       <TableCell>Static Seating</TableCell>
                       {tournament.status === "draft" && (
                         <TableCell align="right">Remove</TableCell>
@@ -1375,6 +1408,46 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                             <Typography variant="caption" color="text.secondary">
                               {formatDateTime(player.created_at)}
                             </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={0.5}>
+                              {player.deck_pokemon1 != null && (
+                                <NormalizedSprite
+                                  src={getSpriteUrl(player.deck_pokemon1)}
+                                  size={28}
+                                />
+                              )}
+                              {player.deck_pokemon2 != null && (
+                                <NormalizedSprite
+                                  src={getSpriteUrl(player.deck_pokemon2)}
+                                  size={28}
+                                />
+                              )}
+                              {isManager ? (
+                                <Tooltip
+                                  title={
+                                    player.deck_pokemon1 != null || player.deck_pokemon2 != null
+                                      ? "Edit deck"
+                                      : "Set deck"
+                                  }
+                                >
+                                  <IconButton
+                                    size="small"
+                                    aria-label={`Set deck for ${player.name}`}
+                                    onClick={() => setDeckPlayerId(player.id)}
+                                  >
+                                    <EditIcon fontSize="inherit" />
+                                  </IconButton>
+                                </Tooltip>
+                              ) : (
+                                player.deck_pokemon1 == null &&
+                                player.deck_pokemon2 == null && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    —
+                                  </Typography>
+                                )
+                              )}
+                            </Box>
                           </TableCell>
                           <TableCell>
                             <Box display="flex" alignItems="center" gap={1}>
@@ -1511,6 +1584,20 @@ const handleSetRoundDuration = async (minutes: number | null) => {
           </Button>
         </DialogActions>
       </Dialog>
+      <DeckPickerDialog
+        open={deckPlayerId !== null}
+        onClose={() => setDeckPlayerId(null)}
+        title={`Deck for ${players.find((p) => p.id === deckPlayerId)?.name ?? "player"}`}
+        initialPokemon1={
+          players.find((p) => p.id === deckPlayerId)?.deck_pokemon1 ?? null
+        }
+        initialPokemon2={
+          players.find((p) => p.id === deckPlayerId)?.deck_pokemon2 ?? null
+        }
+        onSave={async (p1, p2) => {
+          if (deckPlayerId) await handleSaveDeck(deckPlayerId, p1, p2);
+        }}
+      />
       <Snackbar
         open={copyToast !== null}
         autoHideDuration={2000}

@@ -16,6 +16,8 @@ interface Props {
   initialPokemon1: number | null;
   initialPokemon2: number | null;
   onSave: (p1: number | null, p2: number | null) => Promise<void>;
+  /** Defaults to the player-facing wording; organisers set a deck for someone else. */
+  title?: string;
 }
 
 const DeckPickerDialog: React.FC<Props> = ({
@@ -24,6 +26,7 @@ const DeckPickerDialog: React.FC<Props> = ({
   initialPokemon1,
   initialPokemon2,
   onSave,
+  title = "Choose your Pokémon",
 }) => {
   const [pokemon1, setPokemon1] = useState<number | null>(null);
   const [pokemon2, setPokemon2] = useState<number | null>(null);
@@ -61,7 +64,7 @@ const DeckPickerDialog: React.FC<Props> = ({
 
   return (
     <Dialog open={open} onClose={handleCancel} maxWidth="xs" fullWidth>
-      <DialogTitle>Choose your Pokémon</DialogTitle>
+      <DialogTitle>{title}</DialogTitle>
 
       <DialogContent sx={{ pt: 1 }}>
         {/* key remounts the picker on each open so its active-slot state resets */}
