@@ -25,7 +25,7 @@ import { supabase } from "../supabaseClient";
 interface LocalEntry {
   tournamentId: string;
   playerId: string;
-  deviceToken: string;
+  deviceToken: string | null;
   tournamentName?: string;
 }
 
@@ -63,6 +63,9 @@ const Welcome = () => {
     const newClaimed = new Set(claimedIds);
     for (const entry of localEntries) {
       if (newClaimed.has(entry.tournamentId)) continue;
+      // Claiming proves ownership with the device token — entries without one
+      // are already account-linked and need no claim.
+      if (!entry.deviceToken) continue;
       const { error } = await supabase.rpc("self_claim_player_entry", {
         p_tournament_player_id: entry.playerId,
         p_device_token: entry.deviceToken,

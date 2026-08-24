@@ -103,7 +103,7 @@ function MyMatchCard({
   match: MatchWithNames | null;
   playerId: string;
   myReport: { reported_outcome: "win" | "loss" | "draw" } | null;
-  entry: { playerId: string; deviceToken: string } | null;
+  entry: { playerId: string; deviceToken: string | null } | null;
   onRefresh: () => void;
 }) {
   const [selectedOutcome, setSelectedOutcome] = useState<"win" | "loss" | "draw" | null>(null);
@@ -361,10 +361,13 @@ const PlayerTournamentView: React.FC = () => {
         p_tournament_id: tournamentId,
       });
       const row = Array.isArray(data) ? data[0] : data;
-      if (active && row?.device_token) {
+      if (active && row?.player_id) {
+        // device_token is NULL for organiser-created entries the player has
+        // since linked to their account. That's fine — the player RPCs accept
+        // a signed-in owner as proof, so we carry a null token through.
         const recovered: TjEntry = {
           playerId: row.player_id as string,
-          deviceToken: row.device_token as string,
+          deviceToken: (row.device_token as string | null) ?? null,
           joinedAt: new Date().toISOString(),
         };
         saveEntry(tournamentId, recovered);

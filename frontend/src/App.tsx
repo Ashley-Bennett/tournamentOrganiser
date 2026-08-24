@@ -54,6 +54,8 @@ function AutoClaimer() {
 
     void (async () => {
       for (const entry of entries) {
+        // Entries without a device token are already account-linked.
+        if (!entry.deviceToken) continue;
         await supabase.rpc("self_claim_player_entry", {
           p_tournament_player_id: entry.playerId,
           p_device_token: entry.deviceToken,

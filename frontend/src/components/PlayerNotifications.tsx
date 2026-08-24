@@ -58,7 +58,7 @@ function TournamentWatcher({
 }: {
   tournamentId: string;
   playerId: string;
-  deviceToken: string;
+  deviceToken: string | null;
   onAlert: (a: PlayerAlert) => void;
 }) {
   const [view, setView] = useState<WatcherView | null>(null);

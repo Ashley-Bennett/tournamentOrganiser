@@ -366,7 +366,7 @@ interface PlayerRow {
   totalMatches: number;
   isLinked: boolean;
   playerId?: string;
-  deviceToken?: string;
+  deviceToken?: string | null;
   deckPokemon1: number | null;
   deckPokemon2: number | null;
 }

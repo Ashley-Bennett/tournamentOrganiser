@@ -103,7 +103,7 @@ export function usePushSubscription() {
   }, [supported]);
 
   const subscribeAsPlayer = useCallback(
-    async (playerId: string, deviceToken: string): Promise<boolean> => {
+    async (playerId: string, deviceToken: string | null): Promise<boolean> => {
       setSubscribing(true);
       try {
         const s = await doSubscribe();

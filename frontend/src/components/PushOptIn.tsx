@@ -8,7 +8,7 @@ interface Props {
   tournamentId: string;
   /** Required for the player variant */
   playerId?: string;
-  deviceToken?: string;
+  deviceToken?: string | null;
 }
 
 const dismissKey = (variant: string, tournamentId: string) =>
@@ -85,8 +85,8 @@ export default function PushOptIn({
   const handleEnable = async () => {
     const ok =
       variant === "player"
-        ? playerId && deviceToken
-          ? await subscribeAsPlayer(playerId, deviceToken)
+        ? playerId
+          ? await subscribeAsPlayer(playerId, deviceToken ?? null)
           : false
         : await subscribeAsOrganiser(tournamentId);
     if (ok) setDone(true);

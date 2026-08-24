@@ -12,7 +12,12 @@ export interface TjProfile {
 
 export interface TjEntry {
   playerId: string;
-  deviceToken: string;
+  /**
+   * Per-tournament secret for anonymous players. NULL for entries the organiser
+   * created and the player later linked to their account — those authenticate
+   * server-side via auth.uid() = tournament_players.user_id instead.
+   */
+  deviceToken: string | null;
   joinedAt: string;
   tournamentName?: string;
 }

@@ -50,7 +50,7 @@ interface Row {
   isLinked: boolean;
   // present for unlinked device entries
   playerId?: string;
-  deviceToken?: string;
+  deviceToken?: string | null;
 }
 
 export default function DeviceTournaments({ embedded = false }: { embedded?: boolean }) {
