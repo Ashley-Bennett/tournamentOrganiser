@@ -102,7 +102,7 @@ const features = [
   {
     icon: <SpeedIcon fontSize="large" />,
     title: "Swiss & Single Elimination",
-    desc: "Auto-generate pairings for any format. Swiss rounds handle byes and rematches automatically — no manual work.",
+    desc: "Auto-generate pairings for any format. Swiss rounds handle byes and rematches for you, so nobody has to redo the maths.",
   },
   {
     icon: <LeaderboardIcon fontSize="large" />,
@@ -112,7 +112,7 @@ const features = [
   {
     icon: <ShareIcon fontSize="large" />,
     title: "Public Pairings Links",
-    desc: "Share a link so players can check their next match on their phone — no account or login required.",
+    desc: "Share a link and players can check their next match on their phone. No account, no login.",
   },
   {
     icon: <GroupsIcon fontSize="large" />,
@@ -122,7 +122,7 @@ const features = [
   {
     icon: <AccessTimeIcon fontSize="large" />,
     title: "Round Timers",
-    desc: "Built-in countdown timers for each round. Pause, resume, and keep your event on schedule with ease.",
+    desc: "Built-in countdown timers for each round. Pause and resume them as you go to keep the event on schedule.",
   },
   {
     icon: <EmojiEventsIcon fontSize="large" />,
@@ -457,7 +457,7 @@ export default function Landing() {
             }}
           >
             Matchamp handles Swiss pairings, live standings, tiebreakers, and
-            player management — so you can focus on the game, not the admin.
+            player management, so you can spend the day playing instead of running the spreadsheet.
           </Typography>
 
           <Stack
@@ -742,8 +742,8 @@ export default function Landing() {
                 }}
               >
                 Opponent match win percentage and tiebreakers are calculated
-                automatically every time a result is entered. No spreadsheets.
-                No arguments. Just the right answer.
+                automatically every time a result is entered, so nobody ends up
+                arguing about who finished third.
               </Typography>
               <Stack spacing={1.5}>
                 {[
@@ -838,7 +838,7 @@ export default function Landing() {
                 subtitle: "Professional tools, simple interface",
                 items: [
                   "Workspace teams for judges and staff",
-                  "Public pairings link — players check their own match",
+                  "Public pairings link, so players check their own match",
                   "Round timers for timed competitive play",
                   "Clean final standings page to share at end of event",
                 ],

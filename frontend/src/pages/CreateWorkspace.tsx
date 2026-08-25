@@ -15,7 +15,7 @@ import { useWorkspace } from "../WorkspaceContext";
 import { slugify, randomSuffix } from "../utils/slugify";
 
 const WORKSPACE_TYPES = [
-  { value: "personal", label: "Personal", description: "Just for you — running your own events" },
+  { value: "personal", label: "Personal", description: "Just for you, running your own events" },
   { value: "club", label: "Club", description: "A regular group, team, or league" },
   { value: "store", label: "Store", description: "A game store or venue hosting events" },
 ];

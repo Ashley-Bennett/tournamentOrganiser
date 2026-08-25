@@ -25,7 +25,7 @@ const configs: Record<
     body: "The app couldn't connect to Supabase. This is usually a network issue.",
     steps: [
       "Check your internet connection",
-      "If you're online, the server may be temporarily unavailable — try again in a moment",
+      "If you're online, the server may be temporarily unavailable. Try again in a moment",
     ],
   },
   paused: {

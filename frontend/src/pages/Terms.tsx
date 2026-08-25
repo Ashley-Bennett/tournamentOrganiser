@@ -30,7 +30,7 @@ const Terms = () => (
 
     <Section title="The service">
       <P>
-        Matchamp is a tool for organising and running tournaments — creating
+        Matchamp is a tool for organising and running tournaments: creating
         events, pairing players, recording results, and sharing standings. By
         creating an account or using the site you agree to these terms and to
         the{" "}
@@ -74,7 +74,7 @@ const Terms = () => (
         Matchamp is provided free of charge, &ldquo;as is&rdquo;. We work hard to keep
         it reliable, but we don&rsquo;t guarantee uninterrupted availability and
         we may change or discontinue features. Export or record anything
-        critical to your event — to the fullest extent allowed by law, we&rsquo;re
+        critical to your event. To the fullest extent allowed by law, we&rsquo;re
         not liable for losses arising from use of the service. Nothing in
         these terms limits liability that can&rsquo;t legally be limited.
       </P>

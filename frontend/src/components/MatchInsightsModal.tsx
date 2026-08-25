@@ -183,7 +183,7 @@ const MatchInsightsModal: React.FC<Props> = ({
       <DialogContent>
         {!isEditing && (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Answer two quick questions to unlock richer stats — first/second win rates, matchup data, and more.
+            Answer two quick questions and you'll get first/second win rates, matchup data and more.
           </Typography>
         )}
 
@@ -232,7 +232,7 @@ const MatchInsightsModal: React.FC<Props> = ({
           <>
             {!isEditing && (initialOppPokemon1 != null || initialOppPokemon2 != null) && (
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-                Pre-filled from their entry — correct it if wrong.
+                Pre-filled from their entry. Change it if it's wrong.
               </Typography>
             )}
 

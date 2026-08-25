@@ -303,7 +303,7 @@ export default function RoundActionBar({
         <DialogContent>
           <DialogContentText>
             Manually edited pairings can affect Swiss algorithm correctness for
-            future rounds — repeat-opponent and colour-balance checks won't
+            future rounds. Repeat-opponent and colour-balance checks won't
             account for swaps made here. Only continue if you're sure.
           </DialogContentText>
         </DialogContent>

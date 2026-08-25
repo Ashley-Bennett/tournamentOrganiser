@@ -59,7 +59,7 @@ export default function PushOptIn({
         onClose={dismiss}
         sx={{ mb: 2 }}
       >
-        For match notifications, open this page in your browser — tap the menu
+        For match notifications, open this page in your browser. Tap the menu
         (⋮) and choose “Open in Chrome”, or add Matchamp to your Home Screen.
       </Alert>
     );

@@ -130,7 +130,7 @@ function TournamentWatcher({
             mine.match_number != null
               ? `Table ${mine.match_number}`
               : "your table";
-          message = `Round ${newRound} is up — ${where} vs ${oppName ?? "your opponent"}`;
+          message = `Round ${newRound} is up. ${where} vs ${oppName ?? "your opponent"}`;
         }
         onAlertRef.current({ tournamentId, message });
       }
@@ -139,7 +139,7 @@ function TournamentWatcher({
       if (status === "completed" && prevStatusRef.current !== "completed") {
         onAlertRef.current({
           tournamentId,
-          message: "All rounds complete — final standings are ready!",
+          message: "All rounds are done. Final standings are ready.",
         });
       }
       prevStatusRef.current = status;

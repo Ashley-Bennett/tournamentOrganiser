@@ -849,7 +849,7 @@ const TournamentMatches: React.FC = () => {
           sx={{ flex: 1, minWidth: 0 }}
           noWrap
         >
-          {tournament.name} — Matches
+          {tournament.name}: Matches
         </Typography>
         {tournament.status === "active" && (
           <Box display="flex" gap={1} flexWrap="wrap">
@@ -1290,8 +1290,8 @@ const TournamentMatches: React.FC = () => {
                             return (
                               <Alert severity="error" sx={{ mb: 1 }}>
                                 {conflictMatches.length === 1
-                                  ? "1 match has a player conflict — check the match below and resolve manually."
-                                  : `${conflictMatches.length} matches have player conflicts — check them below and resolve manually.`}
+                                  ? "1 match has a player conflict. Check the match below and fix it manually."
+                                  : `${conflictMatches.length} matches have player conflicts. Check them below and fix them manually.`}
                               </Alert>
                             );
                           })()}
@@ -1466,7 +1466,7 @@ const TournamentMatches: React.FC = () => {
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert severity="warning" onClose={() => setAutoSaveWarning(false)}>
-          Auto-save failed — your result may not persist if you navigate away.
+          Auto-save failed. Your result may not be kept if you navigate away.
         </Alert>
       </Snackbar>
     </Box>

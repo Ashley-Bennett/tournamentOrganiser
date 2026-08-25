@@ -41,7 +41,7 @@ const Privacy = () => (
       <P>
         <strong>Account data.</strong> When you create an account we store your
         email address, your name / display name, your password (stored only as
-        a secure hash — we never see it), and your preferred role (player or
+        a secure hash, so we never see it), and your preferred role (player or
         organiser).
       </P>
       <P>

@@ -86,7 +86,7 @@ export default function PlayerClaimLinkDialog({
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       })
-      .catch(() => setError("Failed to copy — select the link and copy it manually."));
+      .catch(() => setError("Couldn't copy. Select the link and copy it manually."));
   };
 
   return (
@@ -95,7 +95,7 @@ export default function PlayerClaimLinkDialog({
       <DialogContent>
         <Typography variant="body2" color="text.secondary" mb={2}>
           Send this link to {playerName}. Once they open it and sign in, this entry
-          becomes theirs — they&apos;ll see their pairings, report their own results,
+          becomes theirs. They&apos;ll see their pairings, report their own results,
           and get round notifications on their phone, including for tournaments that
           have already started.
         </Typography>

@@ -364,7 +364,7 @@ const TournamentPairings: React.FC = () => {
       setSelectedRound("standings");
       // Don't fire on the very first load of an already-completed tournament.
       if (prevTournamentStatusRef.current !== null) {
-        fireAlert("All rounds complete — final standings are ready!");
+        fireAlert("All rounds are done. Final standings are ready.");
       }
     }
     prevTournamentStatusRef.current = tournamentStatus;
@@ -381,7 +381,7 @@ const TournamentPairings: React.FC = () => {
     if (rounds.length > prevRoundCountRef.current) {
       const newRound = Math.max(...rounds);
       setSelectedRound(newRound);
-      fireAlert(`Round ${newRound} pairings are up — check your table!`);
+      fireAlert(`Round ${newRound} pairings are up. Check your table.`);
     }
     prevRoundCountRef.current = rounds.length;
   }, [rounds, fireAlert]);
@@ -715,7 +715,7 @@ const TournamentPairings: React.FC = () => {
     >
       <Box px={2} py={1}>
         <Typography variant="subtitle2" fontWeight={600}>
-          Pairings — Round {selectedRound}
+          Round {selectedRound} pairings
         </Typography>
       </Box>
       <Divider />

@@ -243,12 +243,12 @@ function MyMatchCard({
               </Box>
               {submitStatus === "conflict" && (
                 <Alert severity="warning" sx={{ mb: 1 }}>
-                  Both players reported different results — your organiser will resolve this.
+                  You and your opponent reported different results. Your organiser will sort it out.
                 </Alert>
               )}
               {submitStatus === "agreed" && (
                 <Alert severity="success" sx={{ mb: 1 }}>
-                  Both players agree — waiting for the organiser to confirm.
+                  You both agree. Waiting for the organiser to confirm.
                 </Alert>
               )}
               {!submitStatus && (
@@ -809,7 +809,7 @@ const PlayerTournamentView: React.FC = () => {
             </Box>
           }
         >
-          Your match history is saved on this device only — it may be cleared after 7 days.
+          Your match history is saved on this device only, so it may be cleared after 7 days.
           Sign up to keep it forever.
         </Alert>
       )}
@@ -910,7 +910,7 @@ const PlayerTournamentView: React.FC = () => {
       <Paper variant="outlined">
         <Box px={2} py={1}>
           <Typography variant="subtitle2" fontWeight={600}>
-            Pairings — Round {selectedRound}
+            Round {selectedRound} pairings
           </Typography>
         </Box>
         <Divider />

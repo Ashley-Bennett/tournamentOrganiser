@@ -87,7 +87,7 @@ export default function LateEntryDialog({
         />
         {selection.userId && (
           <Alert severity="success" sx={{ mt: 2 }}>
-            {selection.name} will be linked to their account straight away — their
+            {selection.name} will be linked to their account straight away, so their
             pairings and results appear on their phone as soon as you add them.
           </Alert>
         )}

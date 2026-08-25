@@ -250,7 +250,7 @@ const Me = () => {
       setCopyToast("Copied!");
     } catch {
       setInviteError((prev) => ({ ...prev, [inviteId]: "Failed to copy link." }));
-      setCopyToast("Failed to copy — please try again.");
+      setCopyToast("Couldn't copy. Please try again.");
     }
   };
 
@@ -720,7 +720,7 @@ const Me = () => {
           )}
           <DialogContentText sx={{ mb: 2 }}>
             This permanently deletes your account, your profile, and every
-            workspace only you own — including{" "}
+            workspace only you own, including{" "}
             <strong>all tournaments, matches, and player data</strong> inside
             them. This cannot be undone.
           </DialogContentText>

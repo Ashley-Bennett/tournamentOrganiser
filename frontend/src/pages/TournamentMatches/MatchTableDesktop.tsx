@@ -166,7 +166,7 @@ export default function MatchTableDesktop({
                   renderValue={() => (
                     <em>
                       {slot === "player2" && !match.player2_id
-                        ? "Bye — assign to pair"
+                        ? "Bye (assign to pair)"
                         : "Select player…"}
                     </em>
                   )}

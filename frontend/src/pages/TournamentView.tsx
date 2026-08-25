@@ -508,7 +508,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
     const playerId = confirmDeletePlayerId;
     if (!playerId || !tournament || !user) return;
     if (!workspaceId) {
-      setPlayersError("Workspace not loaded — cannot delete player");
+      setPlayersError("Workspace not loaded, so the player can't be deleted");
       setConfirmDeletePlayerId(null);
       return;
     }
@@ -629,7 +629,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
 
   const handleStartTournament = async () => {
     if (!tournament || tournament.status !== "draft" || !user) return;
-    if (!workspaceId) { setError("Workspace not loaded — cannot start tournament"); return; }
+    if (!workspaceId) { setError("Workspace not loaded, so the tournament can't be started"); return; }
     if (players.length < 2) return;
     if (!numRounds || numRounds < 1) return;
 
@@ -1067,7 +1067,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
       <Paper sx={{ p: 3 }}>
         {isNewTournament && players.length === 0 && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            Tournament created! Now add your players below — use <strong>Bulk add</strong> to add them all at once.
+            Tournament created. Now add your players below, or use <strong>Bulk add</strong> to paste them all in at once.
           </Alert>
         )}
         <Box display="flex" alignItems="center" gap={1} mb={0.5}>
@@ -1088,7 +1088,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                     setCopyToast("Copied!");
                   }).catch(() => {
                     setPlayersError("Failed to copy player list to clipboard.");
-                    setCopyToast("Failed to copy — please try again.");
+                    setCopyToast("Couldn't copy. Please try again.");
                   });
                 }}
               >
@@ -1130,7 +1130,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                           setTimeout(() => setCopiedJoinLink(false), 2000);
                           setCopyToast("Copied!");
                         }).catch(() => {
-                          setCopyToast("Failed to copy — please try again.");
+                          setCopyToast("Couldn't copy. Please try again.");
                         });
                       }}
                     >
@@ -1201,7 +1201,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                             setTimeout(() => setCopiedJoinLink(false), 2000);
                             setCopyToast("Copied!");
                           })
-                          .catch(() => setCopyToast("Failed to copy — please try again."));
+                          .catch(() => setCopyToast("Couldn't copy. Please try again."));
                       }}
                     >
                       <ContentCopyIcon fontSize="inherit" />

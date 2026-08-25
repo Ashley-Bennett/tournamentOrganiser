@@ -206,7 +206,7 @@ export default function DeviceTournaments({ embedded = false }: { embedded?: boo
             </Box>
           }
         >
-          This history is saved on this device only — it may be cleared after 7 days.
+          This history is saved on this device only, so it may be cleared after 7 days.
           Sign up to keep it forever.
         </Alert>
       )}

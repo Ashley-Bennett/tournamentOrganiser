@@ -92,7 +92,7 @@ export default function PairingDecisionAlert({ decisionLog, selectedRound }: Pro
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", flex: 1 }}>
           <Typography variant="subtitle2" fontWeight={600} sx={{ mr: 0.5 }}>
             Pairing notes
-            {typeof selectedRound === "number" ? ` — Round ${selectedRound}` : ""}
+            {typeof selectedRound === "number" ? `: round ${selectedRound}` : ""}
           </Typography>
           {summaryParts}
         </Box>
@@ -115,7 +115,7 @@ export default function PairingDecisionAlert({ decisionLog, selectedRound }: Pro
                 <strong>{decisionLog.byePlayerName}</strong> received a bye (free win)
                 {decisionLog.byePlayerPoints !== undefined &&
                   ` · ${decisionLog.byePlayerPoints} pts`}
-                {" — "}
+                {": "}
                 {humanizeByeReason(decisionLog.byeReason)}
               </Typography>
             </Box>
@@ -133,7 +133,7 @@ export default function PairingDecisionAlert({ decisionLog, selectedRound }: Pro
                       <Typography variant="body2" component="span">
                         <strong>{rp.player1Name}</strong> vs{" "}
                         <strong>{rp.player2Name}</strong>
-                        {" — "}unavoidable, all opponents in this score group already met
+                        {": "}unavoidable, all opponents in this score group had already been played
                       </Typography>
                     </li>
                   ))}
@@ -141,7 +141,7 @@ export default function PairingDecisionAlert({ decisionLog, selectedRound }: Pro
               ) : (
                 <Typography variant="body2" color="text.secondary">
                   {decisionLog.rematchCount} rematch
-                  {decisionLog.rematchCount !== 1 ? "es" : ""} — unavoidable given current standings
+                  {decisionLog.rematchCount !== 1 ? "es" : ""}, unavoidable given the current standings
                 </Typography>
               )}
             </Box>
@@ -157,7 +157,7 @@ export default function PairingDecisionAlert({ decisionLog, selectedRound }: Pro
                   <li key={detail.playerId}>
                     <Typography variant="body2" component="span">
                       <strong>{detail.playerName}</strong> ({detail.playerPoints} pts)
-                      {" — "}
+                      {": "}
                       {humanizeFloatReason(detail.reason)}
                     </Typography>
                   </li>

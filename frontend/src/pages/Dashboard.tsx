@@ -234,7 +234,7 @@ const OrganiserDashboard: React.FC = () => {
           ) : recentTournaments.length === 0 ? (
             <Box px={2} py={3} textAlign="center">
               <Typography variant="body2" color="text.secondary">
-                No tournaments yet — create one to get started.
+                No tournaments yet. Create one to get started.
               </Typography>
             </Box>
           ) : (
@@ -585,7 +585,7 @@ const PlayerDashboard: React.FC = () => {
           ) : recentRows.length === 0 ? (
             <Box px={2} py={3} textAlign="center">
               <Typography variant="body2" color="text.secondary">
-                No tournaments yet — scan a QR code or enter a join code to get started.
+                No tournaments yet. Scan a QR code or enter a join code to get started.
               </Typography>
             </Box>
           ) : (

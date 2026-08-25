@@ -204,7 +204,7 @@ const TournamentLeaderboard: React.FC = () => {
           Back to tournament
         </Button>
         <Typography variant="h4" component="h1">
-          {tournament.name} — Final Standings
+          {tournament.name}: Final Standings
         </Typography>
       </Box>
 

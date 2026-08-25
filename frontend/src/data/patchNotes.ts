@@ -15,21 +15,21 @@ const patchNotes: PatchNote[] = [
       {
         category: "New Features",
         items: [
-          "Push notifications: get alerted when a new round is paired, when the round timer runs out, and when final standings are ready — even when the app isn't open. Add the app to your home screen for the best experience.",
-          "In-app alerts: on any page, you'll now get a heads-up — with a quick link straight to your table — when your next round is ready, along with a vibrate and a flashing tab so you don't miss it.",
+          "Push notifications: get alerted when a new round is paired, when the round timer runs out, and when final standings are ready, even when the app isn't open. Add the app to your home screen for the best experience.",
+          "In-app alerts: whatever page you're on, you'll get a heads-up when your next round is ready, with a quick link straight to your table. It vibrates and flashes the tab too, so you don't miss it.",
           "Tournament details: organisers can add a date and time, game format, location, and notes to a tournament, and players see them before they join.",
         ],
       },
       {
         category: "Workspaces",
         items: [
-          "New accounts now get a personal workspace set up automatically on first sign-in — no more create-workspace step just to get going.",
+          "New accounts now get a personal workspace set up automatically on first sign-in, so there's no create-workspace step to get through first.",
         ],
       },
       {
         category: "Tournaments",
         items: [
-          "Final placings now show correctly — tied players no longer collapse to the wrong spot (for example, 5th showing as 3rd).",
+          "Final placings now show correctly. Tied players no longer collapse to the wrong spot, like 5th showing as 3rd.",
           "Entering a result on mobile now asks \"Who won?\" with buttons labelled by the actual player names, instead of abstract score chips.",
         ],
       },
@@ -55,9 +55,9 @@ const patchNotes: PatchNote[] = [
         category: "New Features",
         items: [
           "New player stats page: see your overall record, a matchup matrix, deck history, round-by-round performance, and how you're trending over time.",
-          "After a match you can now record whether you went first and what deck your opponent played — these feed straight into your stats.",
+          "After a match you can now record whether you went first and what deck your opponent played. Both feed straight into your stats.",
           "Redesigned dashboard: a spotlight for your active tournament, your five most recent tournaments, quick stats, and a friendly time-of-day greeting.",
-          "Your dashboard now shows meaningful stats at a glance — tournaments completed, wins, win rate, and your favourite deck.",
+          "Your dashboard now shows meaningful stats at a glance: tournaments completed, wins, win rate, and your favourite deck.",
           "Switch between Organising and Playing with tabs on the home page, so the app shows what matters for how you're using it.",
           "You can now set whether you prefer the player or organiser view from your account page.",
         ],
@@ -66,14 +66,14 @@ const patchNotes: PatchNote[] = [
         category: "Tournaments",
         items: [
           "You now pick your deck when you join a tournament, so your stats are captured from the very first round. Your deck stays hidden from opponents until the event ends.",
-          "Standings tiebreakers now follow the official Play! Pokémon rules more closely — byes are excluded from win percentage and the rules for draws and dropped players match the handbook.",
+          "Standings tiebreakers now follow the official Play! Pokémon rules more closely. Byes are excluded from win percentage, and the rules for draws and dropped players now match the handbook.",
           "If an organiser removes you by mistake, you can now rejoin a tournament you'd self-registered for.",
         ],
       },
       {
         category: "Fixes & Polish",
         items: [
-          "When you sign in, tournaments you joined on this device are now linked to your account automatically — no manual claiming needed.",
+          "When you sign in, tournaments you joined on this device are now linked to your account automatically, so there's nothing to claim by hand.",
           "Your name is pre-filled from your profile when joining a tournament.",
           "Win rate now counts byes as wins and shows one decimal place, matching the standings.",
           "Your current streak and deck filters on the stats page now calculate correctly.",
@@ -92,7 +92,7 @@ const patchNotes: PatchNote[] = [
         items: [
           "Pairings and player view pages now show a live indicator so everyone knows the page is actively tracking the tournament.",
           "You can now print or export round pairings and standings as a PDF directly from the tournament page.",
-          "The pairing decision log is now collapsible and shows each player's name when a rematch was unavoidable — useful for auditing generated pairs.",
+          "The pairing decision log is now collapsible and shows each player's name when a rematch was unavoidable, which makes generated pairs much easier to audit.",
           "Duplicate names are now blocked when joining a tournament, with a clear error message.",
           "A retry button now appears when a round operation fails, so you don't have to refresh the whole page.",
           "If the app can't reach the server on startup, it now tells you clearly instead of silently failing.",
@@ -101,9 +101,9 @@ const patchNotes: PatchNote[] = [
       {
         category: "Fixes & Polish",
         items: [
-          "Destructive actions — like deleting a round or clearing results — now ask for confirmation before proceeding.",
+          "Deleting a round, clearing results, and other destructive actions now ask for confirmation first.",
           "Copying text to clipboard now shows a confirmation toast so you know it worked.",
-          "Empty states across the app now have helpful buttons so you know what to do next.",
+          "Empty screens across the app now have a button telling you what to do next.",
           "Pairings and standings tables are easier to read on mobile.",
           "Switching tabs and coming back to the tournament no longer resets the page or flashes a loading spinner.",
           "Error messages now appear on the My Tournaments and Device Tournaments pages when something goes wrong.",
@@ -118,7 +118,7 @@ const patchNotes: PatchNote[] = [
       {
         category: "Tournaments",
         items: [
-          "Standings tiebreakers now use Opponent Match Win % (OMW%) and Opponent's Opponent Match Win % (OOMW%), so players are ranked by the actual strength of who they played — not randomly.",
+          "Standings tiebreakers now use Opponent Match Win % (OMW%) and Opponent's Opponent Match Win % (OOMW%), so players are ranked by the actual strength of who they played rather than at random.",
           "Draws now correctly count as half a win when calculating tiebreakers, matching standard Pokémon TCG rules.",
           "Swiss pairings: fixed a bug where a floater player could be rematched against someone they'd already played, even when a fresh opponent was available.",
         ],
@@ -134,16 +134,16 @@ const patchNotes: PatchNote[] = [
         items: [
           "Added a 'My Tournaments' link to the header so you can quickly jump to your tournaments without logging in.",
           "Added a burger menu for mobile navigation on the landing page and logged-out header.",
-          "The join display screen now shows the join URL in a larger, cleaner format — easier to read across the room.",
+          "The join display screen now shows the join URL in a larger, cleaner format that's readable across the room.",
         ],
       },
       {
         category: "Fixes & Polish",
         items: [
-          "Fixed a bug where both players agreeing on a result could auto-complete the match — organiser confirmation is now always required.",
+          "Fixed a bug where both players agreeing on a result could auto-complete the match. Organiser confirmation is now always required.",
           "The organiser's matches view no longer scrolls back to the top when a result is entered or submitted.",
           "Standings table is less cramped when the deck column is shown.",
-          "Performance improvements — faster page loads with better font handling and image optimisation.",
+          "Faster page loads, thanks to better font handling and image optimisation.",
         ],
       },
     ],
@@ -173,12 +173,12 @@ const patchNotes: PatchNote[] = [
       {
         category: "New Features",
         items: [
-          "Player self-registration — players can join a tournament by entering a Pokémon room code or opening a shareable link. No account required.",
-          "Player result submission — players can now submit their own match results from the player view. The first report auto-applies the result; the organiser can always confirm or override.",
-          "My Tournaments page — all tournaments you've joined from your device are listed in one place at /my-tournaments, with live status.",
-          "Organiser announcements — add a note to any round and it appears as an announcement on the public pairings page for all players to see.",
-          "Pokémon deck support — players can pick a Pokémon to represent their deck. Their sprite shows up in standings and pairings so everyone can see what's in the room.",
-          "Timer quick-adjust buttons — +/-1m and +/-10m buttons added to the timer editor for faster adjustments.",
+          "Players can join a tournament themselves by entering a Pokémon room code or opening a shareable link. No account required.",
+          "Players can submit their own match results from the player view. The first report applies the result automatically, and the organiser can always confirm or override it.",
+          "New My Tournaments page at /my-tournaments, listing everything you've joined from your device with live status.",
+          "Organisers can add a note to any round, and it shows up as an announcement on the public pairings page for everyone to see.",
+          "Players can pick a Pokémon to represent their deck. The sprite shows up in standings and pairings, so everyone can see what's in the room.",
+          "The timer editor has +/-1m and +/-10m buttons for quicker adjustments.",
           "You can now add or edit the round timer after a tournament has already been created.",
         ],
       },
@@ -187,9 +187,9 @@ const patchNotes: PatchNote[] = [
         items: [
           "The pairings page automatically switches to the new round tab when a round starts, and to standings when the final round ends.",
           "Dropped players are now sorted to the bottom of standings.",
-          "Pairings on the player view update in real-time as match results come in — no refresh needed.",
+          "Pairings on the player view update in real-time as match results come in, with no refresh needed.",
           "The matches view opens on the current round by default instead of round 1.",
-          "Self-registration is always enabled for draft tournaments — no separate toggle needed.",
+          "Self-registration is always enabled for draft tournaments, so there's no separate toggle.",
           "Joining via self-registration now automatically takes you to your player view.",
           "The tournament details panel has been refreshed with a cleaner look.",
           "Removed the suggested rounds field and bye warning to simplify tournament setup.",
@@ -214,16 +214,16 @@ const patchNotes: PatchNote[] = [
       {
         category: "New Features",
         items: [
-          "Dark mode is here. Switch between light and dark using the toggle in the header — your preference is saved across sessions.",
+          "Dark mode. Switch between light and dark using the toggle in the header, and your preference is saved across sessions.",
           "The header is now consistent across every page, so navigation and the theme toggle are always where you expect them.",
-          "Matchamp now has a proper landing page. If you share the link with someone who hasn't signed up, they'll see a full overview of what Matchamp does, how it works, and a sign-up button.",
-          "You can now pause and resume the round timer. A pause/play button appears next to the timer once a round begins — the timer freezes for everyone including the public pairings view until you resume it.",
+          "Matchamp now has a proper landing page. Share the link with someone who hasn't signed up and they'll see what it does, how it works, and a sign-up button.",
+          "You can now pause and resume the round timer. A pause/play button appears next to the timer once a round begins, and the timer freezes for everyone, including the public pairings view, until you resume it.",
         ],
       },
       {
         category: "Tournaments",
         items: [
-          "Edit Pairings now works on mobile — tap to remove a player from their slot and reassign them using a dropdown.",
+          "Edit Pairings now works on mobile. Tap to remove a player from their slot, then reassign them from a dropdown.",
           "Swiss pairings no longer create rematches when the bye can go elsewhere.",
         ],
       },
@@ -236,9 +236,9 @@ const patchNotes: PatchNote[] = [
       {
         category: "New Features",
         items: [
-          "Round timer — each round now displays a countdown timer to help keep your event on schedule.",
-          "Late entries — players can be added to a tournament after it has already started.",
-          "Player account linking — players can now claim their own player entries and connect them to their account to track results across tournaments.",
+          "Each round now shows a countdown timer to help keep your event on schedule.",
+          "Players can be added to a tournament after it has already started.",
+          "Players can claim their own entries and connect them to their account, so results follow them across tournaments.",
           "Forgot password and reset password flows are now available from the login screen.",
         ],
       },
@@ -264,7 +264,7 @@ const patchNotes: PatchNote[] = [
         items: [
           "Fixed a bug with static seating input.",
           "Improved mobile layout across auth screens.",
-          "Various small fixes and UX improvements throughout the app.",
+          "Plenty of other small fixes and tidy-ups.",
         ],
       },
     ],

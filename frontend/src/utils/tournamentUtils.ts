@@ -218,7 +218,7 @@ export function assignMatchNumbers(
       if (s1 !== undefined && s2 !== undefined) {
         // Both players have a static seat — lower number wins
         target = Math.min(s1, s2);
-        warning = `Seat conflict: ${p.player1Name} (table ${s1}) vs ${p.player2Name} (table ${s2}) — using table ${target}`;
+        warning = `Seat conflict: ${p.player1Name} (table ${s1}) vs ${p.player2Name} (table ${s2}). Using table ${target}`;
         // The player with the higher seat number is the one who gets moved
         const movedIsP1 = s1 > s2;
         conflict = {

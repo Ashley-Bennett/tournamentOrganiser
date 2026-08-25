@@ -217,7 +217,7 @@ export default function TournamentJoin() {
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={2}>
               {lateJoin
-                ? "This tournament is already under way — you can still join."
+                ? "This tournament is already under way, but you can still join."
                 : "Enter your name to join the tournament."}
             </Typography>
 
@@ -265,7 +265,7 @@ export default function TournamentJoin() {
               onChange={(e) => setNameInput(e.target.value)}
               disabled={submitting}
               error={nameTaken}
-              helperText={nameTaken ? "This name is already taken — please use a different name." : " "}
+              helperText={nameTaken ? "That name is already taken. Pick a different one." : " "}
               sx={{ mb: 1 }}
             />
 
@@ -293,7 +293,7 @@ export default function TournamentJoin() {
               <LockOutlinedIcon sx={{ fontSize: "1.1rem", mt: "1px" }} />
               <Typography variant="caption">
                 Your deck stays private. Other players can&apos;t see your picks
-                while the tournament is running — decklists are only revealed in
+                while the tournament is running. Decklists are only revealed in
                 the final standings once the event is over.
               </Typography>
             </Box>

@@ -385,7 +385,7 @@ function FirstSecondSection({
       <DeckFilter decks={decks} selected={selectedDeck} nameMap={nameMap} onChange={setSelectedDeck} />
       {!hasData && !loading && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Not enough data yet — submit post-game insights after your next match to track this.
+          Not enough data yet. Fill in the post-game questions after your next match and this will start filling up.
         </Alert>
       )}
       <Grid container spacing={2}>
@@ -416,8 +416,8 @@ function FirstSecondSection({
                   const s = data.went_second_wins / data.went_second_total;
                   const diff = Math.abs(f - s) * 100;
                   if (diff < 5) return <Typography variant="body2">Going first or second barely matters for your results.</Typography>;
-                  if (f > s) return <Typography variant="body2" color="success.main">You win <strong>{diff.toFixed(0)}% more</strong> when going first — tempo advantage is real for you.</Typography>;
-                  return <Typography variant="body2" color="secondary.main">You actually win <strong>{diff.toFixed(0)}% more</strong> going second — you may benefit from reactive strategies.</Typography>;
+                  if (f > s) return <Typography variant="body2" color="success.main">You win <strong>{diff.toFixed(0)}% more</strong> when going first. Getting the first turn clearly suits you.</Typography>;
+                  return <Typography variant="body2" color="secondary.main">You actually win <strong>{diff.toFixed(0)}% more</strong> going second. Reactive decks look like a good fit for you.</Typography>;
                 })()}
               </CardContent>
             </Card>
@@ -526,10 +526,10 @@ function RoundPerformanceSection({ data, loading }: { data: RoundRow[]; loading:
           <WhatshotIcon fontSize="small" color={Number(clutchRating) >= 0 ? "success" : "error"} />
           <Typography variant="body2">
             {Number(clutchRating) >= 5
-              ? `Clutch factor: +${clutchRating}% — you improve late in events`
+              ? `Clutch factor: +${clutchRating}%. You get stronger late in events`
               : Number(clutchRating) <= -5
-              ? `Tilt factor: ${clutchRating}% — win rate drops late in events`
-              : "Consistent performer — your win rate is stable across rounds"}
+              ? `Tilt factor: ${clutchRating}%. Your win rate drops late in events`
+              : "Steady. Your win rate holds up across rounds"}
           </Typography>
         </Box>
       )}
@@ -585,13 +585,13 @@ function TrendSection({ data, loading }: { data: TrendRow[]; loading: boolean })
       {glowUp && (
         <Box display="flex" alignItems="center" gap={1} mb={2}>
           <EmojiEventsIcon fontSize="small" color="warning" />
-          <Typography variant="body2" color="warning.main">Glow-up detected — your win rate is trending upward.</Typography>
+          <Typography variant="body2" color="warning.main">Your win rate is on the way up.</Typography>
         </Box>
       )}
       {loading ? (
         <Skeleton variant="rectangular" height={80} sx={{ borderRadius: 1 }} />
       ) : data.length === 0 ? (
-        <Typography variant="body2" color="text.disabled">No trend data yet — play in more tournaments to see improvement over time.</Typography>
+        <Typography variant="body2" color="text.disabled">No trend data yet. Play a few more tournaments and this will show how you're getting on.</Typography>
       ) : (
         <Box display="flex" gap={1.5} flexWrap="wrap">
           {data.map((r, i) => {
