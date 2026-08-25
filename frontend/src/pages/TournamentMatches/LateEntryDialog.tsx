@@ -45,13 +45,13 @@ function computeInfoMessage(matches: MatchWithPlayers[]): string {
     if (existingByeInRound) {
       return `Round ${maxRound} hasn't started yet. The player will be paired with ${existingByeInRound.player1_name}, who currently has a bye.`;
     }
-    return `Round ${maxRound} hasn't started yet. The player will be added as the bye for this round and enter the bracket from round ${maxRound + 1} onward.`;
+    return `Round ${maxRound} hasn't started yet. Nobody is free to play them, so they'll sit this round out as a loss and enter the bracket from round ${maxRound + 1} onward.`;
   }
   if (roundHasBegun && !roundComplete) {
     if (existingByeInRound) {
       return `Round ${maxRound} is in progress. The player will be paired with ${existingByeInRound.player1_name}, who currently has a bye.`;
     }
-    return `Round ${maxRound} is in progress. This player will receive a bye for round ${maxRound} and enter the bracket from round ${maxRound + 1} onward.`;
+    return `Round ${maxRound} is in progress. Nobody is free to play them, so they'll sit this round out as a loss and enter the bracket from round ${maxRound + 1} onward.`;
   }
   return `This player will join with 0 points and be included in the next round's pairings.`;
 }

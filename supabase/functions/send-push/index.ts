@@ -14,11 +14,13 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
 interface Payload {
-  type: "pairing_up" | "time_up" | "standings_ready" | "late_join";
+  type: "pairing_up" | "time_up" | "standings_ready" | "late_join" | "bye_paired";
   tournament_id: string;
   round?: number;
-  /** late_join only: who just added themselves. */
+  /** late_join / bye_paired: who just added themselves. */
   player_name?: string;
+  /** bye_paired only: the player whose bye was taken by the late entry. */
+  player_id?: string;
 }
 
 interface Subscription {
@@ -74,7 +76,7 @@ Deno.serve(async (req) => {
   } catch {
     return new Response("Bad request", { status: 400 });
   }
-  const { type, tournament_id, round, player_name } = payload;
+  const { type, tournament_id, round, player_name, player_id } = payload;
   if (!type || !tournament_id) {
     return new Response("Bad request", { status: 400 });
   }
@@ -149,6 +151,13 @@ Deno.serve(async (req) => {
     if (type === "standings_ready") {
       title = "Final standings are ready";
       body = "Tap to see how you placed.";
+    } else if (type === "bye_paired") {
+      // Just the player who lost their bye to a late entry. Their round changed
+      // from "sit this one out" to "you have a game", so this needs to reach them.
+      if (player_id && row.tournament_player_id === player_id) {
+        title = `Round ${round}: you have a match after all`;
+        body = `${player_name ?? "A player"} joined late, so your bye is gone — tap to see your pairing.`;
+      }
     } else if (type === "late_join") {
       // Organisers only — a self-added player has just changed this round's
       // pairings, so whoever is running the event needs to look.
