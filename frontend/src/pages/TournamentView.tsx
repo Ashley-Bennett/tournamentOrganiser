@@ -197,6 +197,34 @@ const TournamentView: React.FC = () => {
   // ── Account linking (organiser hands a player a claim link) ──────────────
   const [claimPlayerId, setClaimPlayerId] = useState<string | null>(null);
 
+  // ── Late joins (players adding themselves after the tournament starts) ──
+  const [allowLateJoin, setAllowLateJoin] = useState(false);
+  const [savingLateJoin, setSavingLateJoin] = useState(false);
+
+  // Mirror the loaded tournament into local toggle state.
+  useEffect(() => {
+    setAllowLateJoin(Boolean(tournament?.allow_late_join));
+  }, [tournament?.allow_late_join]);
+
+  const handleToggleLateJoin = async (enabled: boolean) => {
+    if (!tournament) return;
+    setSavingLateJoin(true);
+    setPlayersError(null);
+    const { data, error } = await supabase.rpc("set_tournament_allow_late_join", {
+      p_tournament_id: tournament.id,
+      p_enabled: enabled,
+    });
+    setSavingLateJoin(false);
+    if (error) {
+      setPlayersError(error.message || "Failed to update late joins");
+      return;
+    }
+    setAllowLateJoin(enabled);
+    const row = Array.isArray(data) ? data[0] : data;
+    const code = (row as { join_code: string | null } | null)?.join_code ?? null;
+    if (code) setTournament((prev) => (prev ? { ...prev, join_code: code } : prev));
+  };
+
   // ── Known players (workspace regulars, for the add-player picker) ────────
   const { knownPlayers } = useWorkspacePlayers(workspaceId);
   const linkedUserIds = useMemo(
@@ -244,126 +272,16 @@ const TournamentView: React.FC = () => {
 
   // Fetch current round matches and update pairings to account for a newly added
   // late-entry player. Returns the current max round number.
-  const applyLateEntryPairing = async (
-    newPlayerId: string,
-    currentMatches: Array<{
-      id: string;
-      round_number: number;
-      player1_id: string;
-      player2_id: string | null;
-      status: string;
-      match_number: number | null;
-    }>,
-    maxRound: number,
-  ) => {
-    const currentRoundMatches = currentMatches.filter(
-      (m) => m.round_number === maxRound,
-    );
-
-    // "Round has begun" = Begin Round was pressed (real matches move to 'pending').
-    // Initial byes created as 'bye' at tournament start do NOT count as begun.
-    const roundHasBegun = currentRoundMatches.some(
-      (m) =>
-        m.status === "pending" ||
-        (m.status === "completed" && m.player2_id !== null),
-    );
-    const roundComplete =
-      currentRoundMatches.length > 0 &&
-      currentRoundMatches.every(
-        (m) => m.status === "completed" || m.status === "bye",
-      );
-    const preBeginRound =
-      currentRoundMatches.length > 0 && !roundHasBegun && !roundComplete;
-
-    const maxMatchNum = currentRoundMatches.reduce(
-      (max, m) => Math.max(max, m.match_number ?? 0),
-      0,
-    );
-
-    // Create a loss record for every completed round the player missed.
-    // Rounds 1..(maxRound-1) are always complete; maxRound is complete only
-    // when roundComplete is true.
-    const missedRounds = roundComplete ? maxRound : maxRound - 1;
-    if (missedRounds > 0) {
-      const lossMatches = Array.from({ length: missedRounds }, (_, i) => ({
-        tournament_id: tournament!.id,
-        workspace_id: workspaceId,
-        round_number: i + 1,
-        match_number: null,
-        player1_id: newPlayerId,
-        player2_id: null,
-        status: "completed",
-        result: "loss",
-        winner_id: null,
-      }));
-      const { error } = await supabase
-        .from("tournament_matches")
-        .insert(lossMatches);
-      if (error) throw new Error(error.message);
-    }
-
-    if (preBeginRound) {
-      // Find any existing bye (player2_id = null), regardless of 'ready'/'bye' status
-      const existingBye = currentRoundMatches.find((m) => !m.player2_id);
-      if (existingBye) {
-        // Convert the bye into a real match with the new player
-        const { error } = await supabase
-          .from("tournament_matches")
-          .update({
-            player2_id: newPlayerId,
-            status: "ready",
-            result: null,
-            winner_id: null,
-          })
-          .eq("id", existingBye.id);
-        if (error) throw new Error(error.message);
-      } else {
-        // No existing bye: new player becomes the bye for this round
-        const { error } = await supabase.from("tournament_matches").insert({
-          tournament_id: tournament!.id,
-          workspace_id: workspaceId,
-          round_number: maxRound,
-          match_number: maxMatchNum + 1,
-          player1_id: newPlayerId,
-          player2_id: null,
-          status: "ready",
-          result: null,
-          winner_id: null,
-        });
-        if (error) throw new Error(error.message);
-      }
-    } else if (roundHasBegun && !roundComplete) {
-      // Round in progress: absorb an existing bye if one exists, otherwise
-      // give the late entry their own bye.
-      const existingBye = currentRoundMatches.find((m) => !m.player2_id);
-      if (existingBye) {
-        // Convert the bye into a real in-progress match
-        const { error } = await supabase
-          .from("tournament_matches")
-          .update({
-            player2_id: newPlayerId,
-            status: "pending",
-            result: null,
-            winner_id: null,
-          })
-          .eq("id", existingBye.id);
-        if (error) throw new Error(error.message);
-      } else {
-        const { error } = await supabase.from("tournament_matches").insert({
-          tournament_id: tournament!.id,
-          workspace_id: workspaceId,
-          round_number: maxRound,
-          match_number: maxMatchNum + 1,
-          player1_id: newPlayerId,
-          player2_id: null,
-          status: "bye",
-          result: "bye",
-          winner_id: newPlayerId,
-        });
-        if (error) throw new Error(error.message);
-      }
-    }
-    // roundComplete: player enters next round, no match needed for current round
+  // Late-entry pairing lives in SQL (apply_late_entry_pairing). It has to:
+  // a joining player is not a workspace member, so RLS blocks them from writing
+  // tournament_matches on their own client. One implementation serves the
+  // organiser paths here and the player self-join path, so they cannot drift.
+  const applyLateEntryPairing = async (newPlayerId: string) => {
+    const { error } = await supabase.rpc("apply_late_entry_pairing", {
+      p_player_id: newPlayerId,
+      p_tournament_id: tournament!.id,
+    });
+    if (error) throw new Error(error.message);
   };
 
   const handleAddPlayer = async (playerName: string, knownUserId: string | null = null) => {
@@ -373,24 +291,16 @@ const TournamentView: React.FC = () => {
       setAddingPlayer(true);
       setPlayersError(null);
 
-      // For active tournaments, fetch current matches upfront so we can update pairings
-      let currentMatches: Array<{
-        id: string;
-        round_number: number;
-        player1_id: string;
-        player2_id: string | null;
-        status: string;
-        match_number: number | null;
-      }> = [];
+      // Which round a late entry is joining at. The pairing itself is worked
+      // out server-side from live match state.
       let maxRound = 1;
       if (tournament.status === "active") {
         const { data: matchData } = await supabase
           .from("tournament_matches")
-          .select("id, round_number, player1_id, player2_id, status, match_number")
+          .select("round_number")
           .eq("tournament_id", tournament.id);
-        currentMatches = matchData ?? [];
-        if (currentMatches.length > 0) {
-          maxRound = Math.max(...currentMatches.map((m) => m.round_number));
+        if ((matchData?.length ?? 0) > 0) {
+          maxRound = Math.max(...matchData!.map((m) => m.round_number));
         }
       }
 
@@ -446,7 +356,7 @@ const TournamentView: React.FC = () => {
       }
 
       if (tournament.status === "active" && data) {
-        await applyLateEntryPairing(data.id, currentMatches, maxRound);
+        await applyLateEntryPairing(data.id);
       }
 
       startTransition(() => {
@@ -486,15 +396,15 @@ const TournamentView: React.FC = () => {
         setPlayers((prev) => [...prev, ...(data as TournamentPlayer[])]);
       } else {
         // Active tournament: add one at a time so each pairing update sees the
-        // current state of the matches (e.g. odd→even→odd alternation with byes)
+        // current state of the matches (e.g. odd→even→odd alternation with byes).
+        // apply_late_entry_pairing reads that state itself on every call.
         const { data: matchData } = await supabase
           .from("tournament_matches")
-          .select("id, round_number, player1_id, player2_id, status, match_number")
+          .select("round_number")
           .eq("tournament_id", tournament.id);
-        let currentMatches = matchData ?? [];
         const maxRound =
-          currentMatches.length > 0
-            ? Math.max(...currentMatches.map((m) => m.round_number))
+          (matchData?.length ?? 0) > 0
+            ? Math.max(...matchData!.map((m) => m.round_number))
             : 1;
 
         const addedPlayers: TournamentPlayer[] = [];
@@ -514,14 +424,7 @@ const TournamentView: React.FC = () => {
           if (error) throw new Error(error.message || `Failed to add ${name}`);
           addedPlayers.push(data as TournamentPlayer);
 
-          await applyLateEntryPairing(data.id, currentMatches, maxRound);
-
-          // Re-fetch matches so the next iteration sees up-to-date bye state
-          const { data: refreshed } = await supabase
-            .from("tournament_matches")
-            .select("id, round_number, player1_id, player2_id, status, match_number")
-            .eq("tournament_id", tournament.id);
-          currentMatches = refreshed ?? [];
+          await applyLateEntryPairing(data.id);
         }
         setPlayers((prev) => [...prev, ...addedPlayers]);
       }
@@ -546,7 +449,7 @@ const TournamentView: React.FC = () => {
       .eq("id", tournament.id)
       .eq("workspace_id", workspaceId ?? "")
       .select(
-        "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description",
+        "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, allow_late_join, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description",
       )
       .maybeSingle();
     if (!error && data) setTournament(data as TournamentSummary);
@@ -740,7 +643,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
         .eq("id", tournament.id)
         .eq("workspace_id", workspaceId)
         .select(
-          "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description",
+          "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, allow_late_join, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description",
         )
         .maybeSingle();
 
@@ -1250,6 +1153,73 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                   {`${window.location.origin}/join/c/${tournament.join_code}`}
                 </Typography>
               </Box>
+          </Box>
+        )}
+
+        {/* ── Late joins (active + manager only) ────────────────────── */}
+        {tournament.status === "active" && isManager && (
+          <Box mb={2}>
+            <Box display="flex" alignItems="center" gap={1}>
+              <Switch
+                size="small"
+                checked={allowLateJoin}
+                disabled={savingLateJoin}
+                onChange={(e) => void handleToggleLateJoin(e.target.checked)}
+                inputProps={{ "aria-label": "Allow late joins" }}
+              />
+              <Box>
+                <Typography variant="body2">Allow late joins</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Players can add themselves from the join link while the
+                  tournament is running. They take a loss for rounds already
+                  played and enter the next pairing.
+                </Typography>
+              </Box>
+            </Box>
+
+            {allowLateJoin && tournament.join_code && (
+              <Box mt={1.5} pl={5}>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    Room code
+                  </Typography>
+                  <Typography
+                    variant="h6"
+                    fontWeight={700}
+                    sx={{ letterSpacing: 2, fontFamily: "monospace" }}
+                  >
+                    {tournament.join_code}
+                  </Typography>
+                  <Tooltip title={copiedJoinLink ? "Copied!" : "Copy link"}>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        void navigator.clipboard
+                          .writeText(`${window.location.origin}/join/c/${tournament.join_code}`)
+                          .then(() => {
+                            setCopiedJoinLink(true);
+                            setTimeout(() => setCopiedJoinLink(false), 2000);
+                            setCopyToast("Copied!");
+                          })
+                          .catch(() => setCopyToast("Failed to copy — please try again."));
+                      }}
+                    >
+                      <ContentCopyIcon fontSize="inherit" />
+                    </IconButton>
+                  </Tooltip>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<QrCode2Icon />}
+                    onClick={() =>
+                      window.open(wPath(`/tournaments/${tournament.id}/join-display`), "_blank")
+                    }
+                  >
+                    Display join info
+                  </Button>
+                </Box>
+              </Box>
+            )}
           </Box>
         )}
 

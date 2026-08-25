@@ -24,6 +24,7 @@ import {
 } from "../utils/playerStorage";
 import { useAuth } from "../AuthContext";
 import { formatDateTime } from "../utils/format";
+import { lateJoinMessage } from "../utils/lateEntry";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,8 @@ export default function TournamentJoin() {
   const [gameFormat, setGameFormat] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
+  // Set when joining an already-running tournament as a late entry.
+  const [lateJoin, setLateJoin] = useState<{ round: number; inProgress: boolean } | null>(null);
 
   const nameTaken = useMemo(
     () => registeredNames.some((n) => n.toLowerCase() === nameInput.trim().toLowerCase()),
@@ -65,25 +68,33 @@ export default function TournamentJoin() {
         return;
       }
 
-      const row = Array.isArray(data) ? data[0] : data;
-      const name = (row as { tournament_name: string; status: string; join_enabled: boolean; registered_names: string[] }).tournament_name;
-      const status = (row as { tournament_name: string; status: string; join_enabled: boolean; registered_names: string[] }).status;
-      const joinEnabled = (row as { tournament_name: string; status: string; join_enabled: boolean; registered_names: string[] }).join_enabled;
-      const names = (row as { tournament_name: string; status: string; join_enabled: boolean; registered_names: string[] }).registered_names ?? [];
-
-      setTournamentName(name);
-      setRegisteredNames(names);
-
-      const details = row as {
+      const row = (Array.isArray(data) ? data[0] : data) as {
+        tournament_name: string;
+        status: string;
+        join_enabled: boolean;
+        registered_names: string[] | null;
+        allow_late_join: boolean;
+        current_round: number;
+        round_in_progress: boolean;
         starts_at: string | null;
         game_format: string | null;
         location: string | null;
         description: string | null;
       };
-      setStartsAt(details.starts_at ?? null);
-      setGameFormat(details.game_format ?? null);
-      setLocation(details.location ?? null);
-      setDescription(details.description ?? null);
+      const name = row.tournament_name;
+      const status = row.status;
+      const joinEnabled = row.join_enabled;
+      const names = row.registered_names ?? [];
+      // The organiser can keep the join link live after the tournament starts.
+      const lateJoinOpen = status === "active" && row.allow_late_join;
+
+      setTournamentName(name);
+      setRegisteredNames(names);
+
+      setStartsAt(row.starts_at ?? null);
+      setGameFormat(row.game_format ?? null);
+      setLocation(row.location ?? null);
+      setDescription(row.description ?? null);
 
       // Expire cache if tournament is completed
       if (status === "completed") {
@@ -110,7 +121,12 @@ export default function TournamentJoin() {
         }
       }
 
-      if (!joinEnabled || status !== "draft") {
+      if (lateJoinOpen) {
+        setLateJoin({
+          round: row.current_round ?? 1,
+          inProgress: Boolean(row.round_in_progress),
+        });
+      } else if (!joinEnabled || status !== "draft") {
         setPageState("closed");
         return;
       }
@@ -200,8 +216,16 @@ export default function TournamentJoin() {
               {tournamentName}
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={2}>
-              Enter your name to join the tournament.
+              {lateJoin
+                ? "This tournament is already under way — you can still join."
+                : "Enter your name to join the tournament."}
             </Typography>
+
+            {lateJoin && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                {lateJoinMessage(lateJoin.round, lateJoin.inProgress)}
+              </Alert>
+            )}
 
             {(startsAt || gameFormat || location || description) && (
               <Box sx={{ mb: 2.5, p: 1.5, borderRadius: 1, bgcolor: "action.hover" }}>
@@ -281,7 +305,13 @@ export default function TournamentJoin() {
               onClick={() => void handleSubmit()}
               disabled={submitting || !nameInput.trim() || nameTaken || deckPokemon1 == null}
             >
-              {submitting ? <CircularProgress size={22} /> : "Join Tournament"}
+              {submitting ? (
+                <CircularProgress size={22} />
+              ) : lateJoin ? (
+                "Join as a late entry"
+              ) : (
+                "Join Tournament"
+              )}
             </Button>
             {deckPokemon1 == null && (
               <Typography variant="caption" color="text.secondary" display="block" textAlign="center" mt={1}>

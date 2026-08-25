@@ -14,9 +14,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
 interface Payload {
-  type: "pairing_up" | "time_up" | "standings_ready";
+  type: "pairing_up" | "time_up" | "standings_ready" | "late_join";
   tournament_id: string;
   round?: number;
+  /** late_join only: who just added themselves. */
+  player_name?: string;
 }
 
 interface Subscription {
@@ -72,7 +74,7 @@ Deno.serve(async (req) => {
   } catch {
     return new Response("Bad request", { status: 400 });
   }
-  const { type, tournament_id, round } = payload;
+  const { type, tournament_id, round, player_name } = payload;
   if (!type || !tournament_id) {
     return new Response("Bad request", { status: 400 });
   }
@@ -147,6 +149,15 @@ Deno.serve(async (req) => {
     if (type === "standings_ready") {
       title = "Final standings are ready";
       body = "Tap to see how you placed.";
+    } else if (type === "late_join") {
+      // Organisers only — a self-added player has just changed this round's
+      // pairings, so whoever is running the event needs to look.
+      if (row.is_organiser) {
+        title = `${player_name ?? "A player"} joined late`;
+        body = round
+          ? `Added during round ${round} — tap to check the pairings.`
+          : "Tap to check the pairings.";
+      }
     } else if (type === "time_up") {
       if (row.is_organiser || (row.tournament_player_id && roundPlayerIds.has(row.tournament_player_id))) {
         title = `Round ${round}: time's up!`;

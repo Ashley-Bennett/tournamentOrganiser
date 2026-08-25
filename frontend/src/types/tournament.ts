@@ -18,6 +18,8 @@ export interface TournamentSummary {
   round_is_paused?: boolean | null;
   round_note?: string | null;
   join_enabled?: boolean;
+  /** Players may add themselves from the join link while the tournament runs. */
+  allow_late_join?: boolean;
   join_code?: string | null;
   starts_at?: string | null;
   game_format?: string | null;

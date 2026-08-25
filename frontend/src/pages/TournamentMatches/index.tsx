@@ -37,7 +37,6 @@ import {
   type TournamentPlayer,
   type Match,
   type MatchWithPlayers,
-  MATCH_STATUS,
 } from "../../types/match";
 import StandingsTable from "../../components/StandingsTable";
 import ErrorBoundary from "../../components/ErrorBoundary";
@@ -633,30 +632,6 @@ const TournamentMatches: React.FC = () => {
           ? Math.max(...matches.map((m) => m.round_number))
           : 1;
 
-      const currentRoundMatches = matches.filter(
-        (m) => m.round_number === maxRound,
-      );
-
-      // Determine round state based on match statuses.
-      // Initial tournament start creates byes as 'bye' immediately, but real matches
-      // are 'ready' until Begin Round is pressed (which moves them to 'pending').
-      // So "round has begun" = any real match is 'pending', or any non-bye match
-      // has been completed. A lone 'bye' status match does NOT mean the round began.
-      const roundHasBegun = currentRoundMatches.some(
-        (m) =>
-          m.status === MATCH_STATUS.PENDING ||
-          (m.status === MATCH_STATUS.COMPLETED && m.player2_id !== null),
-      );
-      const roundComplete =
-        currentRoundMatches.length > 0 &&
-        currentRoundMatches.every(
-          (m) =>
-            m.status === MATCH_STATUS.COMPLETED ||
-            m.status === MATCH_STATUS.BYE,
-        );
-      const preBeginRound =
-        currentRoundMatches.length > 0 && !roundHasBegun && !roundComplete;
-
       // Insert the late entry player. A known player goes through
       // add_known_players_to_tournament so user_id is set at insert time (and
       // workspace membership is validated server-side) — they get pairings and
@@ -697,106 +672,16 @@ const TournamentMatches: React.FC = () => {
         newPlayer = inserted;
       }
 
-      // Create a loss record for every completed round the player missed.
-      // Rounds 1..(maxRound-1) are always complete; maxRound is complete only
-      // when roundComplete is true.
+      // Missed-round losses and this round's pairing are applied server-side by
+      // apply_late_entry_pairing — the same function the player self-join path
+      // uses, so organiser-added and self-added late entries behave identically.
       if (newPlayer) {
-        const missedRounds = roundComplete ? maxRound : maxRound - 1;
-        if (missedRounds > 0) {
-          const lossMatches = Array.from({ length: missedRounds }, (_, i) => ({
-            tournament_id: tournament.id,
-            workspace_id: workspaceId,
-            round_number: i + 1,
-            match_number: null,
-            player1_id: newPlayer.id,
-            player2_id: null,
-            status: MATCH_STATUS.COMPLETED,
-            result: "loss",
-            winner_id: null,
-          }));
-          const { error: lossError } = await supabase
-            .from("tournament_matches")
-            .insert(lossMatches);
-          if (lossError) throw new Error(lossError.message);
-        }
+        const { error: pairingError } = await supabase.rpc("apply_late_entry_pairing", {
+          p_player_id: newPlayer.id,
+          p_tournament_id: tournament.id,
+        });
+        if (pairingError) throw new Error(pairingError.message);
       }
-
-      if (preBeginRound && newPlayer) {
-        // Round not yet begun: slot the new player into the existing bye, or
-        // create a new 'ready' bye for them. All other pairings are untouched.
-        // A bye can be 'ready' (from regenerate) or 'bye' (from initial start).
-        const existingBye = currentRoundMatches.find((m) => !m.player2_id);
-        if (existingBye) {
-          // Pair the waiting bye player with the new player; convert back to a real match
-          const { error: updateError } = await supabase
-            .from("tournament_matches")
-            .update({
-              player2_id: newPlayer.id,
-              status: MATCH_STATUS.READY,
-              result: null,
-              winner_id: null,
-            })
-            .eq("id", existingBye.id);
-          if (updateError) throw new Error(updateError.message);
-        } else {
-          // No existing bye: new player waits as the bye for this round
-          const maxMatchNum = currentRoundMatches.reduce(
-            (max, m) => Math.max(max, m.match_number ?? 0),
-            0,
-          );
-          const { error: matchError } = await supabase
-            .from("tournament_matches")
-            .insert({
-              tournament_id: tournament.id,
-              workspace_id: workspaceId,
-              round_number: maxRound,
-              match_number: maxMatchNum + 1,
-              player1_id: newPlayer.id,
-              player2_id: null,
-              status: MATCH_STATUS.READY,
-              result: null,
-              winner_id: null,
-            });
-          if (matchError) throw new Error(matchError.message);
-        }
-      } else if (roundHasBegun && !roundComplete && newPlayer) {
-        // Round in progress: absorb an existing bye if one exists, otherwise
-        // give the late entry their own bye.
-        const existingBye = currentRoundMatches.find((m) => !m.player2_id);
-        if (existingBye) {
-          // Convert the bye into a real in-progress match
-          const { error: updateError } = await supabase
-            .from("tournament_matches")
-            .update({
-              player2_id: newPlayer.id,
-              status: MATCH_STATUS.PENDING,
-              result: null,
-              winner_id: null,
-            })
-            .eq("id", existingBye.id);
-          if (updateError) throw new Error(updateError.message);
-        } else {
-          const maxMatchNum = currentRoundMatches.reduce(
-            (max, m) => Math.max(max, m.match_number ?? 0),
-            0,
-          );
-          const { error: matchError } = await supabase
-            .from("tournament_matches")
-            .insert({
-              tournament_id: tournament.id,
-              workspace_id: workspaceId,
-              round_number: maxRound,
-              match_number: maxMatchNum + 1,
-              player1_id: newPlayer.id,
-              player2_id: null,
-              status: MATCH_STATUS.BYE,
-              result: "bye",
-              winner_id: newPlayer.id,
-            });
-          if (matchError) throw new Error(matchError.message);
-        }
-      }
-      // If roundComplete: player is simply added; they'll appear in next round's pairing
 
       setLateEntrySelection({ name: "", userId: null });
       setLateEntryDialogOpen(false);
