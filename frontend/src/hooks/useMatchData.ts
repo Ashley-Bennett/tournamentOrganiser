@@ -94,7 +94,7 @@ export function useMatchData({
         const { data: allPlayersData, error: allPlayersError } = await supabase
           .from("tournament_players")
           .select(
-            "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round, deck_pokemon1, deck_pokemon2",
+            "id, name, user_id, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round, deck_pokemon1, deck_pokemon2",
           )
           .eq("tournament_id", tournamentId)
           .order("name");
@@ -190,7 +190,7 @@ export function useMatchData({
     const { data: freshPlayers } = await supabase
       .from("tournament_players")
       .select(
-        "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round, deck_pokemon1, deck_pokemon2",
+        "id, name, user_id, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round, deck_pokemon1, deck_pokemon2",
       )
       .eq("tournament_id", tournamentId)
       .order("name");

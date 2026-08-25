@@ -3,6 +3,8 @@ import type { PairingDecisionLog } from "../utils/tournamentPairing";
 export interface TournamentPlayer {
   id: string;
   name: string;
+  /** Set once the entry is linked to a player account. */
+  user_id: string | null;
   dropped: boolean;
   dropped_at_round: number | null;
   has_static_seating: boolean;

@@ -5,17 +5,22 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  TextField,
 } from "@mui/material";
 import type { MatchWithPlayers } from "../../types/match";
 import { MATCH_STATUS } from "../../types/match";
+import PlayerNameInput, {
+  type PlayerNameSelection,
+} from "../../components/PlayerNameInput";
+import type { WorkspacePlayer } from "../../types/workspacePlayer";
 
 interface Props {
   open: boolean;
-  name: string;
-  setName: (v: string) => void;
+  selection: PlayerNameSelection;
+  setSelection: (v: PlayerNameSelection) => void;
   matches: MatchWithPlayers[];
   adding: boolean;
+  knownPlayers: WorkspacePlayer[];
+  excludeUserIds: string[];
   onSubmit: () => void;
   onClose: () => void;
 }
@@ -53,10 +58,12 @@ function computeInfoMessage(matches: MatchWithPlayers[]): string {
 
 export default function LateEntryDialog({
   open,
-  name,
-  setName,
+  selection,
+  setSelection,
   matches,
   adding,
+  knownPlayers,
+  excludeUserIds,
   onSubmit,
   onClose,
 }: Props) {
@@ -69,23 +76,28 @@ export default function LateEntryDialog({
         <Alert severity="info" sx={{ mb: 2 }}>
           {infoMessage}
         </Alert>
-        <TextField
-          autoFocus
-          fullWidth
+        <PlayerNameInput
+          value={selection}
+          onChange={setSelection}
+          knownPlayers={knownPlayers}
+          excludeUserIds={excludeUserIds}
           label="Player Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && name.trim()) void onSubmit();
-          }}
+          autoFocus
+          onEnter={() => void onSubmit()}
         />
+        {selection.userId && (
+          <Alert severity="success" sx={{ mt: 2 }}>
+            {selection.name} will be linked to their account straight away — their
+            pairings and results appear on their phone as soon as you add them.
+          </Alert>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="contained"
           onClick={() => void onSubmit()}
-          disabled={!name.trim() || adding}
+          disabled={!selection.name.trim() || adding}
         >
           {adding ? "Adding…" : "Add Player"}
         </Button>

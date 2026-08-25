@@ -44,6 +44,8 @@ import ErrorBoundary from "../../components/ErrorBoundary";
 import ScoreDialog from "./ScoreDialog";
 import DeleteRoundDialog from "./DeleteRoundDialog";
 import LateEntryDialog from "./LateEntryDialog";
+import { useWorkspacePlayers } from "../../hooks/useWorkspacePlayers";
+import type { PlayerNameSelection } from "../../components/PlayerNameInput";
 import RoundNoteField from "./RoundNoteField";
 import PairingDecisionAlert from "./PairingDecisionAlert";
 import TimerEditor from "./TimerEditor";
@@ -58,6 +60,7 @@ const TournamentMatches: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { workspaceId, wPath } = useWorkspace();
+  const { knownPlayers } = useWorkspacePlayers(workspaceId);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [tournament, setTournament] = useState<TournamentSummary | null>(null);
@@ -83,7 +86,10 @@ const TournamentMatches: React.FC = () => {
     number | null
   >(null);
   const [lateEntryDialogOpen, setLateEntryDialogOpen] = useState(false);
-  const [lateEntryName, setLateEntryName] = useState("");
+  const [lateEntrySelection, setLateEntrySelection] = useState<PlayerNameSelection>({
+    name: "",
+    userId: null,
+  });
   const [addingLateEntry, setAddingLateEntry] = useState(false);
   const [savingTimer, setSavingTimer] = useState(false);
   const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
@@ -122,6 +128,12 @@ const TournamentMatches: React.FC = () => {
       setRoundNoteInput(tournament?.round_note ?? "");
     }
   }, [tournament?.round_note]);
+
+  // Regulars already in this tournament are filtered out of the picker.
+  const linkedUserIds = useMemo(
+    () => players.map((p) => p.user_id).filter((id): id is string => Boolean(id)),
+    [players],
+  );
 
   const standingsByPlayerId = useMemo(() => {
     // Standings as-of the start of the selected round (all rounds < selectedRound)
@@ -611,7 +623,7 @@ const TournamentMatches: React.FC = () => {
   // ── Late entry ───────────────────────────────────────────────────────────────
 
   const handleAddLateEntry = async () => {
-    if (!tournament || !user || !workspaceId || !lateEntryName.trim()) return;
+    if (!tournament || !user || !workspaceId || !lateEntrySelection.name.trim()) return;
     try {
       setAddingLateEntry(true);
       setError(null);
@@ -645,21 +657,45 @@ const TournamentMatches: React.FC = () => {
       const preBeginRound =
         currentRoundMatches.length > 0 && !roundHasBegun && !roundComplete;
 
-      // Insert the late entry player
-      const { data: newPlayer, error: playerError } = await supabase
-        .from("tournament_players")
-        .insert({
-          name: lateEntryName.trim(),
-          tournament_id: tournament.id,
-          created_by: user.id,
-          workspace_id: workspaceId,
-          is_late_entry: true,
-          late_entry_round: maxRound,
-        })
-        .select("id, name")
-        .single();
+      // Insert the late entry player. A known player goes through
+      // add_known_players_to_tournament so user_id is set at insert time (and
+      // workspace membership is validated server-side) — they get pairings and
+      // result reporting on their phone immediately, with no claim link.
+      let newPlayer: { id: string; name: string } | null = null;
 
-      if (playerError) throw new Error(playerError.message);
+      if (lateEntrySelection.userId) {
+        const { data: rows, error: rpcError } = await supabase.rpc(
+          "add_known_players_to_tournament",
+          {
+            p_tournament_id: tournament.id,
+            p_user_ids: [lateEntrySelection.userId],
+            p_is_late_entry: true,
+            p_late_entry_round: maxRound,
+          },
+        );
+        if (rpcError) throw new Error(rpcError.message);
+        const row = (rows as Array<{ player_id: string; name: string }> | null)?.[0];
+        if (!row) {
+          throw new Error(`${lateEntrySelection.name} is already in this tournament.`);
+        }
+        newPlayer = { id: row.player_id, name: row.name };
+      } else {
+        const { data: inserted, error: playerError } = await supabase
+          .from("tournament_players")
+          .insert({
+            name: lateEntrySelection.name.trim(),
+            tournament_id: tournament.id,
+            created_by: user.id,
+            workspace_id: workspaceId,
+            is_late_entry: true,
+            late_entry_round: maxRound,
+          })
+          .select("id, name")
+          .single();
+
+        if (playerError) throw new Error(playerError.message);
+        newPlayer = inserted;
+      }
 
       // Create a loss record for every completed round the player missed.
       // Rounds 1..(maxRound-1) are always complete; maxRound is complete only
@@ -762,7 +798,7 @@ const TournamentMatches: React.FC = () => {
       }
       // If roundComplete: player is simply added; they'll appear in next round's pairing
 
-      setLateEntryName("");
+      setLateEntrySelection({ name: "", userId: null });
       setLateEntryDialogOpen(false);
       await refreshMatches();
     } catch (e: unknown) {
@@ -1521,14 +1557,16 @@ const TournamentMatches: React.FC = () => {
 
       <LateEntryDialog
         open={lateEntryDialogOpen}
-        name={lateEntryName}
-        setName={setLateEntryName}
+        selection={lateEntrySelection}
+        setSelection={setLateEntrySelection}
         matches={matches}
         adding={addingLateEntry}
+        knownPlayers={knownPlayers}
+        excludeUserIds={linkedUserIds}
         onSubmit={handleAddLateEntry}
         onClose={() => {
           setLateEntryDialogOpen(false);
-          setLateEntryName("");
+          setLateEntrySelection({ name: "", userId: null });
         }}
       />
       <DeleteRoundDialog

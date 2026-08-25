@@ -45,6 +45,8 @@ import Breadcrumbs from "../components/Breadcrumbs";
 import PushOptIn from "../components/PushOptIn";
 import DeckPickerDialog from "../components/DeckPickerDialog";
 import PlayerClaimLinkDialog from "../components/PlayerClaimLinkDialog";
+import PlayerNameInput, { type PlayerNameSelection } from "../components/PlayerNameInput";
+import { useWorkspacePlayers, type WorkspacePlayer } from "../hooks/useWorkspacePlayers";
 import NormalizedSprite from "../components/NormalizedSprite";
 import { getSpriteUrl } from "../utils/pokemonCache";
 import { useTournament } from "../hooks/useTournament";
@@ -60,21 +62,25 @@ import { generateRound1Pairings } from "../utils/tournamentPairing";
 
 // Isolated component so typing only re-renders this small subtree, not the whole page.
 interface AddPlayerInputProps {
-  onAdd: (name: string) => Promise<void>;
+  onAdd: (name: string, userId: string | null) => Promise<void>;
   disabled: boolean;
   inputRef: React.RefObject<HTMLInputElement>;
   onBulkMode: () => void;
+  knownPlayers: WorkspacePlayer[];
+  excludeUserIds: string[];
 }
 
-const AddPlayerInput: React.FC<AddPlayerInputProps> = ({ onAdd, disabled, inputRef, onBulkMode }) => {
-  const [name, setName] = useState("");
+const AddPlayerInput: React.FC<AddPlayerInputProps> = ({
+  onAdd, disabled, inputRef, onBulkMode, knownPlayers, excludeUserIds,
+}) => {
+  const [selection, setSelection] = useState<PlayerNameSelection>({ name: "", userId: null });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = name.trim();
+    const trimmed = selection.name.trim();
     if (!trimmed || disabled) return;
-    await onAdd(trimmed);
-    setName("");
+    await onAdd(trimmed, selection.userId);
+    setSelection({ name: "", userId: null });
     inputRef.current?.focus();
   };
 
@@ -88,19 +94,18 @@ const AddPlayerInput: React.FC<AddPlayerInputProps> = ({ onAdd, disabled, inputR
       flexWrap="wrap"
       alignItems="flex-start"
     >
-      <TextField
-        label="Player name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        size="small"
-        autoComplete="off"
-        sx={{ minWidth: 240 }}
+      <PlayerNameInput
+        value={selection}
+        onChange={setSelection}
+        knownPlayers={knownPlayers}
+        excludeUserIds={excludeUserIds}
         inputRef={inputRef}
+        disabled={disabled}
       />
       <Button
         type="submit"
         variant="contained"
-        disabled={disabled || !name.trim()}
+        disabled={disabled || !selection.name.trim()}
       >
         Add Player
       </Button>
@@ -191,6 +196,13 @@ const TournamentView: React.FC = () => {
 
   // ── Account linking (organiser hands a player a claim link) ──────────────
   const [claimPlayerId, setClaimPlayerId] = useState<string | null>(null);
+
+  // ── Known players (workspace regulars, for the add-player picker) ────────
+  const { knownPlayers } = useWorkspacePlayers(workspaceId);
+  const linkedUserIds = useMemo(
+    () => players.map((p) => p.user_id).filter((id): id is string => Boolean(id)),
+    [players],
+  );
 
   // ── Player list search/sort ───────────────────────────────────────────────
   const [playerSearch, setPlayerSearch] = useState("");
@@ -354,7 +366,7 @@ const TournamentView: React.FC = () => {
     // roundComplete: player enters next round, no match needed for current round
   };
 
-  const handleAddPlayer = async (playerName: string) => {
+  const handleAddPlayer = async (playerName: string, knownUserId: string | null = null) => {
     if (!tournament || !user) return;
 
     try {
@@ -382,23 +394,55 @@ const TournamentView: React.FC = () => {
         }
       }
 
-      const { data, error } = await supabase
-        .from("tournament_players")
-        .insert({
-          name: playerName,
-          tournament_id: tournament.id,
+      // A known player goes through add_known_players_to_tournament, which
+      // validates workspace membership server-side and sets user_id, so the
+      // entry is account-linked from birth. A typed name is a plain insert.
+      let data: TournamentPlayer | null = null;
+
+      if (knownUserId) {
+        const { data: rows, error: rpcError } = await supabase.rpc(
+          "add_known_players_to_tournament",
+          {
+            p_tournament_id: tournament.id,
+            p_user_ids: [knownUserId],
+            p_is_late_entry: tournament.status === "active",
+            p_late_entry_round: tournament.status === "active" ? maxRound : null,
+          },
+        );
+        if (rpcError) throw new Error(rpcError.message || "Failed to add player");
+        const row = (rows as Array<{ player_id: string; name: string; created_at: string; user_id: string }> | null)?.[0];
+        if (!row) throw new Error(`${playerName} is already in this tournament.`);
+        data = {
+          id: row.player_id,
+          name: row.name,
+          created_at: row.created_at,
+          user_id: row.user_id,
           created_by: user.id,
-          workspace_id: workspaceId,
           ...(tournament.status === "active" && {
             is_late_entry: true,
             late_entry_round: maxRound,
           }),
-        })
-        .select("id, name, created_at")
-        .single();
+        };
+      } else {
+        const { data: inserted, error } = await supabase
+          .from("tournament_players")
+          .insert({
+            name: playerName,
+            tournament_id: tournament.id,
+            created_by: user.id,
+            workspace_id: workspaceId,
+            ...(tournament.status === "active" && {
+              is_late_entry: true,
+              late_entry_round: maxRound,
+            }),
+          })
+          .select("id, name, created_at")
+          .single();
 
-      if (error) {
-        throw new Error(error.message || "Failed to add player");
+        if (error) {
+          throw new Error(error.message || "Failed to add player");
+        }
+        data = inserted as TournamentPlayer;
       }
 
       if (tournament.status === "active" && data) {
@@ -1215,6 +1259,8 @@ const handleSetRoundDuration = async (minutes: number | null) => {
             disabled={addingPlayer}
             inputRef={playerNameInputRef}
             onBulkMode={() => setBulkMode(true)}
+            knownPlayers={knownPlayers}
+            excludeUserIds={linkedUserIds}
           />
         ) : (
           <Box display="flex" flexDirection="column" gap={1} mb={2}>
