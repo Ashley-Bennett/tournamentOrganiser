@@ -36,12 +36,15 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/Edit";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
+import LinkIcon from "@mui/icons-material/Link";
+import HowToRegIcon from "@mui/icons-material/HowToReg";
 import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
 import Breadcrumbs from "../components/Breadcrumbs";
 import PushOptIn from "../components/PushOptIn";
 import DeckPickerDialog from "../components/DeckPickerDialog";
+import PlayerClaimLinkDialog from "../components/PlayerClaimLinkDialog";
 import NormalizedSprite from "../components/NormalizedSprite";
 import { getSpriteUrl } from "../utils/pokemonCache";
 import { useTournament } from "../hooks/useTournament";
@@ -185,6 +188,9 @@ const TournamentView: React.FC = () => {
 
   // ── Deck editing (organiser sets a deck on a player's behalf) ────────────
   const [deckPlayerId, setDeckPlayerId] = useState<string | null>(null);
+
+  // ── Account linking (organiser hands a player a claim link) ──────────────
+  const [claimPlayerId, setClaimPlayerId] = useState<string | null>(null);
 
   // ── Player list search/sort ───────────────────────────────────────────────
   const [playerSearch, setPlayerSearch] = useState("");
@@ -1342,6 +1348,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                         </TableSortLabel>
                       </TableCell>
                       <TableCell>Deck</TableCell>
+                      {isManager && <TableCell>Account</TableCell>}
                       <TableCell>Static Seating</TableCell>
                       {tournament.status === "draft" && (
                         <TableCell align="right">Remove</TableCell>
@@ -1449,6 +1456,34 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                               )}
                             </Box>
                           </TableCell>
+                          {isManager && (
+                            <TableCell>
+                              {player.user_id ? (
+                                <Tooltip title="Linked to a player account">
+                                  <Chip
+                                    icon={<HowToRegIcon />}
+                                    label="Linked"
+                                    size="small"
+                                    color="success"
+                                    variant="outlined"
+                                    sx={{ fontSize: "0.65rem", height: 22 }}
+                                  />
+                                </Tooltip>
+                              ) : (
+                                <Tooltip title={`Send ${player.name} a link to claim this entry`}>
+                                  <Button
+                                    size="small"
+                                    variant="text"
+                                    startIcon={<LinkIcon fontSize="inherit" />}
+                                    aria-label={`Link account for ${player.name}`}
+                                    onClick={() => setClaimPlayerId(player.id)}
+                                  >
+                                    Link
+                                  </Button>
+                                </Tooltip>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell>
                             <Box display="flex" alignItems="center" gap={1}>
                               <Switch
@@ -1584,6 +1619,13 @@ const handleSetRoundDuration = async (minutes: number | null) => {
           </Button>
         </DialogActions>
       </Dialog>
+      <PlayerClaimLinkDialog
+        open={claimPlayerId !== null}
+        playerId={claimPlayerId}
+        playerName={players.find((p) => p.id === claimPlayerId)?.name ?? "this player"}
+        onClose={() => setClaimPlayerId(null)}
+      />
+
       <DeckPickerDialog
         open={deckPlayerId !== null}
         onClose={() => setDeckPlayerId(null)}
