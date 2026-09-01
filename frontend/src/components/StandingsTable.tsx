@@ -17,6 +17,31 @@ import {
 } from "@mui/material";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import type { PlayerWithTieBreakers } from "../utils/tieBreaking";
+import { POKEMON_RULES } from "../games/rules";
+import type { RulesProfile, TiebreakerId } from "../games/types";
+
+/**
+ * How each tiebreaker is headed and formatted. The standings show whichever
+ * ones the tournament's rules actually rank by, so a generic event is not
+ * given Pokémon percentages it never used.
+ */
+const TIEBREAK_COLUMN: Record<
+  TiebreakerId,
+  { label: string; value: (p: PlayerWithTieBreakers) => string }
+> = {
+  omw: {
+    label: "OMW%",
+    value: (p) => `${(p.opponentMatchWinPercentage * 100).toFixed(1)}%`,
+  },
+  oomw: {
+    label: "OOMW%",
+    value: (p) => `${(p.opponentOpponentMatchWinPercentage * 100).toFixed(1)}%`,
+  },
+  buchholz: {
+    label: "Buchholz",
+    value: (p) => String(p.buchholz),
+  },
+};
 
 interface Props {
   standings: PlayerWithTieBreakers[];
@@ -26,8 +51,10 @@ interface Props {
   deckMap?: Map<string, [number | null, number | null]>;
   /** Optional: highlight this player's row as "you" */
   currentPlayerId?: string;
-  /** Show OMW%/OOMW% columns on mobile (always visible on sm+) */
+  /** Show the tiebreaker columns on mobile (always visible on sm+) */
   showTiebreakers?: boolean;
+  /** Rules the event is scored under — decides which tiebreaker columns show. */
+  rules?: RulesProfile;
 }
 
 const getRankDisplay = (rank: number): string => {
@@ -64,6 +91,7 @@ interface ChunkTableProps {
   cellPx?: number;
   currentPlayerId?: string;
   showTiebreakers?: boolean;
+  rules: RulesProfile;
 }
 
 const ChunkTable: React.FC<ChunkTableProps> = ({
@@ -76,6 +104,7 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
   cellPx,
   currentPlayerId,
   showTiebreakers,
+  rules,
 }) => (
   <Paper sx={{ overflow: "hidden", height: "100%" }}>
     <TableContainer>
@@ -99,12 +128,15 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
             <TableCell sx={{ fontWeight: "bold" }} align="right">
               Pts
             </TableCell>
-            <TableCell sx={{ fontWeight: "bold", display: { xs: showTiebreakers ? "table-cell" : "none", sm: "table-cell" } }} align="right">
-              OMW%
-            </TableCell>
-            <TableCell sx={{ fontWeight: "bold", display: { xs: showTiebreakers ? "table-cell" : "none", sm: "table-cell" } }} align="right">
-              OOMW%
-            </TableCell>
+            {rules.tiebreakers.map((id) => (
+              <TableCell
+                key={id}
+                sx={{ fontWeight: "bold", display: { xs: showTiebreakers ? "table-cell" : "none", sm: "table-cell" } }}
+                align="right"
+              >
+                {TIEBREAK_COLUMN[id].label}
+              </TableCell>
+            ))}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -225,16 +257,17 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                     {player.matchPoints}
                   </Typography>
                 </TableCell>
-                <TableCell align="right" sx={{ display: { xs: showTiebreakers ? "table-cell" : "none", sm: "table-cell" } }}>
-                  <Typography variant="body2">
-                    {(player.opponentMatchWinPercentage * 100).toFixed(1)}%
-                  </Typography>
-                </TableCell>
-                <TableCell align="right" sx={{ display: { xs: showTiebreakers ? "table-cell" : "none", sm: "table-cell" } }}>
-                  <Typography variant="body2">
-                    {(player.opponentOpponentMatchWinPercentage * 100).toFixed(1)}%
-                  </Typography>
-                </TableCell>
+                {rules.tiebreakers.map((id) => (
+                  <TableCell
+                    key={id}
+                    align="right"
+                    sx={{ display: { xs: showTiebreakers ? "table-cell" : "none", sm: "table-cell" } }}
+                  >
+                    <Typography variant="body2">
+                      {TIEBREAK_COLUMN[id].value(player)}
+                    </Typography>
+                  </TableCell>
+                ))}
               </TableRow>
             );
           })}
@@ -244,7 +277,14 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
   </Paper>
 );
 
-const StandingsTable: React.FC<Props> = ({ standings, droppedMap, deckMap, currentPlayerId, showTiebreakers }) => {
+const StandingsTable: React.FC<Props> = ({
+  standings,
+  droppedMap,
+  deckMap,
+  currentPlayerId,
+  showTiebreakers,
+  rules = POKEMON_RULES,
+}) => {
   const theme = useTheme();
   const isMd = useMediaQuery(theme.breakpoints.up("md"));
   const isLg = useMediaQuery(theme.breakpoints.up("lg"));
@@ -290,6 +330,7 @@ const StandingsTable: React.FC<Props> = ({ standings, droppedMap, deckMap, curre
             cellPx={cellPx}
             currentPlayerId={currentPlayerId}
             showTiebreakers={showTiebreakers}
+            rules={rules}
           />
         </Box>
       ))}

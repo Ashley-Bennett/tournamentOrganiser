@@ -51,9 +51,16 @@ interface Props {
   handleQuickResult: (match: MatchWithPlayers, winner: "player1" | "player2" | "draw") => void;
   removeFromSlot: (matchId: string, slot: "player1" | "player2") => void;
   assignToSlot: (matchId: string, slot: "player1" | "player2", playerId: string) => void;
+  /**
+   * Whether the event records a per-game score. Where it does not, the quick
+   * result chips name the outcome instead of showing a "1-0" that is never
+   * stored.
+   */
+  showGameScore?: boolean;
 }
 
 export default function MatchTableDesktop({
+  showGameScore = true,
   matches,
   pendingResults,
   matchReports,
@@ -221,7 +228,7 @@ export default function MatchTableDesktop({
                       {showResultChips && (
                         <Box display="flex" gap={0.5} flexWrap="wrap">
                           <Chip
-                            label="1-0"
+                            label={showGameScore ? "1-0" : "Won"}
                             size="small"
                             variant={effectiveWinnerId === match.player1_id ? "filled" : "outlined"}
                             sx={{
@@ -267,7 +274,7 @@ export default function MatchTableDesktop({
                             disabled={!canEdit || updatingMatch}
                           />
                           <Chip
-                            label="0-1"
+                            label={showGameScore ? "0-1" : "Lost"}
                             size="small"
                             variant={effectiveWinnerId === match.player2_id ? "filled" : "outlined"}
                             sx={{
@@ -322,7 +329,7 @@ export default function MatchTableDesktop({
                       <Box display="flex" gap={0.5} flexWrap="wrap">
                         {/* P2 perspective: "1-0" = P2 wins, "0-1" = P1 wins */}
                         <Chip
-                          label="1-0"
+                          label={showGameScore ? "1-0" : "Won"}
                           size="small"
                           variant={effectiveWinnerId === match.player2_id ? "filled" : "outlined"}
                           sx={{
@@ -368,7 +375,7 @@ export default function MatchTableDesktop({
                           disabled={!canEdit || updatingMatch}
                         />
                         <Chip
-                          label="0-1"
+                          label={showGameScore ? "0-1" : "Lost"}
                           size="small"
                           variant={effectiveWinnerId === match.player1_id ? "filled" : "outlined"}
                           sx={{

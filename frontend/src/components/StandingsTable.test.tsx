@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import StandingsTable from "./StandingsTable";
 import type { PlayerWithTieBreakers } from "../utils/tieBreaking";
+import { GENERIC_RULES } from "../games/rules";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -174,5 +175,41 @@ describe("StandingsTable — edge cases", () => {
 
     expect(screen.getByText("Solo")).toBeInTheDocument();
     expect(screen.getByText("0-0-0")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tiebreaker columns follow the rules the event is scored under
+// ---------------------------------------------------------------------------
+
+describe("StandingsTable — tiebreaker columns per rules profile", () => {
+  const players = [
+    makePlayer({
+      id: "a",
+      name: "Ana",
+      matchPoints: 6,
+      opponentMatchWinPercentage: 0.5,
+      opponentOpponentMatchWinPercentage: 0.4,
+      buchholz: 9,
+    }),
+  ];
+
+  it("shows the Pokémon percentages by default", () => {
+    render(<StandingsTable standings={players} droppedMap={NO_DROPS} />);
+
+    expect(screen.getByText("OMW%")).toBeInTheDocument();
+    expect(screen.getByText("OOMW%")).toBeInTheDocument();
+    expect(screen.queryByText("Buchholz")).not.toBeInTheDocument();
+  });
+
+  it("shows Buchholz instead for a generic event", () => {
+    render(
+      <StandingsTable standings={players} droppedMap={NO_DROPS} rules={GENERIC_RULES} />,
+    );
+
+    expect(screen.getByText("Buchholz")).toBeInTheDocument();
+    expect(screen.getByText("9")).toBeInTheDocument();
+    expect(screen.queryByText("OMW%")).not.toBeInTheDocument();
+    expect(screen.queryByText("OOMW%")).not.toBeInTheDocument();
   });
 });

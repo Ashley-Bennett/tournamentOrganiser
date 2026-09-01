@@ -196,6 +196,9 @@ const TournamentView: React.FC = () => {
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
 
+  // Games with no deck (generic events) show no deck column at all.
+  const hasDecks = getGame(tournament?.game_id).deck !== "none";
+
   // ── Deck editing (organiser sets a deck on a player's behalf) ────────────
   const [deckPlayerId, setDeckPlayerId] = useState<string | null>(null);
 
@@ -1392,7 +1395,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                           Joined
                         </TableSortLabel>
                       </TableCell>
-                      <TableCell>Deck</TableCell>
+                      {hasDecks && <TableCell>Deck</TableCell>}
                       {isManager && <TableCell>Account</TableCell>}
                       <TableCell>Static Seating</TableCell>
                       {tournament.status === "draft" && (
@@ -1461,46 +1464,48 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                               {formatDateTime(player.created_at)}
                             </Typography>
                           </TableCell>
-                          <TableCell>
-                            <Box display="flex" alignItems="center" gap={0.5}>
-                              {player.deck_pokemon1 != null && (
-                                <NormalizedSprite
-                                  src={getSpriteUrl(player.deck_pokemon1)}
-                                  size={28}
-                                />
-                              )}
-                              {player.deck_pokemon2 != null && (
-                                <NormalizedSprite
-                                  src={getSpriteUrl(player.deck_pokemon2)}
-                                  size={28}
-                                />
-                              )}
-                              {isManager ? (
-                                <Tooltip
-                                  title={
-                                    player.deck_pokemon1 != null || player.deck_pokemon2 != null
-                                      ? "Edit deck"
-                                      : "Set deck"
-                                  }
-                                >
-                                  <IconButton
-                                    size="small"
-                                    aria-label={`Set deck for ${player.name}`}
-                                    onClick={() => setDeckPlayerId(player.id)}
+                          {hasDecks && (
+                            <TableCell>
+                              <Box display="flex" alignItems="center" gap={0.5}>
+                                {player.deck_pokemon1 != null && (
+                                  <NormalizedSprite
+                                    src={getSpriteUrl(player.deck_pokemon1)}
+                                    size={28}
+                                  />
+                                )}
+                                {player.deck_pokemon2 != null && (
+                                  <NormalizedSprite
+                                    src={getSpriteUrl(player.deck_pokemon2)}
+                                    size={28}
+                                  />
+                                )}
+                                {isManager ? (
+                                  <Tooltip
+                                    title={
+                                      player.deck_pokemon1 != null || player.deck_pokemon2 != null
+                                        ? "Edit deck"
+                                        : "Set deck"
+                                    }
                                   >
-                                    <EditIcon fontSize="inherit" />
-                                  </IconButton>
-                                </Tooltip>
-                              ) : (
-                                player.deck_pokemon1 == null &&
-                                player.deck_pokemon2 == null && (
-                                  <Typography variant="caption" color="text.secondary">
-                                    —
-                                  </Typography>
-                                )
-                              )}
-                            </Box>
-                          </TableCell>
+                                    <IconButton
+                                      size="small"
+                                      aria-label={`Set deck for ${player.name}`}
+                                      onClick={() => setDeckPlayerId(player.id)}
+                                    >
+                                      <EditIcon fontSize="inherit" />
+                                    </IconButton>
+                                  </Tooltip>
+                                ) : (
+                                  player.deck_pokemon1 == null &&
+                                  player.deck_pokemon2 == null && (
+                                    <Typography variant="caption" color="text.secondary">
+                                      —
+                                    </Typography>
+                                  )
+                                )}
+                              </Box>
+                            </TableCell>
+                          )}
                           {isManager && (
                             <TableCell>
                               {player.user_id ? (

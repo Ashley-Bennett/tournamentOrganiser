@@ -12,7 +12,7 @@ import {
 } from "@mui/material";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { supabase } from "../supabaseClient";
-import { formatLabel } from "../games/registry";
+import { formatLabel, getGame } from "../games/registry";
 import DeckPicker from "../components/DeckPicker";
 import {
   TjEntry,
@@ -46,6 +46,7 @@ export default function TournamentJoin() {
   const [error, setError] = useState<string | null>(null);
   const [startsAt, setStartsAt] = useState<string | null>(null);
   const [gameFormat, setGameFormat] = useState<string | null>(null);
+  const [gameId, setGameId] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
   // Set when joining an already-running tournament as a late entry.
@@ -58,6 +59,10 @@ export default function TournamentJoin() {
   // A hint only. The server decides: an organiser-added entry with this name
   // becomes a question rather than a refusal, so blocking here would stop the
   // question ever being asked.
+  // Games without decks (generic events) hide every deck surface and must not
+  // gate joining on a pick that is never offered.
+  const deckRequired = getGame(gameId).deck === "pokemon";
+
   const nameTaken = useMemo(
     () => registeredNames.some((n) => n.toLowerCase() === nameInput.trim().toLowerCase()),
     [registeredNames, nameInput],
@@ -103,6 +108,7 @@ export default function TournamentJoin() {
       setStartsAt(row.starts_at ?? null);
       // Stored as a code (e.g. "standard") — resolve it to the name players read.
       setGameFormat(formatLabel(row.game_id, row.game_format));
+      setGameId(row.game_id ?? null);
       setLocation(row.location ?? null);
       setDescription(row.description ?? null);
 
@@ -151,7 +157,8 @@ export default function TournamentJoin() {
   }, [tournamentId, navigate]);
 
   const handleSubmit = async (confirmedDistinct = false) => {
-    if (!tournamentId || !nameInput.trim() || deckPokemon1 == null) return;
+    if (!tournamentId || !nameInput.trim()) return;
+    if (deckRequired && deckPokemon1 == null) return;
     setSubmitting(true);
     setError(null);
 
@@ -361,41 +368,45 @@ export default function TournamentJoin() {
               sx={{ mb: 1 }}
             />
 
-            <Divider sx={{ mb: 2 }} />
+            {deckRequired && (
+              <>
+                <Divider sx={{ mb: 2 }} />
 
-            <Typography variant="subtitle2" gutterBottom>
-              Choose your deck
-            </Typography>
-            <Typography variant="body2" color="text.secondary" mb={1.5}>
-              Pick at least one Pokémon to represent your deck. This is required to join.
-            </Typography>
+                <Typography variant="subtitle2" gutterBottom>
+                  Choose your deck
+                </Typography>
+                <Typography variant="body2" color="text.secondary" mb={1.5}>
+                  Pick at least one Pokémon to represent your deck. This is required to join.
+                </Typography>
 
-            <DeckPicker
-              pokemon1={deckPokemon1}
-              pokemon2={deckPokemon2}
-              onChange={(p1, p2) => { setDeckPokemon1(p1); setDeckPokemon2(p2); }}
-            />
+                <DeckPicker
+                  pokemon1={deckPokemon1}
+                  pokemon2={deckPokemon2}
+                  onChange={(p1, p2) => { setDeckPokemon1(p1); setDeckPokemon2(p2); }}
+                />
 
-            <Box
-              display="flex"
-              alignItems="flex-start"
-              gap={1}
-              sx={{ mt: 1, mb: 2.5, color: "text.secondary" }}
-            >
-              <LockOutlinedIcon sx={{ fontSize: "1.1rem", mt: "1px" }} />
-              <Typography variant="caption">
-                Your deck stays private. Other players can&apos;t see your picks
-                while the tournament is running. Decklists are only revealed in
-                the final standings once the event is over.
-              </Typography>
-            </Box>
+                <Box
+                  display="flex"
+                  alignItems="flex-start"
+                  gap={1}
+                  sx={{ mt: 1, mb: 2.5, color: "text.secondary" }}
+                >
+                  <LockOutlinedIcon sx={{ fontSize: "1.1rem", mt: "1px" }} />
+                  <Typography variant="caption">
+                    Your deck stays private. Other players can&apos;t see your picks
+                    while the tournament is running. Decklists are only revealed in
+                    the final standings once the event is over.
+                  </Typography>
+                </Box>
+              </>
+            )}
 
             <Button
               variant="contained"
               fullWidth
               size="large"
               onClick={() => void handleSubmit()}
-              disabled={submitting || !nameInput.trim() || deckPokemon1 == null}
+              disabled={submitting || !nameInput.trim() || (deckRequired && deckPokemon1 == null)}
             >
               {submitting ? (
                 <CircularProgress size={22} />
@@ -405,7 +416,7 @@ export default function TournamentJoin() {
                 "Join Tournament"
               )}
             </Button>
-            {deckPokemon1 == null && (
+            {deckRequired && deckPokemon1 == null && (
               <Typography variant="caption" color="text.secondary" display="block" textAlign="center" mt={1}>
                 Choose at least one Pokémon to join.
               </Typography>

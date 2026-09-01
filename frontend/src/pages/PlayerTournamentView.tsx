@@ -23,7 +23,8 @@ import { supabase } from "../supabaseClient";
 import { getEntry, clearEntry, saveEntry, type TjEntry } from "../utils/playerStorage";
 import { useAuth } from "../AuthContext";
 import Breadcrumbs from "../components/Breadcrumbs";
-import { sortByTieBreakers } from "../utils/tieBreaking";
+import { sortByProfile } from "../utils/tieBreaking";
+import { getGame, rulesFor } from "../games/registry";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { getSpriteUrl } from "../utils/pokemonCache";
 import StandingsTable from "../components/StandingsTable";
@@ -45,6 +46,7 @@ interface TournamentInfo {
   round_elapsed_seconds: number | null;
   round_is_paused: boolean | null;
   round_note: string | null;
+  game_id: string | null;
 }
 
 interface PlayerInfo {
@@ -596,15 +598,21 @@ const PlayerTournamentView: React.FC = () => {
     return m;
   }, [players]);
 
+  // The game the event is run under, so the player's standings rank the same
+  // way the organiser's do and no deck surface appears where there are none.
+  const game = getGame(viewData?.tournament.game_id);
+  const rules = rulesFor(viewData?.tournament.game_id);
+
   const deckMap = useMemo(() => {
     const m = new Map<string, [number | null, number | null]>();
+    if (game.deck === "none") return m;
     players.forEach((p) => {
       if (p.deck_pokemon1 != null || p.deck_pokemon2 != null) {
         m.set(p.id, [p.deck_pokemon1 ?? null, p.deck_pokemon2 ?? null]);
       }
     });
     return m;
-  }, [players]);
+  }, [players, game]);
 
   const handleSaveDeck = useCallback(
     async (p1: number | null, p2: number | null) => {
@@ -630,8 +638,8 @@ const PlayerTournamentView: React.FC = () => {
       completed,
       players.map((p) => ({ id: p.id, name: p.name })),
     );
-    return sortByTieBreakers(raw, new Set(droppedMap.keys()));
-  }, [matches, players, droppedMap]);
+    return sortByProfile(raw, rules, new Set(droppedMap.keys()));
+  }, [matches, players, droppedMap, rules]);
 
   const recordMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -774,7 +782,7 @@ const PlayerTournamentView: React.FC = () => {
       <Box>
         {header}
         {roundTabs}
-        <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap} currentPlayerId={entry?.playerId} showTiebreakers={tournamentStatus === "completed"} />
+        <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap.size > 0 ? deckMap : undefined} currentPlayerId={entry?.playerId} showTiebreakers={tournamentStatus === "completed"} rules={rules} />
         <Box textAlign="center" mt={2}>
           <LiveIndicator isLive={liveStatus === "SUBSCRIBED"} />
         </Box>

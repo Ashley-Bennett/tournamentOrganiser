@@ -36,14 +36,16 @@ const joinPageRow = {
   game_format: null,
   location: null,
   description: null,
+  // These tests cover a Pokémon event, where a deck is required to join.
+  game_id: "pokemon",
 };
 
 /** Routes each RPC to a canned reply; self_join answers differently per call. */
-function mockRpc(selfJoinReplies: unknown[]) {
+function mockRpc(selfJoinReplies: unknown[], row: Record<string, unknown> = joinPageRow) {
   let selfJoinCall = 0;
   vi.mocked(supabase.rpc).mockImplementation(((name: string) => {
     if (name === "get_tournament_for_join") {
-      return Promise.resolve({ data: [joinPageRow], error: null });
+      return Promise.resolve({ data: [row], error: null });
     }
     if (name === "self_join_tournament") {
       return Promise.resolve({
@@ -167,5 +169,45 @@ describe("TournamentJoin — an entry the organiser already made", () => {
     expect(
       screen.getByRole("button", { name: "Join Tournament" }),
     ).not.toHaveProperty("disabled", true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Generic tournaments have no decks at all
+// ---------------------------------------------------------------------------
+
+describe("TournamentJoin — a generic tournament", () => {
+  const genericRow = { ...joinPageRow, game_id: "generic" };
+
+  it("asks for nothing but a name", async () => {
+    mockRpc([JOINED_REPLY], genericRow);
+    renderJoinPage();
+
+    await screen.findByLabelText("Your name");
+    expect(screen.queryByText(/choose your deck/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "choose deck" })).not.toBeInTheDocument();
+  });
+
+  // The deck was previously required to join, which would have made a generic
+  // tournament impossible to enter.
+  it("can be joined without picking a deck", async () => {
+    const user = userEvent.setup();
+    mockRpc([JOINED_REPLY], genericRow);
+    renderJoinPage();
+
+    const field = await screen.findByLabelText("Your name");
+    await user.clear(field);
+    await user.type(field, "Dana");
+
+    const join = screen.getByRole("button", { name: "Join Tournament" });
+    expect(join).toBeEnabled();
+
+    await user.click(join);
+    await waitFor(() =>
+      expect(supabase.rpc).toHaveBeenCalledWith(
+        "self_join_tournament",
+        expect.objectContaining({ p_player_name: "Dana", p_pokemon1: null }),
+      ),
+    );
   });
 });

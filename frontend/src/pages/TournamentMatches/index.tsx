@@ -25,7 +25,8 @@ import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import { useWorkspace } from "../../WorkspaceContext";
 import { calculateMatchPoints } from "../../utils/tournamentPairing";
-import { sortByTieBreakers } from "../../utils/tieBreaking";
+import { sortByProfile } from "../../utils/tieBreaking";
+import { getGame, rulesFor } from "../../games/registry";
 import { buildStandingsFromMatches } from "../../utils/tournamentUtils";
 import { TournamentSummary } from "../../types/tournament";
 import { usePairingEditor } from "../../hooks/usePairingEditor";
@@ -338,24 +339,32 @@ const TournamentMatches: React.FC = () => {
     return ids;
   }, [matches]);
 
+  // Rank and score under the rules the event is run by.
+  const rules = rulesFor(tournament?.game_id);
+  const game = getGame(tournament?.game_id);
+
   const deckPlayersMap = useMemo(() => {
     const map = new Map<string, [number | null, number | null]>();
+    // A game with no decks shows no deck column. Checking the game rather than
+    // only the data keeps values left over from a different game off the page.
+    if (game.deck === "none") return map;
     for (const p of players) {
       if (p.deck_pokemon1 != null || p.deck_pokemon2 != null) {
         map.set(p.id, [p.deck_pokemon1, p.deck_pokemon2]);
       }
     }
     return map;
-  }, [players]);
+  }, [players, game]);
 
   // Calculate final standings for leaderboard
   const finalStandings = useMemo(() => {
     if (!matches.length) return [];
-    return sortByTieBreakers(
+    return sortByProfile(
       buildStandingsFromMatches(matches),
+      rules,
       new Set(droppedPlayersMap.keys()),
     );
-  }, [matches, droppedPlayersMap]);
+  }, [matches, droppedPlayersMap, rules]);
 
   // Map from player ID → standing (all completed matches), used in the drop dialog
   const finalStandingsById = useMemo(() => {
@@ -444,6 +453,9 @@ const TournamentMatches: React.FC = () => {
       return "Draws are not allowed in single-elimination tournaments";
     }
 
+    // Nothing to validate where the rules record only who won.
+    if (rules.scoring !== "best_of_3") return null;
+
     // Validate score for non-draw matches
     if (selectedWinner !== "draw" && selectedMatch.player2_id) {
       if (player1Wins === 0 && player2Wins === 0) {
@@ -492,14 +504,18 @@ const TournamentMatches: React.FC = () => {
         winnerId = null;
       }
 
-      // Generate score string
+      // Generate score string. Where the rules record only who won there is no
+      // game score to show, and the inputs were never offered — writing
+      // `${player1Wins}-${player2Wins}` would store a meaningless "0-0".
       let resultString = "";
       if (selectedWinner === "draw") {
         resultString = "Draw";
-      } else if (selectedMatch.player2_id) {
+      } else if (!selectedMatch.player2_id) {
+        resultString = "Bye";
+      } else if (rules.scoring === "best_of_3") {
         resultString = `${player1Wins}-${player2Wins}`;
       } else {
-        resultString = "Bye";
+        resultString = "Win";
       }
 
       // Update match in database
@@ -615,6 +631,7 @@ const TournamentMatches: React.FC = () => {
     refreshMatches,
     setError,
     setUpdatingMatch,
+    showGameScore: rules.scoring === "best_of_3",
   });
 
   const {
@@ -1077,6 +1094,7 @@ const TournamentMatches: React.FC = () => {
                             <StandingsTable
                               standings={finalStandings}
                               droppedMap={droppedPlayersMap}
+                              rules={rules}
                               deckMap={
                                 deckPlayersMap.size > 0
                                   ? deckPlayersMap
@@ -1434,6 +1452,7 @@ const TournamentMatches: React.FC = () => {
                         )}
                         {/* ── Desktop table ────────────────────────── */}
                         <MatchTableDesktop
+                          showGameScore={rules.scoring === "best_of_3"}
                           matches={roundMatches}
                           pendingResults={pendingResults}
                           matchReports={matchReports}
@@ -1520,6 +1539,7 @@ const TournamentMatches: React.FC = () => {
         setPlayer2Wins={setPlayer2Wins}
         updatingMatch={updatingMatch}
         getScoreValidationError={getScoreValidationError}
+        showGameScore={rules.scoring === "best_of_3"}
         onSave={handleSaveMatchResult}
         onClose={handleCloseScoreDialog}
         setError={setError}

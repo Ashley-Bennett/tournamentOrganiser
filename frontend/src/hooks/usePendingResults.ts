@@ -8,6 +8,12 @@ interface UsePendingResultsParams {
   refreshMatches: () => Promise<void>;
   setError: (error: string | null) => void;
   setUpdatingMatch: (updating: boolean) => void;
+  /**
+   * Whether the event records a per-game score. Where it does not, a quick
+   * result is stored by name rather than as a "1-0" the organiser was never
+   * shown and cannot edit.
+   */
+  showGameScore?: boolean;
 }
 
 export function usePendingResults({
@@ -16,6 +22,7 @@ export function usePendingResults({
   refreshMatches,
   setError,
   setUpdatingMatch,
+  showGameScore = true,
 }: UsePendingResultsParams) {
   const [pendingResults, setPendingResults] = useState<
     Map<string, { winnerId: string | null; result: string }>
@@ -114,10 +121,10 @@ export function usePendingResults({
       resultString = "Draw";
     } else if (result === "player1") {
       winnerId = match.player1_id;
-      resultString = "1-0";
+      resultString = showGameScore ? "1-0" : "Win";
     } else {
       winnerId = match.player2_id;
-      resultString = "0-1";
+      resultString = showGameScore ? "0-1" : "Win";
     }
 
     setPendingResults((prev) => {

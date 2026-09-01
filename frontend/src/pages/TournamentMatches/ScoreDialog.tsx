@@ -32,6 +32,12 @@ interface Props {
   onSave: () => void;
   onClose: () => void;
   setError: (e: string | null) => void;
+  /**
+   * Whether the event records a per-game score. Games scored `match_only`
+   * (generic tournaments) record just who won, so the best-of-3 inputs and
+   * their validation are not shown at all.
+   */
+  showGameScore?: boolean;
 }
 
 export default function ScoreDialog({
@@ -48,6 +54,7 @@ export default function ScoreDialog({
   onSave,
   onClose,
   setError,
+  showGameScore = true,
 }: Props) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -97,7 +104,7 @@ export default function ScoreDialog({
                 )}
               </RadioGroup>
             </FormControl>
-            {match.player2_id && selectedWinner !== "draw" && (
+            {showGameScore && match.player2_id && selectedWinner !== "draw" && (
               <Box sx={{ mt: 3 }}>
                 <FormLabel component="legend" sx={{ mb: 2 }}>
                   Game Wins

@@ -27,7 +27,8 @@ import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import PrintIcon from "@mui/icons-material/Print";
 import PrintView from "../components/PrintView";
 import { supabase } from "../supabaseClient";
-import { sortByTieBreakers } from "../utils/tieBreaking";
+import { sortByProfile } from "../utils/tieBreaking";
+import { rulesFor } from "../games/registry";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import StandingsTable from "../components/StandingsTable";
 import RoundTimer from "../components/RoundTimer";
@@ -94,7 +95,7 @@ const TournamentPairings: React.FC = () => {
         const { data, error: tErr } = await supabase
           .from("tournaments")
           .select(
-            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
+            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, game_id",
           )
           .eq("id", id)
           .maybeSingle();
@@ -110,7 +111,7 @@ const TournamentPairings: React.FC = () => {
         const { data, error: tErr } = await supabase
           .from("tournaments")
           .select(
-            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
+            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, game_id",
           )
           .eq("public_slug", publicSlug!)
           .eq("is_public", true)
@@ -458,6 +459,9 @@ const TournamentPairings: React.FC = () => {
     return m;
   }, [players]);
 
+  // Rank under the rules the event is run by.
+  const rules = rulesFor(tournament?.game_id);
+
   const standings = useMemo(() => {
     const completed = matches.filter(
       (m) => m.status === "completed" || m.status === "bye",
@@ -466,8 +470,8 @@ const TournamentPairings: React.FC = () => {
       completed,
       players.map((p) => ({ id: p.id, name: p.name })),
     );
-    return sortByTieBreakers(raw, new Set(droppedMap.keys()));
-  }, [matches, players, droppedMap]);
+    return sortByProfile(raw, rules, new Set(droppedMap.keys()));
+  }, [matches, players, droppedMap, rules]);
 
   if (loading) {
     return (
@@ -587,6 +591,7 @@ const TournamentPairings: React.FC = () => {
           <StandingsTable
             standings={standings}
             droppedMap={droppedMap}
+            rules={rules}
             deckMap={deckMap.size > 0 ? deckMap : undefined}
           />
         </Box>

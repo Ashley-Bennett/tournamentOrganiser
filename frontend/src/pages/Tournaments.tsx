@@ -365,7 +365,7 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                     />
                   </Box>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    {getSubtitle(tournament)} · {formatDate(tournament.starts_at ?? tournament.created_at)}
+                    {getGame(tournament.game_id).shortName} · {getSubtitle(tournament)} · {formatDate(tournament.starts_at ?? tournament.created_at)}
                   </Typography>
                 </CardContent>
                 <CardActions sx={{ pt: 0.5, px: 2, pb: 1.5 }}>
@@ -439,6 +439,12 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                     <TableRow key={tournament.id}>
                       <TableCell>{tournament.name}</TableCell>
                       <TableCell>
+                        <Chip
+                          label={getGame(tournament.game_id).shortName}
+                          size="small"
+                          variant="outlined"
+                          sx={{ mr: 1, height: 20, fontSize: 11 }}
+                        />
                         {getSubtitle(tournament)}
                       </TableCell>
                       <TableCell>

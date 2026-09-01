@@ -12,7 +12,8 @@ import { supabase } from "../supabaseClient";
 import PageLoading from "../components/PageLoading";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
-import { sortByTieBreakers } from "../utils/tieBreaking";
+import { sortByProfile } from "../utils/tieBreaking";
+import { rulesFor } from "../games/registry";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { TournamentSummary, TournamentPlayer } from "../types/tournament";
 import { Match, MatchWithPlayers } from "../types/match";
@@ -51,7 +52,7 @@ const TournamentLeaderboard: React.FC = () => {
         const { data: tournamentData, error: tournamentError } = await supabase
           .from("tournaments")
           .select(
-            "id, name, status, tournament_type, num_rounds, created_at, created_by",
+            "id, name, status, tournament_type, num_rounds, created_at, created_by, game_id",
           )
           .eq("id", id)
           .eq("workspace_id", workspaceId ?? "")
@@ -159,13 +160,17 @@ const TournamentLeaderboard: React.FC = () => {
     return m;
   }, [players]);
 
+  // Rank under the rules the event was actually run by.
+  const rules = rulesFor(tournament?.game_id);
+
   const finalStandings = useMemo(() => {
     if (!matches.length) return [];
-    return sortByTieBreakers(
+    return sortByProfile(
       buildStandingsFromMatches(matches),
+      rules,
       new Set(droppedMap.keys()),
     );
-  }, [matches, droppedMap]);
+  }, [matches, droppedMap, rules]);
 
   if (authLoading || loading) return <PageLoading />;
 
@@ -222,7 +227,7 @@ const TournamentLeaderboard: React.FC = () => {
         </Paper>
       ) : (
         <Box sx={{ flex: 1, minHeight: 0 }}>
-          <StandingsTable standings={finalStandings} droppedMap={droppedMap} deckMap={deckMap.size > 0 ? deckMap : undefined} />
+          <StandingsTable standings={finalStandings} droppedMap={droppedMap} deckMap={deckMap.size > 0 ? deckMap : undefined} rules={rules} />
         </Box>
       )}
     </Box>
