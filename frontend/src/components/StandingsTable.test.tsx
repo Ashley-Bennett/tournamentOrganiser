@@ -21,6 +21,7 @@ function makePlayer(
     opponentMatchWinPercentage: 0,
     opponentOpponentMatchWinPercentage: 0,
     gameWinPercentage: 0,
+    buchholz: 0,
     ...overrides,
   };
 }
