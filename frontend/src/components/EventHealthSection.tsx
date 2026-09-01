@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   Alert,
   Card,
@@ -7,8 +7,9 @@ import {
   Skeleton,
   Typography,
 } from "@mui/material";
-import { supabase } from "../supabaseClient";
 import StatsTable, { type StatsColumn } from "./StatsTable";
+import { useStatsRpc, useStatsRpcRow } from "../hooks/useStatsRpc";
+import { TIMINGS_START_LABEL } from "../utils/timing";
 
 /**
  * How the events themselves are running, as opposed to how the players are
@@ -63,60 +64,40 @@ export default function EventHealthSection({
   gameId: string | null;
   periodArgsValue: { p_from: string | null; p_to: string | null };
 }) {
-  const [rounds, setRounds] = useState<RoundRow[]>([]);
-  const [roundsLoading, setRoundsLoading] = useState(true);
-  const [reporting, setReporting] = useState<ReportingStats | null>(null);
-  const [reportingLoading, setReportingLoading] = useState(true);
-  const [pace, setPace] = useState<PaceRow[]>([]);
-  const [paceLoading, setPaceLoading] = useState(true);
-
   const { p_from, p_to } = periodArgsValue;
+  const periodDeps = [workspaceId, gameId, p_from, p_to];
 
-  useEffect(() => {
-    setRoundsLoading(true);
-    void supabase
-      .rpc("get_organiser_round_health", {
-        p_workspace_id: workspaceId,
-        p_from,
-        p_to,
-        p_game_id: gameId,
-      })
-      .then(({ data }) => {
-        setRounds((data ?? []) as RoundRow[]);
-        setRoundsLoading(false);
-      });
-  }, [workspaceId, gameId, p_from, p_to]);
+  const {
+    rows: rounds,
+    loading: roundsLoading,
+    error: roundsError,
+  } = useStatsRpc<RoundRow>(
+    "get_organiser_round_health",
+    { p_workspace_id: workspaceId, p_from, p_to, p_game_id: gameId },
+    periodDeps,
+  );
 
-  useEffect(() => {
-    setReportingLoading(true);
-    void supabase
-      .rpc("get_organiser_reporting_health", {
-        p_workspace_id: workspaceId,
-        p_from,
-        p_to,
-        p_game_id: gameId,
-      })
-      .then(({ data }) => {
-        setReporting(data && data.length > 0 ? (data[0] as ReportingStats) : null);
-        setReportingLoading(false);
-      });
-  }, [workspaceId, gameId, p_from, p_to]);
+  const {
+    row: reporting,
+    loading: reportingLoading,
+    error: reportingError,
+  } = useStatsRpcRow<ReportingStats>(
+    "get_organiser_reporting_health",
+    { p_workspace_id: workspaceId, p_from, p_to, p_game_id: gameId },
+    periodDeps,
+  );
 
-  useEffect(() => {
-    setPaceLoading(true);
-    void supabase
-      .rpc("get_organiser_player_pace", {
-        p_workspace_id: workspaceId,
-        p_from,
-        p_to,
-        p_game_id: gameId,
-        p_min_matches: 3,
-      })
-      .then(({ data }) => {
-        setPace((data ?? []) as PaceRow[]);
-        setPaceLoading(false);
-      });
-  }, [workspaceId, gameId, p_from, p_to]);
+  const {
+    rows: pace,
+    loading: paceLoading,
+    error: paceError,
+  } = useStatsRpc<PaceRow>(
+    "get_organiser_player_pace",
+    { p_workspace_id: workspaceId, p_from, p_to, p_game_id: gameId, p_min_matches: 3 },
+    periodDeps,
+  );
+
+  const error = roundsError ?? reportingError ?? paceError;
 
   const anyTimed = rounds.some((r) => r.timed_matches > 0);
   const totalDrops = rounds.reduce((s, r) => s + r.drops_at_round, 0);
@@ -287,6 +268,12 @@ export default function EventHealthSection({
 
   return (
     <>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Could not load event health: {error}
+        </Alert>
+      )}
+
       <Grid container spacing={2} mb={3}>
         <Grid item xs={6} sm={3}>
           <Card variant="outlined" sx={{ height: "100%" }}>
@@ -390,8 +377,9 @@ export default function EventHealthSection({
 
       {!roundsLoading && rounds.length > 0 && !anyTimed && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          No game timings for these events yet. Timing started being recorded on 1 September
-          2026 — run a round from Begin Round through to the next round and these will fill in.
+          No game timings for these events yet. Timings started being recorded on{" "}
+          {TIMINGS_START_LABEL}. Run a round from Begin Round through to the next round and these
+          will fill in.
         </Alert>
       )}
 

@@ -92,7 +92,7 @@ export default function MergeConfirmDialog({
           onClick={() => setTargetIsA((v) => !v)}
           disabled={busy}
         >
-          Swap — keep {source.display_name} instead
+          Swap: keep {source.display_name} instead
         </Button>
 
         <Alert severity="info" sx={{ mt: 2 }}>

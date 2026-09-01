@@ -313,7 +313,7 @@ export default function PlayerIdentityDialog({
               </Box>
               {selected.length > 0 && selected.length === entries.length && (
                 <Typography variant="caption" color="text.disabled" display="block" mt={1}>
-                  Separating every entry would leave nobody behind — leave at least one unselected.
+                  Separating every entry would leave nobody behind. Leave at least one unselected.
                 </Typography>
               )}
             </>

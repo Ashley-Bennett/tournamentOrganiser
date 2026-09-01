@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Alert, Box, Card, CardContent, Chip, Grid, Skeleton, Typography } from "@mui/material";
 import BoltIcon from "@mui/icons-material/Bolt";
 import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
-import { supabase } from "../supabaseClient";
 import { getSpriteUrl } from "../utils/pokemonCache";
 import { deckName } from "../utils/deck";
+import { TIMINGS_START_LABEL } from "../utils/timing";
+import { useStatsRpcRow } from "../hooks/useStatsRpc";
 
 /**
  * How long the player's games actually take.
@@ -14,8 +15,8 @@ import { deckName } from "../utils/deck";
  * a little long — it is a pace measure, not a stopwatch, and the caption says
  * so rather than implying more precision than there is.
  *
- * Only games played from 1 September 2026 onwards have timings at all, so the
- * section leads with how many matches it is describing.
+ * Only games played from `TIMINGS_START_LABEL` onwards have timings at all, so
+ * the section leads with how many matches it is describing.
  */
 
 interface PaceStats {
@@ -96,28 +97,29 @@ export default function PlayerPaceSection({
   gameId: string | null;
   nameMap: Map<number, string>;
 }) {
-  const [data, setData] = useState<PaceStats | null>(null);
-  const [loading, setLoading] = useState(true);
-
   const { p_from, p_to } = periodArgsValue;
 
-  useEffect(() => {
-    setLoading(true);
-    void supabase
-      .rpc("get_player_game_pace", { p_from, p_to, p_game_id: gameId })
-      .then(({ data: rows }) => {
-        setData(rows && rows.length > 0 ? (rows[0] as PaceStats) : null);
-        setLoading(false);
-      });
-  }, [p_from, p_to, gameId]);
+  const {
+    row: data,
+    loading,
+    error,
+  } = useStatsRpcRow<PaceStats>(
+    "get_player_game_pace",
+    { p_from, p_to, p_game_id: gameId },
+    [p_from, p_to, gameId],
+  );
 
   const timed = data?.timed_matches ?? 0;
+
+  if (error) {
+    return <Alert severity="error">Could not load your game pace: {error}</Alert>;
+  }
 
   if (!loading && timed === 0) {
     return (
       <Alert severity="info">
-        No timed games yet. Game timings started being recorded on 1 September 2026 — play a round
-        that the organiser starts with the round timer and this will fill in.
+        No timed games yet. Game timings started being recorded on {TIMINGS_START_LABEL}. Play a
+        round that the organiser starts with the round timer and this will fill in.
       </Alert>
     );
   }

@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Box, Chip, Typography } from "@mui/material";
+import React, { useMemo, useState } from "react";
+import { Alert, Box, Chip, Typography } from "@mui/material";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import { supabase } from "../supabaseClient";
 import { getSpriteUrl } from "../utils/pokemonCache";
 import { deckName } from "../utils/deck";
 import StatsTimeline, { type TimelineBucket, type TimelinePoint } from "./StatsTimeline";
+import { useStatsRpc } from "../hooks/useStatsRpc";
 
 /**
  * Is the meta narrowing?
@@ -47,27 +47,21 @@ export default function DeckDiversitySection({
   nameMap: Map<number, string>;
   periodArgsValue: { p_from: string | null; p_to: string | null };
 }) {
-  const [rows, setRows] = useState<DiversityRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [bucket, setBucket] = useState<TimelineBucket>("month");
 
   const { p_from, p_to } = periodArgsValue;
 
-  useEffect(() => {
-    setLoading(true);
-    void supabase
-      .rpc("get_organiser_deck_diversity", {
-        p_workspace_id: workspaceId,
-        p_from,
-        p_to,
-        p_game_id: gameId,
-        p_bucket: bucket,
-      })
-      .then(({ data }) => {
-        setRows((data ?? []) as DiversityRow[]);
-        setLoading(false);
-      });
-  }, [workspaceId, gameId, p_from, p_to, bucket]);
+  const { rows, loading, error } = useStatsRpc<DiversityRow>(
+    "get_organiser_deck_diversity",
+    {
+      p_workspace_id: workspaceId,
+      p_from,
+      p_to,
+      p_game_id: gameId,
+      p_bucket: bucket,
+    },
+    [workspaceId, gameId, p_from, p_to, bucket],
+  );
 
   const points: TimelinePoint[] = useMemo(
     () =>
@@ -102,6 +96,12 @@ export default function DeckDiversitySection({
 
   return (
     <>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Could not load deck diversity: {error}
+        </Alert>
+      )}
+
       {!loading && rows.length > 0 && (
         <Typography variant="body2" color="text.secondary" mb={1.5}>
           Bars show how many decks the field effectively plays like, out of how many were
@@ -151,8 +151,8 @@ export default function DeckDiversitySection({
             color={trend.narrowing ? "warning.main" : "success.main"}
           >
             {trend.narrowing
-              ? `The meta is concentrating — the most-played deck now takes ${trend.delta.toFixed(0)}% more of the field than it did.`
-              : `The meta is opening up — the most-played deck takes ${trend.delta.toFixed(0)}% less of the field than it did.`}
+              ? `The meta is concentrating. The most-played deck now takes ${trend.delta.toFixed(0)}% more of the field than it did.`
+              : `The meta is opening up. The most-played deck takes ${trend.delta.toFixed(0)}% less of the field than it did.`}
           </Typography>
         </Box>
       )}

@@ -50,20 +50,30 @@ export default function MergeSuggestions({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Suggestion | null>(null);
 
+  // Returns its own cleanup so a reload triggered by a workspace switch cannot
+  // be overtaken by the request it replaced.
   const load = useCallback(() => {
+    let cancelled = false;
     void supabase
       .rpc("get_workspace_merge_suggestions", {
         p_workspace_id: workspaceId,
         p_threshold: 0.45,
       })
-      .then(({ data }) => setRows((data ?? []) as Suggestion[]));
+      .then(({ data, error: err }) => {
+        if (cancelled) return;
+        setError(err ? err.message : null);
+        setRows(err ? [] : ((data ?? []) as Suggestion[]));
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [workspaceId]);
 
-  useEffect(() => {
-    load();
-  }, [load, refreshKey]);
+  useEffect(() => load(), [load, refreshKey]);
 
-  if (rows.length === 0) return null;
+  // Nothing to suggest is the normal case and stays silent, but a failed lookup
+  // must not: it would otherwise read as "no duplicates found".
+  if (rows.length === 0 && !error) return null;
 
   // Remembered against the pair, so the same two names are not re-offered on
   // every visit. Reversible from either player's dialog.
@@ -106,17 +116,20 @@ export default function MergeSuggestions({
 
   return (
     <Box mb={2}>
-      <Button size="small" startIcon={<MergeIcon />} onClick={() => setOpen((o) => !o)}>
-        {rows.length} possible duplicate{rows.length === 1 ? "" : "s"}
-      </Button>
+      {error && (
+        <Alert severity="error" sx={{ mb: 1 }}>
+          {error}
+        </Alert>
+      )}
+
+      {rows.length > 0 && (
+        <Button size="small" startIcon={<MergeIcon />} onClick={() => setOpen((o) => !o)}>
+          {rows.length} possible duplicate{rows.length === 1 ? "" : "s"}
+        </Button>
+      )}
 
       <Collapse in={open}>
         <Box mt={1}>
-          {error && (
-            <Alert severity="error" sx={{ mb: 1 }}>
-              {error}
-            </Alert>
-          )}
           <Typography variant="body2" color="text.disabled" mb={1}>
             Names similar enough to be the same person. You choose which spelling survives.
             Both merging and &ldquo;not the same&rdquo; are remembered, and both can be undone

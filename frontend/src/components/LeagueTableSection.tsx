@@ -284,7 +284,7 @@ export default function LeagueTableSection({
         >
           {PLACEMENT_SCHEMES.map((s) => (
             <MenuItem key={s.id} value={s.id}>
-              {s.name} — {s.hint}
+              {s.name} · {s.hint}
             </MenuItem>
           ))}
         </Select>
