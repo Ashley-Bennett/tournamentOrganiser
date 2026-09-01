@@ -36,10 +36,11 @@ interface OverviewStats {
   total_matches: number;
   match_wins_no_byes: number;
   matches_no_byes: number;
+  first_count: number;
   top3_count: number;
   top8_count: number;
-  eligible_top3: number;
-  eligible_top8: number;
+  ranked_events: number;
+  best_finish: number | null;
   current_streak: number;
   longest_win_streak: number;
   longest_loss_streak: number;
@@ -201,11 +202,27 @@ function DeckFilter({
 
 // ── Overview section ───────────────────────────────────────────────────────────
 
+/**
+ * Placement tiers, hardest first.
+ *
+ * All three are out of the same `ranked_events`, and they nest — a 1st counts
+ * as a top 3 and a top 8 — so the three cards can be read against each other
+ * and the counts can never go backwards.
+ */
+const TIERS = [
+  { key: "first", label: "1st Place Rate", count: (d: OverviewStats) => d.first_count, unlock: "Win an event" },
+  { key: "top3",  label: "Top 3 Rate",     count: (d: OverviewStats) => d.top3_count,  unlock: "Finish top 3" },
+  { key: "top8",  label: "Top 8 Rate",     count: (d: OverviewStats) => d.top8_count,  unlock: "Finish top 8 in a field of 8+" },
+] as const;
+
+function ordinal(n: number): string {
+  if (n % 100 >= 11 && n % 100 <= 13) return "th";
+  return ["th", "st", "nd", "rd"][n % 10] ?? "th";
+}
+
 function OverviewSection({ data, loading }: { data: OverviewStats | null; loading: boolean }) {
   const winRate = data ? pct(data.total_match_wins, data.total_matches) : "—";
   const winRateNoByes = data ? pct(data.match_wins_no_byes, data.matches_no_byes) : "—";
-  const top8Rate = data && data.eligible_top8 > 0 ? pct(data.top8_count, data.eligible_top8) : "—";
-  const top3Rate = data && data.eligible_top3 > 0 ? pct(data.top3_count, data.eligible_top3) : "—";
 
   const streakLabel = !data
     ? "—"
@@ -223,6 +240,13 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
     ? "error.main"
     : undefined;
 
+  // A tier only appears once it has actually been reached. Showing a 0% "1st
+  // Place Rate" to someone who has never won reads as a rebuke rather than a
+  // stat, and placing 1st reveals all three at once because a 1st is also a
+  // top 3 and a top 8.
+  const earned = data ? TIERS.filter((t) => t.count(data) > 0) : [];
+  const nextLocked = data ? [...TIERS].reverse().find((t) => t.count(data) === 0) : undefined;
+
   return (
     <>
       <Grid container spacing={2} mb={2}>
@@ -237,15 +261,36 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
           <StatCard label="Tournaments" value={data?.total_completed ?? "—"} loading={loading} />
         </Grid>
         <Grid item xs={6} sm={4} md={2}>
-          <StatCard label="Top 8 Rate" value={top8Rate} sub={data ? `${data.top8_count} / ${data.eligible_top8}` : undefined} loading={loading} color="warning.main" />
+          <StatCard
+            label="Best Finish"
+            value={data?.best_finish != null ? `${data.best_finish}${ordinal(data.best_finish)}` : "—"}
+            sub={data?.best_finish != null ? "Across all events" : "No finishes yet"}
+            loading={loading}
+            color={data?.best_finish === 1 ? "warning.main" : undefined}
+          />
         </Grid>
-        <Grid item xs={6} sm={4} md={2}>
-          <StatCard label="Top 3 Rate" value={top3Rate} sub={data ? `${data.top3_count} / ${data.eligible_top3}` : undefined} loading={loading} color="warning.main" />
-        </Grid>
+        {earned.map((t) => (
+          <Grid item xs={6} sm={4} md={2} key={t.key}>
+            <StatCard
+              label={t.label}
+              value={data ? pct(t.count(data), data.ranked_events) : "—"}
+              sub={data ? `${t.count(data)} of ${data.ranked_events} event${data.ranked_events === 1 ? "" : "s"}` : undefined}
+              loading={loading}
+              color="warning.main"
+            />
+          </Grid>
+        ))}
         <Grid item xs={6} sm={4} md={2}>
           <StatCard label="Current Streak" value={streakLabel} loading={loading} color={streakColor} />
         </Grid>
       </Grid>
+
+      {!loading && nextLocked && (
+        <Typography variant="caption" color="text.disabled" display="block" mb={2}>
+          {nextLocked.unlock} to unlock your {nextLocked.label.replace(" Rate", "")} rate.
+        </Typography>
+      )}
+
       <Grid container spacing={2}>
         <Grid item xs={6} sm={3}>
           <StatCard label="Best Win Streak" value={data ? `${data.longest_win_streak}W` : "—"} loading={loading} color="success.main" />
