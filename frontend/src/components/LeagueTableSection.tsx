@@ -2,17 +2,20 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
-  Chip,
+  InputAdornment,
   MenuItem,
   Select,
-  Skeleton,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import SearchIcon from "@mui/icons-material/Search";
 import { supabase } from "../supabaseClient";
+import StatsTable, { type StatsColumn } from "./StatsTable";
+import EventPicker, { type EventOption } from "./EventPicker";
 import {
   DEFAULT_SCHEME_ID,
   LEAGUE_WINDOW_WEEKS,
@@ -25,8 +28,8 @@ import {
  * A running league across several events.
  *
  * Two scores side by side: match points, summed from the standings each event
- * already showed, and placement points for where players finished. Sorting is
- * by the total, but both columns are visible so a club can see whether their
+ * already showed, and placement points for where players finished. The default
+ * sort is by the total, but every column sorts, so a club can see whether their
  * leader is grinding matches or actually winning events.
  */
 
@@ -47,25 +50,12 @@ interface LeagueRow {
   event_wins: number;
 }
 
-interface TournamentOption {
-  id: string;
-  name: string;
-  status: string;
-  played_at: string;
-}
-
 type Mode = "window" | "pick";
 
-const CELL: React.CSSProperties = { padding: "10px 12px" };
-const HEAD: React.CSSProperties = {
-  textAlign: "left",
-  padding: "6px 12px",
-  borderBottom: "1px solid rgba(128,128,128,0.3)",
-  fontSize: 11,
-  textTransform: "uppercase",
-  letterSpacing: 1,
-  fontWeight: 600,
-};
+function ordinal(n: number): string {
+  if (n % 100 >= 11 && n % 100 <= 13) return "th";
+  return ["th", "st", "nd", "rd"][n % 10] ?? "th";
+}
 
 export default function LeagueTableSection({
   workspaceId,
@@ -76,12 +66,14 @@ export default function LeagueTableSection({
 }) {
   const [mode, setMode] = useState<Mode>("window");
   const [schemeId, setSchemeId] = useState(DEFAULT_SCHEME_ID);
-  const [options, setOptions] = useState<TournamentOption[]>([]);
+  const [options, setOptions] = useState<EventOption[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [rows, setRows] = useState<LeagueRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const scheme = schemeById(schemeId);
+  const schemeKey = scheme.points.join(",");
 
   // The events available to pick from — the workspace's own, newest first.
   // Draft events are excluded: they have players but no results to score.
@@ -115,10 +107,12 @@ export default function LeagueTableSection({
     };
   }, [workspaceId, gameId]);
 
+  const selectedKey = selected.join(",");
+
   useEffect(() => {
     // Picking mode with nothing chosen has no table to draw — skip the round
     // trip rather than rendering an empty league.
-    if (mode === "pick" && selected.length === 0) {
+    if (mode === "pick" && selectedKey === "") {
       setRows([]);
       setLoading(false);
       return;
@@ -129,17 +123,17 @@ export default function LeagueTableSection({
     void supabase
       .rpc("get_organiser_league_table", {
         p_workspace_id: workspaceId,
-        p_tournament_ids: mode === "pick" ? selected : null,
+        p_tournament_ids: mode === "pick" ? selectedKey.split(",") : null,
         p_from: mode === "window" ? win.from.toISOString() : null,
         p_to: mode === "window" ? win.to.toISOString() : null,
         p_game_id: mode === "window" ? gameId : null,
-        p_placement_points: scheme.points,
+        p_placement_points: schemeKey === "" ? [] : schemeKey.split(",").map(Number),
       })
       .then(({ data }) => {
         setRows((data ?? []) as LeagueRow[]);
         setLoading(false);
       });
-  }, [workspaceId, gameId, mode, selected, schemeId, scheme.points]);
+  }, [workspaceId, gameId, mode, selectedKey, schemeKey]);
 
   const showPlacement = scheme.points.length > 0;
 
@@ -147,6 +141,126 @@ export default function LeagueTableSection({
     const win = rollingWindow(LEAGUE_WINDOW_WEEKS);
     return options.filter((o) => new Date(o.played_at) >= win.from).length;
   }, [options]);
+
+  const visibleRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (q === "") return rows;
+    return rows.filter((r) => r.display_name.toLowerCase().includes(q));
+  }, [rows, search]);
+
+  // League position, fixed to the standing the RPC returned (which is already
+  // ordered by total points). Deriving it from the row's display index instead
+  // would relabel everyone the moment someone sorts by, say, win count — the
+  // rank has to mean "position in the league", not "position in this view".
+  const rankByKey = useMemo(() => {
+    const m = new Map<string, number>();
+    rows.forEach((r, i) => m.set(r.identity_key, i + 1));
+    return m;
+  }, [rows]);
+
+  const columns: StatsColumn<LeagueRow>[] = useMemo(() => {
+    const cols: StatsColumn<LeagueRow>[] = [
+      {
+        key: "rank",
+        label: "#",
+        sortValue: (r) => rankByKey.get(r.identity_key) ?? null,
+        render: (r) => {
+          const rank = rankByKey.get(r.identity_key) ?? 0;
+          return (
+            <Typography
+              variant="body2"
+              fontWeight={rank <= 3 ? 700 : 400}
+              color={rank === 1 ? "warning.main" : "text.secondary"}
+            >
+              {rank}
+            </Typography>
+          );
+        },
+      },
+      {
+        key: "player",
+        label: "Player",
+        sortValue: (r) => r.display_name.toLowerCase(),
+        render: (r) => (
+          <Box display="flex" alignItems="center" gap={0.75}>
+            <Typography variant="body2">{r.display_name}</Typography>
+            {r.event_wins > 0 && (
+              <Tooltip title={`${r.event_wins} event win${r.event_wins === 1 ? "" : "s"}`}>
+                <EmojiEventsIcon fontSize="small" color="warning" />
+              </Tooltip>
+            )}
+          </Box>
+        ),
+      },
+      {
+        key: "events",
+        label: "Events",
+        sortValue: (r) => r.events_played,
+        render: (r) => <Typography variant="body2">{r.events_played}</Typography>,
+      },
+      {
+        key: "record",
+        label: "W–L–D",
+        sortValue: (r) => r.wins,
+        csvValue: (r) => `${r.wins}-${r.losses}-${r.draws}`,
+        render: (r) => (
+          <Typography variant="body2" color="text.secondary">
+            {r.wins}–{r.losses}–{r.draws}
+          </Typography>
+        ),
+      },
+      {
+        key: "matchpts",
+        label: "Match pts",
+        sortValue: (r) => r.match_points,
+        render: (r) => <Typography variant="body2">{r.match_points}</Typography>,
+      },
+    ];
+
+    if (showPlacement) {
+      cols.push({
+        key: "placepts",
+        label: "Place pts",
+        sortValue: (r) => r.placement_points,
+        render: (r) => <Typography variant="body2">{r.placement_points}</Typography>,
+      });
+    }
+
+    cols.push(
+      {
+        key: "byes",
+        label: "Byes",
+        sortValue: (r) => r.byes,
+        render: (r) => (
+          <Typography variant="body2" color={r.byes > 0 ? "text.primary" : "text.disabled"}>
+            {r.byes}
+          </Typography>
+        ),
+      },
+      {
+        key: "total",
+        label: "Total",
+        sortValue: (r) => r.total_points,
+        render: (r) => (
+          <Typography variant="body2" fontWeight={700}>
+            {r.total_points}
+          </Typography>
+        ),
+      },
+      {
+        key: "best",
+        label: "Best",
+        sortValue: (r) => r.best_finish,
+        render: (r) => (
+          <Typography variant="body2" color="text.secondary">
+            {r.best_finish != null ? `${r.best_finish}${ordinal(r.best_finish)}` : "—"}
+          </Typography>
+        ),
+      },
+    );
+
+    return cols;
+  }, [showPlacement, rankByKey]);
 
   return (
     <>
@@ -175,6 +289,21 @@ export default function LeagueTableSection({
           ))}
         </Select>
 
+        <TextField
+          size="small"
+          placeholder="Search players"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ minWidth: 200 }}
+        />
+
         {mode === "window" && (
           <Typography variant="body2" color="text.secondary">
             {eventsInWindow} event{eventsInWindow === 1 ? "" : "s"} in the window
@@ -183,122 +312,27 @@ export default function LeagueTableSection({
       </Box>
 
       {mode === "pick" && (
-        <Box display="flex" flexWrap="wrap" gap={0.75} mb={2}>
-          {options.length === 0 ? (
-            <Typography variant="body2" color="text.disabled">
-              No events to pick from yet.
-            </Typography>
-          ) : (
-            options.slice(0, 24).map((o) => {
-              const isOn = selected.includes(o.id);
-              return (
-                <Chip
-                  key={o.id}
-                  size="small"
-                  label={`${o.name} · ${new Date(o.played_at).toLocaleDateString()}`}
-                  color={isOn ? "primary" : "default"}
-                  variant={isOn ? "filled" : "outlined"}
-                  onClick={() =>
-                    setSelected((cur) =>
-                      isOn ? cur.filter((id) => id !== o.id) : [...cur, o.id],
-                    )
-                  }
-                />
-              );
-            })
-          )}
-        </Box>
+        <EventPicker options={options} selected={selected} onChange={setSelected} />
       )}
 
       {mode === "pick" && selected.length === 0 ? (
         <Alert severity="info">Pick one or more events above to build a league table.</Alert>
-      ) : loading ? (
-        <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1 }} />
-      ) : rows.length === 0 ? (
-        <Typography variant="body2" color="text.disabled">
-          No results in these events yet.
-        </Typography>
       ) : (
-        <Box sx={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={HEAD}>#</th>
-                <th style={HEAD}>Player</th>
-                <th style={HEAD}>Events</th>
-                <th style={HEAD}>W–L–D</th>
-                <th style={HEAD}>Match pts</th>
-                {showPlacement && <th style={HEAD}>Place pts</th>}
-                <th style={HEAD}>Total</th>
-                <th style={HEAD}>Best</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr
-                  key={r.identity_key}
-                  style={{ borderBottom: "1px solid rgba(128,128,128,0.15)" }}
-                >
-                  <td style={CELL}>
-                    <Typography
-                      variant="body2"
-                      fontWeight={i < 3 ? 700 : 400}
-                      color={i === 0 ? "warning.main" : "text.secondary"}
-                    >
-                      {i + 1}
-                    </Typography>
-                  </td>
-                  <td style={CELL}>
-                    <Box display="flex" alignItems="center" gap={0.75}>
-                      <Typography variant="body2" fontWeight={i < 3 ? 600 : 400}>
-                        {r.display_name}
-                      </Typography>
-                      {r.event_wins > 0 && (
-                        <Tooltip
-                          title={`${r.event_wins} event win${r.event_wins === 1 ? "" : "s"}`}
-                        >
-                          <EmojiEventsIcon fontSize="small" color="warning" />
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </td>
-                  <td style={CELL}>
-                    <Typography variant="body2">{r.events_played}</Typography>
-                  </td>
-                  <td style={CELL}>
-                    <Typography variant="body2" color="text.secondary">
-                      {r.wins}–{r.losses}–{r.draws}
-                    </Typography>
-                  </td>
-                  <td style={CELL}>
-                    <Typography variant="body2">{r.match_points}</Typography>
-                  </td>
-                  {showPlacement && (
-                    <td style={CELL}>
-                      <Typography variant="body2">{r.placement_points}</Typography>
-                    </td>
-                  )}
-                  <td style={CELL}>
-                    <Typography variant="body2" fontWeight={700}>
-                      {r.total_points}
-                    </Typography>
-                  </td>
-                  <td style={CELL}>
-                    <Typography variant="body2" color="text.secondary">
-                      {r.best_finish != null ? `${r.best_finish}${ordinal(r.best_finish)}` : "—"}
-                    </Typography>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Box>
+        <StatsTable
+          rows={visibleRows}
+          columns={columns}
+          getRowKey={(r) => r.identity_key}
+          initialSort={{ key: "total", dir: "desc" }}
+          loading={loading}
+          csvFilename={`matchamp-league-${new Date().toISOString().slice(0, 10)}`}
+          emptyMessage={
+            rows.length === 0
+              ? "No results in these events yet."
+              : "No players match that search."
+          }
+          initialLimit={25}
+        />
       )}
     </>
   );
-}
-
-function ordinal(n: number): string {
-  if (n % 100 >= 11 && n % 100 <= 13) return "th";
-  return ["th", "st", "nd", "rd"][n % 10] ?? "th";
 }

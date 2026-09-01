@@ -14,6 +14,11 @@ import { Box, Skeleton, ToggleButton, ToggleButtonGroup, Tooltip, Typography } f
  * Bars carry a single hue for magnitude; `tone` is reserved for a genuine
  * threshold call-out (a win rate that is good or bad) and is left unset for
  * counts, where "more" is not automatically "better".
+ *
+ * Each period is a single fixed-width column holding its value, bar and label
+ * together. Splitting the bars and the labels into two rows lets the two drift
+ * apart whenever their natural widths differ — a percentage above a "4 matches"
+ * caption — and the labels then sit under the wrong bars.
  */
 
 export type TimelineTone = "good" | "bad" | "neutral";
@@ -41,6 +46,8 @@ const TONE_COLOR: Record<TimelineTone, string> = {
 };
 
 const PLOT_HEIGHT = 96;
+const COL_WIDTH = 68;
+const BAR_WIDTH = 30;
 
 export default function StatsTimeline({
   points,
@@ -84,25 +91,14 @@ export default function StatsTimeline({
       )}
 
       {loading ? (
-        <Skeleton variant="rectangular" height={PLOT_HEIGHT + 48} sx={{ borderRadius: 1 }} />
+        <Skeleton variant="rectangular" height={PLOT_HEIGHT + 64} sx={{ borderRadius: 1 }} />
       ) : points.length === 0 ? (
         <Typography variant="body2" color="text.disabled">
           {emptyMessage}
         </Typography>
       ) : (
-        <Box sx={{ overflowX: "auto", pb: 1 }}>
-          <Box
-            display="flex"
-            alignItems="flex-end"
-            gap={0.75}
-            sx={{
-              minWidth: "min-content",
-              // Recessive baseline — the bars are the data, the axis is not.
-              borderBottom: 1,
-              borderColor: "divider",
-              pb: 0,
-            }}
-          >
+        <Box sx={{ overflowX: "auto", maxWidth: "100%", pb: 1 }}>
+          <Box display="flex" sx={{ minWidth: "min-content" }}>
             {points.map((p) => {
               const height =
                 p.value == null || max === 0
@@ -127,45 +123,56 @@ export default function StatsTimeline({
                   arrow
                 >
                   <Box
-                    display="flex"
-                    flexDirection="column"
-                    alignItems="center"
-                    sx={{ minWidth: 44, cursor: "default" }}
+                    sx={{
+                      width: COL_WIDTH,
+                      flex: `0 0 ${COL_WIDTH}px`,
+                      cursor: "default",
+                      textAlign: "center",
+                    }}
                   >
-                    <Typography variant="caption" fontWeight={700} color="text.primary" mb={0.5}>
+                    <Typography variant="caption" fontWeight={700} color="text.primary" noWrap>
                       {p.display}
                     </Typography>
+
+                    {/* The bar sits in a fixed-height box whose bottom edge is
+                        the axis. Columns are flush, so those edges join into
+                        one continuous baseline across the whole chart. */}
                     <Box
                       sx={{
-                        width: 28,
-                        height,
-                        bgcolor: color,
-                        // Rounded data-end only; the bar stays anchored to the baseline.
-                        borderTopLeftRadius: 4,
-                        borderTopRightRadius: 4,
-                        transition: "height 150ms ease",
+                        height: PLOT_HEIGHT,
+                        display: "flex",
+                        alignItems: "flex-end",
+                        justifyContent: "center",
+                        borderBottom: 1,
+                        borderColor: "divider",
                       }}
-                    />
+                    >
+                      <Box
+                        sx={{
+                          width: BAR_WIDTH,
+                          height,
+                          bgcolor: color,
+                          // Rounded data-end only; the bar stays anchored to
+                          // the baseline.
+                          borderTopLeftRadius: 4,
+                          borderTopRightRadius: 4,
+                          transition: "height 150ms ease",
+                        }}
+                      />
+                    </Box>
+
+                    <Typography variant="caption" color="text.secondary" display="block" noWrap mt={0.5}>
+                      {p.label}
+                    </Typography>
+                    {p.sub && (
+                      <Typography variant="caption" color="text.disabled" display="block" noWrap>
+                        {p.sub}
+                      </Typography>
+                    )}
                   </Box>
                 </Tooltip>
               );
             })}
-          </Box>
-
-          {/* Axis labels sit below the baseline rule, in muted ink. */}
-          <Box display="flex" gap={0.75} sx={{ minWidth: "min-content", mt: 0.5 }}>
-            {points.map((p) => (
-              <Box key={p.key} sx={{ minWidth: 44, textAlign: "center" }}>
-                <Typography variant="caption" color="text.secondary" display="block" noWrap>
-                  {p.label}
-                </Typography>
-                {p.sub && (
-                  <Typography variant="caption" color="text.disabled" display="block" noWrap>
-                    {p.sub}
-                  </Typography>
-                )}
-              </Box>
-            ))}
           </Box>
         </Box>
       )}

@@ -2,14 +2,20 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
-  Chip,
-  Skeleton,
+  FormControlLabel,
+  InputAdornment,
+  Switch,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
 import { supabase } from "../supabaseClient";
 import { getSpriteUrl } from "../utils/pokemonCache";
+import StatsTable, { type StatsColumn } from "./StatsTable";
+import EventPicker, { type EventOption } from "./EventPicker";
+import DeckDetailModal, { type DeckKey } from "./DeckDetailModal";
 
 /**
  * What the room actually brought.
@@ -18,6 +24,10 @@ import { getSpriteUrl } from "../utils/pokemonCache";
  * the same presence in the room as one person playing it three times, and it is
  * the room an organiser is describing. `pilots` is shown alongside so a deck
  * that is really one person's pet project is still visible as such.
+ *
+ * A busy format has a very long tail of one-off brews, so one-offs are folded
+ * away by default — they are noise in a share table, and the switch brings them
+ * back for anyone actually hunting for them. Rows open a drill-down.
  *
  * Only rendered for games that have decks — the caller checks the registry.
  */
@@ -35,30 +45,17 @@ interface MetaRow {
   last_seen: string;
 }
 
-interface TournamentOption {
-  id: string;
-  name: string;
-  played_at: string;
-}
-
 type Mode = "recent" | "pick";
 
 const RECENT_COUNT = 6;
 
-const CELL: React.CSSProperties = { padding: "10px 12px" };
-const HEAD: React.CSSProperties = {
-  textAlign: "left",
-  padding: "6px 12px",
-  borderBottom: "1px solid rgba(128,128,128,0.3)",
-  fontSize: 11,
-  textTransform: "uppercase",
-  letterSpacing: 1,
-  fontWeight: 600,
-};
-
 function pct(part: number, whole: number): string {
   if (whole === 0) return "—";
   return `${((part / whole) * 100).toFixed(0)}%`;
+}
+
+function deckKeyOf(r: { deck_pokemon1: number | null; deck_pokemon2: number | null }): string {
+  return `${r.deck_pokemon1 ?? "x"}-${r.deck_pokemon2 ?? "x"}`;
 }
 
 function DeckLabel({
@@ -105,16 +102,19 @@ export default function MetaShareSection({
   nameMap: Map<number, string>;
 }) {
   const [mode, setMode] = useState<Mode>("recent");
-  const [options, setOptions] = useState<TournamentOption[]>([]);
+  const [options, setOptions] = useState<EventOption[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [rows, setRows] = useState<MetaRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [showOneOffs, setShowOneOffs] = useState(false);
+  const [openDeck, setOpenDeck] = useState<DeckKey | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     let query = supabase
       .from("tournaments")
-      .select("id, name, starts_at, created_at, game_id")
+      .select("id, name, status, starts_at, created_at, game_id")
       .eq("workspace_id", workspaceId)
       .neq("status", "draft")
       .order("created_at", { ascending: false });
@@ -126,6 +126,7 @@ export default function MetaShareSection({
         (data ?? []).map((t) => ({
           id: t.id as string,
           name: t.name as string,
+          status: t.status as string,
           played_at: (t.starts_at ?? t.created_at) as string,
         })),
       );
@@ -142,10 +143,14 @@ export default function MetaShareSection({
     [options],
   );
 
+  // Joined into a string so the effect below compares by value: a fresh array
+  // with the same ids must not trigger another fetch.
   const activeIds = mode === "recent" ? recentIds : selected;
+  const activeKey = activeIds.join(",");
 
   useEffect(() => {
-    if (activeIds.length === 0) {
+    const ids = activeKey === "" ? [] : activeKey.split(",");
+    if (ids.length === 0) {
       setRows([]);
       setLoading(false);
       return;
@@ -154,7 +159,7 @@ export default function MetaShareSection({
     void supabase
       .rpc("get_organiser_meta_share", {
         p_workspace_id: workspaceId,
-        p_tournament_ids: activeIds,
+        p_tournament_ids: ids,
         p_from: null,
         p_to: null,
         p_game_id: gameId,
@@ -163,14 +168,124 @@ export default function MetaShareSection({
         setRows((data ?? []) as MetaRow[]);
         setLoading(false);
       });
-  }, [workspaceId, gameId, activeIds]);
+  }, [workspaceId, gameId, activeKey]);
 
+  // Share is always of the whole field, not of what survives the filters —
+  // otherwise hiding one-offs would silently inflate everything else.
   const totalEntries = useMemo(
     () => rows.reduce((sum, r) => sum + r.entries, 0),
     [rows],
   );
 
-  const eventsDescribed = activeIds.length;
+  const visibleRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (!showOneOffs && r.entries < 2) return false;
+      if (q === "") return true;
+      const label = [r.deck_pokemon1, r.deck_pokemon2]
+        .filter((id): id is number => id != null)
+        .map((id) => nameMap.get(id) ?? `#${id}`)
+        .join(" / ")
+        .toLowerCase();
+      return label.includes(q);
+    });
+  }, [rows, search, showOneOffs, nameMap]);
+
+  const oneOffCount = useMemo(() => rows.filter((r) => r.entries < 2).length, [rows]);
+
+  const columns: StatsColumn<MetaRow>[] = useMemo(
+    () => [
+      {
+        key: "deck",
+        label: "Deck",
+        sortValue: (r) =>
+          [r.deck_pokemon1, r.deck_pokemon2]
+            .filter((id): id is number => id != null)
+            .map((id) => nameMap.get(id) ?? `#${id}`)
+            .join(" / ")
+            .toLowerCase(),
+        render: (r) => (
+          <DeckLabel p1={r.deck_pokemon1} p2={r.deck_pokemon2} nameMap={nameMap} />
+        ),
+      },
+      {
+        key: "share",
+        label: "Share",
+        sortValue: (r) => r.entries,
+        csvValue: (r) =>
+          totalEntries > 0 ? Number(((r.entries / totalEntries) * 100).toFixed(1)) : 0,
+        render: (r) => {
+          const share = totalEntries > 0 ? (r.entries / totalEntries) * 100 : 0;
+          return (
+            <Box display="flex" alignItems="center" gap={1}>
+              <Box
+                sx={{
+                  flex: "0 0 72px",
+                  height: 6,
+                  borderRadius: 3,
+                  bgcolor: "action.hover",
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  sx={{
+                    width: `${share}%`,
+                    height: "100%",
+                    bgcolor: "primary.main",
+                    borderRadius: 3,
+                  }}
+                />
+              </Box>
+              <Typography variant="body2" fontWeight={600}>
+                {share.toFixed(0)}%
+              </Typography>
+            </Box>
+          );
+        },
+      },
+      {
+        key: "entries",
+        label: "Entries",
+        sortValue: (r) => r.entries,
+        render: (r) => <Typography variant="body2">{r.entries}</Typography>,
+      },
+      {
+        key: "pilots",
+        label: "Pilots",
+        sortValue: (r) => r.pilots,
+        render: (r) => (
+          <Typography variant="body2" color="text.secondary">
+            {r.pilots}
+          </Typography>
+        ),
+      },
+      {
+        key: "winrate",
+        label: "Win rate",
+        sortValue: (r) => (r.total_matches > 0 ? r.match_wins / r.total_matches : null),
+        csvValue: (r) =>
+          r.total_matches > 0
+            ? Number(((r.match_wins / r.total_matches) * 100).toFixed(1))
+            : null,
+        render: (r) => (
+          <Typography variant="body2">{pct(r.match_wins, r.total_matches)}</Typography>
+        ),
+      },
+      {
+        key: "top3",
+        label: "Top 3",
+        sortValue: (r) => r.top3_count,
+        render: (r) => <Typography variant="body2">{r.top3_count}</Typography>,
+      },
+      {
+        key: "wins",
+        label: "Event wins",
+        sortValue: (r) => r.event_wins,
+        render: (r) => <Typography variant="body2">{r.event_wins}</Typography>,
+      },
+    ],
+    [nameMap, totalEntries],
+  );
 
   return (
     <>
@@ -185,125 +300,81 @@ export default function MetaShareSection({
           <ToggleButton value="recent">Last {RECENT_COUNT} events</ToggleButton>
           <ToggleButton value="pick">Pick events</ToggleButton>
         </ToggleButtonGroup>
-        {!loading && rows.length > 0 && (
-          <Typography variant="body2" color="text.secondary">
-            {rows.length} deck{rows.length === 1 ? "" : "s"} across {totalEntries} entries in{" "}
-            {eventsDescribed} event{eventsDescribed === 1 ? "" : "s"}
-          </Typography>
+
+        <TextField
+          size="small"
+          placeholder="Search decks"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ minWidth: 200 }}
+        />
+
+        {oneOffCount > 0 && (
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={showOneOffs}
+                onChange={(e) => setShowOneOffs(e.target.checked)}
+              />
+            }
+            label={
+              <Typography variant="body2" color="text.secondary">
+                Show {oneOffCount} one-off{oneOffCount === 1 ? "" : "s"}
+              </Typography>
+            }
+          />
         )}
       </Box>
 
       {mode === "pick" && (
-        <Box display="flex" flexWrap="wrap" gap={0.75} mb={2}>
-          {options.length === 0 ? (
-            <Typography variant="body2" color="text.disabled">
-              No events to pick from yet.
-            </Typography>
-          ) : (
-            options.slice(0, 24).map((o) => {
-              const isOn = selected.includes(o.id);
-              return (
-                <Chip
-                  key={o.id}
-                  size="small"
-                  label={`${o.name} · ${new Date(o.played_at).toLocaleDateString()}`}
-                  color={isOn ? "primary" : "default"}
-                  variant={isOn ? "filled" : "outlined"}
-                  onClick={() =>
-                    setSelected((cur) =>
-                      isOn ? cur.filter((id) => id !== o.id) : [...cur, o.id],
-                    )
-                  }
-                />
-              );
-            })
-          )}
-        </Box>
+        <EventPicker options={options} selected={selected} onChange={setSelected} />
+      )}
+
+      {!loading && rows.length > 0 && (
+        <Typography variant="body2" color="text.secondary" mb={1.5}>
+          Showing {visibleRows.length} of {rows.length} decks across {totalEntries} entries in{" "}
+          {activeIds.length} event{activeIds.length === 1 ? "" : "s"}. Click a deck for its pilots.
+        </Typography>
       )}
 
       {mode === "pick" && selected.length === 0 ? (
         <Alert severity="info">Pick one or more events above to see what people brought.</Alert>
-      ) : loading ? (
-        <Skeleton variant="rectangular" height={200} sx={{ borderRadius: 1 }} />
-      ) : rows.length === 0 ? (
-        <Typography variant="body2" color="text.disabled">
-          No decks were registered in these events.
-        </Typography>
       ) : (
-        <Box sx={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={HEAD}>Deck</th>
-                <th style={HEAD}>Share</th>
-                <th style={HEAD}>Entries</th>
-                <th style={HEAD}>Pilots</th>
-                <th style={HEAD}>Win rate</th>
-                <th style={HEAD}>Top 3</th>
-                <th style={HEAD}>Event wins</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const share = totalEntries > 0 ? (r.entries / totalEntries) * 100 : 0;
-                return (
-                  <tr key={i} style={{ borderBottom: "1px solid rgba(128,128,128,0.15)" }}>
-                    <td style={CELL}>
-                      <DeckLabel p1={r.deck_pokemon1} p2={r.deck_pokemon2} nameMap={nameMap} />
-                    </td>
-                    <td style={{ ...CELL, minWidth: 140 }}>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        {/* The bar is the share; the number beside it is the
-                            same value, so the row reads without the bar. */}
-                        <Box
-                          sx={{
-                            flex: "0 0 72px",
-                            height: 6,
-                            borderRadius: 3,
-                            bgcolor: "action.hover",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              width: `${share}%`,
-                              height: "100%",
-                              bgcolor: "primary.main",
-                              borderRadius: 3,
-                            }}
-                          />
-                        </Box>
-                        <Typography variant="body2" fontWeight={600}>
-                          {share.toFixed(0)}%
-                        </Typography>
-                      </Box>
-                    </td>
-                    <td style={CELL}>
-                      <Typography variant="body2">{r.entries}</Typography>
-                    </td>
-                    <td style={CELL}>
-                      <Typography variant="body2" color="text.secondary">
-                        {r.pilots}
-                      </Typography>
-                    </td>
-                    <td style={CELL}>
-                      <Typography variant="body2">
-                        {pct(r.match_wins, r.total_matches)}
-                      </Typography>
-                    </td>
-                    <td style={CELL}>
-                      <Typography variant="body2">{r.top3_count}</Typography>
-                    </td>
-                    <td style={CELL}>
-                      <Typography variant="body2">{r.event_wins}</Typography>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Box>
+        <StatsTable
+          rows={visibleRows}
+          columns={columns}
+          getRowKey={deckKeyOf}
+          initialSort={{ key: "entries", dir: "desc" }}
+          loading={loading}
+          emptyMessage={
+            rows.length === 0
+              ? "No decks were registered in these events."
+              : "No decks match those filters."
+          }
+          initialLimit={25}
+          csvFilename={`matchamp-meta-share-${new Date().toISOString().slice(0, 10)}`}
+          onRowClick={(r) =>
+            setOpenDeck({ deck_pokemon1: r.deck_pokemon1, deck_pokemon2: r.deck_pokemon2 })
+          }
+        />
       )}
+
+      <DeckDetailModal
+        workspaceId={workspaceId}
+        gameId={gameId}
+        deck={openDeck}
+        tournamentIds={activeIds}
+        nameMap={nameMap}
+        onClose={() => setOpenDeck(null)}
+      />
     </>
   );
 }

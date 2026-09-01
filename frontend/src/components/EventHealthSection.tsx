@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Box,
   Card,
   CardContent,
   Grid,
@@ -9,6 +8,7 @@ import {
   Typography,
 } from "@mui/material";
 import { supabase } from "../supabaseClient";
+import StatsTable, { type StatsColumn } from "./StatsTable";
 
 /**
  * How the events themselves are running, as opposed to how the players are
@@ -34,17 +34,6 @@ interface ReportingStats {
   reports_submitted: number;
   awaiting_confirmation: number;
 }
-
-const CELL: React.CSSProperties = { padding: "10px 12px" };
-const HEAD: React.CSSProperties = {
-  textAlign: "left",
-  padding: "6px 12px",
-  borderBottom: "1px solid rgba(128,128,128,0.3)",
-  fontSize: 11,
-  textTransform: "uppercase",
-  letterSpacing: 1,
-  fontWeight: 600,
-};
 
 function pct(part: number, whole: number): string {
   if (whole === 0) return "—";
@@ -99,6 +88,71 @@ export default function EventHealthSection({
 
   const anyTimed = rounds.some((r) => r.timed_rounds > 0);
   const totalDrops = rounds.reduce((s, r) => s + r.drops_at_round, 0);
+
+  const roundColumns: StatsColumn<RoundRow>[] = useMemo(
+    () => [
+      {
+        key: "round",
+        label: "Round",
+        sortValue: (r) => r.round_number,
+        render: (r) => (
+          <Typography variant="body2" fontWeight={600}>
+            {r.round_number}
+          </Typography>
+        ),
+      },
+      {
+        key: "events",
+        label: "Events",
+        sortValue: (r) => r.events,
+        render: (r) => <Typography variant="body2">{r.events}</Typography>,
+      },
+      {
+        key: "matches",
+        label: "Matches",
+        sortValue: (r) => r.matches,
+        render: (r) => <Typography variant="body2">{r.matches}</Typography>,
+      },
+      {
+        key: "median",
+        label: "Typical length",
+        sortValue: (r) => r.median_minutes,
+        render: (r) => (
+          <Typography variant="body2">
+            {r.median_minutes != null ? `${r.median_minutes} min` : "—"}
+          </Typography>
+        ),
+      },
+      {
+        key: "avg",
+        label: "Average",
+        sortValue: (r) => r.avg_minutes,
+        render: (r) => (
+          <Typography variant="body2" color="text.secondary">
+            {r.avg_minutes != null
+              ? `${r.avg_minutes} min over ${r.timed_rounds} round${
+                  r.timed_rounds === 1 ? "" : "s"
+                }`
+              : "—"}
+          </Typography>
+        ),
+      },
+      {
+        key: "drops",
+        label: "Drops",
+        sortValue: (r) => r.drops_at_round,
+        render: (r) => (
+          <Typography
+            variant="body2"
+            color={r.drops_at_round > 0 ? "error.main" : "text.secondary"}
+          >
+            {r.drops_at_round}
+          </Typography>
+        ),
+      },
+    ],
+    [],
+  );
 
   return (
     <>
@@ -211,70 +265,15 @@ export default function EventHealthSection({
         </Alert>
       )}
 
-      {roundsLoading ? (
-        <Skeleton variant="rectangular" height={180} sx={{ borderRadius: 1 }} />
-      ) : rounds.length === 0 ? (
-        <Typography variant="body2" color="text.disabled">
-          No rounds have been played in this period yet.
-        </Typography>
-      ) : (
-        <Box sx={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={HEAD}>Round</th>
-                <th style={HEAD}>Events</th>
-                <th style={HEAD}>Matches</th>
-                <th style={HEAD}>Typical length</th>
-                <th style={HEAD}>Average</th>
-                <th style={HEAD}>Drops</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rounds.map((r) => (
-                <tr
-                  key={r.round_number}
-                  style={{ borderBottom: "1px solid rgba(128,128,128,0.15)" }}
-                >
-                  <td style={CELL}>
-                    <Typography variant="body2" fontWeight={600}>
-                      {r.round_number}
-                    </Typography>
-                  </td>
-                  <td style={CELL}>
-                    <Typography variant="body2">{r.events}</Typography>
-                  </td>
-                  <td style={CELL}>
-                    <Typography variant="body2">{r.matches}</Typography>
-                  </td>
-                  <td style={CELL}>
-                    <Typography variant="body2">
-                      {r.median_minutes != null ? `${r.median_minutes} min` : "—"}
-                    </Typography>
-                  </td>
-                  <td style={CELL}>
-                    <Typography variant="body2" color="text.secondary">
-                      {r.avg_minutes != null
-                        ? `${r.avg_minutes} min over ${r.timed_rounds} round${
-                            r.timed_rounds === 1 ? "" : "s"
-                          }`
-                        : "—"}
-                    </Typography>
-                  </td>
-                  <td style={CELL}>
-                    <Typography
-                      variant="body2"
-                      color={r.drops_at_round > 0 ? "error.main" : "text.secondary"}
-                    >
-                      {r.drops_at_round}
-                    </Typography>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Box>
-      )}
+      <StatsTable
+        rows={rounds}
+        columns={roundColumns}
+        getRowKey={(r) => String(r.round_number)}
+        initialSort={{ key: "round", dir: "asc" }}
+        loading={roundsLoading}
+        csvFilename={`matchamp-round-health-${new Date().toISOString().slice(0, 10)}`}
+        emptyMessage="No rounds have been played in this period yet."
+      />
     </>
   );
 }

@@ -7,11 +7,14 @@ import {
   Chip,
   Divider,
   Grid,
+  InputAdornment,
   Skeleton,
+  TextField,
   Typography,
   Button,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import SearchIcon from "@mui/icons-material/Search";
 import { Link } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
@@ -21,6 +24,7 @@ import StatsTimeline, { type TimelineBucket, type TimelinePoint } from "../compo
 import LeagueTableSection from "../components/LeagueTableSection";
 import MetaShareSection from "../components/MetaShareSection";
 import EventHealthSection from "../components/EventHealthSection";
+import StatsTable, { type StatsColumn } from "../components/StatsTable";
 import { getPokemonList } from "../utils/pokemonCache";
 import { getGame } from "../games/registry";
 import { ALL_TIME, periodArgs, periodLabel, type StatsPeriod } from "../utils/statsPeriod";
@@ -146,6 +150,88 @@ const OrganiserStats: React.FC = () => {
   const [attendanceLoading, setAttendanceLoading] = useState(true);
   const [timeline, setTimeline] = useState<TimelineRow[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(true);
+  const [playerSearch, setPlayerSearch] = useState("");
+
+  const visibleAttendance = useMemo(() => {
+    const q = playerSearch.trim().toLowerCase();
+    if (q === "") return attendance;
+    return attendance.filter((r) => r.display_name.toLowerCase().includes(q));
+  }, [attendance, playerSearch]);
+
+  const attendanceColumns: StatsColumn<AttendanceRow>[] = useMemo(
+    () => [
+      {
+        key: "player",
+        label: "Player",
+        sortValue: (r) => r.display_name.toLowerCase(),
+        render: (r) => (
+          <Box display="flex" alignItems="center" gap={0.75}>
+            <Typography variant="body2">{r.display_name}</Typography>
+            {r.is_linked && <Chip label="Account" size="small" variant="outlined" />}
+          </Box>
+        ),
+      },
+      {
+        key: "events",
+        label: "Events",
+        sortValue: (r) => r.events_played,
+        render: (r) => (
+          <Typography variant="body2" fontWeight={600}>
+            {r.events_played}
+          </Typography>
+        ),
+      },
+      {
+        key: "matches",
+        label: "Matches",
+        sortValue: (r) => r.matches,
+        render: (r) => <Typography variant="body2">{r.matches}</Typography>,
+      },
+      {
+        key: "winrate",
+        label: "Win rate",
+        sortValue: (r) => (r.matches > 0 ? r.match_wins / r.matches : null),
+        csvValue: (r) =>
+          r.matches > 0 ? Number(((r.match_wins / r.matches) * 100).toFixed(1)) : null,
+        render: (r) => <Typography variant="body2">{pct(r.match_wins, r.matches)}</Typography>,
+      },
+      {
+        key: "wins",
+        label: "Event wins",
+        sortValue: (r) => r.event_wins,
+        render: (r) => <Typography variant="body2">{r.event_wins}</Typography>,
+      },
+      {
+        key: "top3",
+        label: "Top 3",
+        sortValue: (r) => r.top3_finishes,
+        render: (r) => <Typography variant="body2">{r.top3_finishes}</Typography>,
+      },
+      {
+        key: "first",
+        label: "First seen",
+        sortValue: (r) => new Date(r.first_played).getTime(),
+        csvValue: (r) => r.first_played.slice(0, 10),
+        render: (r) => (
+          <Typography variant="body2" color="text.secondary">
+            {new Date(r.first_played).toLocaleDateString()}
+          </Typography>
+        ),
+      },
+      {
+        key: "last",
+        label: "Last seen",
+        sortValue: (r) => new Date(r.last_played).getTime(),
+        csvValue: (r) => r.last_played.slice(0, 10),
+        render: (r) => (
+          <Typography variant="body2" color="text.secondary">
+            {new Date(r.last_played).toLocaleDateString()}
+          </Typography>
+        ),
+      },
+    ],
+    [],
+  );
 
   // Deck names for the meta share table. Only fetched for a game that has
   // decks — there is nothing to name otherwise.
@@ -209,7 +295,10 @@ const OrganiserStats: React.FC = () => {
         p_workspace_id: workspaceId,
         ...periodArgs(period),
         p_game_id: gameId,
-        p_limit: 50,
+        // Deliberately generous: the table searches, sorts and pages client
+        // side, so the limit only exists to bound the payload for a workspace
+        // with years of history — not to decide what is worth showing.
+        p_limit: 500,
       })
       .then(({ data }) => {
         setAttendance((data ?? []) as AttendanceRow[]);
@@ -263,7 +352,11 @@ const OrganiserStats: React.FC = () => {
   }
 
   return (
-    <Box p={{ xs: 2, sm: 3 }} maxWidth={1200} mx="auto">
+    // width:100% alongside the cap is load-bearing, not belt-and-braces. With
+    // max-width alone the box takes its width from its widest content, so a
+    // table wide enough to need its own scrollbar stretched the whole page and
+    // scrolled the layout sideways instead of scrolling inside the table.
+    <Box p={{ xs: 2, sm: 3 }} sx={{ width: "100%", maxWidth: 1200, mx: "auto" }}>
       <Button
         component={Link}
         to={wPath("/dashboard")}
@@ -428,72 +521,36 @@ const OrganiserStats: React.FC = () => {
       <SectionHeader hint="Sorted by events attended. Players without an account are matched on name, so a typo can split one person into two rows.">
         Regulars
       </SectionHeader>
-      {attendanceLoading ? (
-        <Skeleton variant="rectangular" height={200} sx={{ borderRadius: 1 }} />
-      ) : attendance.length === 0 ? (
-        <Typography variant="body2" color="text.disabled">
-          No players in this period yet.
-        </Typography>
-      ) : (
-        <Box sx={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["Player", "Events", "Matches", "Win rate", "Wins", "Top 3", "Last seen"].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign: "left",
-                      padding: "6px 12px",
-                      borderBottom: "1px solid rgba(128,128,128,0.3)",
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      letterSpacing: 1,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {attendance.map((r) => (
-                <tr key={r.identity_key} style={{ borderBottom: "1px solid rgba(128,128,128,0.15)" }}>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Box display="flex" alignItems="center" gap={0.75}>
-                      <Typography variant="body2">{r.display_name}</Typography>
-                      {r.is_linked && <Chip label="Account" size="small" variant="outlined" />}
-                    </Box>
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2" fontWeight={600}>
-                      {r.events_played}
-                    </Typography>
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2">{r.matches}</Typography>
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2">{pct(r.match_wins, r.matches)}</Typography>
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2">{r.event_wins}</Typography>
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2">{r.top3_finishes}</Typography>
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {new Date(r.last_played).toLocaleDateString()}
-                    </Typography>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Box>
-      )}
+      <Box mb={1.5}>
+        <TextField
+          size="small"
+          placeholder="Search players"
+          value={playerSearch}
+          onChange={(e) => setPlayerSearch(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ minWidth: 220 }}
+        />
+      </Box>
+      <StatsTable
+        rows={visibleAttendance}
+        columns={attendanceColumns}
+        getRowKey={(r) => r.identity_key}
+        initialSort={{ key: "events", dir: "desc" }}
+        loading={attendanceLoading}
+        csvFilename={`matchamp-regulars-${new Date().toISOString().slice(0, 10)}`}
+        emptyMessage={
+          attendance.length === 0
+            ? "No players in this period yet."
+            : "No players match that search."
+        }
+        initialLimit={25}
+      />
 
       <SectionHeader hint="How the events themselves ran: how long rounds took, which round people dropped in, and who entered the results.">
         Event health

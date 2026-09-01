@@ -21,6 +21,7 @@ import { useAuth } from "../AuthContext";
 import { getPokemonList, getSpriteUrl, getArtworkUrl } from "../utils/pokemonCache";
 import StatsPeriodFilter from "../components/StatsPeriodFilter";
 import StatsGameFilter from "../components/StatsGameFilter";
+import StatsTimeline, { type TimelineBucket, type TimelinePoint } from "../components/StatsTimeline";
 import { getGame } from "../games/registry";
 import { ALL_TIME, periodArgs, periodLabel, type StatsPeriod } from "../utils/statsPeriod";
 
@@ -597,7 +598,17 @@ function RoundPerformanceSection({ data, loading }: { data: RoundRow[]; loading:
 
 // ── Trend section ──────────────────────────────────────────────────────────────
 
-function TrendSection({ data, loading }: { data: TrendRow[]; loading: boolean }) {
+function TrendSection({
+  data,
+  loading,
+  bucket,
+  onBucketChange,
+}: {
+  data: TrendRow[];
+  loading: boolean;
+  bucket: TimelineBucket;
+  onBucketChange: (b: TimelineBucket) => void;
+}) {
   const glowUp = useMemo(() => {
     if (data.length < 4) return false;
     const recent = data.slice(-2);
@@ -607,6 +618,25 @@ function TrendSection({ data, loading }: { data: TrendRow[]; loading: boolean })
     return recentRate - olderRate > 0.05;
   }, [data]);
 
+  // The bar height is the win rate, so the shared timeline draws the same
+  // measure the cards used to. Tone is a real threshold call here — unlike a
+  // headcount, a higher win rate genuinely is better.
+  const points: TimelinePoint[] = useMemo(
+    () =>
+      data.map((r) => {
+        const rate = r.total > 0 ? (r.wins / r.total) * 100 : null;
+        return {
+          key: r.period_start,
+          label: r.period_label,
+          value: rate,
+          display: rate != null ? `${rate.toFixed(0)}%` : "—",
+          sub: `${r.total} match${r.total === 1 ? "" : "es"}`,
+          tone: rate == null ? undefined : rate >= 55 ? "good" : rate <= 40 ? "bad" : "neutral",
+        };
+      }),
+    [data],
+  );
+
   return (
     <>
       {glowUp && (
@@ -615,29 +645,13 @@ function TrendSection({ data, loading }: { data: TrendRow[]; loading: boolean })
           <Typography variant="body2" color="warning.main">Your win rate is on the way up.</Typography>
         </Box>
       )}
-      {loading ? (
-        <Skeleton variant="rectangular" height={80} sx={{ borderRadius: 1 }} />
-      ) : data.length === 0 ? (
-        <Typography variant="body2" color="text.disabled">No trend data yet. Play a few more tournaments and this will show how you're getting on.</Typography>
-      ) : (
-        <Box display="flex" gap={1.5} flexWrap="wrap">
-          {data.map((r, i) => {
-            const rate = r.total > 0 ? (r.wins / r.total) * 100 : null;
-            const isLatest = i === data.length - 1;
-            return (
-              <Card key={r.period_start} variant="outlined" sx={{ minWidth: 100, borderColor: isLatest ? "primary.main" : undefined }}>
-                <CardContent sx={{ pb: "12px !important", pt: 1.5 }}>
-                  <Typography variant="caption" color="text.secondary" display="block">{r.period_label}</Typography>
-                  <Typography variant="h5" fontWeight={700} color={rate != null && rate >= 55 ? "success.main" : rate != null && rate <= 40 ? "error.main" : "text.primary"}>
-                    {rate != null ? `${rate.toFixed(0)}%` : "—"}
-                  </Typography>
-                  <Typography variant="caption" color="text.disabled">{r.total} matches</Typography>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </Box>
-      )}
+      <StatsTimeline
+        points={points}
+        loading={loading}
+        emptyMessage="No trend data yet. Play a few more tournaments and this will show how you're getting on."
+        bucket={bucket}
+        onBucketChange={onBucketChange}
+      />
     </>
   );
 }
@@ -652,6 +666,7 @@ const PlayerStats: React.FC = () => {
   const [gameIds, setGameIds] = useState<string[]>([]);
   const [gameId, setGameId] = useState<string | null>(null);
   const [period, setPeriod] = useState<StatsPeriod>(ALL_TIME);
+  const [trendBucket, setTrendBucket] = useState<TimelineBucket>("quarter");
   const [overview, setOverview] = useState<OverviewStats | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [decks, setDecks] = useState<DeckStat[]>([]);
@@ -720,11 +735,11 @@ const PlayerStats: React.FC = () => {
       setRoundsLoading(false);
     });
 
-    void supabase.rpc("get_player_trend", args).then(({ data }) => {
+    void supabase.rpc("get_player_trend", { ...args, p_bucket: trendBucket }).then(({ data }) => {
       setTrend((data ?? []) as TrendRow[]);
       setTrendLoading(false);
     });
-  }, [user, period, gameId]);
+  }, [user, period, gameId, trendBucket]);
 
   const hasDecks = getGame(gameId).deck !== "none";
 
@@ -793,7 +808,12 @@ const PlayerStats: React.FC = () => {
 
       {/* Trend */}
       <SectionHeader>Win Rate Trend</SectionHeader>
-      <TrendSection data={trend} loading={trendLoading} />
+      <TrendSection
+        data={trend}
+        loading={trendLoading}
+        bucket={trendBucket}
+        onBucketChange={setTrendBucket}
+      />
 
       <Box pb={4} />
     </Box>
