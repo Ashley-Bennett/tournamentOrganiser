@@ -30,7 +30,7 @@ export interface StatsColumn<T> {
    */
   sortValue?: (row: T) => number | string | null | undefined;
   render: (row: T, index: number) => React.ReactNode;
-  align?: "left" | "right";
+  align?: "left" | "center" | "right";
   /**
    * Plain value for CSV export. Falls back to `sortValue`; a column with
    * neither exports blank, which is right for a purely decorative column.

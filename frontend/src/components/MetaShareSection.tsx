@@ -13,6 +13,7 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import { supabase } from "../supabaseClient";
 import { getSpriteUrl } from "../utils/pokemonCache";
+import { deckKey } from "../utils/deck";
 import StatsTable, { type StatsColumn } from "./StatsTable";
 import EventPicker, { type EventOption } from "./EventPicker";
 import DeckDetailModal, { type DeckKey } from "./DeckDetailModal";
@@ -52,10 +53,6 @@ const RECENT_COUNT = 6;
 function pct(part: number, whole: number): string {
   if (whole === 0) return "—";
   return `${((part / whole) * 100).toFixed(0)}%`;
-}
-
-function deckKeyOf(r: { deck_pokemon1: number | null; deck_pokemon2: number | null }): string {
-  return `${r.deck_pokemon1 ?? "x"}-${r.deck_pokemon2 ?? "x"}`;
 }
 
 function DeckLabel({
@@ -351,7 +348,7 @@ export default function MetaShareSection({
         <StatsTable
           rows={visibleRows}
           columns={columns}
-          getRowKey={deckKeyOf}
+          getRowKey={deckKey}
           initialSort={{ key: "entries", dir: "desc" }}
           loading={loading}
           emptyMessage={

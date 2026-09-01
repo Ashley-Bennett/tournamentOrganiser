@@ -4,7 +4,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Divider,
   Grid,
   Skeleton,
   Typography,
@@ -18,10 +17,14 @@ import WhatshotIcon from "@mui/icons-material/Whatshot";
 import { Link } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
-import { getPokemonList, getSpriteUrl, getArtworkUrl } from "../utils/pokemonCache";
+import { getPokemonList, getSpriteUrl } from "../utils/pokemonCache";
 import StatsPeriodFilter from "../components/StatsPeriodFilter";
 import StatsGameFilter from "../components/StatsGameFilter";
 import StatsTimeline, { type TimelineBucket, type TimelinePoint } from "../components/StatsTimeline";
+import StatsTable, { type StatsColumn } from "../components/StatsTable";
+import StatsSection from "../components/StatsSection";
+import StatsDeckFilter from "../components/StatsDeckFilter";
+import { deckKey, deckName } from "../utils/deck";
 import { getGame } from "../games/registry";
 import { ALL_TIME, periodArgs, periodLabel, type StatsPeriod } from "../utils/statsPeriod";
 
@@ -152,6 +155,10 @@ function StatCard({
 
 // ── Deck selector chips ────────────────────────────────────────────────────────
 
+/**
+ * Deck filter — a thin adapter onto the shared DeckPicker so the sections here
+ * keep passing DeckStat objects around rather than ids.
+ */
 function DeckFilter({
   decks,
   selected,
@@ -163,54 +170,34 @@ function DeckFilter({
   nameMap: Map<number, string>;
   onChange: (d: DeckStat | null) => void;
 }) {
-  if (decks.length === 0) return null;
+  const withSummary = useMemo(
+    () =>
+      decks.map((d) => ({
+        ...d,
+        secondary: `${d.tournaments_played} tournament${d.tournaments_played === 1 ? "" : "s"} · ${pct(d.match_wins, d.total_matches)}`,
+      })),
+    [decks],
+  );
+
   return (
-    <Box display="flex" flexWrap="wrap" gap={0.75} mb={2}>
-      <Chip
-        label="All decks"
-        variant={selected === null ? "filled" : "outlined"}
-        color={selected === null ? "primary" : "default"}
-        onClick={() => onChange(null)}
-        size="small"
-      />
-      {decks.map((d, i) => {
-        const isSelected = selected?.deck_pokemon1 === d.deck_pokemon1 && selected?.deck_pokemon2 === d.deck_pokemon2;
-        const label = [d.deck_pokemon1, d.deck_pokemon2]
-          .filter(Boolean)
-          .map((id) => nameMap.get(id!) ?? `#${id}`)
-          .join(" / ");
-        return (
-          <Chip
-            key={i}
-            avatar={
-              d.deck_pokemon1 ? (
-                <img src={getArtworkUrl(d.deck_pokemon1)} alt="" style={{ width: 20, height: 20, objectFit: "contain", borderRadius: "50%" }} />
-              ) : undefined
-            }
-            label={label}
-            variant={isSelected ? "filled" : "outlined"}
-            color={isSelected ? "primary" : "default"}
-            onClick={() => onChange(isSelected ? null : d)}
-            size="small"
-          />
-        );
-      })}
-    </Box>
+    <StatsDeckFilter
+      decks={withSummary}
+      selected={
+        selected
+          ? (withSummary.find(
+              (d) =>
+                d.deck_pokemon1 === selected.deck_pokemon1 &&
+                d.deck_pokemon2 === selected.deck_pokemon2,
+            ) ?? null)
+          : null
+      }
+      nameMap={nameMap}
+      onChange={(d) => onChange(d ? decks.find((x) => deckKey(x) === deckKey(d)) ?? null : null)}
+    />
   );
 }
 
 // ── Section header ─────────────────────────────────────────────────────────────
-
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <Divider sx={{ my: 3 }} />
-      <Typography variant="overline" color="text.secondary" display="block" mb={1.5}>
-        {children}
-      </Typography>
-    </>
-  );
-}
 
 // ── Overview section ───────────────────────────────────────────────────────────
 
@@ -307,6 +294,52 @@ function DeckStatsSection({ data, loading, nameMap, period }: { data: DeckStat[]
   const deckCount = data.length;
   const loyaltyLabel = deckCount === 0 ? null : deckCount === 1 ? "Specialist" : deckCount >= 5 ? "Meta Chaser" : "Flexible";
 
+  const columns: StatsColumn<DeckStat>[] = useMemo(
+    () => [
+      {
+        key: "deck",
+        label: "Deck",
+        sortValue: (d) => deckName(d, nameMap).toLowerCase(),
+        render: (d) => <DeckLabel p1={d.deck_pokemon1} p2={d.deck_pokemon2} nameMap={nameMap} />,
+      },
+      {
+        key: "tournaments",
+        label: "Tournaments",
+        sortValue: (d) => d.tournaments_played,
+        render: (d) => <Typography variant="body2">{d.tournaments_played}</Typography>,
+      },
+      {
+        key: "winrate",
+        label: "Win Rate",
+        sortValue: (d) => (d.total_matches > 0 ? d.match_wins / d.total_matches : null),
+        csvValue: (d) =>
+          d.total_matches > 0 ? Number(((d.match_wins / d.total_matches) * 100).toFixed(1)) : null,
+        render: (d) => (
+          <Typography variant="body2" fontWeight={600}>{pct(d.match_wins, d.total_matches)}</Typography>
+        ),
+      },
+      {
+        key: "matches",
+        label: "Matches",
+        sortValue: (d) => d.total_matches,
+        render: (d) => <Typography variant="body2">{d.match_wins}W of {d.total_matches}</Typography>,
+      },
+      {
+        key: "top3",
+        label: "Top 3",
+        sortValue: (d) => d.top3_count,
+        render: (d) => <Typography variant="body2">{d.top3_count}</Typography>,
+      },
+      {
+        key: "top8",
+        label: "Top 8",
+        sortValue: (d) => d.top8_count,
+        render: (d) => <Typography variant="body2">{d.top8_count}</Typography>,
+      },
+    ],
+    [nameMap],
+  );
+
   return (
     <>
       <Box display="flex" alignItems="center" gap={1} mb={2}>
@@ -315,49 +348,16 @@ function DeckStatsSection({ data, loading, nameMap, period }: { data: DeckStat[]
           {deckCount} deck{deckCount !== 1 ? "s" : ""} registered {period.year == null ? "across all tournaments" : `in ${periodLabel(period)}`}
         </Typography>
       </Box>
-      {loading ? (
-        <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 1 }} />
-      ) : data.length === 0 ? (
-        <Typography variant="body2" color="text.disabled">No deck data yet. Set your deck before your next tournament.</Typography>
-      ) : (
-        <Box sx={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["Deck", "Tournaments", "Win Rate", "Matches", "Top 3", "Top 8"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: "6px 12px", borderBottom: "1px solid rgba(255,255,255,0.12)", fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((d, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                  <td style={{ padding: "10px 12px" }}>
-                    <DeckLabel p1={d.deck_pokemon1} p2={d.deck_pokemon2} nameMap={nameMap} />
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2">{d.tournaments_played}</Typography>
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2" fontWeight={600}>{pct(d.match_wins, d.total_matches)}</Typography>
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2">{d.match_wins}W of {d.total_matches}</Typography>
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2">{d.top3_count}</Typography>
-                  </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Typography variant="body2">{d.top8_count}</Typography>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Box>
-      )}
+      <StatsTable
+        rows={data}
+        columns={columns}
+        getRowKey={(d) => deckKey(d)}
+        initialSort={{ key: "tournaments", dir: "desc" }}
+        loading={loading}
+        emptyMessage="No deck data yet. Set your deck before your next tournament."
+        maxRows={10}
+        csvFilename={`matchamp-my-decks-${new Date().toISOString().slice(0, 10)}`}
+      />
     </>
   );
 }
@@ -482,52 +482,80 @@ function MatchupMatrixSection({
       });
   }, [selectedDeck, period, gameId]);
 
+  const matchupColumns: StatsColumn<MatchupRow>[] = useMemo(
+    () => [
+      {
+        key: "deck",
+        label: "Opponent deck",
+        sortValue: (r) =>
+          deckName({ deck_pokemon1: r.opp_pokemon1, deck_pokemon2: r.opp_pokemon2 }, nameMap).toLowerCase(),
+        render: (r) => <DeckLabel p1={r.opp_pokemon1} p2={r.opp_pokemon2} nameMap={nameMap} />,
+      },
+      {
+        key: "played",
+        label: "Played",
+        align: "center",
+        sortValue: (r) => r.matches_played,
+        render: (r) => <Typography variant="body2">{r.matches_played}</Typography>,
+      },
+      {
+        key: "w",
+        label: "W",
+        align: "center",
+        sortValue: (r) => r.wins,
+        render: (r) => <Typography variant="body2" color="success.main">{r.wins}</Typography>,
+      },
+      {
+        key: "l",
+        label: "L",
+        align: "center",
+        sortValue: (r) => r.losses,
+        render: (r) => <Typography variant="body2" color="error.main">{r.losses}</Typography>,
+      },
+      {
+        key: "d",
+        label: "D",
+        align: "center",
+        sortValue: (r) => r.draws,
+        render: (r) => <Typography variant="body2" color="text.secondary">{r.draws}</Typography>,
+      },
+      {
+        key: "winrate",
+        label: "Win Rate",
+        align: "center",
+        sortValue: (r) => (r.matches_played > 0 ? r.wins / r.matches_played : null),
+        csvValue: (r) =>
+          r.matches_played > 0 ? Number(((r.wins / r.matches_played) * 100).toFixed(1)) : null,
+        render: (r) => {
+          const rate = r.matches_played > 0 ? (r.wins / r.matches_played) * 100 : 0;
+          return (
+            <Typography
+              variant="body2"
+              fontWeight={700}
+              color={rate >= 60 ? "success.main" : rate <= 40 ? "error.main" : undefined}
+            >
+              {pct(r.wins, r.matches_played)}
+            </Typography>
+          );
+        },
+      },
+    ],
+    [nameMap],
+  );
+
   return (
     <>
       <DeckFilter decks={decks} selected={selectedDeck} nameMap={nameMap} onChange={setSelectedDeck} />
-      {loading ? (
-        <Skeleton variant="rectangular" height={140} sx={{ borderRadius: 1 }} />
-      ) : data.length === 0 ? (
-        <Typography variant="body2" color="text.disabled">
-          No matchup data yet. Opponent deck info comes from their tournament entry or post-game insights.
-        </Typography>
-      ) : (
-        <Box sx={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["Opponent deck", "Played", "W", "L", "D", "Win Rate"].map((h) => (
-                  <th key={h} style={{ textAlign: h === "Opponent deck" ? "left" : "center", padding: "6px 12px", borderBottom: "1px solid rgba(255,255,255,0.12)", fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row, i) => {
-                const rate = row.matches_played > 0 ? (row.wins / row.matches_played) * 100 : 0;
-                const rateColor = rate >= 60 ? "#4caf50" : rate <= 40 ? "#f44336" : undefined;
-                return (
-                  <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    <td style={{ padding: "10px 12px" }}>
-                      <DeckLabel p1={row.opp_pokemon1} p2={row.opp_pokemon2} nameMap={nameMap} />
-                    </td>
-                    <td style={{ padding: "10px 12px", textAlign: "center" }}><Typography variant="body2">{row.matches_played}</Typography></td>
-                    <td style={{ padding: "10px 12px", textAlign: "center" }}><Typography variant="body2" color="success.main">{row.wins}</Typography></td>
-                    <td style={{ padding: "10px 12px", textAlign: "center" }}><Typography variant="body2" color="error.main">{row.losses}</Typography></td>
-                    <td style={{ padding: "10px 12px", textAlign: "center" }}><Typography variant="body2" color="text.secondary">{row.draws}</Typography></td>
-                    <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                      <Typography variant="body2" fontWeight={700} color={rateColor}>
-                        {pct(row.wins, row.matches_played)}
-                      </Typography>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Box>
-      )}
+      <StatsTable
+        rows={data}
+        columns={matchupColumns}
+        getRowKey={(r) => `${r.opp_pokemon1 ?? "x"}-${r.opp_pokemon2 ?? "x"}`}
+        initialSort={{ key: "played", dir: "desc" }}
+        loading={loading}
+        emptyMessage="No matchup data yet. Opponent deck info comes from their tournament entry or post-game insights."
+        maxRows={10}
+        csvFilename={`matchamp-my-matchups-${new Date().toISOString().slice(0, 10)}`}
+      />
     </>
   );
 }
@@ -779,41 +807,44 @@ const PlayerStats: React.FC = () => {
         Going first still means something without decks, so it stays.
       */}
       {hasDecks && (
-        <>
-          <SectionHeader>Deck History</SectionHeader>
+        <StatsSection
+          id="player-decks"
+          title="Deck History"
+          defaultOpen
+          summary={decks.length > 0 ? `${decks.length} deck${decks.length === 1 ? "" : "s"}` : undefined}
+        >
           <DeckStatsSection data={decks} loading={decksLoading} nameMap={nameMap} period={period} />
-        </>
+        </StatsSection>
       )}
 
-      {/* First / Second */}
-      <SectionHeader>Going First vs Second</SectionHeader>
-      <FirstSecondSection
-        decks={decks}
-        nameMap={nameMap}
-        period={period}
-        gameId={gameId}
-        hasDecks={hasDecks}
-      />
+      <StatsSection id="player-first-second" title="Going First vs Second">
+        <FirstSecondSection
+          decks={decks}
+          nameMap={nameMap}
+          period={period}
+          gameId={gameId}
+          hasDecks={hasDecks}
+        />
+      </StatsSection>
 
       {hasDecks && (
-        <>
-          <SectionHeader>Matchup Matrix</SectionHeader>
+        <StatsSection id="player-matchups" title="Matchup Matrix">
           <MatchupMatrixSection decks={decks} nameMap={nameMap} period={period} gameId={gameId} />
-        </>
+        </StatsSection>
       )}
 
-      {/* Round performance */}
-      <SectionHeader>Round-by-Round Performance</SectionHeader>
-      <RoundPerformanceSection data={rounds} loading={roundsLoading} />
+      <StatsSection id="player-rounds" title="Round-by-Round Performance">
+        <RoundPerformanceSection data={rounds} loading={roundsLoading} />
+      </StatsSection>
 
-      {/* Trend */}
-      <SectionHeader>Win Rate Trend</SectionHeader>
-      <TrendSection
-        data={trend}
-        loading={trendLoading}
-        bucket={trendBucket}
-        onBucketChange={setTrendBucket}
-      />
+      <StatsSection id="player-trend" title="Win Rate Trend" defaultOpen>
+        <TrendSection
+          data={trend}
+          loading={trendLoading}
+          bucket={trendBucket}
+          onBucketChange={setTrendBucket}
+        />
+      </StatsSection>
 
       <Box pb={4} />
     </Box>
