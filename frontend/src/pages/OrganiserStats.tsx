@@ -22,6 +22,7 @@ import StatsGameFilter from "../components/StatsGameFilter";
 import StatsTimeline, { type TimelineBucket, type TimelinePoint } from "../components/StatsTimeline";
 import LeagueTableSection from "../components/LeagueTableSection";
 import MetaShareSection from "../components/MetaShareSection";
+import DeckDiversitySection from "../components/DeckDiversitySection";
 import EventHealthSection from "../components/EventHealthSection";
 import StatsTable, { type StatsColumn } from "../components/StatsTable";
 import StatsSection from "../components/StatsSection";
@@ -511,6 +512,21 @@ const OrganiserStats: React.FC = () => {
           hint="What people brought, by share of entries. A deck played three times by one person and one played once each by three people take up the same room, so 'pilots' is shown alongside."
         >
           <MetaShareSection workspaceId={workspaceId} gameId={gameId} nameMap={nameMap} />
+        </StatsSection>
+      )}
+
+      {hasDecks && (
+        <StatsSection
+          id="diversity"
+          title="Deck diversity"
+          hint="Whether the meta is spreading out or concentrating. Counts how many decks the field effectively plays like, which — unlike a plain count of decks — does not simply rise and fall with turnout."
+        >
+          <DeckDiversitySection
+            workspaceId={workspaceId}
+            gameId={gameId}
+            nameMap={nameMap}
+            periodArgsValue={periodArgs(period)}
+          />
         </StatsSection>
       )}
 
