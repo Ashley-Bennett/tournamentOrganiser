@@ -142,7 +142,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       isMounted = false;
       authSubscription?.unsubscribe();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchProfile, retryKey]);
 
   // Refresh session when the tab becomes visible again — browser timer throttling

@@ -16,7 +16,7 @@ import { sortByProfile } from "../utils/tieBreaking";
 import { rulesFor } from "../games/registry";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { TournamentSummary, TournamentPlayer } from "../types/tournament";
-import { Match, MatchWithPlayers } from "../types/match";
+import { MatchWithPlayers } from "../types/match";
 import StandingsTable from "../components/StandingsTable";
 
 const TournamentLeaderboard: React.FC = () => {

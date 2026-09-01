@@ -33,7 +33,8 @@ import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
 import { useAuth } from "../AuthContext";
 import { TournamentSummary } from "../types/tournament";
-import { formatLabel } from "../games/registry";
+import { formatLabel, getGame } from "../games/registry";
+import StatsGameFilter from "../components/StatsGameFilter";
 import { formatDate } from "../utils/format";
 import { getAllEntries } from "../utils/playerStorage";
 import { getSpriteUrl } from "../utils/pokemonCache";
@@ -344,6 +345,7 @@ interface DbEntry {
   total_matches: number;
   deck_pokemon1: number | null;
   deck_pokemon2: number | null;
+  game_id: string | null;
 }
 
 interface PlayerTournamentSummary {
@@ -355,6 +357,7 @@ interface PlayerTournamentSummary {
   total_players: number | null;
   deck_pokemon1: number | null;
   deck_pokemon2: number | null;
+  game_id: string | null;
 }
 
 interface PlayerRow {
@@ -372,6 +375,7 @@ interface PlayerRow {
   deviceToken?: string | null;
   deckPokemon1: number | null;
   deckPokemon2: number | null;
+  gameId: string | null;
 }
 
 const PlayerDashboard: React.FC = () => {
@@ -383,6 +387,7 @@ const PlayerDashboard: React.FC = () => {
   const [summaries, setSummaries] = useState<PlayerTournamentSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [gameId, setGameId] = useState<string | null>(null);
   const initialLoadDoneRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -430,6 +435,7 @@ const PlayerDashboard: React.FC = () => {
       isLinked: true,
       deckPokemon1: e.deck_pokemon1 ?? null,
       deckPokemon2: e.deck_pokemon2 ?? null,
+      gameId: e.game_id ?? null,
     }));
     const deviceRows: PlayerRow[] = deviceEntries.flatMap((e) => {
       if (linkedIds.has(e.tournamentId)) return [];
@@ -450,6 +456,7 @@ const PlayerDashboard: React.FC = () => {
         deviceToken: e.deviceToken,
         deckPokemon1: summary?.deck_pokemon1 ?? null,
         deckPokemon2: summary?.deck_pokemon2 ?? null,
+        gameId: summary?.game_id ?? null,
       }];
     });
     return [...dbRows, ...deviceRows].sort((a, b) => {
@@ -466,16 +473,52 @@ const PlayerDashboard: React.FC = () => {
       .slice(0, 5),
     [rows],
   );
-  const completedRows = rows.filter((r) => r.status === "completed");
+  // Games the player has entries in, busiest first — the same rule the stats
+  // page uses, so the two pages agree on which game leads. Rows whose game is
+  // unknown are skipped rather than assumed: a device entry for a tournament
+  // that no longer exists resolves to nothing, and counting those as generic
+  // would invent a game the player never played.
+  const gameIds = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      if (!row.gameId) continue;
+      counts.set(row.gameId, (counts.get(row.gameId) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([id]) => id);
+  }, [rows]);
+
+  // Wait for the load to finish before settling on a game. Device entries
+  // resolve before the account's, so choosing early would latch onto whichever
+  // happened to arrive first rather than the game they actually play most.
+  useEffect(() => {
+    if (loading) return;
+    setGameId((current) =>
+      current && gameIds.includes(current) ? current : gameIds[0] ?? null,
+    );
+  }, [gameIds, loading]);
+
+  // Results are never mixed across games, here or on the stats page. The
+  // tournament list above stays whole — it is a list of what you played, not
+  // a record — but these cards describe one game.
+  const gameRows = useMemo(
+    () => (gameId == null ? rows : rows.filter((r) => r.gameId === gameId)),
+    [rows, gameId],
+  );
+
+  const completedRows = gameRows.filter((r) => r.status === "completed");
   const totalCompleted = completedRows.length;
   const totalWins = completedRows.filter((r) => r.playerPosition === 1).length;
-  const allMatchWins = rows.reduce((sum, r) => sum + r.matchWins, 0);
-  const allTotalMatches = rows.reduce((sum, r) => sum + r.totalMatches, 0);
+  const allMatchWins = gameRows.reduce((sum, r) => sum + r.matchWins, 0);
+  const allTotalMatches = gameRows.reduce((sum, r) => sum + r.totalMatches, 0);
   const winRate = allTotalMatches > 0 ? parseFloat(((allMatchWins / allTotalMatches) * 100).toFixed(1)) : null;
+
+  const hasDecks = getGame(gameId).deck !== "none";
 
   const favDeck = useMemo(() => {
     const counts = new Map<string, { count: number; p1: number | null; p2: number | null }>();
-    for (const row of rows) {
+    for (const row of gameRows) {
       if (row.deckPokemon1 == null && row.deckPokemon2 == null) continue;
       const key = `${row.deckPokemon1 ?? ""}_${row.deckPokemon2 ?? ""}`;
       const entry = counts.get(key);
@@ -483,7 +526,7 @@ const PlayerDashboard: React.FC = () => {
       else counts.set(key, { count: 1, p1: row.deckPokemon1, p2: row.deckPokemon2 });
     }
     return [...counts.values()].sort((a, b) => b.count - a.count)[0] ?? null;
-  }, [rows]);
+  }, [gameRows]);
 
   return (
     <Box>
@@ -638,6 +681,7 @@ const PlayerDashboard: React.FC = () => {
           View full stats
         </Button>
       </Box>
+      <StatsGameFilter gameIds={gameIds} value={gameId} onChange={setGameId} />
       <Grid container spacing={2}>
         {([
           {
@@ -675,6 +719,7 @@ const PlayerDashboard: React.FC = () => {
             </Card>
           </Grid>
         ))}
+        {hasDecks && (
         <Grid item xs={6} sm={3}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent sx={{ pb: "16px !important" }}>
@@ -699,6 +744,7 @@ const PlayerDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
+        )}
       </Grid>
     </Box>
   );

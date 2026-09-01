@@ -4,7 +4,6 @@ import {
   Card,
   CardContent,
   Chip,
-  CircularProgress,
   Divider,
   Grid,
   Skeleton,
@@ -19,7 +18,7 @@ import WhatshotIcon from "@mui/icons-material/Whatshot";
 import { Link } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
-import { getPokemonList, getSpriteUrl, getArtworkUrl, type PokemonEntry } from "../utils/pokemonCache";
+import { getPokemonList, getSpriteUrl, getArtworkUrl } from "../utils/pokemonCache";
 import StatsPeriodFilter from "../components/StatsPeriodFilter";
 import StatsGameFilter from "../components/StatsGameFilter";
 import { getGame } from "../games/registry";

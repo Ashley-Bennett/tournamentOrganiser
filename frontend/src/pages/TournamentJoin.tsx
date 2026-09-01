@@ -154,6 +154,10 @@ export default function TournamentJoin() {
 
       setPageState("open");
     })();
+    // profile is read only to prefill the name box. Adding it to the deps would
+    // re-run this whole effect — RPCs, cached-entry check and the redirect it
+    // can trigger — the moment the profile resolves, so it is left out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournamentId, navigate]);
 
   const handleSubmit = async (confirmedDistinct = false) => {
