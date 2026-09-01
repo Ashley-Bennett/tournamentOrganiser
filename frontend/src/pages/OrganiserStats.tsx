@@ -26,6 +26,8 @@ import DeckDiversitySection from "../components/DeckDiversitySection";
 import EventHealthSection from "../components/EventHealthSection";
 import StatsTable, { type StatsColumn } from "../components/StatsTable";
 import StatsSection from "../components/StatsSection";
+import MergeSuggestions from "../components/MergeSuggestions";
+import PlayerIdentityDialog, { type IdentityOption } from "../components/PlayerIdentityDialog";
 import { getPokemonList } from "../utils/pokemonCache";
 import { getGame } from "../games/registry";
 import { ALL_TIME, periodArgs, periodLabel, type StatsPeriod } from "../utils/statsPeriod";
@@ -119,7 +121,7 @@ function StatCard({
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 const OrganiserStats: React.FC = () => {
-  const { workspace, wPath } = useWorkspace();
+  const { workspace, wPath, currentRole } = useWorkspace();
   const workspaceId = workspace?.id ?? null;
 
   const [gameIds, setGameIds] = useState<string[]>([]);
@@ -136,6 +138,12 @@ const OrganiserStats: React.FC = () => {
   const [timeline, setTimeline] = useState<TimelineRow[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(true);
   const [playerSearch, setPlayerSearch] = useState("");
+  const [openIdentity, setOpenIdentity] = useState<IdentityOption | null>(null);
+  // Bumped after a merge or split so every section refetches: correcting an
+  // identity changes attendance, the league and the meta share at once.
+  const [identityVersion, setIdentityVersion] = useState(0);
+
+  const canEditIdentities = currentRole === "owner" || currentRole === "admin";
 
   const visibleAttendance = useMemo(() => {
     const q = playerSearch.trim().toLowerCase();
@@ -289,7 +297,7 @@ const OrganiserStats: React.FC = () => {
         setAttendance((data ?? []) as AttendanceRow[]);
         setAttendanceLoading(false);
       });
-  }, [workspaceId, period, gameId]);
+  }, [workspaceId, period, gameId, identityVersion]);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -534,7 +542,7 @@ const OrganiserStats: React.FC = () => {
         id="regulars"
         title="Regulars"
         summary={attendance.length > 0 ? `${attendance.length} players` : undefined}
-        hint="Sorted by events attended. Players without an account are matched on name, so a typo can split one person into two rows."
+        hint="Sorted by events attended. Players without an account are matched on name, so a typo can split one person into two rows — click anyone to review the entries behind them and correct it."
       >
         <Box mb={1.5}>
           <TextField
@@ -552,10 +560,23 @@ const OrganiserStats: React.FC = () => {
             sx={{ minWidth: 220 }}
           />
         </Box>
+        <MergeSuggestions
+          workspaceId={workspaceId}
+          canEdit={canEditIdentities}
+          refreshKey={identityVersion}
+          onChanged={() => setIdentityVersion((v) => v + 1)}
+        />
         <StatsTable
           rows={visibleAttendance}
           columns={attendanceColumns}
           getRowKey={(r) => r.identity_key}
+          onRowClick={(r) =>
+            setOpenIdentity({
+              identity_key: r.identity_key,
+              display_name: r.display_name,
+              events_played: r.events_played,
+            })
+          }
           initialSort={{ key: "events", dir: "desc" }}
           loading={attendanceLoading}
           csvFilename={`matchamp-regulars-${new Date().toISOString().slice(0, 10)}`}
@@ -579,6 +600,19 @@ const OrganiserStats: React.FC = () => {
           periodArgsValue={periodArgs(period)}
         />
       </StatsSection>
+
+      <PlayerIdentityDialog
+        workspaceId={workspaceId}
+        identity={openIdentity}
+        allIdentities={attendance.map((r) => ({
+          identity_key: r.identity_key,
+          display_name: r.display_name,
+          events_played: r.events_played,
+        }))}
+        canEdit={canEditIdentities}
+        onClose={() => setOpenIdentity(null)}
+        onChanged={() => setIdentityVersion((v) => v + 1)}
+      />
 
       <Box pb={4} />
     </Box>
