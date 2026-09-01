@@ -13,7 +13,17 @@ export interface TournamentPlayer {
   late_entry_round: number | null;
   deck_pokemon1: number | null;
   deck_pokemon2: number | null;
+  /** Set when a player told the join page this entry is theirs and asked to be linked. */
+  link_requested_at?: string | null;
 }
+
+/**
+ * Every column the organiser screens need from tournament_players. Kept in one
+ * place so a refresh after an edit cannot quietly return a narrower row and
+ * blank out fields the UI is already showing.
+ */
+export const TOURNAMENT_PLAYER_COLUMNS =
+  "id, name, user_id, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round, deck_pokemon1, deck_pokemon2, link_requested_at";
 
 export interface Match {
   id: string;

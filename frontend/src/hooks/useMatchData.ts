@@ -2,7 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../supabaseClient";
-import { type TournamentPlayer, type MatchWithPlayers } from "../types/match";
+import {
+  type TournamentPlayer,
+  type MatchWithPlayers,
+  TOURNAMENT_PLAYER_COLUMNS,
+} from "../types/match";
 import type { PairingDecisionLog } from "../utils/tournamentPairing";
 
 interface UseMatchDataParams {
@@ -94,7 +98,7 @@ export function useMatchData({
         const { data: allPlayersData, error: allPlayersError } = await supabase
           .from("tournament_players")
           .select(
-            "id, name, user_id, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round, deck_pokemon1, deck_pokemon2",
+            TOURNAMENT_PLAYER_COLUMNS,
           )
           .eq("tournament_id", tournamentId)
           .order("name");
@@ -190,7 +194,7 @@ export function useMatchData({
     const { data: freshPlayers } = await supabase
       .from("tournament_players")
       .select(
-        "id, name, user_id, dropped, dropped_at_round, has_static_seating, static_seat_number, is_late_entry, late_entry_round, deck_pokemon1, deck_pokemon2",
+        TOURNAMENT_PLAYER_COLUMNS,
       )
       .eq("tournament_id", tournamentId)
       .order("name");

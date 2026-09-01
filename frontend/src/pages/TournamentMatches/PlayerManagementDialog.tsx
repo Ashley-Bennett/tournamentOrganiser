@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -28,8 +29,18 @@ interface Props {
   finalStandingsById: Map<string, PlayerStanding>;
   togglingDrop: string | null;
   savingSeat: string | null;
+  /** Round currently being viewed, or null on the standings tab. */
+  currentRound: number | null;
+  /** Players who have a match in `currentRound`. */
+  playersInRound: Set<string>;
+  /** Players with a finished match against a real opponent. Their entry can no longer be deleted. */
+  playersWithResults: Set<string>;
+  busyPlayerId: string | null;
   onClose: () => void;
   onToggleDrop: (playerId: string, currentlyDropped: boolean) => void;
+  onRemoveFromRound: (playerId: string, round: number) => void;
+  onDeleteEntry: (playerId: string) => void;
+  onClearLinkRequest: (playerId: string) => void;
   onUpdateStaticSeat: (
     playerId: string,
     hasStaticSeating: boolean,
@@ -43,12 +54,24 @@ export default function PlayerManagementDialog({
   finalStandingsById,
   togglingDrop,
   savingSeat,
+  currentRound,
+  playersInRound,
+  playersWithResults,
+  busyPlayerId,
   onClose,
   onToggleDrop,
+  onRemoveFromRound,
+  onDeleteEntry,
+  onClearLinkRequest,
   onUpdateStaticSeat,
 }: Props) {
   const [seatInputs, setSeatInputs] = useState<Map<string, string>>(new Map());
   const [pendingDropId, setPendingDropId] = useState<string | null>(null);
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const nameOf = (id: string | null) =>
+    players.find((p) => p.id === id)?.name ?? "this player";
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -56,11 +79,17 @@ export default function PlayerManagementDialog({
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Dropped players keep their record but are excluded from future
-          pairings. Static seating keeps a player at a fixed table each round.
+          pairings. Taking someone out of a round leaves them in the tournament
+          and gives their opponent a bye. Static seating keeps a player at a
+          fixed table each round.
         </Typography>
         {players.map((player, idx) => {
           const standing = finalStandingsById.get(player.id);
           const isSaving = savingSeat === player.id;
+          const isBusy = busyPlayerId === player.id;
+          const canRemoveFromRound =
+            currentRound !== null && playersInRound.has(player.id);
+          const canDeleteEntry = !playersWithResults.has(player.id);
           return (
             <Box
               key={player.id}
@@ -74,7 +103,7 @@ export default function PlayerManagementDialog({
               {/* Top row: name + record + drop button */}
               <Box display="flex" alignItems="center" justifyContent="space-between">
                 <Box>
-                  <Box display="flex" alignItems="center" gap={1}>
+                  <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
                     <Typography variant="body1">{player.name}</Typography>
                     {player.is_late_entry && (
                       <Chip
@@ -82,6 +111,16 @@ export default function PlayerManagementDialog({
                         size="small"
                         color="info"
                         variant="outlined"
+                      />
+                    )}
+                    {player.link_requested_at && (
+                      <Chip
+                        label="Wants to link"
+                        size="small"
+                        color="warning"
+                        variant="outlined"
+                        onDelete={() => onClearLinkRequest(player.id)}
+                        disabled={isBusy}
                       />
                     )}
                   </Box>
@@ -100,14 +139,20 @@ export default function PlayerManagementDialog({
                       ? onToggleDrop(player.id, true)
                       : setPendingDropId(player.id)
                   }
-                  disabled={!!togglingDrop}
+                  disabled={!!togglingDrop || isBusy}
                   sx={{ ml: 2, minWidth: 80 }}
                 >
                   {togglingDrop === player.id ? "…" : player.dropped ? "Restore" : "Drop"}
                 </Button>
               </Box>
+              {player.link_requested_at && (
+                <Typography variant="caption" color="warning.main" display="block" mt={0.5}>
+                  Someone tried to sign up as this player. Send them a claim link
+                  from the tournament page, or dismiss the flag.
+                </Typography>
+              )}
               {/* Bottom row: static seating toggle + table number input */}
-              <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+              <Box display="flex" alignItems="center" gap={1} mt={0.5} flexWrap="wrap">
                 <FormControlLabel
                   control={
                     <Switch
@@ -163,6 +208,27 @@ export default function PlayerManagementDialog({
                     Saving…
                   </Typography>
                 )}
+                <Box flexGrow={1} />
+                {canRemoveFromRound && (
+                  <Button
+                    size="small"
+                    color="warning"
+                    disabled={isBusy}
+                    onClick={() => setPendingRemoveId(player.id)}
+                  >
+                    Take out of Round {currentRound}
+                  </Button>
+                )}
+                {canDeleteEntry && (
+                  <Button
+                    size="small"
+                    color="error"
+                    disabled={isBusy}
+                    onClick={() => setPendingDeleteId(player.id)}
+                  >
+                    Delete entry
+                  </Button>
+                )}
               </Box>
             </Box>
           );
@@ -197,6 +263,59 @@ export default function PlayerManagementDialog({
             }}
           >
             Drop Player
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={pendingRemoveId !== null} onClose={() => setPendingRemoveId(null)}>
+        <DialogTitle>Take out of Round {currentRound}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {`"${nameOf(pendingRemoveId)}" will not play in Round ${currentRound}. Their opponent gets a bye for the round, and this player stays in the tournament and will be paired again next round.`}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingRemoveId(null)}>Cancel</Button>
+          <Button
+            color="warning"
+            variant="contained"
+            onClick={() => {
+              if (pendingRemoveId !== null && currentRound !== null) {
+                onRemoveFromRound(pendingRemoveId, currentRound);
+                setPendingRemoveId(null);
+              }
+            }}
+          >
+            Take out of round
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={pendingDeleteId !== null} onClose={() => setPendingDeleteId(null)}>
+        <DialogTitle>Delete this entry?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {`"${nameOf(pendingDeleteId)}" will be removed from the tournament completely, along with any pairing they are in. Any opponent gets a bye for that round.`}
+          </DialogContentText>
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Use this for an entry that should never have existed, like the same
+            person signed up twice. To take someone out who has been playing,
+            drop them instead so their results are kept.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingDeleteId(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              if (pendingDeleteId !== null) {
+                onDeleteEntry(pendingDeleteId);
+                setPendingDeleteId(null);
+              }
+            }}
+          >
+            Delete entry
           </Button>
         </DialogActions>
       </Dialog>

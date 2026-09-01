@@ -20,6 +20,8 @@ import { Link } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
 import { getPokemonList, getSpriteUrl, getArtworkUrl, type PokemonEntry } from "../utils/pokemonCache";
+import StatsPeriodFilter from "../components/StatsPeriodFilter";
+import { ALL_TIME, periodArgs, periodLabel, type StatsPeriod } from "../utils/season";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -76,6 +78,12 @@ interface TrendRow {
   period_start: string;
   wins: number;
   total: number;
+}
+
+interface SeasonRow {
+  season_start_year: number;
+  tournaments: number;
+  matches: number;
 }
 
 interface FirstSecondStats {
@@ -293,7 +301,7 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
 
 // ── Deck stats section ─────────────────────────────────────────────────────────
 
-function DeckStatsSection({ data, loading, nameMap }: { data: DeckStat[]; loading: boolean; nameMap: Map<number, string> }) {
+function DeckStatsSection({ data, loading, nameMap, period }: { data: DeckStat[]; loading: boolean; nameMap: Map<number, string>; period: StatsPeriod }) {
   const deckCount = data.length;
   const loyaltyLabel = deckCount === 0 ? null : deckCount === 1 ? "Specialist" : deckCount >= 5 ? "Meta Chaser" : "Flexible";
 
@@ -301,7 +309,9 @@ function DeckStatsSection({ data, loading, nameMap }: { data: DeckStat[]; loadin
     <>
       <Box display="flex" alignItems="center" gap={1} mb={2}>
         {loyaltyLabel && <Chip label={loyaltyLabel} size="small" color={loyaltyLabel === "Specialist" ? "secondary" : loyaltyLabel === "Meta Chaser" ? "warning" : "default"} />}
-        <Typography variant="body2" color="text.secondary">{deckCount} deck{deckCount !== 1 ? "s" : ""} registered across all tournaments</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {deckCount} deck{deckCount !== 1 ? "s" : ""} registered {period.seasonStartYear == null ? "across all tournaments" : `in ${periodLabel(period)}`}
+        </Typography>
       </Box>
       {loading ? (
         <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 1 }} />
@@ -355,9 +365,11 @@ function DeckStatsSection({ data, loading, nameMap }: { data: DeckStat[]; loadin
 function FirstSecondSection({
   decks,
   nameMap,
+  period,
 }: {
   decks: DeckStat[];
   nameMap: Map<number, string>;
+  period: StatsPeriod;
 }) {
   const [selectedDeck, setSelectedDeck] = useState<DeckStat | null>(null);
   const [data, setData] = useState<FirstSecondStats | null>(null);
@@ -369,12 +381,13 @@ function FirstSecondSection({
       .rpc("get_player_first_second_stats", {
         p_deck_pokemon1: selectedDeck?.deck_pokemon1 ?? null,
         p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? null,
+        ...periodArgs(period),
       })
       .then(({ data: rows }) => {
-        if (rows && rows.length > 0) setData(rows[0] as FirstSecondStats);
+        setData(rows && rows.length > 0 ? (rows[0] as FirstSecondStats) : null);
         setLoading(false);
       });
-  }, [selectedDeck]);
+  }, [selectedDeck, period]);
 
   const firstRate = data ? pct(data.went_first_wins, data.went_first_total) : "—";
   const secondRate = data ? pct(data.went_second_wins, data.went_second_total) : "—";
@@ -433,9 +446,11 @@ function FirstSecondSection({
 function MatchupMatrixSection({
   decks,
   nameMap,
+  period,
 }: {
   decks: DeckStat[];
   nameMap: Map<number, string>;
+  period: StatsPeriod;
 }) {
   const [selectedDeck, setSelectedDeck] = useState<DeckStat | null>(null);
   const [data, setData] = useState<MatchupRow[]>([]);
@@ -447,12 +462,13 @@ function MatchupMatrixSection({
       .rpc("get_player_matchup_matrix", {
         p_deck_pokemon1: selectedDeck?.deck_pokemon1 ?? null,
         p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? null,
+        ...periodArgs(period),
       })
       .then(({ data: rows }) => {
         setData((rows ?? []) as MatchupRow[]);
         setLoading(false);
       });
-  }, [selectedDeck]);
+  }, [selectedDeck, period]);
 
   return (
     <>
@@ -621,6 +637,8 @@ const PlayerStats: React.FC = () => {
   const { user } = useAuth();
 
   const [nameMap, setNameMap] = useState<Map<number, string>>(new Map());
+  const [seasons, setSeasons] = useState<number[]>([]);
+  const [period, setPeriod] = useState<StatsPeriod>(ALL_TIME);
   const [overview, setOverview] = useState<OverviewStats | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [decks, setDecks] = useState<DeckStat[]>([]);
@@ -638,29 +656,44 @@ const PlayerStats: React.FC = () => {
     });
   }, []);
 
+  // Seasons the player has results in — drives the picker, so it is fetched
+  // once rather than per period.
   useEffect(() => {
     if (!user) return;
+    void supabase.rpc("get_player_stats_seasons").then(({ data }) => {
+      setSeasons(((data ?? []) as SeasonRow[]).map((r) => r.season_start_year));
+    });
+  }, [user]);
 
-    void supabase.rpc("get_player_overview_stats").then(({ data }) => {
-      if (data && data.length > 0) setOverview(data[0] as OverviewStats);
+  useEffect(() => {
+    if (!user) return;
+    const args = periodArgs(period);
+
+    setOverviewLoading(true);
+    setDecksLoading(true);
+    setRoundsLoading(true);
+    setTrendLoading(true);
+
+    void supabase.rpc("get_player_overview_stats", args).then(({ data }) => {
+      setOverview(data && data.length > 0 ? (data[0] as OverviewStats) : null);
       setOverviewLoading(false);
     });
 
-    void supabase.rpc("get_player_deck_stats").then(({ data }) => {
+    void supabase.rpc("get_player_deck_stats", args).then(({ data }) => {
       setDecks((data ?? []) as DeckStat[]);
       setDecksLoading(false);
     });
 
-    void supabase.rpc("get_player_round_performance").then(({ data }) => {
+    void supabase.rpc("get_player_round_performance", args).then(({ data }) => {
       setRounds((data ?? []) as RoundRow[]);
       setRoundsLoading(false);
     });
 
-    void supabase.rpc("get_player_trend").then(({ data }) => {
+    void supabase.rpc("get_player_trend", args).then(({ data }) => {
       setTrend((data ?? []) as TrendRow[]);
       setTrendLoading(false);
     });
-  }, [user]);
+  }, [user, period]);
 
   if (!user) {
     return (
@@ -679,22 +712,26 @@ const PlayerStats: React.FC = () => {
         </Button>
         <ShowChartIcon color="primary" />
         <Typography variant="h5" fontWeight={700}>Your Stats</Typography>
+        <Typography variant="body2" color="text.secondary">{periodLabel(period)}</Typography>
       </Box>
+
+      {/* Season / quarter picker */}
+      <StatsPeriodFilter seasons={seasons} value={period} onChange={setPeriod} />
 
       {/* Overview */}
       <OverviewSection data={overview} loading={overviewLoading} />
 
       {/* Deck stats */}
       <SectionHeader>Deck History</SectionHeader>
-      <DeckStatsSection data={decks} loading={decksLoading} nameMap={nameMap} />
+      <DeckStatsSection data={decks} loading={decksLoading} nameMap={nameMap} period={period} />
 
       {/* First / Second */}
       <SectionHeader>Going First vs Second</SectionHeader>
-      <FirstSecondSection decks={decks} nameMap={nameMap} />
+      <FirstSecondSection decks={decks} nameMap={nameMap} period={period} />
 
       {/* Matchup matrix */}
       <SectionHeader>Matchup Matrix</SectionHeader>
-      <MatchupMatrixSection decks={decks} nameMap={nameMap} />
+      <MatchupMatrixSection decks={decks} nameMap={nameMap} period={period} />
 
       {/* Round performance */}
       <SectionHeader>Round-by-Round Performance</SectionHeader>

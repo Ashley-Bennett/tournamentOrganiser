@@ -49,7 +49,14 @@ export default function TournamentJoin() {
   const [description, setDescription] = useState<string | null>(null);
   // Set when joining an already-running tournament as a late entry.
   const [lateJoin, setLateJoin] = useState<{ round: number; inProgress: boolean } | null>(null);
+  // Name of an entry the organiser added by hand that looks like the same
+  // person. Set by the server instead of creating a second entry.
+  const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
+  const [linkRequested, setLinkRequested] = useState(false);
 
+  // A hint only. The server decides: an organiser-added entry with this name
+  // becomes a question rather than a refusal, so blocking here would stop the
+  // question ever being asked.
   const nameTaken = useMemo(
     () => registeredNames.some((n) => n.toLowerCase() === nameInput.trim().toLowerCase()),
     [registeredNames, nameInput],
@@ -140,8 +147,8 @@ export default function TournamentJoin() {
     })();
   }, [tournamentId, navigate]);
 
-  const handleSubmit = async () => {
-    if (!tournamentId || !nameInput.trim() || nameTaken || deckPokemon1 == null) return;
+  const handleSubmit = async (confirmedDistinct = false) => {
+    if (!tournamentId || !nameInput.trim() || deckPokemon1 == null) return;
     setSubmitting(true);
     setError(null);
 
@@ -153,6 +160,7 @@ export default function TournamentJoin() {
       p_device_id: deviceProfile.deviceId,
       p_pokemon1: deckPokemon1,
       p_pokemon2: deckPokemon2,
+      p_confirmed_distinct: confirmedDistinct,
     });
 
     if (rpcError) {
@@ -161,18 +169,45 @@ export default function TournamentJoin() {
       return;
     }
 
-    const row = Array.isArray(data) ? data[0] : data;
+    const row = (Array.isArray(data) ? data[0] : data) as {
+      player_id: string | null;
+      device_token: string | null;
+      tournament_name: string;
+      duplicate_of: string | null;
+    };
+
+    // The organiser looks to have signed this person up already. Nothing was
+    // created; ask before making a second entry.
+    if (row?.duplicate_of) {
+      setDuplicateOf(row.duplicate_of);
+      setSubmitting(false);
+      return;
+    }
+
     const entry: TjEntry = {
-      playerId: (row as { player_id: string; device_token: string; tournament_name: string }).player_id,
-      deviceToken: (row as { player_id: string; device_token: string; tournament_name: string }).device_token,
+      playerId: row.player_id as string,
+      deviceToken: row.device_token as string,
       joinedAt: new Date().toISOString(),
-      tournamentName: (row as { player_id: string; device_token: string; tournament_name: string }).tournament_name,
+      tournamentName: row.tournament_name,
     };
 
     saveEntry(tournamentId, entry);
     saveProfile(nameInput.trim(), (deviceProfile as TjProfile).deviceId);
 
     navigate(`/t/${tournamentId}/me`, { replace: true });
+  };
+
+  // "Yes, the organiser signed me up." Flags the existing entry for the
+  // organiser rather than handing this device access to it.
+  const handleConfirmAlreadyRegistered = async () => {
+    if (!tournamentId || !duplicateOf) return;
+    setSubmitting(true);
+    await supabase.rpc("request_player_entry_link", {
+      p_tournament_id: tournamentId,
+      p_entry_name: duplicateOf,
+    });
+    setLinkRequested(true);
+    setSubmitting(false);
   };
 
   if (pageState === "loading") {
@@ -210,7 +245,58 @@ export default function TournamentJoin() {
           </>
         )}
 
-        {pageState === "open" && (
+        {pageState === "open" && linkRequested && (
+          <>
+            <Typography variant="h6" gutterBottom>
+              You are already signed up
+            </Typography>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              The organiser has you registered as <strong>{duplicateOf}</strong>,
+              so there is nothing else to do. You have not been added twice.
+            </Typography>
+            <Alert severity="info">
+              We have let the organiser know you want this entry on your phone.
+              Ask them for your link when you next see them.
+            </Alert>
+          </>
+        )}
+
+        {pageState === "open" && duplicateOf && !linkRequested && (
+          <>
+            <Typography variant="h6" gutterBottom>
+              Has the organiser already signed you up?
+            </Typography>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              There is already a player called <strong>{duplicateOf}</strong> in
+              this tournament, added by the organiser. If that is you, joining
+              again would put you in twice.
+            </Typography>
+            <Button
+              variant="contained"
+              fullWidth
+              size="large"
+              disabled={submitting}
+              onClick={() => void handleConfirmAlreadyRegistered()}
+              sx={{ mb: 1.5 }}
+            >
+              {submitting ? <CircularProgress size={22} /> : `Yes, I am ${duplicateOf}`}
+            </Button>
+            <Button
+              variant="outlined"
+              fullWidth
+              size="large"
+              disabled={submitting}
+              onClick={() => {
+                setDuplicateOf(null);
+                void handleSubmit(true);
+              }}
+            >
+              No, that is someone else
+            </Button>
+          </>
+        )}
+
+        {pageState === "open" && !duplicateOf && !linkRequested && (
           <>
             <Typography variant="h5" gutterBottom fontWeight={600}>
               {tournamentName}
@@ -264,8 +350,11 @@ export default function TournamentJoin() {
               inputProps={{ maxLength: 50 }}
               onChange={(e) => setNameInput(e.target.value)}
               disabled={submitting}
-              error={nameTaken}
-              helperText={nameTaken ? "That name is already taken. Pick a different one." : " "}
+              helperText={
+                nameTaken
+                  ? "Someone with this name is already registered. Carry on and we will check whether that is you."
+                  : " "
+              }
               sx={{ mb: 1 }}
             />
 
@@ -303,7 +392,7 @@ export default function TournamentJoin() {
               fullWidth
               size="large"
               onClick={() => void handleSubmit()}
-              disabled={submitting || !nameInput.trim() || nameTaken || deckPokemon1 == null}
+              disabled={submitting || !nameInput.trim() || deckPokemon1 == null}
             >
               {submitting ? (
                 <CircularProgress size={22} />

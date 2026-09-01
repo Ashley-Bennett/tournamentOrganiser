@@ -14,12 +14,22 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
 interface Payload {
-  type: "pairing_up" | "time_up" | "standings_ready" | "late_join" | "bye_paired";
+  type:
+    | "pairing_up"
+    | "time_up"
+    | "standings_ready"
+    | "late_join"
+    | "bye_paired"
+    | "opponent_removed"
+    | "link_request";
   tournament_id: string;
   round?: number;
-  /** late_join / bye_paired: who just added themselves. */
+  /** late_join / bye_paired: who just added themselves.
+   *  opponent_removed: who was taken out of the round.
+   *  link_request: the entry a player says is theirs. */
   player_name?: string;
-  /** bye_paired only: the player whose bye was taken by the late entry. */
+  /** bye_paired: the player whose bye was taken by the late entry.
+   *  opponent_removed: the player left without an opponent. */
   player_id?: string;
 }
 
@@ -157,6 +167,20 @@ Deno.serve(async (req) => {
       if (player_id && row.tournament_player_id === player_id) {
         title = `Round ${round}: you have a match after all`;
         body = `${player_name ?? "A player"} joined late, so your bye is gone — tap to see your pairing.`;
+      }
+    } else if (type === "opponent_removed") {
+      // The mirror of bye_paired: their opponent was taken out of the round, so
+      // the game they were about to play is now a bye.
+      if (player_id && row.tournament_player_id === player_id) {
+        title = `Round ${round}: you have a bye`;
+        body = `${player_name ?? "Your opponent"} is out of this round, so you get the win.`;
+      }
+    } else if (type === "link_request") {
+      // Organisers only — someone tried to sign themselves up as a player the
+      // organiser had already added by hand.
+      if (row.is_organiser) {
+        title = `${player_name ?? "A player"} is already registered`;
+        body = "They tried to sign up again and need their entry linked.";
       }
     } else if (type === "late_join") {
       // Organisers only — a self-added player has just changed this round's

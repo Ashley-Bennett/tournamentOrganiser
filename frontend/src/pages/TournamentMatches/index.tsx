@@ -37,6 +37,8 @@ import {
   type TournamentPlayer,
   type Match,
   type MatchWithPlayers,
+  MATCH_STATUS,
+  TOURNAMENT_PLAYER_COLUMNS,
 } from "../../types/match";
 import StandingsTable from "../../components/StandingsTable";
 import ErrorBoundary from "../../components/ErrorBoundary";
@@ -80,6 +82,9 @@ const TournamentMatches: React.FC = () => {
   const [dropDialogOpen, setDropDialogOpen] = useState(false);
   const [togglingDrop, setTogglingDrop] = useState<string | null>(null);
   const [savingSeat, setSavingSeat] = useState<string | null>(null);
+  // Whichever player-management action is mid-flight (remove from round,
+  // delete entry, dismiss a link request).
+  const [busyPlayerId, setBusyPlayerId] = useState<string | null>(null);
   const [hoveredRound, setHoveredRound] = useState<number | null>(null);
   const [deleteRoundConfirmRound, setDeleteRoundConfirmRound] = useState<
     number | null
@@ -308,6 +313,30 @@ const TournamentMatches: React.FC = () => {
     }
     return map;
   }, [players]);
+
+  // Who is actually paired in the round on screen, and who has a real result
+  // that must not be erased. Together these decide which player-management
+  // actions are offered.
+  const playersInSelectedRound = useMemo(() => {
+    const ids = new Set<string>();
+    if (typeof selectedRound !== "number") return ids;
+    for (const m of matches) {
+      if (m.round_number !== selectedRound) continue;
+      ids.add(m.player1_id);
+      if (m.player2_id) ids.add(m.player2_id);
+    }
+    return ids;
+  }, [matches, selectedRound]);
+
+  const playersWithResults = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of matches) {
+      if (m.status !== MATCH_STATUS.COMPLETED || !m.player2_id) continue;
+      ids.add(m.player1_id);
+      ids.add(m.player2_id);
+    }
+    return ids;
+  }, [matches]);
 
   const deckPlayersMap = useMemo(() => {
     const map = new Map<string, [number | null, number | null]>();
@@ -720,7 +749,7 @@ const TournamentMatches: React.FC = () => {
       const { data: fresh } = await supabase
         .from("tournament_players")
         .select(
-          "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, deck_pokemon1, deck_pokemon2",
+          TOURNAMENT_PLAYER_COLUMNS,
         )
         .eq("tournament_id", tournament.id)
         .order("name");
@@ -729,6 +758,73 @@ const TournamentMatches: React.FC = () => {
       setError(e instanceof Error ? e.message : "Failed to update drop status");
     } finally {
       setTogglingDrop(null);
+    }
+  };
+
+  const refreshPlayers = async () => {
+    if (!tournament) return;
+    const { data: fresh } = await supabase
+      .from("tournament_players")
+      .select(TOURNAMENT_PLAYER_COLUMNS)
+      .eq("tournament_id", tournament.id)
+      .order("name");
+    setPlayers((fresh as TournamentPlayer[]) ?? []);
+  };
+
+  // Pull a player out of one round without dropping them. Their opponent takes
+  // the bye; the player is paired again as normal next round.
+  const handleRemoveFromRound = async (playerId: string, round: number) => {
+    if (!tournament) return;
+    setBusyPlayerId(playerId);
+    setError(null);
+    try {
+      const { error } = await supabase.rpc("remove_player_from_round", {
+        p_player_id: playerId,
+        p_round: round,
+      });
+      if (error) throw new Error(error.message);
+      await refreshMatches();
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : "Failed to take the player out of the round",
+      );
+    } finally {
+      setBusyPlayerId(null);
+    }
+  };
+
+  // For an entry that should never have existed, such as the same person
+  // signed up twice. Blocked server-side once they have played a real match.
+  const handleDeleteEntry = async (playerId: string) => {
+    if (!tournament) return;
+    setBusyPlayerId(playerId);
+    setError(null);
+    try {
+      const { error } = await supabase.rpc("delete_tournament_entry", {
+        p_player_id: playerId,
+      });
+      if (error) throw new Error(error.message);
+      // refreshMatches reloads the player list too.
+      await refreshMatches();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to delete the entry");
+    } finally {
+      setBusyPlayerId(null);
+    }
+  };
+
+  const handleClearLinkRequest = async (playerId: string) => {
+    setBusyPlayerId(playerId);
+    try {
+      const { error } = await supabase.rpc("clear_player_link_request", {
+        p_player_id: playerId,
+      });
+      if (error) throw new Error(error.message);
+      await refreshPlayers();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to clear the link request");
+    } finally {
+      setBusyPlayerId(null);
     }
   };
 
@@ -752,7 +848,7 @@ const TournamentMatches: React.FC = () => {
       const { data: fresh } = await supabase
         .from("tournament_players")
         .select(
-          "id, name, dropped, dropped_at_round, has_static_seating, static_seat_number, deck_pokemon1, deck_pokemon2",
+          TOURNAMENT_PLAYER_COLUMNS,
         )
         .eq("tournament_id", tournament.id)
         .order("name");
@@ -1435,8 +1531,15 @@ const TournamentMatches: React.FC = () => {
         finalStandingsById={finalStandingsById}
         togglingDrop={togglingDrop}
         savingSeat={savingSeat}
+        currentRound={typeof selectedRound === "number" ? selectedRound : null}
+        playersInRound={playersInSelectedRound}
+        playersWithResults={playersWithResults}
+        busyPlayerId={busyPlayerId}
         onClose={() => setDropDialogOpen(false)}
         onToggleDrop={handleToggleDrop}
+        onRemoveFromRound={handleRemoveFromRound}
+        onDeleteEntry={handleDeleteEntry}
+        onClearLinkRequest={handleClearLinkRequest}
         onUpdateStaticSeat={handleUpdateStaticSeat}
       />
 
