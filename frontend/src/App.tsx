@@ -27,6 +27,7 @@ import DeviceTournaments from "./pages/DeviceTournaments";
 import JoinLanding from "./pages/JoinLanding";
 import WhatsNew from "./pages/WhatsNew";
 import PlayerStats from "./pages/PlayerStats";
+import OrganiserStats from "./pages/OrganiserStats";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import PlayerNotifications from "./components/PlayerNotifications";
@@ -271,6 +272,14 @@ function App() {
                   element={
                     <RequireAuth>
                       <Dashboard />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/w/:workspaceSlug/stats"
+                  element={
+                    <RequireAuth>
+                      <OrganiserStats />
                     </RequireAuth>
                   }
                 />
