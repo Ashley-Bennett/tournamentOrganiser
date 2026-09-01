@@ -36,6 +36,30 @@ interface UseRoundLifecycleParams {
   setTimerEditorOpen: Dispatch<SetStateAction<boolean>>;
 }
 
+/**
+ * Record a round lifecycle event for the stats history.
+ *
+ * Deliberately swallows its errors. This writes `tournament_rounds`, which
+ * exists only to feed timing stats — if it fails, the organiser must still be
+ * able to start, pause and advance rounds. The live countdown is driven by the
+ * columns on `tournaments`, which are written separately.
+ */
+async function recordRoundEvent(
+  fn: "begin_tournament_round" | "pause_tournament_round" | "resume_tournament_round" | "end_tournament_round",
+  tournamentId: string,
+  roundNumber: number | "standings",
+): Promise<void> {
+  if (typeof roundNumber !== "number") return;
+  try {
+    await supabase.rpc(fn, {
+      p_tournament_id: tournamentId,
+      p_round_number: roundNumber,
+    });
+  } catch {
+    // Timing history is best-effort; never surface this to the organiser.
+  }
+}
+
 export function useRoundLifecycle({
   tournament,
   setTournament,
@@ -86,6 +110,10 @@ export function useRoundLifecycle({
           });
         }
       }
+
+      // Recorded regardless of whether a countdown is configured: an untimed
+      // event still has a round that started, and game lengths are worth having.
+      await recordRoundEvent("begin_tournament_round", tournament.id, selectedRound);
 
       // Auto-complete any bye matches (player2_id is null) that are still "ready".
       // Byes are created as "ready" so the organiser can edit pairings; we finalise
@@ -146,6 +174,7 @@ export function useRoundLifecycle({
       })
       .eq("id", tournament.id);
     if (!error) {
+      await recordRoundEvent("pause_tournament_round", tournament.id, selectedRound);
       setTournament({
         ...tournament,
         current_round_started_at: null,
@@ -164,6 +193,7 @@ export function useRoundLifecycle({
       .update({ current_round_started_at: resumedAt, round_is_paused: false })
       .eq("id", tournament.id);
     if (!error) {
+      await recordRoundEvent("resume_tournament_round", tournament.id, selectedRound);
       setTournament({
         ...tournament,
         current_round_started_at: resumedAt,
@@ -272,6 +302,9 @@ export function useRoundLifecycle({
       setError(null);
 
       await savePendingResults();
+
+      // The final round never gets an "advance" to close it, so close it here.
+      await recordRoundEvent("end_tournament_round", tournament.id, selectedRound);
 
       const { error: updateError } = await supabase
         .from("tournaments")
@@ -667,6 +700,9 @@ export function useRoundLifecycle({
       if (insertError) {
         throw new Error(insertError.message || "Failed to create next round");
       }
+
+      // Close the outgoing round's history before the timer is cleared.
+      await recordRoundEvent("end_tournament_round", tournament.id, selectedRound);
 
       // Clear the round timer so the new round starts without a running clock
       await supabase

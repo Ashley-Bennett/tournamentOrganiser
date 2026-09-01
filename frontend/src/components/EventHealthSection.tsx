@@ -20,10 +20,24 @@ interface RoundRow {
   round_number: number;
   events: number;
   matches: number;
-  timed_rounds: number;
-  avg_minutes: number | null;
+  timed_matches: number;
   median_minutes: number | null;
+  longest_minutes: number | null;
+  round_minutes: number | null;
+  clock_pct: number | null;
   drops_at_round: number;
+}
+
+interface PaceRow {
+  identity_key: string;
+  display_name: string;
+  is_linked: boolean;
+  timed_matches: number;
+  median_minutes: number | null;
+  fastest_minutes: number | null;
+  slowest_minutes: number | null;
+  clock_pct: number | null;
+  went_to_time: number;
 }
 
 interface ReportingStats {
@@ -53,6 +67,8 @@ export default function EventHealthSection({
   const [roundsLoading, setRoundsLoading] = useState(true);
   const [reporting, setReporting] = useState<ReportingStats | null>(null);
   const [reportingLoading, setReportingLoading] = useState(true);
+  const [pace, setPace] = useState<PaceRow[]>([]);
+  const [paceLoading, setPaceLoading] = useState(true);
 
   const { p_from, p_to } = periodArgsValue;
 
@@ -86,7 +102,23 @@ export default function EventHealthSection({
       });
   }, [workspaceId, gameId, p_from, p_to]);
 
-  const anyTimed = rounds.some((r) => r.timed_rounds > 0);
+  useEffect(() => {
+    setPaceLoading(true);
+    void supabase
+      .rpc("get_organiser_player_pace", {
+        p_workspace_id: workspaceId,
+        p_from,
+        p_to,
+        p_game_id: gameId,
+        p_min_matches: 3,
+      })
+      .then(({ data }) => {
+        setPace((data ?? []) as PaceRow[]);
+        setPaceLoading(false);
+      });
+  }, [workspaceId, gameId, p_from, p_to]);
+
+  const anyTimed = rounds.some((r) => r.timed_matches > 0);
   const totalDrops = rounds.reduce((s, r) => s + r.drops_at_round, 0);
 
   const roundColumns: StatsColumn<RoundRow>[] = useMemo(
@@ -102,38 +134,71 @@ export default function EventHealthSection({
         ),
       },
       {
-        key: "events",
-        label: "Events",
-        sortValue: (r) => r.events,
-        render: (r) => <Typography variant="body2">{r.events}</Typography>,
-      },
-      {
         key: "matches",
         label: "Matches",
         sortValue: (r) => r.matches,
-        render: (r) => <Typography variant="body2">{r.matches}</Typography>,
+        render: (r) => (
+          <Typography variant="body2">
+            {r.matches}
+            {r.timed_matches < r.matches && (
+              <Typography component="span" variant="caption" color="text.disabled">
+                {" "}
+                ({r.timed_matches} timed)
+              </Typography>
+            )}
+          </Typography>
+        ),
       },
       {
         key: "median",
-        label: "Typical length",
+        label: "Typical game",
         sortValue: (r) => r.median_minutes,
         render: (r) => (
-          <Typography variant="body2">
+          <Typography variant="body2" fontWeight={600}>
             {r.median_minutes != null ? `${r.median_minutes} min` : "—"}
           </Typography>
         ),
       },
       {
-        key: "avg",
-        label: "Average",
-        sortValue: (r) => r.avg_minutes,
+        key: "clock",
+        label: "Of the clock",
+        sortValue: (r) => r.clock_pct,
+        render: (r) => (
+          <Typography
+            variant="body2"
+            // Past 90% the round is effectively running to time, which is the
+            // signal that the timer is too short rather than a nice-to-know.
+            color={
+              r.clock_pct == null
+                ? "text.disabled"
+                : r.clock_pct >= 90
+                  ? "error.main"
+                  : r.clock_pct >= 75
+                    ? "warning.main"
+                    : "text.primary"
+            }
+          >
+            {r.clock_pct != null ? `${r.clock_pct}%` : "—"}
+          </Typography>
+        ),
+      },
+      {
+        key: "longest",
+        label: "Longest game",
+        sortValue: (r) => r.longest_minutes,
         render: (r) => (
           <Typography variant="body2" color="text.secondary">
-            {r.avg_minutes != null
-              ? `${r.avg_minutes} min over ${r.timed_rounds} round${
-                  r.timed_rounds === 1 ? "" : "s"
-                }`
-              : "—"}
+            {r.longest_minutes != null ? `${r.longest_minutes} min` : "—"}
+          </Typography>
+        ),
+      },
+      {
+        key: "roundlen",
+        label: "Round length",
+        sortValue: (r) => r.round_minutes,
+        render: (r) => (
+          <Typography variant="body2" color="text.secondary">
+            {r.round_minutes != null ? `${r.round_minutes} min` : "—"}
           </Typography>
         ),
       },
@@ -147,6 +212,72 @@ export default function EventHealthSection({
             color={r.drops_at_round > 0 ? "error.main" : "text.secondary"}
           >
             {r.drops_at_round}
+          </Typography>
+        ),
+      },
+    ],
+    [],
+  );
+
+  const paceColumns: StatsColumn<PaceRow>[] = useMemo(
+    () => [
+      {
+        key: "player",
+        label: "Player",
+        sortValue: (r) => r.display_name.toLowerCase(),
+        render: (r) => <Typography variant="body2">{r.display_name}</Typography>,
+      },
+      {
+        key: "clock",
+        label: "Of the clock",
+        sortValue: (r) => r.clock_pct,
+        render: (r) => (
+          <Typography
+            variant="body2"
+            fontWeight={600}
+            color={
+              r.clock_pct == null
+                ? "text.disabled"
+                : r.clock_pct >= 90
+                  ? "error.main"
+                  : r.clock_pct >= 75
+                    ? "warning.main"
+                    : "text.primary"
+            }
+          >
+            {r.clock_pct != null ? `${r.clock_pct}%` : "—"}
+          </Typography>
+        ),
+      },
+      {
+        key: "median",
+        label: "Typical game",
+        sortValue: (r) => r.median_minutes,
+        render: (r) => (
+          <Typography variant="body2">
+            {r.median_minutes != null ? `${r.median_minutes} min` : "—"}
+          </Typography>
+        ),
+      },
+      {
+        key: "range",
+        label: "Fastest / longest",
+        sortValue: (r) => r.fastest_minutes,
+        csvValue: (r) => `${r.fastest_minutes ?? ""}-${r.slowest_minutes ?? ""}`,
+        render: (r) => (
+          <Typography variant="body2" color="text.secondary">
+            {r.fastest_minutes != null ? `${r.fastest_minutes}` : "—"} /{" "}
+            {r.slowest_minutes != null ? `${r.slowest_minutes} min` : "—"}
+          </Typography>
+        ),
+      },
+      {
+        key: "totime",
+        label: "Went to time",
+        sortValue: (r) => r.went_to_time,
+        render: (r) => (
+          <Typography variant="body2" color={r.went_to_time > 0 ? "warning.main" : "text.secondary"}>
+            {r.went_to_time} of {r.timed_matches}
           </Typography>
         ),
       },
@@ -259,9 +390,8 @@ export default function EventHealthSection({
 
       {!roundsLoading && rounds.length > 0 && !anyTimed && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Round timings aren&apos;t available for these events. A round only counts towards the
-          average if it ran between one minute and twelve hours — anything longer is usually a
-          tournament that was left open rather than a round that really took that long.
+          No game timings for these events yet. Timing started being recorded on 1 September
+          2026 — run a round from Begin Round through to the next round and these will fill in.
         </Alert>
       )}
 
@@ -274,6 +404,28 @@ export default function EventHealthSection({
         csvFilename={`matchamp-round-health-${new Date().toISOString().slice(0, 10)}`}
         emptyMessage="No rounds have been played in this period yet."
       />
+
+      {(paceLoading || pace.length > 0) && (
+        <>
+          <Typography variant="overline" color="text.secondary" display="block" mt={3} mb={0.25}>
+            Player pace
+          </Typography>
+          <Typography variant="body2" color="text.disabled" mb={1.5}>
+            How much of the clock each player typically uses. Players with at least three timed
+            games, slowest first.
+          </Typography>
+          <StatsTable
+            rows={pace}
+            columns={paceColumns}
+            getRowKey={(r) => r.identity_key}
+            initialSort={{ key: "clock", dir: "desc" }}
+            loading={paceLoading}
+            emptyMessage="Not enough timed games yet."
+            maxRows={10}
+            csvFilename={`matchamp-player-pace-${new Date().toISOString().slice(0, 10)}`}
+          />
+        </>
+      )}
     </>
   );
 }

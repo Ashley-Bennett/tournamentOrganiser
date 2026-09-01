@@ -23,6 +23,7 @@ import StatsGameFilter from "../components/StatsGameFilter";
 import StatsTimeline, { type TimelineBucket, type TimelinePoint } from "../components/StatsTimeline";
 import StatsTable, { type StatsColumn } from "../components/StatsTable";
 import StatsSection from "../components/StatsSection";
+import PlayerPaceSection from "../components/PlayerPaceSection";
 import StatsDeckFilter from "../components/StatsDeckFilter";
 import { deckKey, deckName } from "../utils/deck";
 import { getGame } from "../games/registry";
@@ -888,6 +889,14 @@ const PlayerStats: React.FC = () => {
           <MatchupMatrixSection decks={decks} nameMap={nameMap} period={period} gameId={gameId} />
         </StatsSection>
       )}
+
+      <StatsSection id="player-pace" title="Game Pace">
+        <PlayerPaceSection
+          periodArgsValue={periodArgs(period)}
+          gameId={gameId}
+          nameMap={nameMap}
+        />
+      </StatsSection>
 
       <StatsSection id="player-rounds" title="Round-by-Round Performance">
         <RoundPerformanceSection data={rounds} loading={roundsLoading} />
