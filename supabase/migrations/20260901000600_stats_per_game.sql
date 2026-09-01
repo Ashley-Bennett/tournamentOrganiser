@@ -1,20 +1,20 @@
 -- ============================================================
--- Per-game player stats (2026-09-01) — 1.0 Phase F
+-- Per-game player stats, filtered by calendar year (2026-09-01) — 1.0 Phase F
 --
--- Stats aggregated every match a player had ever played, across
--- every game. Once someone runs a chess night and Pokemon locals in
--- the same workspace that single win rate is meaningless, so each
--- stats RPC now takes a game and reports only that game. Results are
--- never combined: the page picks one game and shows it.
+-- Two changes to the stats RPCs:
 --
--- Two related fixes ride along:
---   * get_player_stats_games() lists the games the player has actually
---     entered, so the picker can hide itself for a single-game player.
---   * The season boundary was hardcoded to the Play! Pokemon year
---     (September to August, "- INTERVAL '8 months'"). It is now
---     derived from p_season_start_month, which the frontend takes from
---     the game's registry entry — 9 for Pokemon, 1 (calendar year) for
---     a game with no published season.
+-- 1. Every one takes a game and reports only that game. Stats used to
+--    aggregate every match a player had ever played; once someone runs
+--    a chess night and Pokemon locals in the same workspace that single
+--    win rate describes neither. Results are never combined - the page
+--    picks one game and shows it.
+--
+-- 2. The time filter is the calendar year, for every game. It was the
+--    Play! Pokemon season (September to August, split into quarters),
+--    which meant nothing for any other game and was more machinery than
+--    the filter needed. get_player_stats_seasons is replaced by
+--    get_player_stats_years, and the trend chart buckets by plain
+--    calendar quarters.
 --
 -- p_game_id defaults to NULL, meaning every game, so a client that has
 -- not been updated keeps working during a rollout.
@@ -23,9 +23,10 @@
 -- 20260901000200_stats_season_filters.sql.
 -- ============================================================
 
--- Adding a defaulted parameter would make the existing 2-argument calls
--- ambiguous, so the old signatures go first.
+-- Adding a defaulted parameter would make the existing calls ambiguous, so the
+-- old signatures go first. DROP also discards their grants, reissued at the end.
 DROP FUNCTION IF EXISTS public.get_player_stats_seasons();
+DROP FUNCTION IF EXISTS public.get_player_stats_seasons(TEXT, INT);
 DROP FUNCTION IF EXISTS public.get_player_overview_stats(TIMESTAMPTZ, TIMESTAMPTZ);
 DROP FUNCTION IF EXISTS public.get_player_deck_stats(TIMESTAMPTZ, TIMESTAMPTZ);
 DROP FUNCTION IF EXISTS public.get_player_matchup_matrix(INTEGER, INTEGER, TIMESTAMPTZ, TIMESTAMPTZ);
@@ -33,11 +34,19 @@ DROP FUNCTION IF EXISTS public.get_player_first_second_stats(INTEGER, INTEGER, T
 DROP FUNCTION IF EXISTS public.get_player_round_performance(TIMESTAMPTZ, TIMESTAMPTZ);
 DROP FUNCTION IF EXISTS public.get_player_trend(TIMESTAMPTZ, TIMESTAMPTZ);
 
+-- Signatures from the first cut of this migration, so it re-applies cleanly.
+DROP FUNCTION IF EXISTS public.get_player_overview_stats(TIMESTAMPTZ, TIMESTAMPTZ, TEXT);
+DROP FUNCTION IF EXISTS public.get_player_deck_stats(TIMESTAMPTZ, TIMESTAMPTZ, TEXT);
+DROP FUNCTION IF EXISTS public.get_player_matchup_matrix(INTEGER, INTEGER, TIMESTAMPTZ, TIMESTAMPTZ, TEXT);
+DROP FUNCTION IF EXISTS public.get_player_first_second_stats(INTEGER, INTEGER, TIMESTAMPTZ, TIMESTAMPTZ, TEXT);
+DROP FUNCTION IF EXISTS public.get_player_round_performance(TIMESTAMPTZ, TIMESTAMPTZ, TEXT);
+DROP FUNCTION IF EXISTS public.get_player_trend(TIMESTAMPTZ, TIMESTAMPTZ, TEXT, INT);
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- get_player_stats_games
--- Which games the player actually has entries in, busiest first. Drives the
--- stats game picker, which hides itself when there is only one row — so a
--- player who has only ever played Pokemon sees exactly what they saw before.
+-- Which games the player has entries in, busiest first. Drives the game picker,
+-- which hides itself when there is only one row — so a player who has only ever
+-- played Pokémon sees exactly what they saw before.
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.get_player_stats_games()
 RETURNS TABLE(
@@ -76,14 +85,19 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.get_player_stats_seasons(
-  p_game_id            TEXT DEFAULT NULL,
-  p_season_start_month INT  DEFAULT 9
+-- ─────────────────────────────────────────────────────────────────────────────
+-- get_player_stats_years
+-- Calendar years the player has results in, newest first. Replaces
+-- get_player_stats_seasons: the stats filter is now All time plus plain years,
+-- the same for every game, rather than the Play! Pokémon season and quarters.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.get_player_stats_years(
+  p_game_id TEXT DEFAULT NULL
 )
 RETURNS TABLE(
-  season_start_year INT,
-  tournaments       INT,
-  matches           INT
+  year        INT,
+  tournaments INT,
+  matches     INT
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -100,23 +114,23 @@ BEGIN
     SELECT
       tp.id AS player_id,
       tp.tournament_id,
-      EXTRACT(YEAR FROM (COALESCE(t.starts_at, t.created_at) - (INTERVAL '1 month' * (p_season_start_month - 1))))::INT AS season
+      EXTRACT(YEAR FROM COALESCE(t.starts_at, t.created_at))::INT AS yr
     FROM public.tournament_players tp
     JOIN public.tournaments t ON t.id = tp.tournament_id
     WHERE tp.user_id = v_uid
       AND (p_game_id IS NULL OR t.game_id = p_game_id)
   )
   SELECT
-    me.season,
-    COUNT(DISTINCT me.tournament_id)::INT AS tournaments,
-    COUNT(tm.id)::INT                     AS matches
+    me.yr,
+    COUNT(DISTINCT me.tournament_id)::INT,
+    COUNT(tm.id)::INT
   FROM my_entries me
   LEFT JOIN public.tournament_matches tm
     ON tm.tournament_id = me.tournament_id
     AND (tm.player1_id = me.player_id OR tm.player2_id = me.player_id)
     AND tm.status IN ('completed', 'bye')
-  GROUP BY me.season
-  ORDER BY me.season DESC;
+  GROUP BY me.yr
+  ORDER BY me.yr DESC;
 END;
 $$;
 
@@ -622,8 +636,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.get_player_trend(
   p_from TIMESTAMPTZ DEFAULT NULL,
   p_to   TIMESTAMPTZ DEFAULT NULL,
-  p_game_id TEXT DEFAULT NULL,
-  p_season_start_month INT DEFAULT 9
+  p_game_id TEXT DEFAULT NULL
 )
 RETURNS TABLE(
   period_label TEXT,
@@ -648,8 +661,7 @@ BEGIN
       tm.status,
       tm.player2_id,
       tp.id AS my_player_id,
-      -- Shift back 8 months: Sep-Nov -> Q1, Dec-Feb -> Q2, Mar-May -> Q3, Jun-Aug -> Q4
-      DATE_TRUNC('quarter', COALESCE(t.starts_at, t.created_at) - (INTERVAL '1 month' * (p_season_start_month - 1))) AS shifted_start
+      DATE_TRUNC('quarter', COALESCE(t.starts_at, t.created_at)) AS period_start
     FROM public.tournament_players tp
     JOIN public.tournaments t ON t.id = tp.tournament_id
     JOIN public.tournament_matches tm
@@ -667,14 +679,22 @@ BEGIN
       )
   )
   SELECT
-    'Q' || EXTRACT(QUARTER FROM mm.shifted_start)::TEXT
-        || ' ' || TO_CHAR(mm.shifted_start, 'YY')
-        || '/' || TO_CHAR(mm.shifted_start + INTERVAL '1 year', 'YY')  AS period_label,
-    (mm.shifted_start + (INTERVAL '1 month' * (p_season_start_month - 1)))                            AS period_start,
+    'Q' || EXTRACT(QUARTER FROM mm.period_start)::TEXT
+        || ' ' || TO_CHAR(mm.period_start, 'YY')                        AS period_label,
+    mm.period_start                                                     AS period_start,
     COUNT(*) FILTER (WHERE mm.winner_id = mm.my_player_id)::INT         AS wins,
     COUNT(*)::INT                                                       AS total
   FROM my_matches mm
-  GROUP BY mm.shifted_start
+  GROUP BY mm.period_start
   ORDER BY period_start;
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION public.get_player_stats_games() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_player_stats_years(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_player_overview_stats(TIMESTAMPTZ, TIMESTAMPTZ, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_player_deck_stats(TIMESTAMPTZ, TIMESTAMPTZ, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_player_round_performance(TIMESTAMPTZ, TIMESTAMPTZ, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_player_trend(TIMESTAMPTZ, TIMESTAMPTZ, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_player_matchup_matrix(INT, INT, TIMESTAMPTZ, TIMESTAMPTZ, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_player_first_second_stats(INT, INT, TIMESTAMPTZ, TIMESTAMPTZ, TEXT) TO authenticated;

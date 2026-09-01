@@ -21,8 +21,6 @@ const POKEMON: GameDefinition = {
   structures: ["swiss", "round_robin"],
   deck: "pokemon",
   rules: POKEMON_RULES,
-  // Play! Pokémon seasons run September to August.
-  season: { startMonth: 9 },
   iconSrc: "/games/pokemon.svg",
   accent: "#F2C94C",
   defaults: { structure: "swiss", format: "standard" },
@@ -39,7 +37,6 @@ const GENERIC: GameDefinition = {
   structures: ["swiss", "round_robin"],
   deck: "none",
   rules: GENERIC_RULES,
-  season: { startMonth: 1 },
   iconSrc: "/games/generic.svg",
   // Mid-tone on purpose: a darker slate vanishes against the dark theme and
   // a lighter one washes out on white.
@@ -67,7 +64,6 @@ function comingSoon(
     structures: ["swiss"],
     deck: "none",
     rules: GENERIC_RULES,
-    season: { startMonth: 1 },
     iconSrc: `/games/${id}.svg`,
     accent,
     defaults: { structure: "swiss" },

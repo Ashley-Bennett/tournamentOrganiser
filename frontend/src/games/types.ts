@@ -84,12 +84,6 @@ export interface GameDefinition {
    */
   deck: "pokemon" | "text" | "none";
   rules: RulesProfile;
-  /**
-   * Month (1-12) a competitive season starts in. Pokémon runs September to
-   * August; a game without a published season uses the calendar year, so the
-   * stats period picker does not offer quarters that mean nothing.
-   */
-  season: { startMonth: number };
   /** Path under public/ for the picker tile icon. */
   iconSrc: string;
   /** Tile accent colour when selected. */

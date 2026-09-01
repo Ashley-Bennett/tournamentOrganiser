@@ -23,7 +23,7 @@ import { getPokemonList, getSpriteUrl, getArtworkUrl, type PokemonEntry } from "
 import StatsPeriodFilter from "../components/StatsPeriodFilter";
 import StatsGameFilter from "../components/StatsGameFilter";
 import { getGame } from "../games/registry";
-import { ALL_TIME, periodArgs, periodLabel, toMonthIndex, type StatsPeriod } from "../utils/season";
+import { ALL_TIME, periodArgs, periodLabel, type StatsPeriod } from "../utils/statsPeriod";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -82,8 +82,8 @@ interface TrendRow {
   total: number;
 }
 
-interface SeasonRow {
-  season_start_year: number;
+interface YearRow {
+  year: number;
   tournaments: number;
   matches: number;
 }
@@ -312,7 +312,7 @@ function DeckStatsSection({ data, loading, nameMap, period }: { data: DeckStat[]
       <Box display="flex" alignItems="center" gap={1} mb={2}>
         {loyaltyLabel && <Chip label={loyaltyLabel} size="small" color={loyaltyLabel === "Specialist" ? "secondary" : loyaltyLabel === "Meta Chaser" ? "warning" : "default"} />}
         <Typography variant="body2" color="text.secondary">
-          {deckCount} deck{deckCount !== 1 ? "s" : ""} registered {period.seasonStartYear == null ? "across all tournaments" : `in ${periodLabel(period)}`}
+          {deckCount} deck{deckCount !== 1 ? "s" : ""} registered {period.year == null ? "across all tournaments" : `in ${periodLabel(period)}`}
         </Typography>
       </Box>
       {loading ? (
@@ -387,7 +387,7 @@ function FirstSecondSection({
       .rpc("get_player_first_second_stats", {
         p_deck_pokemon1: selectedDeck?.deck_pokemon1 ?? null,
         p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? null,
-        ...periodArgs(period, toMonthIndex(getGame(gameId).season.startMonth)),
+        ...periodArgs(period),
         p_game_id: gameId,
       })
       .then(({ data: rows }) => {
@@ -473,7 +473,7 @@ function MatchupMatrixSection({
       .rpc("get_player_matchup_matrix", {
         p_deck_pokemon1: selectedDeck?.deck_pokemon1 ?? null,
         p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? null,
-        ...periodArgs(period, toMonthIndex(getGame(gameId).season.startMonth)),
+        ...periodArgs(period),
         p_game_id: gameId,
       })
       .then(({ data: rows }) => {
@@ -649,7 +649,7 @@ const PlayerStats: React.FC = () => {
   const { user } = useAuth();
 
   const [nameMap, setNameMap] = useState<Map<number, string>>(new Map());
-  const [seasons, setSeasons] = useState<number[]>([]);
+  const [years, setYears] = useState<number[]>([]);
   const [gameIds, setGameIds] = useState<string[]>([]);
   const [gameId, setGameId] = useState<string | null>(null);
   const [period, setPeriod] = useState<StatsPeriod>(ALL_TIME);
@@ -682,33 +682,24 @@ const PlayerStats: React.FC = () => {
     });
   }, [user]);
 
-  // Seasons the player has results in for the chosen game. Season boundaries
-  // differ per game, so this is refetched when the game changes.
+  // Years the player has results in for the chosen game.
   useEffect(() => {
     if (!user || !gameId) return;
     void supabase
-      .rpc("get_player_stats_seasons", {
-        p_game_id: gameId,
-        p_season_start_month: getGame(gameId).season.startMonth,
-      })
+      .rpc("get_player_stats_years", { p_game_id: gameId })
       .then(({ data }) => {
-        setSeasons(((data ?? []) as SeasonRow[]).map((r) => r.season_start_year));
+        setYears(((data ?? []) as YearRow[]).map((r) => r.year));
       });
   }, [user, gameId]);
 
-  // Changing game invalidates the selected season — the seasons on offer, and
-  // even where a season starts, are not the same between games.
+  // Changing game invalidates the selected year — the years on offer differ.
   useEffect(() => {
     setPeriod(ALL_TIME);
   }, [gameId]);
 
   useEffect(() => {
     if (!user || !gameId) return;
-    const game = getGame(gameId);
-    const args = {
-      ...periodArgs(period, toMonthIndex(game.season.startMonth)),
-      p_game_id: gameId,
-    };
+    const args = { ...periodArgs(period), p_game_id: gameId };
 
     setOverviewLoading(true);
     setDecksLoading(true);
@@ -730,12 +721,10 @@ const PlayerStats: React.FC = () => {
       setRoundsLoading(false);
     });
 
-    void supabase
-      .rpc("get_player_trend", { ...args, p_season_start_month: game.season.startMonth })
-      .then(({ data }) => {
-        setTrend((data ?? []) as TrendRow[]);
-        setTrendLoading(false);
-      });
+    void supabase.rpc("get_player_trend", args).then(({ data }) => {
+      setTrend((data ?? []) as TrendRow[]);
+      setTrendLoading(false);
+    });
   }, [user, period, gameId]);
 
   const hasDecks = getGame(gameId).deck !== "none";
@@ -757,21 +746,14 @@ const PlayerStats: React.FC = () => {
         </Button>
         <ShowChartIcon color="primary" />
         <Typography variant="h5" fontWeight={700}>Your Stats</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {periodLabel(period, toMonthIndex(getGame(gameId).season.startMonth))}
-        </Typography>
+        <Typography variant="body2" color="text.secondary">{periodLabel(period)}</Typography>
       </Box>
 
       {/* Game picker — hides itself for a player with only one game */}
       <StatsGameFilter gameIds={gameIds} value={gameId} onChange={setGameId} />
 
       {/* Season / quarter picker */}
-      <StatsPeriodFilter
-        seasons={seasons}
-        value={period}
-        onChange={setPeriod}
-        seasonStartMonth={toMonthIndex(getGame(gameId).season.startMonth)}
-      />
+      <StatsPeriodFilter years={years} value={period} onChange={setPeriod} />
 
       {/* Overview */}
       <OverviewSection data={overview} loading={overviewLoading} />

@@ -36,11 +36,6 @@ describe("games registry", () => {
     expect(generic.formats).toEqual([]);
   });
 
-  it("uses the calendar year for a game with no published season", () => {
-    expect(getGame("pokemon").season.startMonth).toBe(9);
-    expect(getGame("generic").season.startMonth).toBe(1);
-  });
-
   // A tournament row outlives the registry entry it was created against.
   it("falls back to generic for a game this build does not know", () => {
     expect(getGame("some_withdrawn_game").id).toBe("generic");
