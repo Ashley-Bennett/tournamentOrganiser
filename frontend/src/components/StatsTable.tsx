@@ -7,8 +7,13 @@ import { downloadCsv, toCsv } from "../utils/csv";
  * The shared table for the stats pages.
  *
  * Every stats table was the same hand-rolled `<table>` with the same inline
- * styles and no sorting. This owns the markup, the sort state and the "show
- * more" tail so a new table is a column list rather than another copy.
+ * styles and no sorting. This owns the markup, the sort state, the CSV export
+ * and the scroll cap, so a new table is a column list rather than another copy.
+ *
+ * Long tables scroll inside themselves (`maxRows`) rather than running down the
+ * page. That replaced a "show more" button: paging a table the reader is
+ * scanning makes them scroll the whole page to reach a control that then makes
+ * the page even longer.
  *
  * Sorting is client-side and deliberately so: the RPCs already aggregate, so
  * what comes back is hundreds of rows at worst, and sorting them in the browser
@@ -50,6 +55,9 @@ const HEAD: React.CSSProperties = {
 
 const CELL: React.CSSProperties = { padding: "10px 12px" };
 
+const ROW_H = 42;
+const HEADER_H = 34;
+
 export default function StatsTable<T>({
   rows,
   columns,
@@ -58,7 +66,7 @@ export default function StatsTable<T>({
   onRowClick,
   loading,
   emptyMessage,
-  initialLimit,
+  maxRows,
   csvFilename,
 }: {
   rows: T[];
@@ -69,13 +77,15 @@ export default function StatsTable<T>({
   onRowClick?: (row: T) => void;
   loading?: boolean;
   emptyMessage: string;
-  /** Show this many rows with a "show all" button. Omit to show everything. */
-  initialLimit?: number;
+  /**
+   * Cap the table at roughly this many rows and scroll the rest inside it,
+   * rather than growing the page. Omit to let the table run to full height.
+   */
+  maxRows?: number;
   /** Basename for the CSV download. Omit to hide the export button. */
   csvFilename?: string;
 }) {
   const [sort, setSort] = useState<SortState | null>(initialSort ?? null);
-  const [expanded, setExpanded] = useState(false);
 
   const sorted = useMemo(() => {
     if (!sort) return rows;
@@ -98,12 +108,18 @@ export default function StatsTable<T>({
     });
   }, [rows, columns, sort]);
 
-  const limited =
-    initialLimit != null && !expanded ? sorted.slice(0, initialLimit) : sorted;
-  const hiddenCount = sorted.length - limited.length;
+  // An approximate row height is fine: this is a max-height, so a row that
+  // wraps to two lines simply means slightly fewer are visible before the
+  // scroll starts. ROW_H covers a single-line row plus its border.
+  const maxHeight =
+    maxRows != null && sorted.length > maxRows
+      ? HEADER_H + maxRows * ROW_H
+      : undefined;
 
   function exportCsv() {
     const cols = columns.filter((c) => c.csvValue || c.sortValue);
+    // Exports every row, not just the ones currently in view — the scroll
+    // region is a display cap, not a filter.
     const csv = toCsv(
       cols.map((c) => c.label),
       sorted.map((row) => cols.map((c) => (c.csvValue ?? c.sortValue)!(row))),
@@ -148,7 +164,24 @@ export default function StatsTable<T>({
       {/* maxWidth pins the wrapper to its container so a wide table scrolls
           here rather than stretching the page — the table is reusable, so it
           cannot rely on every host page constraining its own width. */}
-      <Box sx={{ overflowX: "auto", maxWidth: "100%" }}>
+      <Box
+        sx={{
+          overflowX: "auto",
+          overflowY: maxHeight ? "auto" : undefined,
+          maxHeight,
+          maxWidth: "100%",
+          // The header has to stay put while the body scrolls, and it needs an
+          // opaque background or rows show through it on the way past.
+          "& thead th": maxHeight
+            ? {
+                position: "sticky",
+                top: 0,
+                zIndex: 1,
+                bgcolor: "background.default",
+              }
+            : undefined,
+        }}
+      >
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
@@ -171,7 +204,7 @@ export default function StatsTable<T>({
             </tr>
           </thead>
           <tbody>
-            {limited.map((row, i) => (
+            {sorted.map((row, i) => (
               <tr
                 key={getRowKey(row, i)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
@@ -191,19 +224,11 @@ export default function StatsTable<T>({
         </table>
       </Box>
 
-      {hiddenCount > 0 && (
-        <Box mt={1}>
-          <Button size="small" onClick={() => setExpanded(true)}>
-            Show {hiddenCount} more
-          </Button>
-        </Box>
-      )}
-      {expanded && initialLimit != null && sorted.length > initialLimit && (
-        <Box mt={1}>
-          <Button size="small" onClick={() => setExpanded(false)}>
-            Show fewer
-          </Button>
-        </Box>
+      {maxHeight && (
+        <Typography variant="caption" color="text.disabled" display="block" mt={0.5}>
+          Scroll for the other {sorted.length - maxRows!} row
+          {sorted.length - maxRows! === 1 ? "" : "s"}
+        </Typography>
       )}
     </>
   );

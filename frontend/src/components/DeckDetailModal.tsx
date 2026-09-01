@@ -321,7 +321,7 @@ export default function DeckDetailModal({
           initialSort={{ key: "entries", dir: "desc" }}
           loading={loading}
           emptyMessage="Nobody has registered this deck in these events."
-          initialLimit={10}
+          maxRows={8}
         />
 
         <Divider sx={{ my: 2 }} />
@@ -335,7 +335,7 @@ export default function DeckDetailModal({
           initialSort={{ key: "date", dir: "desc" }}
           loading={loading}
           emptyMessage="This deck has not appeared in these events."
-          initialLimit={10}
+          maxRows={8}
         />
       </DialogContent>
     </Dialog>

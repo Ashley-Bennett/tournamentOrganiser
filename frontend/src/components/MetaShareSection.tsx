@@ -359,7 +359,7 @@ export default function MetaShareSection({
               ? "No decks were registered in these events."
               : "No decks match those filters."
           }
-          initialLimit={25}
+          maxRows={10}
           csvFilename={`matchamp-meta-share-${new Date().toISOString().slice(0, 10)}`}
           onRowClick={(r) =>
             setOpenDeck({ deck_pokemon1: r.deck_pokemon1, deck_pokemon2: r.deck_pokemon2 })

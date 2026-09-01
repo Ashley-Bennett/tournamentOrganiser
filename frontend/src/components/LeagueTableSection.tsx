@@ -330,7 +330,7 @@ export default function LeagueTableSection({
               ? "No results in these events yet."
               : "No players match that search."
           }
-          initialLimit={25}
+          maxRows={10}
         />
       )}
     </>

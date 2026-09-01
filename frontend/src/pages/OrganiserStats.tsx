@@ -5,7 +5,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Divider,
   Grid,
   InputAdornment,
   Skeleton,
@@ -25,6 +24,7 @@ import LeagueTableSection from "../components/LeagueTableSection";
 import MetaShareSection from "../components/MetaShareSection";
 import EventHealthSection from "../components/EventHealthSection";
 import StatsTable, { type StatsColumn } from "../components/StatsTable";
+import StatsSection from "../components/StatsSection";
 import { getPokemonList } from "../utils/pokemonCache";
 import { getGame } from "../games/registry";
 import { ALL_TIME, periodArgs, periodLabel, type StatsPeriod } from "../utils/statsPeriod";
@@ -112,22 +112,6 @@ function StatCard({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function SectionHeader({ children, hint }: { children: React.ReactNode; hint?: string }) {
-  return (
-    <>
-      <Divider sx={{ my: 3 }} />
-      <Typography variant="overline" color="text.secondary" display="block" mb={hint ? 0.25 : 1.5}>
-        {children}
-      </Typography>
-      {hint && (
-        <Typography variant="body2" color="text.disabled" mb={1.5}>
-          {hint}
-        </Typography>
-      )}
-    </>
   );
 }
 
@@ -477,89 +461,108 @@ const OrganiserStats: React.FC = () => {
         </Grid>
       )}
 
-      <SectionHeader hint="How many different people showed up in each period, and how many of them were there for the first time.">
-        Attendance over time
-      </SectionHeader>
-      <StatsTimeline
-        points={points}
-        loading={timelineLoading}
-        emptyMessage="No events in this period yet."
-        bucket={bucket}
-        onBucketChange={setBucket}
-      />
-      {!timelineLoading && timeline.length > 0 && (
-        <Box display="flex" flexWrap="wrap" gap={0.75} mt={1.5}>
-          {timeline
-            .filter((r) => r.new_players > 0)
-            .slice(-6)
-            .map((r) => (
-              <Chip
-                key={r.period_start}
-                size="small"
-                variant="outlined"
-                color="success"
-                label={`${r.period_label}: ${r.new_players} new`}
-              />
-            ))}
-        </Box>
-      )}
+      <StatsSection
+        id="attendance"
+        title="Attendance over time"
+        defaultOpen
+        summary={
+          overview ? `${overview.unique_players} players · ${overview.events_total} events` : undefined
+        }
+        hint="How many different people showed up in each period, and how many of them were there for the first time."
+      >
+        <StatsTimeline
+          points={points}
+          loading={timelineLoading}
+          emptyMessage="No events in this period yet."
+          bucket={bucket}
+          onBucketChange={setBucket}
+        />
+        {!timelineLoading && timeline.length > 0 && (
+          <Box display="flex" flexWrap="wrap" gap={0.75} mt={1.5}>
+            {timeline
+              .filter((r) => r.new_players > 0)
+              .slice(-6)
+              .map((r) => (
+                <Chip
+                  key={r.period_start}
+                  size="small"
+                  variant="outlined"
+                  color="success"
+                  label={`${r.period_label}: ${r.new_players} new`}
+                />
+              ))}
+          </Box>
+        )}
+      </StatsSection>
 
-      <SectionHeader hint="A running table across several events. Match points come from the standings each event already showed; placement points reward finishing high. Events still in progress contribute match points only.">
-        League table
-      </SectionHeader>
-      <LeagueTableSection workspaceId={workspaceId} gameId={gameId} />
+      <StatsSection
+        id="league"
+        title="League table"
+        defaultOpen
+        hint="A running table across several events. Match points come from the standings each event already showed; placement points reward finishing high. Events still in progress contribute match points only."
+      >
+        <LeagueTableSection workspaceId={workspaceId} gameId={gameId} />
+      </StatsSection>
 
       {hasDecks && (
-        <>
-          <SectionHeader hint="What people brought, by share of entries. A deck played three times by one person and one played once each by three people take up the same room, so 'pilots' is shown alongside.">
-            Meta share
-          </SectionHeader>
+        <StatsSection
+          id="meta"
+          title="Meta share"
+          hint="What people brought, by share of entries. A deck played three times by one person and one played once each by three people take up the same room, so 'pilots' is shown alongside."
+        >
           <MetaShareSection workspaceId={workspaceId} gameId={gameId} nameMap={nameMap} />
-        </>
+        </StatsSection>
       )}
 
-      <SectionHeader hint="Sorted by events attended. Players without an account are matched on name, so a typo can split one person into two rows.">
-        Regulars
-      </SectionHeader>
-      <Box mb={1.5}>
-        <TextField
-          size="small"
-          placeholder="Search players"
-          value={playerSearch}
-          onChange={(e) => setPlayerSearch(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ minWidth: 220 }}
+      <StatsSection
+        id="regulars"
+        title="Regulars"
+        summary={attendance.length > 0 ? `${attendance.length} players` : undefined}
+        hint="Sorted by events attended. Players without an account are matched on name, so a typo can split one person into two rows."
+      >
+        <Box mb={1.5}>
+          <TextField
+            size="small"
+            placeholder="Search players"
+            value={playerSearch}
+            onChange={(e) => setPlayerSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ minWidth: 220 }}
+          />
+        </Box>
+        <StatsTable
+          rows={visibleAttendance}
+          columns={attendanceColumns}
+          getRowKey={(r) => r.identity_key}
+          initialSort={{ key: "events", dir: "desc" }}
+          loading={attendanceLoading}
+          csvFilename={`matchamp-regulars-${new Date().toISOString().slice(0, 10)}`}
+          emptyMessage={
+            attendance.length === 0
+              ? "No players in this period yet."
+              : "No players match that search."
+          }
+          maxRows={10}
         />
-      </Box>
-      <StatsTable
-        rows={visibleAttendance}
-        columns={attendanceColumns}
-        getRowKey={(r) => r.identity_key}
-        initialSort={{ key: "events", dir: "desc" }}
-        loading={attendanceLoading}
-        csvFilename={`matchamp-regulars-${new Date().toISOString().slice(0, 10)}`}
-        emptyMessage={
-          attendance.length === 0
-            ? "No players in this period yet."
-            : "No players match that search."
-        }
-        initialLimit={25}
-      />
+      </StatsSection>
 
-      <SectionHeader hint="How the events themselves ran: how long rounds took, which round people dropped in, and who entered the results.">
-        Event health
-      </SectionHeader>
-      <EventHealthSection
-        workspaceId={workspaceId}
-        gameId={gameId}
-        periodArgsValue={periodArgs(period)}
-      />
+      <StatsSection
+        id="health"
+        title="Event health"
+        hint="How the events themselves ran: how long rounds took, which round people dropped in, and who entered the results."
+      >
+        <EventHealthSection
+          workspaceId={workspaceId}
+          gameId={gameId}
+          periodArgsValue={periodArgs(period)}
+        />
+      </StatsSection>
 
       <Box pb={4} />
     </Box>
