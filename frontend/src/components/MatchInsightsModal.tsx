@@ -91,6 +91,11 @@ interface Props {
   isEditing: boolean;
   // True when opponent has a registered deck that is hidden until the round result is confirmed
   oppDeckLocked: boolean;
+  /**
+   * Whether this game has decks at all. A generic event has none, so the
+   * insight is just who went first — the deck question is not asked.
+   */
+  showDeck?: boolean;
   onClose: () => void;
   onDismiss: () => void;
 }
@@ -103,6 +108,7 @@ const MatchInsightsModal: React.FC<Props> = ({
   initialOppPokemon2,
   isEditing,
   oppDeckLocked,
+  showDeck = true,
   onClose,
   onDismiss,
 }) => {
@@ -204,12 +210,14 @@ const MatchInsightsModal: React.FC<Props> = ({
           ))}
         </Box>
 
-        {/* Q2: opponent deck */}
+        {/* Q2: opponent deck — only where the game has decks */}
+        {showDeck && (
         <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
           What deck did your opponent play?
         </Typography>
+        )}
 
-        {oppDeckLocked ? (
+        {showDeck && (oppDeckLocked ? (
           <Box
             sx={{
               border: 1,
@@ -292,7 +300,7 @@ const MatchInsightsModal: React.FC<Props> = ({
               )}
             </Box>
           </>
-        )}
+        ))}
 
         {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
       </DialogContent>

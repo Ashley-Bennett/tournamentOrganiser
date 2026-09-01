@@ -21,7 +21,9 @@ import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
 import { getPokemonList, getSpriteUrl, getArtworkUrl, type PokemonEntry } from "../utils/pokemonCache";
 import StatsPeriodFilter from "../components/StatsPeriodFilter";
-import { ALL_TIME, periodArgs, periodLabel, type StatsPeriod } from "../utils/season";
+import StatsGameFilter from "../components/StatsGameFilter";
+import { getGame } from "../games/registry";
+import { ALL_TIME, periodArgs, periodLabel, toMonthIndex, type StatsPeriod } from "../utils/season";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -366,10 +368,14 @@ function FirstSecondSection({
   decks,
   nameMap,
   period,
+  gameId,
+  hasDecks,
 }: {
   decks: DeckStat[];
   nameMap: Map<number, string>;
   period: StatsPeriod;
+  gameId: string | null;
+  hasDecks: boolean;
 }) {
   const [selectedDeck, setSelectedDeck] = useState<DeckStat | null>(null);
   const [data, setData] = useState<FirstSecondStats | null>(null);
@@ -381,13 +387,14 @@ function FirstSecondSection({
       .rpc("get_player_first_second_stats", {
         p_deck_pokemon1: selectedDeck?.deck_pokemon1 ?? null,
         p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? null,
-        ...periodArgs(period),
+        ...periodArgs(period, toMonthIndex(getGame(gameId).season.startMonth)),
+        p_game_id: gameId,
       })
       .then(({ data: rows }) => {
         setData(rows && rows.length > 0 ? (rows[0] as FirstSecondStats) : null);
         setLoading(false);
       });
-  }, [selectedDeck, period]);
+  }, [selectedDeck, period, gameId]);
 
   const firstRate = data ? pct(data.went_first_wins, data.went_first_total) : "—";
   const secondRate = data ? pct(data.went_second_wins, data.went_second_total) : "—";
@@ -395,7 +402,9 @@ function FirstSecondSection({
 
   return (
     <>
-      <DeckFilter decks={decks} selected={selectedDeck} nameMap={nameMap} onChange={setSelectedDeck} />
+      {hasDecks && (
+        <DeckFilter decks={decks} selected={selectedDeck} nameMap={nameMap} onChange={setSelectedDeck} />
+      )}
       {!hasData && !loading && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Not enough data yet. Fill in the post-game questions after your next match and this will start filling up.
@@ -447,10 +456,12 @@ function MatchupMatrixSection({
   decks,
   nameMap,
   period,
+  gameId,
 }: {
   decks: DeckStat[];
   nameMap: Map<number, string>;
   period: StatsPeriod;
+  gameId: string | null;
 }) {
   const [selectedDeck, setSelectedDeck] = useState<DeckStat | null>(null);
   const [data, setData] = useState<MatchupRow[]>([]);
@@ -462,13 +473,14 @@ function MatchupMatrixSection({
       .rpc("get_player_matchup_matrix", {
         p_deck_pokemon1: selectedDeck?.deck_pokemon1 ?? null,
         p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? null,
-        ...periodArgs(period),
+        ...periodArgs(period, toMonthIndex(getGame(gameId).season.startMonth)),
+        p_game_id: gameId,
       })
       .then(({ data: rows }) => {
         setData((rows ?? []) as MatchupRow[]);
         setLoading(false);
       });
-  }, [selectedDeck, period]);
+  }, [selectedDeck, period, gameId]);
 
   return (
     <>
@@ -638,6 +650,8 @@ const PlayerStats: React.FC = () => {
 
   const [nameMap, setNameMap] = useState<Map<number, string>>(new Map());
   const [seasons, setSeasons] = useState<number[]>([]);
+  const [gameIds, setGameIds] = useState<string[]>([]);
+  const [gameId, setGameId] = useState<string | null>(null);
   const [period, setPeriod] = useState<StatsPeriod>(ALL_TIME);
   const [overview, setOverview] = useState<OverviewStats | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
@@ -656,18 +670,45 @@ const PlayerStats: React.FC = () => {
     });
   }, []);
 
-  // Seasons the player has results in — drives the picker, so it is fetched
-  // once rather than per period.
+  // Which games the player has entries in. Results are never combined across
+  // games, so one is chosen up front — the busiest, which the RPC returns
+  // first, meaning a single-game player lands exactly where they always did.
   useEffect(() => {
     if (!user) return;
-    void supabase.rpc("get_player_stats_seasons").then(({ data }) => {
-      setSeasons(((data ?? []) as SeasonRow[]).map((r) => r.season_start_year));
+    void supabase.rpc("get_player_stats_games").then(({ data }) => {
+      const ids = ((data ?? []) as { game_id: string }[]).map((r) => r.game_id);
+      setGameIds(ids);
+      setGameId((current) => current ?? ids[0] ?? null);
     });
   }, [user]);
 
+  // Seasons the player has results in for the chosen game. Season boundaries
+  // differ per game, so this is refetched when the game changes.
   useEffect(() => {
-    if (!user) return;
-    const args = periodArgs(period);
+    if (!user || !gameId) return;
+    void supabase
+      .rpc("get_player_stats_seasons", {
+        p_game_id: gameId,
+        p_season_start_month: getGame(gameId).season.startMonth,
+      })
+      .then(({ data }) => {
+        setSeasons(((data ?? []) as SeasonRow[]).map((r) => r.season_start_year));
+      });
+  }, [user, gameId]);
+
+  // Changing game invalidates the selected season — the seasons on offer, and
+  // even where a season starts, are not the same between games.
+  useEffect(() => {
+    setPeriod(ALL_TIME);
+  }, [gameId]);
+
+  useEffect(() => {
+    if (!user || !gameId) return;
+    const game = getGame(gameId);
+    const args = {
+      ...periodArgs(period, toMonthIndex(game.season.startMonth)),
+      p_game_id: gameId,
+    };
 
     setOverviewLoading(true);
     setDecksLoading(true);
@@ -689,11 +730,15 @@ const PlayerStats: React.FC = () => {
       setRoundsLoading(false);
     });
 
-    void supabase.rpc("get_player_trend", args).then(({ data }) => {
-      setTrend((data ?? []) as TrendRow[]);
-      setTrendLoading(false);
-    });
-  }, [user, period]);
+    void supabase
+      .rpc("get_player_trend", { ...args, p_season_start_month: game.season.startMonth })
+      .then(({ data }) => {
+        setTrend((data ?? []) as TrendRow[]);
+        setTrendLoading(false);
+      });
+  }, [user, period, gameId]);
+
+  const hasDecks = getGame(gameId).deck !== "none";
 
   if (!user) {
     return (
@@ -712,26 +757,54 @@ const PlayerStats: React.FC = () => {
         </Button>
         <ShowChartIcon color="primary" />
         <Typography variant="h5" fontWeight={700}>Your Stats</Typography>
-        <Typography variant="body2" color="text.secondary">{periodLabel(period)}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {periodLabel(period, toMonthIndex(getGame(gameId).season.startMonth))}
+        </Typography>
       </Box>
 
+      {/* Game picker — hides itself for a player with only one game */}
+      <StatsGameFilter gameIds={gameIds} value={gameId} onChange={setGameId} />
+
       {/* Season / quarter picker */}
-      <StatsPeriodFilter seasons={seasons} value={period} onChange={setPeriod} />
+      <StatsPeriodFilter
+        seasons={seasons}
+        value={period}
+        onChange={setPeriod}
+        seasonStartMonth={toMonthIndex(getGame(gameId).season.startMonth)}
+      />
 
       {/* Overview */}
       <OverviewSection data={overview} loading={overviewLoading} />
 
-      {/* Deck stats */}
-      <SectionHeader>Deck History</SectionHeader>
-      <DeckStatsSection data={decks} loading={decksLoading} nameMap={nameMap} period={period} />
+      {/*
+        Deck history and the matchup matrix are deck-against-deck by nature, so
+        a game without decks does not show them at all — an empty panel would
+        read as missing data rather than as something that does not apply here.
+        Going first still means something without decks, so it stays.
+      */}
+      {hasDecks && (
+        <>
+          <SectionHeader>Deck History</SectionHeader>
+          <DeckStatsSection data={decks} loading={decksLoading} nameMap={nameMap} period={period} />
+        </>
+      )}
 
       {/* First / Second */}
       <SectionHeader>Going First vs Second</SectionHeader>
-      <FirstSecondSection decks={decks} nameMap={nameMap} period={period} />
+      <FirstSecondSection
+        decks={decks}
+        nameMap={nameMap}
+        period={period}
+        gameId={gameId}
+        hasDecks={hasDecks}
+      />
 
-      {/* Matchup matrix */}
-      <SectionHeader>Matchup Matrix</SectionHeader>
-      <MatchupMatrixSection decks={decks} nameMap={nameMap} period={period} />
+      {hasDecks && (
+        <>
+          <SectionHeader>Matchup Matrix</SectionHeader>
+          <MatchupMatrixSection decks={decks} nameMap={nameMap} period={period} gameId={gameId} />
+        </>
+      )}
 
       {/* Round performance */}
       <SectionHeader>Round-by-Round Performance</SectionHeader>

@@ -1,8 +1,9 @@
 import React from "react";
 import { Box, Chip, Typography } from "@mui/material";
 import {
-  SEASON_QUARTERS,
+  SEASON_START_MONTH,
   seasonLabel,
+  seasonQuarters,
   type StatsPeriod,
 } from "../utils/season";
 
@@ -17,10 +18,13 @@ export default function StatsPeriodFilter({
   seasons,
   value,
   onChange,
+  seasonStartMonth = SEASON_START_MONTH,
 }: {
   seasons: number[];
   value: StatsPeriod;
   onChange: (p: StatsPeriod) => void;
+  /** 0-indexed month the game's season starts in. */
+  seasonStartMonth?: number;
 }) {
   if (seasons.length === 0) return null;
 
@@ -40,7 +44,7 @@ export default function StatsPeriodFilter({
         {seasons.map((year) => (
           <Chip
             key={year}
-            label={seasonLabel(year)}
+            label={seasonLabel(year, seasonStartMonth)}
             size="small"
             color={value.seasonStartYear === year ? "primary" : "default"}
             variant={value.seasonStartYear === year ? "filled" : "outlined"}
@@ -63,7 +67,7 @@ export default function StatsPeriodFilter({
             variant={value.quarter == null ? "filled" : "outlined"}
             onClick={() => onChange({ ...value, quarter: null })}
           />
-          {SEASON_QUARTERS.map((q) => (
+          {seasonQuarters(seasonStartMonth).map((q) => (
             <Chip
               key={q.quarter}
               label={`${q.label} · ${q.months}`}

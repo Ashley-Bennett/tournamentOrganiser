@@ -10,6 +10,8 @@ import {
   seasonQuarterRange,
   seasonRange,
   seasonStartYear,
+  seasonQuarters,
+  toMonthIndex,
 } from "./season";
 
 describe("seasonStartYear", () => {
@@ -94,5 +96,46 @@ describe("periodLabel", () => {
     expect(periodLabel(ALL_TIME)).toBe("All time");
     expect(periodLabel({ seasonStartYear: 2026, quarter: null })).toBe("Season 2026/27");
     expect(periodLabel({ seasonStartYear: 2026, quarter: 3 })).toBe("Q3 2026/27");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Calendar-year seasons, for games with no published competitive season
+// ---------------------------------------------------------------------------
+
+describe("season helpers with a calendar-year start", () => {
+  const JAN = 0;
+
+  it("names a calendar season by its year alone, not as a split year", () => {
+    expect(seasonLabel(2026, JAN)).toBe("2026");
+    // Pokémon's September season still reads as a split year.
+    expect(seasonLabel(2026)).toBe("2026/27");
+  });
+
+  it("puts a date in the year it actually falls in", () => {
+    // Under Pokémon rules an August date belongs to the previous season.
+    expect(seasonStartYear(new Date(2027, 7, 15))).toBe(2026);
+    expect(seasonStartYear(new Date(2027, 7, 15), JAN)).toBe(2027);
+  });
+
+  it("runs a calendar season from January to January", () => {
+    const range = seasonRange(2026, JAN);
+    expect(range.from).toEqual(new Date(2026, 0, 1));
+    expect(range.to).toEqual(new Date(2027, 0, 1));
+  });
+
+  it("labels the quarters with the months they cover", () => {
+    expect(seasonQuarters(JAN).map((q) => q.months)).toEqual([
+      "Jan–Mar", "Apr–Jun", "Jul–Sep", "Oct–Dec",
+    ]);
+    expect(seasonQuarters().map((q) => q.months)).toEqual([
+      "Sep–Nov", "Dec–Feb", "Mar–May", "Jun–Aug",
+    ]);
+  });
+
+  it("converts the registry's 1-12 month to a 0-indexed one", () => {
+    expect(toMonthIndex(1)).toBe(0);
+    expect(toMonthIndex(9)).toBe(8);
+    expect(toMonthIndex(12)).toBe(11);
   });
 });

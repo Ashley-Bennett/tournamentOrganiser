@@ -602,6 +602,7 @@ const PlayerTournamentView: React.FC = () => {
   // way the organiser's do and no deck surface appears where there are none.
   const game = getGame(viewData?.tournament.game_id);
   const rules = rulesFor(viewData?.tournament.game_id);
+  const hasDecks = game.deck !== "none";
 
   const deckMap = useMemo(() => {
     const m = new Map<string, [number | null, number | null]>();
@@ -731,14 +732,16 @@ const PlayerTournamentView: React.FC = () => {
               : ""}
       </Typography>
       <Box display="flex" alignItems="center" gap={1} mt={1}>
-        <Button
-          size="small"
-          variant={player.deck_pokemon1 ? "outlined" : "contained"}
-          startIcon={<CatchingPokemonIcon />}
-          onClick={() => setDeckPickerOpen(true)}
-        >
-          {player.deck_pokemon1 ? "Edit deck" : "Choose deck"}
-        </Button>
+        {hasDecks && (
+          <Button
+            size="small"
+            variant={player.deck_pokemon1 ? "outlined" : "contained"}
+            startIcon={<CatchingPokemonIcon />}
+            onClick={() => setDeckPickerOpen(true)}
+          >
+            {player.deck_pokemon1 ? "Edit deck" : "Choose deck"}
+          </Button>
+        )}
         {player.deck_pokemon1 != null && (
           <img
             src={getSpriteUrl(player.deck_pokemon1)}
@@ -786,6 +789,7 @@ const PlayerTournamentView: React.FC = () => {
         <Box textAlign="center" mt={2}>
           <LiveIndicator isLive={liveStatus === "SUBSCRIBED"} />
         </Box>
+        {hasDecks && (
         <DeckPickerDialog
           open={deckPickerOpen}
           onClose={() => setDeckPickerOpen(false)}
@@ -793,6 +797,7 @@ const PlayerTournamentView: React.FC = () => {
           initialPokemon2={viewData?.player.deck_pokemon2 ?? null}
           onSave={handleSaveDeck}
         />
+        )}
       </Box>
     );
   }
@@ -1076,13 +1081,15 @@ const PlayerTournamentView: React.FC = () => {
         <Typography variant="caption" color="text.disabled">Updates automatically</Typography>
       </Box>
 
-      <DeckPickerDialog
-        open={deckPickerOpen}
-        onClose={() => setDeckPickerOpen(false)}
-        initialPokemon1={viewData?.player.deck_pokemon1 ?? null}
-        initialPokemon2={viewData?.player.deck_pokemon2 ?? null}
-        onSave={handleSaveDeck}
-      />
+      {hasDecks && (
+        <DeckPickerDialog
+          open={deckPickerOpen}
+          onClose={() => setDeckPickerOpen(false)}
+          initialPokemon1={viewData?.player.deck_pokemon1 ?? null}
+          initialPokemon2={viewData?.player.deck_pokemon2 ?? null}
+          onSave={handleSaveDeck}
+        />
+      )}
 
       {user && insightsTarget && (
         <MatchInsightsModal
@@ -1093,6 +1100,7 @@ const PlayerTournamentView: React.FC = () => {
           initialOppPokemon2={insightsTarget.oppP2}
           isEditing={insightsTarget.isEditing}
           oppDeckLocked={insightsTarget.oppDeckLocked}
+          showDeck={hasDecks}
           onClose={() => {
             const ids = viewData?.matches.map((m) => m.id) ?? [];
             void loadInsights(ids);
