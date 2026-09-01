@@ -247,6 +247,10 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
   const earned = data ? TIERS.filter((t) => t.count(data) > 0) : [];
   const nextLocked = data ? [...TIERS].reverse().find((t) => t.count(data) === 0) : undefined;
 
+  // Shown only while there is still a better finish to chase — see the slot
+  // comment below.
+  const showBestFinish = !data || data.first_count === 0;
+
   return (
     <>
       <Grid container spacing={2} mb={2}>
@@ -260,15 +264,22 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
         <Grid item xs={6} sm={4} md={2}>
           <StatCard label="Tournaments" value={data?.total_completed ?? "—"} loading={loading} />
         </Grid>
-        <Grid item xs={6} sm={4} md={2}>
-          <StatCard
-            label="Best Finish"
-            value={data?.best_finish != null ? `${data.best_finish}${ordinal(data.best_finish)}` : "—"}
-            sub={data?.best_finish != null ? "Across all events" : "No finishes yet"}
-            loading={loading}
-            color={data?.best_finish === 1 ? "warning.main" : undefined}
-          />
-        </Grid>
+        {/*
+          Best Finish and the 1st Place Rate share a slot. Until you win an
+          event, your best finish is the thing that moves and the win rate is a
+          flat 0%; the moment you win, best finish is pinned at 1st forever and
+          stops saying anything, while the rate carries on being useful.
+        */}
+        {showBestFinish && (
+          <Grid item xs={6} sm={4} md={2}>
+            <StatCard
+              label="Best Finish"
+              value={data?.best_finish != null ? `${data.best_finish}${ordinal(data.best_finish)}` : "—"}
+              sub={data?.best_finish != null ? "Across all events" : "No finishes yet"}
+              loading={loading}
+            />
+          </Grid>
+        )}
         {earned.map((t) => (
           <Grid item xs={6} sm={4} md={2} key={t.key}>
             <StatCard
