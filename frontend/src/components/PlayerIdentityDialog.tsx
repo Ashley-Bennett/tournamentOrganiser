@@ -45,6 +45,12 @@ export interface IdentityOption {
   events_played: number;
 }
 
+interface DismissalRow {
+  other_key: string;
+  other_name: string | null;
+  other_events: number;
+}
+
 interface EntryRow {
   tournament_player_id: string;
   entry_name: string;
@@ -80,6 +86,7 @@ export default function PlayerIdentityDialog({
   const [error, setError] = useState<string | null>(null);
   const [mergePickerOpen, setMergePickerOpen] = useState(false);
   const [mergeTarget, setMergeTarget] = useState<IdentityOption | null>(null);
+  const [dismissals, setDismissals] = useState<DismissalRow[]>([]);
 
   const open = identity != null;
   const key = identity?.identity_key ?? null;
@@ -87,16 +94,21 @@ export default function PlayerIdentityDialog({
   const load = useCallback(() => {
     if (!key) return;
     setLoading(true);
-    void supabase
-      .rpc("get_workspace_player_entries", {
+    void Promise.all([
+      supabase.rpc("get_workspace_player_entries", {
         p_workspace_id: workspaceId,
         p_identity_key: key,
-      })
-      .then(({ data, error: err }) => {
-        setEntries((data ?? []) as EntryRow[]);
-        setError(err?.message ?? null);
-        setLoading(false);
-      });
+      }),
+      supabase.rpc("get_workspace_player_dismissals", {
+        p_workspace_id: workspaceId,
+        p_identity_key: key,
+      }),
+    ]).then(([entryRes, dismissRes]) => {
+      setEntries((entryRes.data ?? []) as EntryRow[]);
+      setDismissals((dismissRes.data ?? []) as DismissalRow[]);
+      setError(entryRes.error?.message ?? null);
+      setLoading(false);
+    });
   }, [workspaceId, key]);
 
   useEffect(() => {
@@ -142,6 +154,26 @@ export default function PlayerIdentityDialog({
         p_target_key: targetKey,
       }),
     );
+  }
+
+  async function restoreSuggestion(otherKey: string) {
+    if (!key) return;
+    setBusy(true);
+    setError(null);
+    const { error: err } = await supabase.rpc("restore_merge_suggestion", {
+      p_workspace_id: workspaceId,
+      p_key_a: key,
+      p_key_b: otherKey,
+    });
+    setBusy(false);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    // Stays open: unlike a merge, this does not change who this player is,
+    // so there is nothing to step back and look at.
+    load();
+    onChanged();
   }
 
   function splitSelected() {
@@ -220,6 +252,30 @@ export default function PlayerIdentityDialog({
                 );
               })}
             </List>
+          )}
+
+          {dismissals.length > 0 && (
+            <>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="caption" color="text.secondary" display="block" mb={0.75}>
+                Marked as not the same as
+              </Typography>
+              <Box display="flex" flexWrap="wrap" gap={0.75}>
+                {dismissals.map((d) => (
+                  <Chip
+                    key={d.other_key}
+                    size="small"
+                    variant="outlined"
+                    label={d.other_name ?? "a player who no longer exists"}
+                    onDelete={canEdit ? () => void restoreSuggestion(d.other_key) : undefined}
+                    deleteIcon={<UndoIcon />}
+                  />
+                ))}
+              </Box>
+              <Typography variant="caption" color="text.disabled" display="block" mt={0.5}>
+                These stay out of the duplicate suggestions. Undo one to have it offered again.
+              </Typography>
+            </>
           )}
 
           {canEdit && (

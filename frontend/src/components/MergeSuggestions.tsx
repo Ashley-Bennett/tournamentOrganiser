@@ -48,7 +48,6 @@ export default function MergeSuggestions({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [dismissed, setDismissed] = useState<string[]>([]);
   const [pending, setPending] = useState<Suggestion | null>(null);
 
   const load = useCallback(() => {
@@ -64,9 +63,26 @@ export default function MergeSuggestions({
     load();
   }, [load, refreshKey]);
 
-  const visible = rows.filter((r) => !dismissed.includes(r.key_a + r.key_b));
+  if (rows.length === 0) return null;
 
-  if (visible.length === 0) return null;
+  // Remembered against the pair, so the same two names are not re-offered on
+  // every visit. Reversible from either player's dialog.
+  async function dismiss(s: Suggestion) {
+    const id = s.key_a + s.key_b;
+    setBusy(id);
+    setError(null);
+    const { error: err } = await supabase.rpc("dismiss_merge_suggestion", {
+      p_workspace_id: workspaceId,
+      p_key_a: s.key_a,
+      p_key_b: s.key_b,
+    });
+    setBusy(null);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    load();
+  }
 
   async function confirmMerge(sourceKey: string, targetKey: string) {
     if (!pending) return;
@@ -91,7 +107,7 @@ export default function MergeSuggestions({
   return (
     <Box mb={2}>
       <Button size="small" startIcon={<MergeIcon />} onClick={() => setOpen((o) => !o)}>
-        {visible.length} possible duplicate{visible.length === 1 ? "" : "s"}
+        {rows.length} possible duplicate{rows.length === 1 ? "" : "s"}
       </Button>
 
       <Collapse in={open}>
@@ -102,11 +118,12 @@ export default function MergeSuggestions({
             </Alert>
           )}
           <Typography variant="body2" color="text.disabled" mb={1}>
-            Names similar enough to be the same person. You choose which spelling survives, and
-            it can be undone afterwards.
+            Names similar enough to be the same person. You choose which spelling survives.
+            Both merging and &ldquo;not the same&rdquo; are remembered, and both can be undone
+            from the player afterwards.
           </Typography>
 
-          {visible.map((s) => {
+          {rows.map((s) => {
             const id = s.key_a + s.key_b;
             return (
               <Box
@@ -134,7 +151,8 @@ export default function MergeSuggestions({
                     <Button
                       size="small"
                       color="inherit"
-                      onClick={() => setDismissed((d) => [...d, id])}
+                      disabled={busy === id}
+                      onClick={() => void dismiss(s)}
                     >
                       Not the same
                     </Button>
