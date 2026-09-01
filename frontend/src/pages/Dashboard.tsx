@@ -33,6 +33,7 @@ import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
 import { useAuth } from "../AuthContext";
 import { TournamentSummary } from "../types/tournament";
+import { formatLabel } from "../games/registry";
 import { formatDate } from "../utils/format";
 import { getAllEntries } from "../utils/playerStorage";
 import { getSpriteUrl } from "../utils/pokemonCache";
@@ -76,7 +77,9 @@ function statusLabel(status: string) {
 }
 
 function typeLabel(type: string) {
-  return type === "single_elimination" ? "Single Elim" : "Swiss";
+  if (type === "single_elimination") return "Single Elim";
+  if (type === "round_robin") return "Round Robin";
+  return "Swiss";
 }
 
 const OrganiserDashboard: React.FC = () => {
@@ -106,7 +109,7 @@ const OrganiserDashboard: React.FC = () => {
         await Promise.all([
           supabase
             .from("tournaments")
-            .select("id, name, status, tournament_type, created_at, created_by, current_round_started_at, starts_at, game_format")
+            .select("id, name, status, tournament_type, created_at, created_by, current_round_started_at, starts_at, game_format, game_id")
             .eq("workspace_id", workspaceId)
             .order("created_at", { ascending: false }),
           supabase
@@ -205,7 +208,7 @@ const OrganiserDashboard: React.FC = () => {
                           {activeTournament.name}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {activeTournament.game_format || typeLabel(activeTournament.tournament_type)} · Started {formatDate(activeTournament.created_at)}
+                          {formatLabel(activeTournament.game_id, activeTournament.game_format) ?? typeLabel(activeTournament.tournament_type)} · Started {formatDate(activeTournament.created_at)}
                         </Typography>
                       </Box>
                     </Box>
@@ -247,7 +250,7 @@ const OrganiserDashboard: React.FC = () => {
                         {t.name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {t.game_format || typeLabel(t.tournament_type)} · {formatDate(t.starts_at ?? t.created_at)}
+                        {formatLabel(t.game_id, t.game_format) ?? typeLabel(t.tournament_type)} · {formatDate(t.starts_at ?? t.created_at)}
                       </Typography>
                     </Box>
                     <Chip label={statusLabel(t.status)} color={statusColor(t.status)} size="small" sx={{ flexShrink: 0 }} />

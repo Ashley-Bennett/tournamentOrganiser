@@ -41,7 +41,9 @@ const GENERIC: GameDefinition = {
   rules: GENERIC_RULES,
   season: { startMonth: 1 },
   iconSrc: "/games/generic.svg",
-  accent: "#7E8CA0",
+  // Mid-tone on purpose: a darker slate vanishes against the dark theme and
+  // a lighter one washes out on white.
+  accent: "#8296B0",
   defaults: { structure: "swiss" },
 };
 
@@ -85,6 +87,19 @@ export const GAMES: GameDefinition[] = [
 export const AVAILABLE_GAMES = GAMES.filter((g) => g.status === "available");
 
 export const DEFAULT_GAME_ID = "generic";
+
+/**
+ * Structures the app can actually run today.
+ *
+ * A game may declare `round_robin` in its registry entry before the pairing
+ * code for it exists; until then the create dialog offers it disabled rather
+ * than creating a tournament that would silently be paired as Swiss.
+ */
+export const IMPLEMENTED_STRUCTURES: TournamentStructure[] = ["swiss"];
+
+export function isStructureImplemented(structure: TournamentStructure): boolean {
+  return IMPLEMENTED_STRUCTURES.includes(structure);
+}
 
 /**
  * Look up a game, falling back to Generic for an id this build does not know.

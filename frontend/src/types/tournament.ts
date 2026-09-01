@@ -6,7 +6,7 @@ export interface TournamentSummary {
   id: string;
   name: string;
   status: string;
-  tournament_type: "swiss" | "single_elimination";
+  tournament_type: "swiss" | "round_robin" | "single_elimination";
   num_rounds?: number | null;
   created_at: string;
   created_by: string;
@@ -22,6 +22,9 @@ export interface TournamentSummary {
   allow_late_join?: boolean;
   join_code?: string | null;
   starts_at?: string | null;
+  /** Which game this event is for — see games/registry. */
+  game_id?: string | null;
+  /** Format code within that game (e.g. "standard"), or free text on older rows. */
   game_format?: string | null;
   location?: string | null;
   description?: string | null;

@@ -16,7 +16,11 @@ import {
   DialogContentText,
   DialogActions,
   Switch,
+  FormControl,
   FormControlLabel,
+  InputLabel,
+  MenuItem,
+  Select,
   Tooltip,
   Divider,
   Table,
@@ -29,6 +33,7 @@ import {
   InputAdornment,
   Snackbar,
 } from "@mui/material";
+import { formatLabel, getGame } from "../games/registry";
 import SeatIcon from "@mui/icons-material/EventSeat";
 import { PlayArrow as PlayArrowIcon, Add as AddIcon, Remove as RemoveIcon } from "@mui/icons-material";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -449,7 +454,7 @@ const TournamentView: React.FC = () => {
       .eq("id", tournament.id)
       .eq("workspace_id", workspaceId ?? "")
       .select(
-        "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, allow_late_join, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description",
+        "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, allow_late_join, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description, game_id",
       )
       .maybeSingle();
     if (!error && data) setTournament(data as TournamentSummary);
@@ -643,7 +648,7 @@ const handleSetRoundDuration = async (minutes: number | null) => {
         .eq("id", tournament.id)
         .eq("workspace_id", workspaceId)
         .select(
-          "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, allow_late_join, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description",
+          "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, allow_late_join, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description, game_id",
         )
         .maybeSingle();
 
@@ -817,7 +822,9 @@ const handleSetRoundDuration = async (minutes: number | null) => {
           {tournament.game_format && (
             <>
               <Typography variant="body2" color="text.secondary">Format</Typography>
-              <Typography variant="body2">{tournament.game_format}</Typography>
+              <Typography variant="body2">
+                {formatLabel(tournament.game_id, tournament.game_format)}
+              </Typography>
             </>
           )}
           {tournament.location && (
@@ -874,15 +881,37 @@ const handleSetRoundDuration = async (minutes: number | null) => {
                   InputLabelProps={{ shrink: true }}
                   fullWidth
                 />
-                <TextField
-                  label="Format"
-                  size="small"
-                  value={formatInput}
-                  onChange={(e) => setFormatInput(e.target.value)}
-                  placeholder="e.g. Standard, Expanded, GLC"
-                  inputProps={{ maxLength: 50 }}
-                  fullWidth
-                />
+                {/*
+                  Formats come from the game's registry entry rather than being
+                  typed. A game with no formats (generic) has nothing to ask.
+                  Any value already stored that the registry does not know —
+                  free text from before games existed — is offered as an extra
+                  option so saving the panel cannot silently discard it.
+                */}
+                {getGame(tournament.game_id).formats.length > 0 && (
+                  <FormControl size="small" fullWidth>
+                    <InputLabel id="details-format-label">Format</InputLabel>
+                    <Select
+                      labelId="details-format-label"
+                      label="Format"
+                      value={formatInput}
+                      onChange={(e) => setFormatInput(e.target.value)}
+                    >
+                      <MenuItem value="">
+                        <em>Not set</em>
+                      </MenuItem>
+                      {getGame(tournament.game_id).formats.map((f) => (
+                        <MenuItem key={f.id} value={f.id}>
+                          {f.name}
+                        </MenuItem>
+                      ))}
+                      {formatInput &&
+                        !getGame(tournament.game_id).formats.some((f) => f.id === formatInput) && (
+                          <MenuItem value={formatInput}>{formatInput}</MenuItem>
+                        )}
+                    </Select>
+                  </FormControl>
+                )}
                 <TextField
                   label="Location"
                   size="small"

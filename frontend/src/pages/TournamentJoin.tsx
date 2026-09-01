@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { supabase } from "../supabaseClient";
+import { formatLabel } from "../games/registry";
 import DeckPicker from "../components/DeckPicker";
 import {
   TjEntry,
@@ -87,6 +88,7 @@ export default function TournamentJoin() {
         game_format: string | null;
         location: string | null;
         description: string | null;
+        game_id: string | null;
       };
       const name = row.tournament_name;
       const status = row.status;
@@ -99,7 +101,8 @@ export default function TournamentJoin() {
       setRegisteredNames(names);
 
       setStartsAt(row.starts_at ?? null);
-      setGameFormat(row.game_format ?? null);
+      // Stored as a code (e.g. "standard") — resolve it to the name players read.
+      setGameFormat(formatLabel(row.game_id, row.game_format));
       setLocation(row.location ?? null);
       setDescription(row.description ?? null);
 

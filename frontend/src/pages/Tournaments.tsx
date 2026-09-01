@@ -39,6 +39,14 @@ import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
 import { TournamentSummary } from "../types/tournament";
+import GamePicker from "../components/GamePicker";
+import {
+  formatLabel,
+  getGame,
+  getGameFormat,
+  isStructureImplemented,
+  structureLabel,
+} from "../games/registry";
 import Breadcrumbs from "../components/Breadcrumbs";
 
 const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
@@ -66,6 +74,9 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
     !!(location.state as { openCreate?: boolean } | null)?.openCreate,
   );
   const [newName, setNewName] = useState("");
+  const [newGameId, setNewGameId] = useState<string | null>(null);
+  const [newFormat, setNewFormat] = useState("");
+  const [newStructure, setNewStructure] = useState("swiss");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const createNameRef = useRef<HTMLInputElement>(null);
@@ -98,7 +109,7 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
 
       const { data, error } = await supabase
         .from("tournaments")
-        .select("id, name, status, tournament_type, created_at, created_by, starts_at, game_format")
+        .select("id, name, status, tournament_type, created_at, created_by, starts_at, game_format, game_id")
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
 
@@ -159,10 +170,30 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
     }
   };
 
+  const resetCreateForm = () => {
+    setCreateOpen(false);
+    setNewName("");
+    setNewGameId(null);
+    setNewFormat("");
+    setNewStructure("swiss");
+    setCreateError("");
+  };
+
+  /** Picking a game resets the steps below it to that game's defaults. */
+  const handlePickGame = (gameId: string) => {
+    const game = getGame(gameId);
+    setNewGameId(game.id);
+    setNewFormat(game.defaults.format ?? "");
+    setNewStructure(game.defaults.structure);
+    setCreateError("");
+  };
+
   const handleCreateTournament = async () => {
     const name = newName.trim();
     if (!name) { setCreateError("Please enter a tournament name."); return; }
+    if (!newGameId) { setCreateError("Please choose a game."); return; }
     if (!user || !workspaceId) return;
+    const game = getGame(newGameId);
     setCreating(true);
     setCreateError("");
     const { data, error: insertError } = await supabase
@@ -172,15 +203,17 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
         created_by: user.id,
         workspace_id: workspaceId,
         status: "draft",
-        tournament_type: "swiss",
+        game_id: game.id,
+        // A game with no formats stores nothing rather than an empty string.
+        game_format: game.formats.length > 0 ? newFormat || null : null,
+        tournament_type: newStructure,
         is_public: false,
       })
       .select("id")
       .single();
     setCreating(false);
     if (insertError) { setCreateError(insertError.message); return; }
-    setCreateOpen(false);
-    setNewName("");
+    resetCreateForm();
     navigate(wPath(`/tournaments/${data.id}`), { state: { new: true } });
   };
 
@@ -203,11 +236,11 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
-  // Format tournament type for display
-  const getTournamentTypeLabel = (type: string) => {
-    if (!type) return "";
-    return type === "single_elimination" ? "Single Elimination" : "Swiss";
-  };
+  // What to show under a tournament's name: the format if one was chosen,
+  // otherwise how it is run. Formats are stored as codes, so they go through
+  // the registry rather than being printed raw.
+  const getSubtitle = (t: TournamentSummary) =>
+    formatLabel(t.game_id, t.game_format) ?? structureLabel(t.tournament_type);
 
   // Filtering and sorting logic
   const filteredTournaments = tournaments
@@ -332,7 +365,7 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                     />
                   </Box>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    {tournament.game_format || getTournamentTypeLabel(tournament.tournament_type)} · {formatDate(tournament.starts_at ?? tournament.created_at)}
+                    {getSubtitle(tournament)} · {formatDate(tournament.starts_at ?? tournament.created_at)}
                   </Typography>
                 </CardContent>
                 <CardActions sx={{ pt: 0.5, px: 2, pb: 1.5 }}>
@@ -406,7 +439,7 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                     <TableRow key={tournament.id}>
                       <TableCell>{tournament.name}</TableCell>
                       <TableCell>
-                        {tournament.game_format || getTournamentTypeLabel(tournament.tournament_type)}
+                        {getSubtitle(tournament)}
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -449,9 +482,9 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
 
       <Dialog
         open={createOpen}
-        onClose={() => { setCreateOpen(false); setNewName(""); setCreateError(""); }}
+        onClose={resetCreateForm}
         fullWidth
-        maxWidth="xs"
+        maxWidth="sm"
       >
         <DialogTitle>Create tournament</DialogTitle>
         <DialogContent>
@@ -470,16 +503,74 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
             required
             autoComplete="off"
             autoFocus
-            sx={{ mt: 1 }}
+            sx={{ mt: 1, mb: 2 }}
           />
+
+          <GamePicker value={newGameId} onChange={handlePickGame} />
+
+          {/*
+            Format and structure are revealed only once a game is chosen, and
+            the format step is skipped entirely by games that have no formats —
+            so a generic Swiss event is still a two-step create.
+          */}
+          {newGameId && (
+            <Box display="flex" flexWrap="wrap" gap={2} mt={2.5}>
+              {getGame(newGameId).formats.length > 0 && (
+                <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 200 }, flex: 1 }}>
+                  <InputLabel id="create-format-label">Format</InputLabel>
+                  <Select
+                    labelId="create-format-label"
+                    label="Format"
+                    value={newFormat}
+                    onChange={(e) => setNewFormat(e.target.value)}
+                    // The hint belongs in the open list, not in the field —
+                    // without this the closed Select reads "Standard Current rotation".
+                    renderValue={(v) => getGameFormat(newGameId, v as string)?.name ?? String(v)}
+                  >
+                    {getGame(newGameId).formats.map((f) => (
+                      <MenuItem key={f.id} value={f.id}>
+                        {f.name}
+                        {f.hint && (
+                          <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                            {f.hint}
+                          </Typography>
+                        )}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+
+              <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 200 }, flex: 1 }}>
+                <InputLabel id="create-structure-label">Structure</InputLabel>
+                <Select
+                  labelId="create-structure-label"
+                  label="Structure"
+                  value={newStructure}
+                  onChange={(e) => setNewStructure(e.target.value)}
+                >
+                  {getGame(newGameId).structures.map((st) => (
+                    <MenuItem key={st} value={st} disabled={!isStructureImplemented(st)}>
+                      {structureLabel(st)}
+                      {!isStructureImplemented(st) && (
+                        <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                          coming soon
+                        </Typography>
+                      )}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setCreateOpen(false); setNewName(""); setCreateError(""); }}>
+          <Button onClick={resetCreateForm}>
             Cancel
           </Button>
           <Button
             variant="contained"
-            disabled={creating || !newName.trim()}
+            disabled={creating || !newName.trim() || !newGameId}
             onClick={() => void handleCreateTournament()}
           >
             {creating ? "Creating…" : "Create"}
