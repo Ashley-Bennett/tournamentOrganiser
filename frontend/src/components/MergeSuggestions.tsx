@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, Chip, Collapse, Typography } from "@mui/material";
 import MergeIcon from "@mui/icons-material/Merge";
 import { supabase } from "../supabaseClient";
+import MergeConfirmDialog, { type MergeCandidate } from "./MergeConfirmDialog";
 
 /**
  * Likely duplicate players, by name similarity.
@@ -10,8 +11,8 @@ import { supabase } from "../supabaseClient";
  * "Dan OKafor" and "Dan Okafor" look identical to a computer and different to
  * an organiser who was in the room, and only one of them is right.
  *
- * The merge always keeps the identity with more events as the target, so the
- * busier history absorbs the stray rather than the other way round.
+ * Merging goes through a confirmation that states the direction and allows it
+ * to be swapped: which spelling survives is a judgement the app cannot make.
  */
 
 interface Suggestion {
@@ -48,6 +49,7 @@ export default function MergeSuggestions({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<string[]>([]);
+  const [pending, setPending] = useState<Suggestion | null>(null);
 
   const load = useCallback(() => {
     void supabase
@@ -66,18 +68,18 @@ export default function MergeSuggestions({
 
   if (visible.length === 0) return null;
 
-  async function merge(s: Suggestion) {
-    // Bigger history wins, so the merged person keeps the fuller record.
-    const [target, source] =
-      s.events_a >= s.events_b ? [s.key_a, s.key_b] : [s.key_b, s.key_a];
-    setBusy(s.key_a + s.key_b);
+  async function confirmMerge(sourceKey: string, targetKey: string) {
+    if (!pending) return;
+    const id = pending.key_a + pending.key_b;
+    setBusy(id);
     setError(null);
     const { error: err } = await supabase.rpc("merge_workspace_players", {
       p_workspace_id: workspaceId,
-      p_source_keys: [source],
-      p_target_key: target,
+      p_source_keys: [sourceKey],
+      p_target_key: targetKey,
     });
     setBusy(null);
+    setPending(null);
     if (err) {
       setError(err.message);
       return;
@@ -100,13 +102,12 @@ export default function MergeSuggestions({
             </Alert>
           )}
           <Typography variant="body2" color="text.disabled" mb={1}>
-            Names similar enough to be the same person. Merging keeps whichever has played more
-            events, and can be undone from that player afterwards.
+            Names similar enough to be the same person. You choose which spelling survives, and
+            it can be undone afterwards.
           </Typography>
 
           {visible.map((s) => {
             const id = s.key_a + s.key_b;
-            const keepA = s.events_a >= s.events_b;
             return (
               <Box
                 key={id}
@@ -117,26 +118,18 @@ export default function MergeSuggestions({
                 py={0.75}
                 sx={{ borderBottom: 1, borderColor: "divider" }}
               >
-                <Chip
-                  size="small"
-                  label={`${s.name_a} · ${s.events_a}`}
-                  variant={keepA ? "filled" : "outlined"}
-                />
+                <Chip size="small" label={`${s.name_a} · ${s.events_a}`} variant="outlined" />
                 <Typography variant="caption" color="text.disabled">
-                  {keepA ? "←" : "→"}
+                  and
                 </Typography>
-                <Chip
-                  size="small"
-                  label={`${s.name_b} · ${s.events_b}`}
-                  variant={keepA ? "outlined" : "filled"}
-                />
+                <Chip size="small" label={`${s.name_b} · ${s.events_b}`} variant="outlined" />
                 <Typography variant="caption" color="text.disabled" flexGrow={1}>
                   {(s.similarity * 100).toFixed(0)}% alike
                 </Typography>
                 {canEdit && (
                   <>
-                    <Button size="small" disabled={busy === id} onClick={() => void merge(s)}>
-                      Merge
+                    <Button size="small" disabled={busy === id} onClick={() => setPending(s)}>
+                      Merge…
                     </Button>
                     <Button
                       size="small"
@@ -152,6 +145,30 @@ export default function MergeSuggestions({
           })}
         </Box>
       </Collapse>
+
+      <MergeConfirmDialog
+        a={
+          pending
+            ? ({
+                identity_key: pending.key_a,
+                display_name: pending.name_a,
+                events_played: pending.events_a,
+              } as MergeCandidate)
+            : null
+        }
+        b={
+          pending
+            ? ({
+                identity_key: pending.key_b,
+                display_name: pending.name_b,
+                events_played: pending.events_b,
+              } as MergeCandidate)
+            : null
+        }
+        busy={busy != null}
+        onConfirm={(src, tgt) => void confirmMerge(src, tgt)}
+        onCancel={() => setPending(null)}
+      />
     </Box>
   );
 }

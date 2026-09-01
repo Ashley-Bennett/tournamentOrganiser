@@ -25,6 +25,7 @@ import CallSplitIcon from "@mui/icons-material/CallSplit";
 import UndoIcon from "@mui/icons-material/Undo";
 import { supabase } from "../supabaseClient";
 import PickerDialog, { type PickerItem } from "./PickerDialog";
+import MergeConfirmDialog, { type MergeCandidate } from "./MergeConfirmDialog";
 
 /**
  * Review and correct one player identity.
@@ -78,6 +79,7 @@ export default function PlayerIdentityDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mergePickerOpen, setMergePickerOpen] = useState(false);
+  const [mergeTarget, setMergeTarget] = useState<IdentityOption | null>(null);
 
   const open = identity != null;
   const key = identity?.identity_key ?? null;
@@ -131,12 +133,12 @@ export default function PlayerIdentityDialog({
     onClose();
   }
 
-  function mergeInto(targetKey: string) {
-    if (!key) return;
+  function confirmMerge(sourceKey: string, targetKey: string) {
+    setMergeTarget(null);
     void run(() =>
       supabase.rpc("merge_workspace_players", {
         p_workspace_id: workspaceId,
-        p_source_keys: [key],
+        p_source_keys: [sourceKey],
         p_target_key: targetKey,
       }),
     );
@@ -280,8 +282,32 @@ export default function PlayerIdentityDialog({
         selected={[]}
         multi={false}
         searchPlaceholder="Search players"
-        onApply={(ids) => ids[0] && mergeInto(ids[0])}
+        onApply={(ids) => {
+          const picked = allIdentities.find((p) => p.identity_key === ids[0]);
+          if (picked) setMergeTarget(picked);
+        }}
         onClose={() => setMergePickerOpen(false)}
+      />
+
+      {/*
+        The picker chooses who to merge with; the confirm chooses which way
+        round. Picking someone is not the same as agreeing to lose your own
+        spelling, so the direction is still shown and swappable here.
+      */}
+      <MergeConfirmDialog
+        a={
+          identity && mergeTarget
+            ? ({
+                identity_key: identity.identity_key,
+                display_name: identity.display_name,
+                events_played: identity.events_played,
+              } as MergeCandidate)
+            : null
+        }
+        b={mergeTarget}
+        busy={busy}
+        onConfirm={confirmMerge}
+        onCancel={() => setMergeTarget(null)}
       />
     </>
   );
