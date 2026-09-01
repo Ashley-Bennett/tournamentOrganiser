@@ -7,6 +7,10 @@ import type { StatsPeriod } from "../utils/statsPeriod";
  *
  * The years offered are the ones the player actually has results in, newest
  * first, so the list never fills up with empty years.
+ *
+ * Re-selecting the chip that is already active does nothing. A `StatsPeriod` is
+ * an object, so firing `onChange` again would hand the page an equal-but-new
+ * value and refetch the whole page off a click that changed nothing.
  */
 export default function StatsPeriodFilter({
   years,
@@ -30,7 +34,7 @@ export default function StatsPeriodFilter({
           size="small"
           color={value.year == null ? "primary" : "default"}
           variant={value.year == null ? "filled" : "outlined"}
-          onClick={() => onChange({ year: null })}
+          onClick={() => value.year != null && onChange({ year: null })}
         />
         {years.map((year) => (
           <Chip
@@ -39,7 +43,7 @@ export default function StatsPeriodFilter({
             size="small"
             color={value.year === year ? "primary" : "default"}
             variant={value.year === year ? "filled" : "outlined"}
-            onClick={() => onChange({ year })}
+            onClick={() => value.year !== year && onChange({ year })}
           />
         ))}
       </Box>

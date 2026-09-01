@@ -752,6 +752,13 @@ const PlayerStats: React.FC = () => {
   const [gameId, setGameId] = useState<string | null>(null);
   const [period, setPeriod] = useState<StatsPeriod>(ALL_TIME);
   const [trendBucket, setTrendBucket] = useState<TimelineBucket>("quarter");
+
+  // Depended on as primitives rather than as the `period` object: an
+  // equal-but-new object counts as a changed dependency, which would refetch
+  // the page off a click that selected what was already selected.
+  const periodYear = period.year;
+  const periodArgsValue = useMemo(() => periodArgs({ year: periodYear }), [periodYear]);
+  const { p_from, p_to } = periodArgsValue;
   const [overview, setOverview] = useState<OverviewStats | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [decks, setDecks] = useState<DeckStat[]>([]);
@@ -798,7 +805,7 @@ const PlayerStats: React.FC = () => {
 
   useEffect(() => {
     if (!user || !gameId) return;
-    const args = { ...periodArgs(period), p_game_id: gameId };
+    const args = { p_from, p_to, p_game_id: gameId };
 
     setOverviewLoading(true);
     setDecksLoading(true);
@@ -824,7 +831,7 @@ const PlayerStats: React.FC = () => {
       setTrend((data ?? []) as TrendRow[]);
       setTrendLoading(false);
     });
-  }, [user, period, gameId, trendBucket]);
+  }, [user, p_from, p_to, gameId, trendBucket]);
 
   const hasDecks = getGame(gameId).deck !== "none";
 
@@ -892,7 +899,7 @@ const PlayerStats: React.FC = () => {
 
       <StatsSection id="player-pace" title="Game Pace">
         <PlayerPaceSection
-          periodArgsValue={periodArgs(period)}
+          periodArgsValue={periodArgsValue}
           gameId={gameId}
           nameMap={nameMap}
         />

@@ -131,6 +131,14 @@ const OrganiserStats: React.FC = () => {
   const [period, setPeriod] = useState<StatsPeriod>(ALL_TIME);
   const [bucket, setBucket] = useState<TimelineBucket>("month");
 
+  // The fetches below depend on the period as two primitives rather than on the
+  // `period` object. An equal-but-new object is a different dependency as far
+  // as React is concerned, so depending on the object makes every fetch on the
+  // page hostage to whoever happens to construct one.
+  const periodYear = period.year;
+  const periodArgsValue = useMemo(() => periodArgs({ year: periodYear }), [periodYear]);
+  const { p_from, p_to } = periodArgsValue;
+
   const [overview, setOverview] = useState<OverviewStats | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
@@ -271,14 +279,15 @@ const OrganiserStats: React.FC = () => {
     void supabase
       .rpc("get_organiser_overview_stats", {
         p_workspace_id: workspaceId,
-        ...periodArgs(period),
+        p_from,
+        p_to,
         p_game_id: gameId,
       })
       .then(({ data }) => {
         setOverview(data && data.length > 0 ? (data[0] as OverviewStats) : null);
         setOverviewLoading(false);
       });
-  }, [workspaceId, period, gameId]);
+  }, [workspaceId, p_from, p_to, gameId]);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -286,7 +295,8 @@ const OrganiserStats: React.FC = () => {
     void supabase
       .rpc("get_organiser_attendance", {
         p_workspace_id: workspaceId,
-        ...periodArgs(period),
+        p_from,
+        p_to,
         p_game_id: gameId,
         // Deliberately generous: the table searches, sorts and pages client
         // side, so the limit only exists to bound the payload for a workspace
@@ -297,7 +307,7 @@ const OrganiserStats: React.FC = () => {
         setAttendance((data ?? []) as AttendanceRow[]);
         setAttendanceLoading(false);
       });
-  }, [workspaceId, period, gameId, identityVersion]);
+  }, [workspaceId, p_from, p_to, gameId, identityVersion]);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -305,7 +315,8 @@ const OrganiserStats: React.FC = () => {
     void supabase
       .rpc("get_organiser_timeline", {
         p_workspace_id: workspaceId,
-        ...periodArgs(period),
+        p_from,
+        p_to,
         p_game_id: gameId,
         p_bucket: bucket,
       })
@@ -313,7 +324,7 @@ const OrganiserStats: React.FC = () => {
         setTimeline((data ?? []) as TimelineRow[]);
         setTimelineLoading(false);
       });
-  }, [workspaceId, period, gameId, bucket]);
+  }, [workspaceId, p_from, p_to, gameId, bucket]);
 
   const points: TimelinePoint[] = useMemo(
     () =>
@@ -533,7 +544,7 @@ const OrganiserStats: React.FC = () => {
             workspaceId={workspaceId}
             gameId={gameId}
             nameMap={nameMap}
-            periodArgsValue={periodArgs(period)}
+            periodArgsValue={periodArgsValue}
           />
         </StatsSection>
       )}
@@ -597,7 +608,7 @@ const OrganiserStats: React.FC = () => {
         <EventHealthSection
           workspaceId={workspaceId}
           gameId={gameId}
-          periodArgsValue={periodArgs(period)}
+          periodArgsValue={periodArgsValue}
         />
       </StatsSection>
 

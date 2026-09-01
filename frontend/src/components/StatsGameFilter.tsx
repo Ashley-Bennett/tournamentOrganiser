@@ -36,7 +36,11 @@ export default function StatsGameFilter({
             size="small"
             color={value === id ? "primary" : "default"}
             variant={value === id ? "filled" : "outlined"}
-            onClick={() => onChange(id)}
+            // Guarded to match the period filter. A repeat pick is already
+            // inert here because the value is a string and React bails out of
+            // an identical state write, but that is a detail of the type
+            // rather than something this component should rely on.
+            onClick={() => value !== id && onChange(id)}
           />
         ))}
       </Box>
