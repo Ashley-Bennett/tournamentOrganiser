@@ -23,6 +23,7 @@ import {
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 import { useThemeMode } from "../ThemeContext";
+import NotificationBell from "./NotificationBell";
 
 const BORDER = "rgba(255,255,255,0.08)";
 const TEXT_MUTED = "rgba(255,255,255,0.6)";
@@ -108,6 +109,7 @@ const Header: React.FC = () => {
                 <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
                   What&apos;s New
                 </Button>
+                <NotificationBell showWhenEmpty={!!user} />
                 <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                   <IconButton
                     onClick={toggleTheme}
@@ -124,6 +126,7 @@ const Header: React.FC = () => {
 
               {/* Mobile */}
               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ display: { xs: "flex", sm: "none" } }}>
+                <NotificationBell showWhenEmpty={!!user} />
                 <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
                   <IconButton
                     onClick={toggleTheme}
@@ -193,6 +196,7 @@ const Header: React.FC = () => {
                 <Button component={RouterLink} to="/whats-new" sx={navBtnSx}>
                   What&apos;s New
                 </Button>
+                <NotificationBell showWhenEmpty={!!user} />
                 <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
                   <IconButton
                     onClick={toggleTheme}
@@ -225,6 +229,7 @@ const Header: React.FC = () => {
 
               {/* Mobile */}
               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ display: { xs: "flex", sm: "none" } }}>
+                <NotificationBell showWhenEmpty={!!user} />
                 <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
                   <IconButton
                     onClick={toggleTheme}
