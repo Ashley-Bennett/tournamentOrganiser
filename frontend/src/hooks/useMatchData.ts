@@ -67,6 +67,20 @@ export function useMatchData({
           throw new Error(matchesError.message || "Failed to load matches");
         }
 
+        // The roster loads whether or not any pairings exist. Manage Players,
+        // late entries and drops all need it before round 1 is generated, and
+        // this used to sit below the early return — so a tournament with
+        // players but no matches showed an empty player list.
+        const { data: allPlayersData, error: allPlayersError } = await supabase
+          .from("tournament_players")
+          .select(TOURNAMENT_PLAYER_COLUMNS)
+          .eq("tournament_id", tournamentId)
+          .order("name");
+        if (allPlayersError) {
+          throw new Error(allPlayersError.message || "Failed to load players");
+        }
+        setPlayers((allPlayersData as TournamentPlayer[]) ?? []);
+
         if (!matchesData || matchesData.length === 0) {
           setMatches([]);
           if (isInitialLoad) {
@@ -94,18 +108,6 @@ export function useMatchData({
 
         const playersMap = new Map<string, string>();
         playersData?.forEach((p) => playersMap.set(p.id, p.name));
-
-        const { data: allPlayersData, error: allPlayersError } = await supabase
-          .from("tournament_players")
-          .select(
-            TOURNAMENT_PLAYER_COLUMNS,
-          )
-          .eq("tournament_id", tournamentId)
-          .order("name");
-        if (allPlayersError) {
-          throw new Error(allPlayersError.message || "Failed to load players");
-        }
-        setPlayers((allPlayersData as TournamentPlayer[]) ?? []);
 
         const matchesWithPlayers: MatchWithPlayers[] = matchesData.map((match) => ({
           ...match,

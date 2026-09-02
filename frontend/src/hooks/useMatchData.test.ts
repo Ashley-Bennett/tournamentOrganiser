@@ -64,6 +64,43 @@ function makeChain(response: unknown) {
   return chain;
 }
 
+/**
+ * Route each supabase.from() call by table and selected columns.
+ *
+ * The previous fixture keyed responses off the order the hook happened to
+ * issue its queries in, which is why it went green while the roster fetch sat
+ * behind an early return and never ran for a tournament without matches.
+ */
+function mockQueries(responses: {
+  matches?: unknown;
+  playerNames?: unknown;
+  roster?: unknown;
+}) {
+  const empty = { data: [], error: null };
+  vi.mocked(supabase.from).mockImplementation(((table: string) => {
+    const chain: Record<string, unknown> = {};
+    let response: unknown = empty;
+    for (const m of ["eq", "in", "order"]) {
+      chain[m] = vi.fn().mockReturnValue(chain);
+    }
+    chain.select = vi.fn().mockImplementation((cols: string) => {
+      if (table === "tournament_matches") {
+        response = responses.matches ?? empty;
+      } else if (cols.replace(/\s/g, "") === "id,name") {
+        response = responses.playerNames ?? empty;
+      } else {
+        response = responses.roster ?? empty;
+      }
+      return chain;
+    });
+    chain.then = vi.fn().mockImplementation((resolve: (v: unknown) => void) => {
+      resolve(response);
+      return Promise.resolve(response);
+    });
+    return chain;
+  }) as never);
+}
+
 const defaultParams = {
   tournamentId: "t1",
   user: MOCK_USER,
@@ -94,16 +131,11 @@ describe("useMatchData", () => {
   });
 
   it("populates matches with player names on successful fetch", async () => {
-    vi.mocked(supabase.from)
-      .mockImplementationOnce(
-        () => makeChain({ data: [MOCK_MATCH], error: null }) as unknown as ReturnType<typeof supabase.from>,
-      )
-      .mockImplementationOnce(
-        () => makeChain({ data: MOCK_PLAYER_NAMES, error: null }) as unknown as ReturnType<typeof supabase.from>,
-      )
-      .mockImplementationOnce(
-        () => makeChain({ data: MOCK_ALL_PLAYERS, error: null }) as unknown as ReturnType<typeof supabase.from>,
-      );
+    mockQueries({
+      matches: { data: [MOCK_MATCH], error: null },
+      playerNames: { data: MOCK_PLAYER_NAMES, error: null },
+      roster: { data: MOCK_ALL_PLAYERS, error: null },
+    });
 
     const { result } = renderHook(() => useMatchData(defaultParams));
     await waitFor(() => expect(result.current.matches.length).toBe(1));
@@ -114,19 +146,30 @@ describe("useMatchData", () => {
   it("calls setSelectedRound with highest round on first load", async () => {
     const setSelectedRound = vi.fn();
     const twoRoundMatches = [MOCK_MATCH, { ...MOCK_MATCH, id: "m2", round_number: 3 }];
-    vi.mocked(supabase.from)
-      .mockImplementationOnce(
-        () => makeChain({ data: twoRoundMatches, error: null }) as unknown as ReturnType<typeof supabase.from>,
-      )
-      .mockImplementationOnce(
-        () => makeChain({ data: MOCK_PLAYER_NAMES, error: null }) as unknown as ReturnType<typeof supabase.from>,
-      )
-      .mockImplementationOnce(
-        () => makeChain({ data: MOCK_ALL_PLAYERS, error: null }) as unknown as ReturnType<typeof supabase.from>,
-      );
+    mockQueries({
+      matches: { data: twoRoundMatches, error: null },
+      playerNames: { data: MOCK_PLAYER_NAMES, error: null },
+      roster: { data: MOCK_ALL_PLAYERS, error: null },
+    });
 
     renderHook(() => useMatchData({ ...defaultParams, setSelectedRound }));
     await waitFor(() => expect(setSelectedRound).toHaveBeenCalledWith(3));
+  });
+
+  it("loads the roster even when no pairings have been generated yet", async () => {
+    // Manage Players, drops and late entries all need the roster before round
+    // 1 exists. This is the CODE-5 regression: the roster fetch used to sit
+    // below an early return taken whenever there were no matches.
+    mockQueries({
+      matches: { data: [], error: null },
+      roster: { data: MOCK_ALL_PLAYERS, error: null },
+    });
+
+    const { result } = renderHook(() => useMatchData(defaultParams));
+
+    await waitFor(() => expect(result.current.players.length).toBe(1));
+    expect(result.current.players[0].name).toBe("Alice");
+    expect(result.current.matches).toEqual([]);
   });
 
   it("calls setError when the matches fetch fails", async () => {
