@@ -11,6 +11,8 @@ import {
   type NewNotification,
 } from "../utils/notificationStore";
 import { useAttentionAlert } from "../hooks/useAttentionAlert";
+import { useAuth } from "../AuthContext";
+import OrganiserWatcher from "./OrganiserWatcher";
 
 /**
  * App-level player notifications.
@@ -295,6 +297,7 @@ function TournamentWatcher({
 export default function PlayerNotifications() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { notify } = useAttentionAlert();
   const [alert, setAlert] = useState<PlayerAlert | null>(null);
 
@@ -352,6 +355,9 @@ export default function PlayerNotifications() {
 
   return (
     <>
+      {/* Organiser-side events need an account — the RPC is auth.uid() scoped. */}
+      {user && <OrganiserWatcher onAlert={handleAlert} />}
+
       {entries.map((e) => (
         <TournamentWatcher
           key={e.tournamentId}

@@ -25,10 +25,14 @@ const MAX_ENTRIES = 50;
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type NotificationType =
+  // Player-facing, derived from get_player_tournament_view.
   | "round_published"
   | "round_time_up"
   | "result_needed"
-  | "tournament_completed";
+  | "tournament_completed"
+  // Organiser-facing, derived from get_organiser_alert_state.
+  | "results_all_in"
+  | "result_conflict";
 
 export interface StoredNotification {
   /**
