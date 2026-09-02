@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+# A newer push to the same branch makes an in-flight run redundant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, lint and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # npm ci needs the lockfile to match package.json exactly, which also
+      # means a stale lockfile fails here rather than in a deploy.
+      - name: Install
+        run: npm ci
+
+      # frontend/public/pokemonList.json is generated and gitignored, but it is
+      # fetched at runtime rather than imported, so none of the steps below need it.
+      - name: Typecheck
+        run: npx tsc --noEmit --project frontend/tsconfig.json
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test

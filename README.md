@@ -21,10 +21,9 @@
 | Layer | Tech |
 |-------|------|
 | **Frontend** | React 18, TypeScript, Vite 5, React Router 6, Material-UI (MUI) 5, Supabase JS client |
-| **Backend** | Node.js, Express, TypeScript (minimal API; auth and data live in Supabase) |
 | **Data & auth** | **Supabase** (PostgreSQL, Auth, Row Level Security) |
 
-The app uses **Supabase** for authentication (email/password) and all tournament data. The Express backend is a thin shell for health checks and optional legacy endpoints; the frontend talks to Supabase directly.
+The app uses **Supabase** for authentication (email/password) and all tournament data. There is no application server: the frontend talks to Supabase directly, and anything that needs privileged access is a `SECURITY DEFINER` Postgres function or an edge function.
 
 ---
 
@@ -42,13 +41,10 @@ tournamentOrganiser/
 │   │   └── supabaseClient.ts
 │   ├── package.json
 │   └── vite.config.ts
-├── backend/                  # Node/Express (minimal)
-│   ├── src/index.ts
-│   ├── package.json
-│   └── .env
 ├── supabase/
-│   └── migrations/           # Postgres schema, RLS, functions
-└── package.json              # npm workspaces (frontend, backend)
+│   ├── migrations/           # Postgres schema, RLS, functions
+│   └── functions/            # Edge functions (send-push)
+└── package.json              # npm workspaces (frontend)
 ```
 
 ---
@@ -69,11 +65,8 @@ tournamentOrganiser/
 git clone <repository-url>
 cd tournamentOrganiser
 
-# Install all dependencies (root + workspaces)
+# Install all dependencies (root + frontend workspace)
 npm install
-npm install --workspace=backend
-npm install --workspace=frontend
-# Or: npm run install:all
 ```
 
 ### 2. Supabase (required for full features)
@@ -105,27 +98,15 @@ VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 
 For a hosted project, use your project’s URL and anon key.
 
-**Backend** (optional, for running the Express server):
-
-```env
-# backend/.env
-PORT=3002
-NODE_ENV=development
-FRONTEND_URL=http://localhost:5173
-JWT_SECRET=dev-secret-key
-```
-
 ### 4. Run the app
 
 ```bash
-# Start both frontend and backend
 npm run dev
 ```
 
-- **Frontend:** [http://localhost:5173](http://localhost:5173)  
-- **Backend:** [http://localhost:3002](http://localhost:3002)
+- **App:** [http://localhost:5173](http://localhost:5173)
 
-Frontend-only (e.g. if you only use Supabase):
+Or from the workspace directly:
 
 ```bash
 npm run dev:frontend
@@ -282,16 +263,6 @@ You can open **Me** from the header to switch between “organiser” and “pla
 ---
 
 ## 🚀 Deployment
-
-### Backend
-
-```bash
-cd backend
-npm run build
-# Set NODE_ENV=production and env vars, then:
-node dist/index.js
-# Or use your preferred process manager (e.g. PM2)
-```
 
 ### Frontend
 

@@ -1,104 +1,71 @@
-# Deployment Guide for Render
+# Deployment
 
-This guide will help you deploy your Tournament Organizer app to Render.
+The app deploys to Render as a **single static site**. There is no application
+server — auth and all data go directly to Supabase, and anything needing
+privileged access is a `SECURITY DEFINER` Postgres function or a Supabase edge
+function.
 
-## Prerequisites
+`render.yaml` is the source of truth; the settings below are what it declares.
 
-1. A Render account (free tier available)
-2. Your code pushed to a Git repository (GitHub, GitLab, etc.)
+## Render service
 
-## Deployment Steps
+| Setting | Value |
+|---|---|
+| Type | Static Site |
+| Name | `tournament-organizer-frontend` |
+| Build command | `cd frontend && npm install && npm run build` |
+| Publish directory | `frontend/dist` |
 
-### 1. Connect to Render
+### Build environment variables
 
-1. Go to [render.com](https://render.com) and sign up/login
-2. Click "New +" and select "Blueprint"
-3. Connect your Git repository
-
-### 2. Deploy Backend
-
-1. Create a new **Web Service**
-2. Configure the service:
-   - **Name**: `tournament-organizer-backend`
-   - **Environment**: `Node`
-   - **Build Command**: `cd backend && npm install && npm run build`
-   - **Start Command**: `cd backend && npm start`
-   - **Plan**: Free
-
-3. Add Environment Variables:
-   - `NODE_ENV`: `production`
-   - `PORT`: `10000`
-   - `FRONTEND_URL`: `https://your-frontend-service-name.onrender.com`
-   - `JWT_SECRET`: (generate a secure random string)
-
-### 3. Deploy Frontend
-
-1. Create a new **Static Site**
-2. Configure the service:
-   - **Name**: `tournament-organizer-frontend`
-   - **Build Command**: `cd frontend && npm install && npm run build`
-   - **Publish Directory**: `frontend/dist`
-   - **Plan**: Free
-
-3. Add Environment Variables:
-   - `VITE_API_URL`: `https://your-backend-service-name.onrender.com`
-
-### 4. Update URLs
-
-After deployment, update the URLs in your `render.yaml` file with the actual service URLs provided by Render.
-
-## Environment Variables
-
-### Backend (.env)
+Set these in the Render dashboard — they are baked into the bundle at build
+time, so a change needs a rebuild, not just a restart.
 
 ```env
-NODE_ENV=production
-PORT=10000
-FRONTEND_URL=https://your-frontend-service-name.onrender.com
-JWT_SECRET=your-secure-jwt-secret
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon key>
 ```
 
-### Frontend (.env)
+The anon key is publishable by design; it is safe in the bundle because every
+table is protected by Row Level Security. Never put the service role key here.
 
-```env
-VITE_API_URL=https://your-backend-service-name.onrender.com
-```
+### Files that matter in the build
 
-## Important Notes
+- `frontend/public/_redirects` — `/* /index.html 200`. Without it, refreshing a
+  deep link like `/tournaments/abc` returns 404, because React Router handles
+  those paths in the browser.
+- `frontend/public/_headers` — CSP and other security headers. Adding a new
+  external origin (font host, image CDN, API) means updating the CSP here or the
+  browser blocks it silently.
 
-1. **CORS**: The backend is configured to accept requests from the frontend URL
-2. **JWT Secret**: Generate a secure random string for production
-3. **Free Tier Limitations**:
-   - Services may sleep after 15 minutes of inactivity
-   - Limited bandwidth and build minutes
-   - Database files may be reset on service restarts
+## Database
 
-## Troubleshooting
-
-### Common Issues
-
-1. **Build Failures**: Check that all dependencies are in package.json
-2. **CORS Errors**: Verify FRONTEND_URL is set correctly
-3. **Port Conflicts**: Use PORT environment variable
-
-### Logs
-
-Check the logs in your Render dashboard for detailed error messages.
-
-## Local Development
-
-To test the production build locally:
+Migrations are promoted separately from the frontend, and the order matters.
 
 ```bash
-# Backend
-cd backend
-npm install
-npm run build
-npm start
+npx supabase db push --dry-run   # confirm what would apply
+npx supabase db push             # targets the LINKED project
+```
 
-# Frontend
+`db push` has no per-command project flag — it targets whatever
+`supabase/.temp/project-ref` points at. Check it before pushing, and relink back
+to dev afterwards if you pushed to prod.
+
+**Ship migrations and the frontend in the same window when a migration is not
+backward compatible.** Dropping or changing an RPC signature breaks the deployed
+bundle the moment it lands, and shipping the frontend first breaks it until the
+migration arrives.
+
+## Free tier
+
+Render's free static sites do not sleep, but the Supabase free project pauses
+after inactivity — the `keep-supabase-alive` workflow pings it every 5 days to
+prevent that.
+
+## Local production build
+
+```bash
 cd frontend
-npm install
 npm run build
 npm run preview
 ```

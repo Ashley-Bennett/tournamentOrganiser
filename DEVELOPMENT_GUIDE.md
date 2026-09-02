@@ -1,82 +1,72 @@
 # Development Guide
 
-## Running the Application
+## Running the app
 
-### Development Mode
-
-In development mode, the frontend and backend run on separate ports:
-
-1. **Backend Server** (Port 3002): Handles API requests
-2. **Frontend Server** (Port 5173): Handles the React application
-
-### How to Start Development Servers
-
-#### Option 1: Use the provided script
+There is no application server. The frontend is the whole app, and it talks to
+Supabase directly.
 
 ```bash
-# Windows
-scripts/dev.bat
-
-# PowerShell
-scripts/dev.ps1
-```
-
-#### Option 2: Manual start
-
-```bash
-# Terminal 1 - Backend
-cd backend
-npm run dev
-
-# Terminal 2 - Frontend
-cd frontend
 npm run dev
 ```
 
-### Accessing the Application
+That serves the app on **http://localhost:5173**. The `predev` step refreshes
+`frontend/public/pokemonList.json` from PokéAPI if it is missing or stale; it is
+gitignored and fetched at runtime, so nothing else depends on it existing.
 
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3002/api
+### Supabase
 
-### Important: Always Access Through Frontend URL
+Local development points at the local Supabase stack on `127.0.0.1:54321`, not
+dev or prod. Start it with `npx supabase start` — the database is whatever is in
+Docker, so it is usually near-empty.
 
-When developing, **always access your application through the frontend URL** (http://localhost:5173), not directly through the backend.
+```bash
+npx supabase start     # local stack (API 54321, DB 54322, Studio 54323)
+npx supabase stop      # data survives via Docker volumes
+```
 
-**Why?** The frontend uses client-side routing (React Router), which means routes like `/dashboard`, `/tournaments`, etc. are handled by the React application, not the server.
+If `supabase start` fails with a container name conflict, run `supabase stop`
+first.
 
-### What Happens When You Refresh
+## Client-side routing
 
-1. **Correct way**: Access http://localhost:5173/dashboard
+Routes like `/dashboard` and `/tournaments` are handled by React Router in the
+browser, not by a server. In development the Vite dev server serves `index.html`
+for any path, so refreshing a deep link works.
 
-   - Vite dev server serves the React app
-   - React Router handles the `/dashboard` route
-   - Page loads correctly
+In production the app is a Render static site. The rewrite that sends unknown
+paths to `index.html` lives in `frontend/public/_redirects`; without it, a
+refresh on a deep link 404s.
 
-2. **Incorrect way**: Access http://localhost:3002/dashboard
-   - Backend server receives the request
-   - Backend doesn't know about frontend routes
-   - Returns "Not Found" error
+## Checks
 
-### Production Mode
+CI runs these three on every push to `dev` and `main`, and on PRs into them. Run
+them locally before pushing:
 
-In production, the backend serves both the API and the React application:
+```bash
+npx tsc --noEmit --project frontend/tsconfig.json
+npm run lint
+npm test
+```
 
-- All API requests go to `/api/*` routes
-- All other requests serve the React app's `index.html`
-- React Router handles client-side routing
+## Database changes
 
-### Troubleshooting
+Schema changes are migrations in `supabase/migrations/`. Test locally first,
+then push to the dev project; prod is promoted as part of a release.
 
-**Problem**: "Not Found" when refreshing pages
-**Solution**: Make sure you're accessing the application through http://localhost:5173, not http://localhost:3002
+```bash
+npx supabase db push --dry-run   # check what would apply
+npx supabase db push
+```
 
-**Problem**: API calls failing
-**Solution**: Check that the backend is running on port 3002 and the frontend proxy is configured correctly
+`db push` targets whichever project the CLI is currently linked to — check
+`supabase/.temp/project-ref` before pushing rather than assuming.
 
-### Development Workflow
+## Troubleshooting
 
-1. Start both servers using the dev script
-2. Access the application at http://localhost:5173
-3. Navigate to different pages using the React Router links
-4. If you need to refresh, always refresh from http://localhost:5173
-5. API calls will be automatically proxied to the backend
+**A deep link 404s in production** — check `frontend/public/_redirects` is
+present in the build output.
+
+**Stats or player pages read zero** — `/stats` and the player views need a
+`tournament_players` row with `user_id` set. Organising a tournament is not
+enough; without a linked entry every stat reads 0 and the season picker hides
+itself.

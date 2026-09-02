@@ -1,25 +1,7 @@
 services:
-  # Backend API service
-  - type: web
-    name: tournament-organizer-backend
-    env: node
-    plan: free
-    buildCommand: cd backend && npm install && npm run build
-    startCommand: cd backend && npm start
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 10000
-      - key: FRONTEND_URL
-        value: https://matchamp.win
-
-  # Frontend service
+  # Frontend — the whole app. Auth and all data go directly to Supabase.
   - type: web
     name: tournament-organizer-frontend
     runtime: static
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
-    envVars:
-      - key: VITE_API_URL
-        value: https://tournament-organizer-backend.onrender.com
