@@ -249,7 +249,7 @@ const TournamentMatches: React.FC = () => {
         const { data, error } = await supabase
           .from("tournaments")
           .select(
-            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
+            "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, game_id",
           )
           .eq("id", id)
           .eq("workspace_id", workspaceId ?? "")
@@ -273,7 +273,7 @@ const TournamentMatches: React.FC = () => {
           const { data: retryData, error: retryError } = await supabase
             .from("tournaments")
             .select(
-              "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
+              "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, game_id",
             )
             .eq("id", id)
             .maybeSingle();

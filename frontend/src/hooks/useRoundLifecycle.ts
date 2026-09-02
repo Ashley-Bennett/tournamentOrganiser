@@ -11,7 +11,8 @@ import {
   assignMatchNumbers,
   type SeatConflict,
 } from "../utils/tournamentUtils";
-import { sortByTieBreakers } from "../utils/tieBreaking";
+import { sortByProfile } from "../utils/tieBreaking";
+import { rulesFor } from "../games/registry";
 import {
   MATCH_STATUS,
   serializeDecisionLog,
@@ -329,8 +330,10 @@ export function useRoundLifecycle({
         round_is_paused: false,
       });
 
-      // Persist the final standings using the same tiebreakers the app shows
-      // (OMW%/OOMW%/head-to-head), so player-facing placings match exactly.
+      // Persist the final standings using the same tiebreakers the app shows,
+      // so player-facing placings match exactly. Ranked under the event's own
+      // rules profile — a generic event must not be stored under Pokémon
+      // OMW%/OOMW% just because that is the older of the two.
       // Best-effort: completion has already succeeded above.
       try {
         const [{ data: freshMatches }, { data: playerRows }] = await Promise.all([
@@ -364,7 +367,7 @@ export function useRoundLifecycle({
         const droppedIds = new Set(
           players.filter((p) => p.dropped).map((p) => p.id),
         );
-        const sorted = sortByTieBreakers(raw, droppedIds);
+        const sorted = sortByProfile(raw, rulesFor(tournament.game_id), droppedIds);
         const p_rows = sorted.map((s, i) => ({
           player_id: s.id,
           position: i + 1,
