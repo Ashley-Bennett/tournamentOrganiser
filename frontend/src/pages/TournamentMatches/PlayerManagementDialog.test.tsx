@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+// The dialog renders RecordHistory, which imports the real Supabase client —
+// and that module throws on import without env vars. The history panel only
+// fetches when expanded, so an empty rpc mock is enough for these tests.
+vi.mock("../../supabaseClient", () => ({
+  supabase: { rpc: vi.fn().mockResolvedValue({ data: [], error: null }) },
+}));
+
 import PlayerManagementDialog from "./PlayerManagementDialog";
 import type { TournamentPlayer } from "../../types/match";
 

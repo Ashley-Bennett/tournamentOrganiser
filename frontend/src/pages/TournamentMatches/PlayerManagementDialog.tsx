@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Box,
@@ -15,6 +15,8 @@ import {
   Typography,
 } from "@mui/material";
 import type { TournamentPlayer } from "../../types/match";
+import RecordHistory from "../../components/RecordHistory";
+import { supabase } from "../../supabaseClient";
 
 interface PlayerStanding {
   wins: number;
@@ -66,6 +68,40 @@ export default function PlayerManagementDialog({
   onUpdateStaticSeat,
 }: Props) {
   const [seatInputs, setSeatInputs] = useState<Map<string, string>>(new Map());
+  // How many times each entry has been changed since it was created. Fetched
+  // once per dialog rather than once per player, and used only to decide
+  // whether a player gets a History control at all.
+  const [changeCounts, setChangeCounts] = useState<Map<string, number> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!open || players.length === 0) {
+      setChangeCounts(null);
+      return;
+    }
+    let stale = false;
+    void supabase
+      .rpc("get_record_change_counts", {
+        p_table_name: "tournament_players",
+        p_record_ids: players.map((p) => p.id),
+      })
+      .then(({ data, error }) => {
+        if (stale) return;
+        if (error) {
+          // Not worth surfacing: the panel is supplementary, and falling back
+          // to "no history anywhere" is quieter than an error on every row.
+          setChangeCounts(new Map());
+          return;
+        }
+        const rows = (data ?? []) as { record_id: string; change_count: number }[];
+        setChangeCounts(new Map(rows.map((r) => [r.record_id, r.change_count])));
+      });
+    return () => {
+      stale = true;
+    };
+  }, [open, players]);
+
   const [pendingDropId, setPendingDropId] = useState<string | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -230,6 +266,12 @@ export default function PlayerManagementDialog({
                   </Button>
                 )}
               </Box>
+
+              <RecordHistory
+                table="tournament_players"
+                recordId={player.id}
+                changeCount={changeCounts?.get(player.id) ?? 0}
+              />
             </Box>
           );
         })}
