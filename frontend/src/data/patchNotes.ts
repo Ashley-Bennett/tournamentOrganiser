@@ -9,6 +9,51 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.7.0",
+    date: "2026-09-02",
+    entries: [
+      {
+        category: "New Features",
+        items: [
+          "More than one game: when you create a tournament you now pick which game it is for. Pokemon works as it always has, and Generic covers any other game. More TCGs are on the way.",
+          "New stats page for organisers: see how many different people play with you, how attendance is going, a running league table, what decks people are bringing, and how your events are running.",
+          "Deck diversity: see whether your meta is opening up or narrowing down over time, and how big a share the most popular deck has.",
+          "Game pace: your stats now show your fastest and longest games, and organisers can see typical game length and how much of the round clock it uses.",
+          "Fix mixed-up players: spot people who have been entered twice under slightly different names, merge them into one person, or split entries back out. Everything can be undone.",
+          "Late joins: turn on \"Allow late joins\" and the join link keeps working after a tournament has started. Latecomers take a loss for the rounds they missed and get paired into the current round.",
+          "Players can now be linked to an account, so they see their pairings and report results on any device without the original join link.",
+        ],
+      },
+      {
+        category: "Tournaments",
+        items: [
+          "Adding a player now suggests people who have played with you before, along with how many events they have played. Picking someone links their account straight away.",
+          "You can link an existing player to an account yourself, and send them a one-time link or QR code to claim it.",
+          "You can now take a player out of a single round without removing them from the tournament.",
+          "The player list has a Deck column with artwork and an edit button, so you can set someone's deck for them.",
+          "Generic tournaments skip the Pokemon-only bits: no deck needed to join, neutral room codes, and standings that rank by the rules the event is run under.",
+          "Someone who has already been added by the organiser can no longer sign themselves up a second time.",
+          "Late entries no longer get a free win. A player who joins mid-round and cannot be paired sits that round out instead of being awarded a bye, and anyone whose bye was taken is told.",
+        ],
+      },
+      {
+        category: "Fixes & Polish",
+        items: [
+          "Stats are now shown one game at a time, on both your stats page and your dashboard, so different games no longer get mixed together.",
+          "You can filter your stats by year, or view everything.",
+          "Every stats table can be sorted by any column, exported to CSV, and long tables scroll in place instead of stretching the page sideways.",
+          "Stats sections fold away and remember what you left open, and only load once you open them.",
+          "Picking decks or events now opens a searchable dialog, full screen on the phone, instead of a long wall of chips.",
+          "Top 3, Top 8 and 1st place rates are now counted out of the same number of events, so they can be compared, and a better finish counts towards the lower tiers too.",
+          "Best finish now makes way for your 1st place rate once you have won an event.",
+          "Stats no longer leave the previous game or period's numbers on screen while new ones load, and a section that fails to load now says so instead of pretending there is nothing to show.",
+          "Picking the game or period you are already on no longer reloads the page.",
+          "Plainer wording across the landing page, alerts, dialogs, empty states and error messages.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.6.1",
     date: "2026-07-27",
     entries: [

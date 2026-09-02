@@ -6,6 +6,67 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.0] - 2026-09-02
+
+### Added
+- **Multi-game tournaments.** Tournaments now carry a `game_id` and a rules profile. A new games registry (`frontend/src/games/`: `registry.ts`, `rules.ts`, `types.ts`) declares each game's formats, deck handling, season start month and scoring rules. Existing tournaments are backfilled to Pokemon. Create-tournament asks which game the event is for (Pokemon and Generic selectable, other TCGs marked coming soon); Pokemon events pick a format from a code list, generic events skip the step. Round robin added as an allowed structure (shown but not yet selectable).
+- **Game-neutral behaviour for non-Pokemon events.** Join/room codes use neutral words instead of Pokemon names, joining needs only a name, deck columns and per-game scores are hidden, and standings rank by the profile's rules — Buchholz instead of OMW/OOMW. Results record the winner rather than a game score that was never entered.
+- **Organiser stats page** (`/w/:slug/stats`, `OrganiserStats.tsx`) with unique players, attendance timeline, running league table, deck meta share, event health and deck diversity. Accountless players are matched by name within the workspace so regulars count once across events. League table = match points + placement points over the last 6 weeks or a hand-picked event set, showing byes and ranking by league position. Meta share hides one-off decks by default, searches by name, and drills into a deck's pilots and events (`DeckDetailModal`). Event health reports round length, drops by round and self-reported result share.
+- **Deck diversity trend**: concentration-based effective deck count alongside registered deck count, top-deck share per period, and a flag when the meta is genuinely concentrating or opening up (`DeckDiversitySection`).
+- **Round and game timing capture.** Rounds persist start/end/pause timestamps and matches record when a result was first entered, replacing the old round timing that could never populate. Player stats gain a Game Pace section (fastest/longest games with event, deck and opponent); organiser round health shows typical game length, clock usage and a per-player pace table (`PlayerPaceSection`, `utils/timing.ts`).
+- **Player identity merge/split.** Suggests likely duplicates by name similarity, merges (keeping the entry-richer player, direction swappable, confirmed via `MergeConfirmDialog`), splits entries onto their own person, and persists "not the same" dismissals. All corrections are undoable and owner/admin only (`PlayerIdentityDialog`, `MergeSuggestions`).
+- **Per-game, per-period stats.** Player and organiser stats take a game filter (hidden until you have played more than one game) and a period filter of all time or a calendar year. Deck history and matchup matrix are hidden for games without decks. The playing dashboard shows one game at a time to match.
+- **Shared stats UI primitives**: `PickerDialog` (one searchable, mobile-full-screen dialog behind both the deck and event pickers), `StatsSection` (collapsible, remembers open state, lazy-loads its data, shows a collapsed summary), `StatsTable` (sort by any column, in-place scroll with sticky header past 10 rows, CSV export of every row), `StatsTimeline` (month/quarter/year grouping, shared by both stats pages), plus `EventPicker`, `GamePicker`, `StatsDeckFilter`, `useStatsRpc` and `utils/csv.ts`.
+- **Account identity as a player credential.** `assert_player_access` now accepts either a device token or the signed-in account, so a linked player can open their tournament on any device. Organiser-added players can be linked to an account and get pairings, result reporting, deck selection and notifications; anonymous players are unaffected.
+- **Organiser player linking**: new Account column in the player list with a Link button that mints a single-use claim link plus QR code (`PlayerClaimLinkDialog`).
+- **Known-players picker** (`PlayerNameInput`, `useWorkspacePlayers`, `types/workspacePlayer.ts`): the name field suggests workspace regulars with their event counts, and adding someone that way links their account immediately. Works for late entries too; free-text names still work for walk-ins.
+- **Late joins.** New "Allow late joins" toggle keeps the join link/QR live once a tournament is under way. Late joiners take a loss for rounds already played and are slotted into the current round; organisers are notified when someone self-adds. Late-entry pairing moved server-side (`utils/lateEntry.ts` + RPC) so organiser-added and self-added entries behave identically, replacing two divergent client copies.
+- Organiser can remove a player from a single round.
+- Deck column on the tournament player list with sprites and an edit button, so organiser-added players can get a deck without self-registering; the deck picker dialog names the player being edited.
+
+### Fixed
+- **Late entries no longer get a free win.** A player who joins mid-round and cannot be paired now sits the round out as a loss instead of being awarded a 3-point bye; players whose bye is taken by a late entry are notified, and the join page and late-entry dialog no longer promise a bye that will not happen.
+- **Placement rates share a denominator and nest.** Top 3, Top 8 and 1st place rates are all out of the same event count, a stronger finish counts toward the weaker tiers (so top 3 can no longer exceed top 8), and each card names the events it is out of.
+- Best finish and 1st place rate now share a card: best finish while it can still move, the win rate once a win is earned.
+- **Stale and silently-failed stats.** Out-of-order responses could leave the previous game/period's numbers on screen; a section that failed to load reported "no events in this period yet" instead of an error; a failed possible-duplicate lookup hid the whole banner. All three now surface correctly.
+- Re-picking the already-selected game or period no longer triggers a refetch (`StatsGameFilter`, `StatsPeriodFilter`, both stats pages).
+- Event selection moved from a wall of chips into a searchable dialog with a checkbox list, full-screen on mobile, applying on Done so the table no longer refetches on every tick while a selection is being built. The page keeps a one-line summary with quick-remove chips.
+- Wide stats tables stretched the page sideways instead of scrolling in place; timeline labels could sit under the wrong bars.
+- Fixed a permission check that let any signed-in user mint a claim link for another organiser's player entry, or toggle registration on someone else's tournament.
+- Duplicate-join guard stops a player self-registering when the organiser has already added them.
+- Dashboard stats are per game rather than mixing games together, and the favourite-deck card is hidden for games without decks. Removed unused imports and a stale lint directive so the lint script passes clean.
+- Copy rewrite: landing page, meta tags, patch notes, in-app alerts, dialogs, empty states and error messages put into plainer language; em dashes removed from UI text, keeping "—" only as the no-value placeholder. A later pass reverted copy that had crept back to em dashes.
+
+### Changed
+- Player stats brought in line with the organiser page: collapsible sections that remember what was left open, sortable/scroll-capped/exportable deck history and matchup matrix, and the shared timeline component. Deck key and label helpers consolidated into `utils/deck.ts`.
+- Season handling follows the game: September–August for Pokemon, calendar year for everything else (`utils/statsPeriod.ts`). The interim Pokemon season-and-quarter stats filter was superseded by all time / calendar year.
+- Post-match questions skip the opponent's deck for games without decks, and players are no longer offered a deck in a generic tournament.
+
+### Migrations
+- `20260825120000_identity_as_player_credential` — `assert_player_access` accepts account identity.
+- `20260825130000_fix_null_role_guard` — COALESCE the role guard so a NULL (non-member) role no longer passes.
+- `20260825140000_known_players_late_entry` — workspace known-players lookup + account-linked late entry.
+- `20260825150000_late_join_active_tournament` — allow joining an in-progress tournament.
+- `20260825160000_notify_late_join` — organiser notification on a self-added late entry.
+- `20260825170000_late_join_no_free_bye` — late entrant takes a loss instead of a bye.
+- `20260901000000_remove_player_from_round` — drop a player from a single round.
+- `20260901000100_duplicate_join_guard` — block self-registration for an already-added player.
+- `20260901000200_stats_season_filters` — season/quarter filtering on the stats RPCs.
+- `20260901000300_multi_game_tournaments` — `game_id` + rules profile on tournaments; backfill to Pokemon.
+- `20260901000400_game_neutral_join_codes` — neutral room codes for non-Pokemon games.
+- `20260901000500_player_view_game_id`, `20260901000600_stats_per_game`, `20260901000700_dashboard_game_id` — thread `game_id` through the player view, stats and dashboard RPCs.
+- `20260901010000_organiser_stats_foundation` through `20260901010400_organiser_deck_detail` — attendance, league table, meta share, event health and deck detail RPCs.
+- `20260901010500_player_trend_bucket` — month/quarter/year trend buckets.
+- `20260901010600_player_placement_tiers`, `20260901010700_monotonic_placement_tiers` — shared denominator and nesting for placement tiers.
+- `20260901010900_round_timing_capture`, `20260901011000_timing_stats` — persist round/match timings and report on them.
+- `20260901011100_deck_diversity` — effective deck count and top-deck share.
+- `20260901011200_player_identity_merge`, `20260901011300_merge_dismissals` — merge/split player identities and remember dismissed suggestions.
+
+### Tests
+- New suites: `games/registry.test.ts`, `utils/statsPeriod.test.ts`, `utils/csv.test.ts`, `utils/tieBreaking.profiles.test.ts`, `components/StatsGameFilter.test.tsx`, `components/StatsPeriodFilter.test.tsx`, `components/PlayerNameInput.test.tsx`, `components/PlayerClaimLinkDialog.test.tsx`, `pages/TournamentJoin.test.tsx`, `pages/Tournaments.create.test.tsx`, `pages/TournamentMatches/PlayerManagementDialog.test.tsx`.
+
+---
+
 ## [0.6.1] - 2026-07-27
 
 ### Added
