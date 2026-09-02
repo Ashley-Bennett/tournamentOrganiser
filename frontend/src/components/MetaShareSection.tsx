@@ -16,7 +16,7 @@ import { getSpriteUrl } from "../utils/pokemonCache";
 import { deckKey } from "../utils/deck";
 import StatsTable, { type StatsColumn } from "./StatsTable";
 import EventPicker, { type EventOption } from "./EventPicker";
-import DeckDetailModal, { type DeckKey } from "./DeckDetailModal";
+import { useStatsDrill } from "../hooks/useStatsDrill";
 
 /**
  * What the room actually brought.
@@ -93,10 +93,16 @@ export default function MetaShareSection({
   workspaceId,
   gameId,
   nameMap,
+  onScopeChange,
 }: {
   workspaceId: string;
   gameId: string | null;
   nameMap: Map<number, string>;
+  /**
+   * Reports the events this table is describing, so a deck drill-down opened
+   * from it covers the same scope and the totals reconcile.
+   */
+  onScopeChange?: (tournamentIds: string[]) => void;
 }) {
   const [mode, setMode] = useState<Mode>("recent");
   const [options, setOptions] = useState<EventOption[]>([]);
@@ -105,7 +111,6 @@ export default function MetaShareSection({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showOneOffs, setShowOneOffs] = useState(false);
-  const [openDeck, setOpenDeck] = useState<DeckKey | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,6 +148,11 @@ export default function MetaShareSection({
   // Joined into a string so the effect below compares by value: a fresh array
   // with the same ids must not trigger another fetch.
   const activeIds = mode === "recent" ? recentIds : selected;
+  const drill = useStatsDrill();
+
+  useEffect(() => {
+    onScopeChange?.(activeIds);
+  }, [activeIds, onScopeChange]);
   const activeKey = activeIds.join(",");
 
   useEffect(() => {
@@ -359,19 +369,16 @@ export default function MetaShareSection({
           maxRows={10}
           csvFilename={`matchamp-meta-share-${new Date().toISOString().slice(0, 10)}`}
           onRowClick={(r) =>
-            setOpenDeck({ deck_pokemon1: r.deck_pokemon1, deck_pokemon2: r.deck_pokemon2 })
+            drill.open({
+              kind: "deck",
+              p1: r.deck_pokemon1,
+              p2: r.deck_pokemon2,
+              scoped: true,
+            })
           }
         />
       )}
 
-      <DeckDetailModal
-        workspaceId={workspaceId}
-        gameId={gameId}
-        deck={openDeck}
-        tournamentIds={activeIds}
-        nameMap={nameMap}
-        onClose={() => setOpenDeck(null)}
-      />
     </>
   );
 }

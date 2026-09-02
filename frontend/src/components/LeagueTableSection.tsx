@@ -16,6 +16,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import { supabase } from "../supabaseClient";
 import StatsTable, { type StatsColumn } from "./StatsTable";
 import EventPicker, { type EventOption } from "./EventPicker";
+import { useStatsDrill } from "../hooks/useStatsDrill";
 import {
   DEFAULT_SCHEME_ID,
   LEAGUE_WINDOW_WEEKS,
@@ -64,6 +65,7 @@ export default function LeagueTableSection({
   workspaceId: string;
   gameId: string | null;
 }) {
+  const drill = useStatsDrill();
   const [mode, setMode] = useState<Mode>("window");
   const [schemeId, setSchemeId] = useState(DEFAULT_SCHEME_ID);
   const [options, setOptions] = useState<EventOption[]>([]);
@@ -322,6 +324,9 @@ export default function LeagueTableSection({
           rows={visibleRows}
           columns={columns}
           getRowKey={(r) => r.identity_key}
+          onRowClick={(r) =>
+            drill.open({ kind: "player", identityKey: r.identity_key })
+          }
           initialSort={{ key: "total", dir: "desc" }}
           loading={loading}
           csvFilename={`matchamp-league-${new Date().toISOString().slice(0, 10)}`}

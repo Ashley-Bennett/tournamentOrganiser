@@ -1,20 +1,12 @@
 import React, { useEffect, useState } from "react";
-import {
-  Box,
-  Chip,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  Grid,
-  IconButton,
-  Typography,
-} from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { Box, Chip, Divider, Grid, Typography } from "@mui/material";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { supabase } from "../supabaseClient";
 import { getArtworkUrl, getSpriteUrl } from "../utils/pokemonCache";
 import StatsTable, { type StatsColumn } from "./StatsTable";
+import StatBox from "./StatBox";
+import { deckLabel, ordinal, pct } from "../utils/statsFormat";
+import type { DetailView } from "../utils/statsDrill";
 
 /**
  * Drill-down for one row of the meta share table: who piloted this deck and
@@ -52,60 +44,37 @@ interface EventRow {
   total_matches: number;
 }
 
-function pct(part: number, whole: number): string {
-  if (whole === 0) return "—";
-  return `${((part / whole) * 100).toFixed(0)}%`;
-}
-
-function ordinal(n: number): string {
-  if (n % 100 >= 11 && n % 100 <= 13) return "th";
-  return ["th", "st", "nd", "rd"][n % 10] ?? "th";
-}
-
-function StatBox({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <Box>
-      <Typography variant="caption" color="text.secondary" display="block">
-        {label}
-      </Typography>
-      <Typography variant="h5" fontWeight={700}>
-        {value}
-      </Typography>
-      {sub && (
-        <Typography variant="caption" color="text.disabled">
-          {sub}
-        </Typography>
-      )}
-    </Box>
-  );
-}
-
-export default function DeckDetailModal({
+export default function DeckDetailView({
   workspaceId,
   gameId,
   deck,
   tournamentIds,
   nameMap,
-  onClose,
+  onOpen,
+  onLabel,
 }: {
   workspaceId: string;
   gameId: string | null;
-  deck: DeckKey | null;
-  /** The same event scope the meta share table used. */
-  tournamentIds: string[];
+  deck: DeckKey;
+  /**
+   * The meta share table's event list when opened from it, or null for every
+   * event — which is what a deck opened from a player or a link must use.
+   */
+  tournamentIds: string[] | null;
   nameMap: Map<number, string>;
-  onClose: () => void;
+  /** Drill onwards — a pilot is a player. */
+  onOpen: (view: DetailView) => void;
+  /** Reports the deck's name upward, for the dialog's breadcrumb. */
+  onLabel: (label: string) => void;
 }) {
   const [pilots, setPilots] = useState<PilotRow[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const p1 = deck?.deck_pokemon1 ?? null;
-  const p2 = deck?.deck_pokemon2 ?? null;
-  const open = deck != null;
+  const p1 = deck.deck_pokemon1;
+  const p2 = deck.deck_pokemon2;
 
   useEffect(() => {
-    if (!open) return;
     setLoading(true);
     const args = {
       p_workspace_id: workspaceId,
@@ -124,13 +93,14 @@ export default function DeckDetailModal({
       setEvents((eventRes.data ?? []) as EventRow[]);
       setLoading(false);
     });
-  }, [open, workspaceId, gameId, p1, p2, tournamentIds]);
+  }, [workspaceId, gameId, p1, p2, tournamentIds]);
 
-  const deckName =
-    [p1, p2]
-      .filter((id): id is number => id != null)
-      .map((id) => nameMap.get(id) ?? `#${id}`)
-      .join(" / ") || "Unknown deck";
+  const deckName = deckLabel(p1, p2, nameMap);
+
+  useEffect(() => {
+    onLabel(deckName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deckName]);
 
   const totalEntries = pilots.reduce((s, p) => s + p.entries, 0);
   const totalWins = pilots.reduce((s, p) => s + p.match_wins, 0);
@@ -261,8 +231,8 @@ export default function DeckDetailModal({
   ];
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle sx={{ pr: 6 }}>
+    <Box>
+      <Box mb={2}>
         <Box display="flex" alignItems="center" gap={1}>
           {p1 != null && (
             <img
@@ -282,12 +252,14 @@ export default function DeckDetailModal({
             {deckName}
           </Typography>
         </Box>
-        <IconButton onClick={onClose} sx={{ position: "absolute", right: 8, top: 8 }}>
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
+        <Typography variant="caption" color="text.secondary">
+          {tournamentIds === null
+            ? "Across every event"
+            : `Across the ${tournamentIds.length} events in Meta share`}
+        </Typography>
+      </Box>
 
-      <DialogContent dividers>
+      <Box>
         <Grid container spacing={2} mb={1}>
           <Grid item xs={6} sm={3}>
             <StatBox label="Entries" value={String(totalEntries)} sub={`${pilots.length} pilots`} />
@@ -318,9 +290,12 @@ export default function DeckDetailModal({
           rows={pilots}
           columns={pilotColumns}
           getRowKey={(r) => r.identity_key}
+          onRowClick={(r) =>
+            onOpen({ kind: "player", identityKey: r.identity_key })
+          }
           initialSort={{ key: "entries", dir: "desc" }}
           loading={loading}
-          emptyMessage="Nobody has registered this deck in these events."
+          emptyMessage="Nobody has registered this deck."
           maxRows={8}
         />
 
@@ -334,10 +309,10 @@ export default function DeckDetailModal({
           getRowKey={(r) => r.tournament_id}
           initialSort={{ key: "date", dir: "desc" }}
           loading={loading}
-          emptyMessage="This deck has not appeared in these events."
+          emptyMessage="This deck has not appeared in any event."
           maxRows={8}
         />
-      </DialogContent>
-    </Dialog>
+      </Box>
+    </Box>
   );
 }

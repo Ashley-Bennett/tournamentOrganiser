@@ -26,6 +26,7 @@ import DeckDiversitySection from "../components/DeckDiversitySection";
 import EventHealthSection from "../components/EventHealthSection";
 import StatsTable, { type StatsColumn } from "../components/StatsTable";
 import StatsSection from "../components/StatsSection";
+import { StatsDrillProvider } from "../components/StatsDrill";
 import MergeSuggestions from "../components/MergeSuggestions";
 import PlayerIdentityDialog, { type IdentityOption } from "../components/PlayerIdentityDialog";
 import { getPokemonList } from "../utils/pokemonCache";
@@ -150,6 +151,9 @@ const OrganiserStats: React.FC = () => {
   // Bumped after a merge or split so every section refetches: correcting an
   // identity changes attendance, the league and the meta share at once.
   const [identityVersion, setIdentityVersion] = useState(0);
+  // The events the meta share table is describing, so a deck drill-down
+  // opened from it covers the same scope.
+  const [deckScope, setDeckScope] = useState<string[]>([]);
 
   const canEditIdentities = currentRole === "owner" || currentRole === "admin";
 
@@ -356,10 +360,16 @@ const OrganiserStats: React.FC = () => {
   }
 
   return (
-    // width:100% alongside the cap is load-bearing, not belt-and-braces. With
-    // max-width alone the box takes its width from its widest content, so a
-    // table wide enough to need its own scrollbar stretched the whole page and
-    // scrolled the layout sideways instead of scrolling inside the table.
+    <StatsDrillProvider
+      workspaceId={workspaceId}
+      gameId={gameId}
+      nameMap={nameMap}
+      deckTournamentIds={deckScope}
+    >
+    {/* width:100% alongside the cap is load-bearing, not belt-and-braces. With
+        max-width alone the box takes its width from its widest content, so a
+        table wide enough to need its own scrollbar stretched the whole page and
+        scrolled the layout sideways instead of scrolling inside the table. */}
     <Box p={{ xs: 2, sm: 3 }} sx={{ width: "100%", maxWidth: 1200, mx: "auto" }}>
       <Button
         component={Link}
@@ -530,7 +540,12 @@ const OrganiserStats: React.FC = () => {
           title="Meta share"
           hint="What people brought, by share of entries. A deck played three times by one person and one played once each by three people take up the same room, so 'pilots' is shown alongside."
         >
-          <MetaShareSection workspaceId={workspaceId} gameId={gameId} nameMap={nameMap} />
+          <MetaShareSection
+            workspaceId={workspaceId}
+            gameId={gameId}
+            nameMap={nameMap}
+            onScopeChange={setDeckScope}
+          />
         </StatsSection>
       )}
 
@@ -627,6 +642,7 @@ const OrganiserStats: React.FC = () => {
 
       <Box pb={4} />
     </Box>
+    </StatsDrillProvider>
   );
 };
 
