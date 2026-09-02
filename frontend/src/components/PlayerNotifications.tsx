@@ -6,6 +6,8 @@ import { getAllEntries, clearEntry } from "../utils/playerStorage";
 import {
   addNotification,
   clearTournament,
+  notificationId,
+  resolveNotification,
   type NewNotification,
 } from "../utils/notificationStore";
 import { useAttentionAlert } from "../hooks/useAttentionAlert";
@@ -47,6 +49,8 @@ interface WatcherView {
   };
   player: { id: string };
   matches: WatcherMatch[];
+  /** The player's own submitted result for their current match, if any. */
+  my_report: { reported_outcome: "win" | "loss" | "draw" } | null;
 }
 
 export interface PlayerAlert {
@@ -166,6 +170,23 @@ function TournamentWatcher({
         });
       }
       prevStatusRef.current = status;
+
+      // A "needs your result" prompt is noise the moment the result lands, so
+      // drop it rather than leaving it sitting in the inbox. my_report is
+      // view-level — there is only ever one match of mine in play at a time.
+      d.matches
+        .filter((m) => m.is_my_match)
+        .forEach((m) => {
+          const settled =
+            m.status === "completed" ||
+            m.status === "bye" ||
+            (m.status === "pending" && d.my_report !== null);
+          if (settled) {
+            resolveNotification(
+              notificationId(tournamentId, "result_needed", m.round_number),
+            );
+          }
+        });
     };
 
     void load();
@@ -232,14 +253,37 @@ function TournamentWatcher({
     const roundForAlert = activeTimerRound;
     const timeoutId = window.setTimeout(() => {
       expiredAlertRoundRef.current = roundForAlert;
-      onAlertRef.current({
-        type: "round_time_up",
-        tournamentId,
-        tournamentName: t.name ?? null,
-        message: `Time's up for Round ${roundForAlert}!`,
-        href: playerHref(tournamentId),
-        roundNumber: roundForAlert,
-      });
+
+      // If the player still owes a result, ask for that instead of announcing
+      // the time — same moment, one notification, and the useful one.
+      const mine = (view?.matches ?? []).find(
+        (m) => m.is_my_match && m.round_number === roundForAlert,
+      );
+      const owesResult =
+        mine != null &&
+        mine.status === "pending" &&
+        mine.player2_id !== null &&
+        view?.my_report == null;
+
+      onAlertRef.current(
+        owesResult
+          ? {
+              type: "result_needed",
+              tournamentId,
+              tournamentName: t.name ?? null,
+              message: `Round ${roundForAlert} needs your result`,
+              href: playerHref(tournamentId),
+              roundNumber: roundForAlert,
+            }
+          : {
+              type: "round_time_up",
+              tournamentId,
+              tournamentName: t.name ?? null,
+              message: `Time's up for Round ${roundForAlert}!`,
+              href: playerHref(tournamentId),
+              roundNumber: roundForAlert,
+            },
+      );
     }, remainingMs);
     return () => clearTimeout(timeoutId);
   }, [view, activeTimerRound, tournamentId]);

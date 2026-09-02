@@ -191,6 +191,19 @@ export function markAllRead(now = Date.now()) {
 }
 
 /**
+ * Drops a single notification because the thing it was asking for has happened.
+ *
+ * Actionable prompts ("Round 3 needs your result") are noise once actioned, so
+ * they are removed rather than marked read — the round_published event for the
+ * same round is still in the list as history.
+ */
+export function resolveNotification(id: string) {
+  const list = read();
+  const kept = list.filter((n) => n.id !== id);
+  if (kept.length !== list.length) write(kept);
+}
+
+/**
  * Drops a tournament's notifications. Called alongside playerStorage.clearEntry
  * so an entry whose credentials stopped working does not leave orphaned rows
  * pointing at a tournament the player can no longer open.

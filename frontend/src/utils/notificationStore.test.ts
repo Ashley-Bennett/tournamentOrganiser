@@ -7,6 +7,7 @@ import {
   markAllRead,
   markRead,
   notificationId,
+  resolveNotification,
   subscribe,
   unreadCount,
   type NewNotification,
@@ -133,6 +134,51 @@ describe("read state", () => {
     addNotification(roundUp());
     markRead("nope");
     expect(unreadCount()).toBe(1);
+  });
+});
+
+describe("resolving", () => {
+  const needsResult = (): NewNotification => ({
+    type: "result_needed",
+    tournamentId: "t1",
+    tournamentName: "Thursday Locals",
+    message: "Round 2 needs your result",
+    href: "/t/t1/me",
+    roundNumber: 2,
+  });
+
+  it("removes a prompt once it has been actioned", () => {
+    const stored = addNotification(needsResult());
+    resolveNotification(stored!.id);
+    expect(getNotifications()).toEqual([]);
+  });
+
+  it("leaves other notifications alone", () => {
+    addNotification(roundUp());
+    const stored = addNotification(needsResult());
+    resolveNotification(stored!.id);
+    expect(getNotifications().map((n) => n.type)).toEqual(["round_published"]);
+  });
+
+  it("is a no-op for an id that is not there", () => {
+    addNotification(roundUp());
+    resolveNotification("t1:result_needed:99");
+    expect(getNotifications()).toHaveLength(1);
+  });
+
+  it("drops the unread count with it", () => {
+    const stored = addNotification(needsResult());
+    expect(unreadCount()).toBe(1);
+    resolveNotification(stored!.id);
+    expect(unreadCount()).toBe(0);
+  });
+
+  // Resolving must not permanently block the id — the next round can raise its
+  // own prompt, and a re-paired round could legitimately raise the same one.
+  it("lets the same event be raised again afterwards", () => {
+    const stored = addNotification(needsResult());
+    resolveNotification(stored!.id);
+    expect(addNotification(needsResult())).not.toBeNull();
   });
 });
 
