@@ -33,7 +33,7 @@ export default function NotificationBell({
   showWhenEmpty?: boolean;
 }) {
   const navigate = useNavigate();
-  const { items, unread, markRead, markAllRead } = useNotifications();
+  const { items, unread, markRead, markAllRead, clearAll } = useNotifications();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
   useUnreadTitle(unread);
@@ -94,14 +94,25 @@ export default function NotificationBell({
           <Typography variant="subtitle2" fontWeight={700}>
             Notifications
           </Typography>
-          <Button
-            size="small"
-            onClick={markAllRead}
-            disabled={unread === 0}
-            sx={{ textTransform: "none" }}
-          >
-            Mark all read
-          </Button>
+          <Box display="flex" alignItems="center" gap={0.5}>
+            <Button
+              size="small"
+              onClick={markAllRead}
+              disabled={unread === 0}
+              sx={{ textTransform: "none" }}
+            >
+              Mark all read
+            </Button>
+            <Button
+              size="small"
+              onClick={clearAll}
+              disabled={items.length === 0}
+              color="inherit"
+              sx={{ textTransform: "none", color: "text.secondary" }}
+            >
+              Clear
+            </Button>
+          </Box>
         </Box>
         <Divider />
 

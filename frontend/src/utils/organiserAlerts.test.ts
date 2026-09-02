@@ -14,6 +14,9 @@ const row = (overrides: Partial<OrganiserAlertRow> = {}): OrganiserAlertRow => (
   total_matches: 8,
   settled_matches: 4,
   conflict_count: 0,
+  late_entries: 0,
+  latest_late_name: null,
+  latest_late_round: null,
   ...overrides,
 });
 
@@ -107,6 +110,76 @@ describe("conflicts", () => {
   it("has nothing to resolve when there was never a conflict", () => {
     const prev = baselineOf(row());
     expect(organiserDiff(row(), prev).resolve).toEqual([]);
+  });
+});
+
+describe("late joins", () => {
+  const arrival = (o: Partial<OrganiserAlertRow> = {}) =>
+    row({
+      late_entries: 1,
+      latest_late_name: "Aisha Bello",
+      latest_late_round: 3,
+      ...o,
+    });
+
+  it("seeds silently — arrivals from before you opened the app are old news", () => {
+    expect(organiserDiff(arrival(), null).raise).toEqual([]);
+  });
+
+  it("names the player and the round they walked in on", () => {
+    const prev = baselineOf(row());
+    const { raise } = organiserDiff(arrival(), prev);
+    expect(raise).toHaveLength(1);
+    expect(raise[0]?.type).toBe("late_join");
+    expect(raise[0]?.message).toBe(
+      "Aisha Bello joined during Round 3. Pairings may have changed.",
+    );
+  });
+
+  it("falls back when the join round is unknown", () => {
+    const prev = baselineOf(row());
+    const { raise } = organiserDiff(
+      arrival({ latest_late_round: null }),
+      prev,
+    );
+    expect(raise[0]?.message).toBe(
+      "Aisha Bello joined mid-tournament. Pairings may have changed.",
+    );
+  });
+
+  it("counts them when several arrive between polls", () => {
+    const prev = baselineOf(row());
+    const { raise } = organiserDiff(arrival({ late_entries: 3 }), prev);
+    expect(raise[0]?.message).toBe(
+      "3 players joined during Round 3. Pairings may have changed.",
+    );
+  });
+
+  it("does not fire again while nobody new arrives", () => {
+    const prev = baselineOf(arrival());
+    expect(organiserDiff(arrival(), prev).raise).toEqual([]);
+  });
+
+  // Two arrivals in the same round must be two notifications, not one — which
+  // is why the id is keyed on the running total rather than the round.
+  it("gives each new arrival its own id", () => {
+    const first = organiserDiff(arrival(), baselineOf(row())).raise[0];
+    const second = organiserDiff(
+      arrival({ late_entries: 2, latest_late_name: "Tom Ellery" }),
+      baselineOf(arrival()),
+    ).raise[0];
+    expect(first?.idKey).toBe("n1");
+    expect(second?.idKey).toBe("n2");
+  });
+
+  // Someone who joined in round 3 still matters once round 4 is paired.
+  it("still fires across a round change", () => {
+    const prev = baselineOf(row({ round_number: 3 }));
+    const { raise } = organiserDiff(
+      arrival({ round_number: 4, latest_late_round: 4 }),
+      prev,
+    );
+    expect(raise.map((n) => n.type)).toContain("late_join");
   });
 });
 

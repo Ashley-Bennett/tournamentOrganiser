@@ -32,7 +32,8 @@ export type NotificationType =
   | "tournament_completed"
   // Organiser-facing, derived from get_organiser_alert_state.
   | "results_all_in"
-  | "result_conflict";
+  | "result_conflict"
+  | "late_join";
 
 export interface StoredNotification {
   /**
@@ -60,18 +61,24 @@ export type NewNotification = Omit<
 > & {
   /** Included in the id, so one event per round rather than one per poll. */
   roundNumber?: number;
+  /**
+   * Overrides roundNumber as the id suffix, for events a round does not
+   * identify — a late join is keyed by how many have arrived, so two people
+   * joining the same round stay two notifications.
+   */
+  idKey?: string | number;
   source?: StoredNotification["source"];
 };
 
-/** `{tournamentId}:{type}`, plus the round where one applies. */
+/** `{tournamentId}:{type}`, plus a key where one event per tournament is too few. */
 export function notificationId(
   tournamentId: string,
   type: NotificationType,
-  roundNumber?: number,
+  key?: string | number,
 ): string {
-  return roundNumber == null
+  return key == null
     ? `${tournamentId}:${type}`
-    : `${tournamentId}:${type}:${roundNumber}`;
+    : `${tournamentId}:${type}:${key}`;
 }
 
 // ── Listeners ────────────────────────────────────────────────────────────────
@@ -156,8 +163,12 @@ export function addNotification(
   input: NewNotification,
   now = Date.now(),
 ): StoredNotification | null {
-  const { roundNumber, source = "local", ...rest } = input;
-  const id = notificationId(input.tournamentId, input.type, roundNumber);
+  const { roundNumber, idKey, source = "local", ...rest } = input;
+  const id = notificationId(
+    input.tournamentId,
+    input.type,
+    idKey ?? roundNumber,
+  );
 
   const list = fresh(read(), now);
   if (list.some((n) => n.id === id)) return null;

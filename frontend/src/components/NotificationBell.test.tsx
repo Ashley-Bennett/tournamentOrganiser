@@ -166,6 +166,35 @@ describe("the panel", () => {
     expect(getNotifications().every((n) => n.readAt !== null)).toBe(true);
   });
 
+  it("empties the list on clear", async () => {
+    addNotification(event({ roundNumber: 1 }));
+    addNotification(event({ roundNumber: 2 }));
+    renderBell({ showWhenEmpty: true });
+    await userEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^clear$/i }));
+
+    expect(getNotifications()).toEqual([]);
+    expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+  });
+
+  it("offers nothing to clear when the list is empty", async () => {
+    renderBell({ showWhenEmpty: true });
+    await userEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    expect(screen.getByRole("button", { name: /^clear$/i })).toBeDisabled();
+  });
+
+  // Clear is not the same as read — it removes history, so it stays available
+  // once everything has been marked read.
+  it("can still clear after marking everything read", async () => {
+    addNotification(event());
+    renderBell({ showWhenEmpty: true });
+    await userEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    await userEvent.click(screen.getByRole("button", { name: /mark all read/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^clear$/i }));
+
+    expect(getNotifications()).toEqual([]);
+  });
+
   it("shows newest first", async () => {
     // Must be inside the 30-day window, or the store prunes them before render.
     const t0 = Date.now() - 120_000;

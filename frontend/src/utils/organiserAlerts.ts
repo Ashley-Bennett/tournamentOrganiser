@@ -9,6 +9,9 @@ export interface OrganiserAlertRow {
   total_matches: number;
   settled_matches: number;
   conflict_count: number;
+  late_entries: number;
+  latest_late_name: string | null;
+  latest_late_round: number | null;
 }
 
 /** What we remember between polls, so only transitions raise anything. */
@@ -16,6 +19,7 @@ export interface OrganiserBaseline {
   roundNumber: number;
   allIn: boolean;
   hasConflict: boolean;
+  lateEntries: number;
 }
 
 export function baselineOf(row: OrganiserAlertRow): OrganiserBaseline {
@@ -23,6 +27,7 @@ export function baselineOf(row: OrganiserAlertRow): OrganiserBaseline {
     roundNumber: row.round_number,
     allIn: row.total_matches > 0 && row.settled_matches >= row.total_matches,
     hasConflict: row.conflict_count > 0,
+    lateEntries: row.late_entries,
   };
 }
 
@@ -83,6 +88,28 @@ export function organiserDiff(
         n === 1
           ? `A result in Round ${next.roundNumber} needs a decision`
           : `${n} results in Round ${next.roundNumber} need a decision`,
+    });
+  }
+
+  // Late arrivals are counted, not compared per round: someone joining during
+  // round 3 still matters once round 4 is paired, and two people arriving in the
+  // same round are two events. Keying on the running total gives each its own
+  // notification without needing the entrant's id.
+  if (next.lateEntries > prev.lateEntries) {
+    const arrived = next.lateEntries - prev.lateEntries;
+    const where =
+      row.latest_late_round != null
+        ? ` during Round ${row.latest_late_round}`
+        : " mid-tournament";
+
+    diff.raise.push({
+      ...base,
+      type: "late_join",
+      idKey: `n${next.lateEntries}`,
+      message:
+        arrived === 1 && row.latest_late_name
+          ? `${row.latest_late_name} joined${where}. Pairings may have changed.`
+          : `${arrived} players joined${where}. Pairings may have changed.`,
     });
   }
 

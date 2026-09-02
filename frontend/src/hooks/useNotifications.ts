@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  clearAll as storeClearAll,
   getNotifications,
   markAllRead as storeMarkAllRead,
   markRead as storeMarkRead,
@@ -26,8 +27,9 @@ export function useNotifications() {
 
   const markRead = useCallback((id: string) => storeMarkRead(id), []);
   const markAllRead = useCallback(() => storeMarkAllRead(), []);
+  const clearAll = useCallback(() => storeClearAll(), []);
 
-  return { items, unread, markRead, markAllRead };
+  return { items, unread, markRead, markAllRead, clearAll };
 }
 
 /**
