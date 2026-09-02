@@ -3,6 +3,11 @@ import { Snackbar, Alert, Button, Box } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { getAllEntries, clearEntry } from "../utils/playerStorage";
+import {
+  addNotification,
+  clearTournament,
+  type NewNotification,
+} from "../utils/notificationStore";
 import { useAttentionAlert } from "../hooks/useAttentionAlert";
 
 /**
@@ -49,6 +54,11 @@ export interface PlayerAlert {
   message: string;
 }
 
+/** Where a notification for this tournament takes the player when tapped. */
+function playerHref(tournamentId: string) {
+  return `/t/${tournamentId}/me`;
+}
+
 // ── One headless watcher per joined tournament ──────────────────────────────
 function TournamentWatcher({
   tournamentId,
@@ -59,7 +69,7 @@ function TournamentWatcher({
   tournamentId: string;
   playerId: string;
   deviceToken: string | null;
-  onAlert: (a: PlayerAlert) => void;
+  onAlert: (n: NewNotification) => void;
 }) {
   const [view, setView] = useState<WatcherView | null>(null);
   const initialLoadedRef = useRef(false);
@@ -86,6 +96,9 @@ function TournamentWatcher({
         // Player was removed — forget this entry so we stop watching it.
         if (error?.message.includes("Invalid player credentials")) {
           clearEntry(tournamentId);
+          // Don't leave notifications pointing at a tournament we can no
+          // longer open.
+          clearTournament(tournamentId);
         }
         return;
       }
@@ -132,14 +145,24 @@ function TournamentWatcher({
               : "your table";
           message = `Round ${newRound} is up. ${where} vs ${oppName ?? "your opponent"}`;
         }
-        onAlertRef.current({ tournamentId, message });
+        onAlertRef.current({
+          type: "round_published",
+          tournamentId,
+          tournamentName: d.tournament.name ?? null,
+          message,
+          href: playerHref(tournamentId),
+          roundNumber: newRound,
+        });
       }
       prevRoundCountRef.current = roundCount;
 
       if (status === "completed" && prevStatusRef.current !== "completed") {
         onAlertRef.current({
+          type: "tournament_completed",
           tournamentId,
+          tournamentName: d.tournament.name ?? null,
           message: "All rounds are done. Final standings are ready.",
+          href: playerHref(tournamentId),
         });
       }
       prevStatusRef.current = status;
@@ -210,8 +233,12 @@ function TournamentWatcher({
     const timeoutId = window.setTimeout(() => {
       expiredAlertRoundRef.current = roundForAlert;
       onAlertRef.current({
+        type: "round_time_up",
         tournamentId,
+        tournamentName: t.name ?? null,
         message: `Time's up for Round ${roundForAlert}!`,
+        href: playerHref(tournamentId),
+        roundNumber: roundForAlert,
       });
     }, remainingMs);
     return () => clearTimeout(timeoutId);
@@ -237,18 +264,24 @@ export default function PlayerNotifications() {
   );
 
   const handleAlert = useCallback(
-    (a: PlayerAlert) => {
+    (n: NewNotification) => {
+      // Record first, always. A duplicate id returns null, which is how a
+      // re-derived event stays silent instead of re-toasting.
+      const stored = addNotification(n);
+      if (!stored) return;
+
       // When OS push is granted, the service worker shows the notification for
       // every event (foreground included) — so skip the in-app toast to avoid
-      // doubling up. Non-push users still get the in-app cue.
+      // doubling up. The event is still recorded above, so the app keeps its
+      // own copy of anything the OS announced.
       if (
         typeof Notification !== "undefined" &&
         Notification.permission === "granted"
       ) {
         return;
       }
-      setAlert(a);
-      notify(a.message);
+      setAlert({ tournamentId: n.tournamentId, message: n.message });
+      notify(n.message);
     },
     [notify],
   );
