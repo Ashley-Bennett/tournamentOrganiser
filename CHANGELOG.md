@@ -61,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `20260901010900_round_timing_capture`, `20260901011000_timing_stats` — persist round/match timings and report on them.
 - `20260901011100_deck_diversity` — effective deck count and top-deck share.
 - `20260901011200_player_identity_merge`, `20260901011300_merge_dismissals` — merge/split player identities and remember dismissed suggestions.
+- `20260902000000_fix_set_result_recorded_at_search_path` — pin `search_path = public` on the `set_result_recorded_at` trigger function, clearing the `function_search_path_mutable` advisor warning that `20260901010900` introduced. SECURITY INVOKER, so nothing was exploitable; body unchanged and the trigger keeps its oid.
 
 ### Tests
 - New suites: `games/registry.test.ts`, `utils/statsPeriod.test.ts`, `utils/csv.test.ts`, `utils/tieBreaking.profiles.test.ts`, `components/StatsGameFilter.test.tsx`, `components/StatsPeriodFilter.test.tsx`, `components/PlayerNameInput.test.tsx`, `components/PlayerClaimLinkDialog.test.tsx`, `pages/TournamentJoin.test.tsx`, `pages/Tournaments.create.test.tsx`, `pages/TournamentMatches/PlayerManagementDialog.test.tsx`.
