@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { GAMES } from "./registry";
 import {
   defaultPartnerKey,
@@ -39,6 +41,33 @@ describe("the registry declares a partner source per game", () => {
         const keys = g.partner.options.map((o) => o.key);
         expect(new Set(keys).size).toBe(keys.length);
       }
+    });
+  });
+});
+
+describe("declared partner art exists", () => {
+  // A missing file is a picker full of broken images, and nothing in the type
+  // system catches it — the src is just a string.
+  it("ships a file for every option every game declares", () => {
+    GAMES.forEach((g) => {
+      if (g.partner.kind !== "set") return;
+      g.partner.options.forEach((o) => {
+        const file = join(process.cwd(), "public", o.src);
+        expect(existsSync(file), `missing ${o.src}`).toBe(true);
+      });
+    });
+  });
+
+  it("ships them as usable svg", () => {
+    GAMES.forEach((g) => {
+      if (g.partner.kind !== "set") return;
+      g.partner.options.forEach((o) => {
+        const svg = readFileSync(join(process.cwd(), "public", o.src), "utf8");
+        expect(svg).toContain("<svg");
+        // currentColor so a partner inherits the theme rather than being
+        // painted for one of them.
+        expect(svg).toContain("currentColor");
+      });
     });
   });
 });

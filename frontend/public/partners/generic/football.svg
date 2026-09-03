@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Football">
+  <!-- PLACEHOLDER. Crude on purpose: this exists so the generic partner
+       picker renders while the UI is built, and is replaced by the
+       commissioned set. Single-stroke, currentColor, so it inherits the
+       theme and works on either ground. -->
+  <circle cx="32" cy="32" r="24"/>
+  <path d="M32 18l10 7-4 12H26l-4-12z"/>
+  <path d="M32 8v10M12 26l10 6M52 26l-10 6M20 50l6-13M44 50l-6-13"/>
+</svg>
