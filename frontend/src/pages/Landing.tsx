@@ -86,7 +86,10 @@ function ScreenshotFrame({
         component="img"
         src={webpSrc}
         alt={alt}
-        fetchPriority={priority ? "high" : "auto"}
+        // React 18 passes unknown camelCase props straight to the DOM and
+        // warns; the HTML attribute is all-lowercase. React 19 handles the
+        // camelCase spelling, at which point this can go back.
+        {...{ fetchpriority: priority ? "high" : "auto" }}
         loading={priority ? "eager" : "lazy"}
         sx={{
           width: "100%",
@@ -582,7 +585,7 @@ export default function Landing() {
 
           <Grid container spacing={3}>
             {features.map((f) => (
-              <Grid item xs={12} sm={6} md={4} key={f.title}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={f.title}>
                 <Box
                   sx={{
                     bgcolor: cardBg,
@@ -658,7 +661,7 @@ export default function Landing() {
                   },
                 }}
               >
-                <Grid item xs={12} md={5}>
+                <Grid size={{ xs: 12, md: 5 }}>
                   <Stack direction="row" spacing={2} alignItems="flex-start">
                     <Box
                       sx={{
@@ -700,7 +703,7 @@ export default function Landing() {
                     </Box>
                   </Stack>
                 </Grid>
-                <Grid item xs={12} md={7}>
+                <Grid size={{ xs: 12, md: 7 }}>
                   <ScreenshotFrame
                     src={step.img}
                     alt={step.imgAlt}
@@ -718,7 +721,7 @@ export default function Landing() {
       <Box sx={{ py: { xs: 8, md: 12 } }}>
         <Container maxWidth="lg">
           <Grid container spacing={{ xs: 4, md: 8 }} alignItems="center">
-            <Grid item xs={12} md={5}>
+            <Grid size={{ xs: 12, md: 5 }}>
               <Typography
                 component="h2"
                 sx={{
@@ -779,7 +782,7 @@ export default function Landing() {
                 ))}
               </Stack>
             </Grid>
-            <Grid item xs={12} md={7}>
+            <Grid size={{ xs: 12, md: 7 }}>
               <ScreenshotFrame
                 src="/screenshots/standings.png"
                 alt="Final standings with tiebreakers"
@@ -844,7 +847,7 @@ export default function Landing() {
                 ],
               },
             ].map((card) => (
-              <Grid item xs={12} md={6} key={card.title}>
+              <Grid size={{ xs: 12, md: 6 }} key={card.title}>
                 <Box
                   sx={{
                     bgcolor: cardBg,

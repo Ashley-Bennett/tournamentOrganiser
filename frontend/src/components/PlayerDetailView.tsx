@@ -355,28 +355,28 @@ export default function PlayerDetailView({
   return (
     <Box>
       <Grid container spacing={2} mb={1}>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatBox
             label="Events"
             value={String(summary.events_played)}
             sub={`since ${new Date(summary.first_seen).toLocaleDateString()}`}
           />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatBox
             label="Win rate"
             value={pct(summary.wins, summary.matches_played)}
             sub={`${record(summary.wins, summary.losses, summary.draws)} in ${summary.matches_played}`}
           />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatBox
             label="Best finish"
             value={placing(summary.best_finish)}
             sub={summary.event_wins > 0 ? `${summary.event_wins} won` : undefined}
           />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatBox label="Decks" value={String(decks.length)} sub={`${opponents.length} opponents`} />
         </Grid>
       </Grid>

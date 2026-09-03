@@ -33,7 +33,7 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { formatDate } from "../utils/format";
-import { Add as AddIcon } from "@mui/icons-material";
+import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
@@ -163,8 +163,10 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
 
       setTournaments((prev) => prev.filter((t) => t.id !== id));
       setSuccess("Tournament deleted successfully.");
-    } catch (err) {
-      setError("Network error. Please try again.");
+    } catch (e: unknown) {
+      // The throw above carries the database's own message; reporting every
+      // failure as a network error hid the real reason.
+      setError(e instanceof Error ? e.message : "Failed to delete tournament.");
     } finally {
       setDeletingId(null);
     }

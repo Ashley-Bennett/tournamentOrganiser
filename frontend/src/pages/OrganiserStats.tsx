@@ -366,7 +366,7 @@ const OrganiserStats: React.FC = () => {
       )}
 
       <Grid container spacing={2} mb={2}>
-        <Grid item xs={6} sm={4} md={2}>
+        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
           <StatCard
             label="Unique players"
             value={overview?.unique_players ?? "—"}
@@ -379,7 +379,7 @@ const OrganiserStats: React.FC = () => {
             color="info.main"
           />
         </Grid>
-        <Grid item xs={6} sm={4} md={2}>
+        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
           <StatCard
             label="Events run"
             value={overview?.events_total ?? "—"}
@@ -387,7 +387,7 @@ const OrganiserStats: React.FC = () => {
             loading={overviewLoading}
           />
         </Grid>
-        <Grid item xs={6} sm={4} md={2}>
+        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
           <StatCard
             label="Average field"
             value={overview?.avg_field_size ?? "—"}
@@ -395,14 +395,14 @@ const OrganiserStats: React.FC = () => {
             loading={overviewLoading}
           />
         </Grid>
-        <Grid item xs={6} sm={4} md={2}>
+        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
           <StatCard
             label="Matches played"
             value={overview?.total_matches ?? "—"}
             loading={overviewLoading}
           />
         </Grid>
-        <Grid item xs={6} sm={4} md={2}>
+        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
           <StatCard
             label="Biggest event"
             value={overview?.largest_event_size ?? "—"}
@@ -411,7 +411,7 @@ const OrganiserStats: React.FC = () => {
             color="warning.main"
           />
         </Grid>
-        <Grid item xs={6} sm={4} md={2}>
+        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
           <StatCard
             label="Drop-outs"
             value={overview?.dropped_entries ?? "—"}
@@ -428,7 +428,7 @@ const OrganiserStats: React.FC = () => {
 
       {showNewReturning && (
         <Grid container spacing={2}>
-          <Grid item xs={6} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <StatCard
               label="New players"
               value={overview?.new_players ?? "—"}
@@ -441,7 +441,7 @@ const OrganiserStats: React.FC = () => {
               color="success.main"
             />
           </Grid>
-          <Grid item xs={6} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <StatCard
               label="Returning players"
               value={overview?.returning_players ?? "—"}
@@ -449,7 +449,7 @@ const OrganiserStats: React.FC = () => {
               loading={overviewLoading}
             />
           </Grid>
-          <Grid item xs={6} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <StatCard
               label="Late entries"
               value={overview?.late_entries ?? "—"}

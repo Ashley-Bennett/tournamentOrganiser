@@ -275,7 +275,7 @@ export default function EventHealthSection({
       )}
 
       <Grid container spacing={2} mb={3}>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent sx={{ pb: "16px !important" }}>
               <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
@@ -298,7 +298,7 @@ export default function EventHealthSection({
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent sx={{ pb: "16px !important" }}>
               <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
@@ -319,7 +319,7 @@ export default function EventHealthSection({
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent sx={{ pb: "16px !important" }}>
               <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
@@ -348,7 +348,7 @@ export default function EventHealthSection({
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent sx={{ pb: "16px !important" }}>
               <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>

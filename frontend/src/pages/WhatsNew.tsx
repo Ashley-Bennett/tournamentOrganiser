@@ -7,9 +7,7 @@ import {
   ListItem,
   ListItemText,
 } from "@mui/material";
-import {
-  NewReleases as NewReleasesIcon,
-} from "@mui/icons-material";
+import NewReleasesIcon from "@mui/icons-material/NewReleases";
 import patchNotes from "../data/patchNotes";
 
 const categoryColour: Record<string, "primary" | "success" | "warning" | "default"> = {

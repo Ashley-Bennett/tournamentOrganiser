@@ -15,11 +15,9 @@ import {
   ListItemText,
   Tooltip,
 } from "@mui/material";
-import {
-  Menu as MenuIcon,
-  LightMode as LightModeIcon,
-  DarkMode as DarkModeIcon,
-} from "@mui/icons-material";
+import MenuIcon from "@mui/icons-material/Menu";
+import LightModeIcon from "@mui/icons-material/LightMode";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 import { useThemeMode } from "../ThemeContext";

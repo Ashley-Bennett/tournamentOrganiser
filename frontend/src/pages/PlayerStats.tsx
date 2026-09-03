@@ -200,14 +200,14 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
   return (
     <>
       <Grid container spacing={2} mb={2}>
-        <Grid item xs={6} sm={4} md={2}>
+        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
           {/* "of N" rather than "/ NL": the remainder includes draws, not just losses */}
           <StatCard label="Win Rate" value={winRate} sub={data ? `${data.total_match_wins}W of ${data.total_matches}` : undefined} loading={loading} color="info.main" />
         </Grid>
-        <Grid item xs={6} sm={4} md={2}>
+        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
           <StatCard label="Win Rate (no byes)" value={winRateNoByes} sub={data ? `${data.matches_no_byes} matches` : undefined} loading={loading} />
         </Grid>
-        <Grid item xs={6} sm={4} md={2}>
+        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
           <StatCard label="Tournaments" value={data?.total_completed ?? "—"} loading={loading} />
         </Grid>
         {/*
@@ -217,7 +217,7 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
           stops saying anything, while the rate carries on being useful.
         */}
         {showBestFinish && (
-          <Grid item xs={6} sm={4} md={2}>
+          <Grid size={{ xs: 6, sm: 4, md: 2 }}>
             <StatCard
               label="Best Finish"
               value={data?.best_finish != null ? `${data.best_finish}${ordinal(data.best_finish)}` : "—"}
@@ -227,7 +227,7 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
           </Grid>
         )}
         {earned.map((t) => (
-          <Grid item xs={6} sm={4} md={2} key={t.key}>
+          <Grid size={{ xs: 6, sm: 4, md: 2 }} key={t.key}>
             <StatCard
               label={t.label}
               value={data ? pct(t.count(data), data.ranked_events) : "—"}
@@ -237,7 +237,7 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
             />
           </Grid>
         ))}
-        <Grid item xs={6} sm={4} md={2}>
+        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
           <StatCard label="Current Streak" value={streakLabel} loading={loading} color={streakColor} />
         </Grid>
       </Grid>
@@ -249,13 +249,13 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
       )}
 
       <Grid container spacing={2}>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatCard label="Best Win Streak" value={data ? `${data.longest_win_streak}W` : "—"} loading={loading} color="success.main" />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatCard label="Worst Loss Streak" value={data ? `${data.longest_loss_streak}L` : "—"} loading={loading} color="error.main" />
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent sx={{ pb: "16px !important" }}>
               <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>Nemesis</Typography>
@@ -270,7 +270,7 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent sx={{ pb: "16px !important" }}>
               <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>Favourite opponent</Typography>
@@ -413,7 +413,7 @@ function FirstSecondSection({
         </Alert>
       )}
       <Grid container spacing={2}>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatCard
             label="Going First"
             value={firstRate}
@@ -422,7 +422,7 @@ function FirstSecondSection({
             color="primary.main"
           />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatCard
             label="Going Second"
             value={secondRate}
@@ -431,7 +431,7 @@ function FirstSecondSection({
           />
         </Grid>
         {hasData && data && data.went_first_total > 0 && data.went_second_total > 0 && (
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Card variant="outlined" sx={{ height: "100%" }}>
               <CardContent sx={{ pb: "16px !important" }}>
                 <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>Tempo insight</Typography>

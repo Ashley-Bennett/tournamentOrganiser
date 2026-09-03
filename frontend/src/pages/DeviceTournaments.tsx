@@ -10,7 +10,8 @@ import {
   Chip,
   CircularProgress,
 } from "@mui/material";
-import { EmojiEventsOutlined as TrophyIcon, Add as AddIcon } from "@mui/icons-material";
+import TrophyIcon from "@mui/icons-material/EmojiEventsOutlined";
+import AddIcon from "@mui/icons-material/Add";
 import { getAllEntries } from "../utils/playerStorage";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";

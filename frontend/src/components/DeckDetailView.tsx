@@ -261,23 +261,23 @@ export default function DeckDetailView({
 
       <Box>
         <Grid container spacing={2} mb={1}>
-          <Grid item xs={6} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <StatBox label="Entries" value={String(totalEntries)} sub={`${pilots.length} pilots`} />
           </Grid>
-          <Grid item xs={6} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <StatBox
               label="Win rate"
               value={pct(totalWins, totalMatches)}
               sub={`${totalWins}W of ${totalMatches}`}
             />
           </Grid>
-          <Grid item xs={6} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <StatBox
               label="Best finish"
               value={bestFinish != null ? `${bestFinish}${ordinal(bestFinish)}` : "—"}
             />
           </Grid>
-          <Grid item xs={6} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <StatBox label="Event wins" value={String(totalEventWins)} />
           </Grid>
         </Grid>

@@ -139,7 +139,7 @@ export default function PlayerPaceSection({
       )}
 
       <Grid container spacing={2} mb={2}>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatCard
             label="Typical game"
             value={formatMinutes(data?.median_minutes ?? null)}
@@ -148,7 +148,7 @@ export default function PlayerPaceSection({
             color="info.main"
           />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatCard
             label="Fastest game"
             value={formatMinutes(data?.fastest_minutes ?? null)}
@@ -158,7 +158,7 @@ export default function PlayerPaceSection({
             icon={<BoltIcon fontSize="small" color="success" />}
           />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatCard
             label="Longest game"
             value={formatMinutes(data?.slowest_minutes ?? null)}
@@ -167,7 +167,7 @@ export default function PlayerPaceSection({
             icon={<HourglassBottomIcon fontSize="small" />}
           />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatCard
             label="Went to time"
             value={String(data?.went_to_time ?? 0)}

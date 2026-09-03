@@ -16,18 +16,16 @@ import {
   Tab,
   Tabs,
 } from "@mui/material";
-import {
-  SportsEsports as TournamentIcon,
-  People as PeopleIcon,
-  EmojiEvents as TrophyIcon,
-  Add as AddIcon,
-  OpenInNew as OpenInNewIcon,
-  PlayArrow as ResumeIcon,
-  Ballot as TotalIcon,
-  WorkspacePremium as WinIcon,
-  ShowChart as WinRateIcon,
-  Style as DeckIcon,
-} from "@mui/icons-material";
+import TournamentIcon from "@mui/icons-material/SportsEsports";
+import PeopleIcon from "@mui/icons-material/People";
+import TrophyIcon from "@mui/icons-material/EmojiEvents";
+import AddIcon from "@mui/icons-material/Add";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import ResumeIcon from "@mui/icons-material/PlayArrow";
+import TotalIcon from "@mui/icons-material/Ballot";
+import WinIcon from "@mui/icons-material/WorkspacePremium";
+import WinRateIcon from "@mui/icons-material/ShowChart";
+import DeckIcon from "@mui/icons-material/Style";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
@@ -301,7 +299,7 @@ const OrganiserDashboard: React.FC = () => {
             color: "secondary.main" as const,
           },
         ].map(({ label, value, icon, color, onClick }) => (
-          <Grid item xs={6} sm={3} key={label}>
+          <Grid size={{ xs: 6, sm: 3 }} key={label}>
             <Card
               variant="outlined"
               sx={{ height: "100%", cursor: onClick ? "pointer" : "default" }}
@@ -708,7 +706,7 @@ const PlayerDashboard: React.FC = () => {
             color: winRate != null ? "info.main" as const : "text.disabled" as const,
           },
         ] as const).map(({ label, value, icon, color }) => (
-          <Grid item xs={6} sm={3} key={label}>
+          <Grid size={{ xs: 6, sm: 3 }} key={label}>
             <Card variant="outlined" sx={{ height: "100%" }}>
               <CardContent sx={{ pb: "16px !important" }}>
                 <Box display="flex" alignItems="center" gap={1} mb={1}>
@@ -725,7 +723,7 @@ const PlayerDashboard: React.FC = () => {
           </Grid>
         ))}
         {hasDecks && (
-        <Grid item xs={6} sm={3}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent sx={{ pb: "16px !important" }}>
               <Box display="flex" alignItems="center" gap={1} mb={1}>

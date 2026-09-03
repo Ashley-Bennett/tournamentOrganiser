@@ -35,7 +35,9 @@ import {
 } from "@mui/material";
 import { formatLabel, getGame } from "../games/registry";
 import SeatIcon from "@mui/icons-material/EventSeat";
-import { PlayArrow as PlayArrowIcon, Add as AddIcon, Remove as RemoveIcon } from "@mui/icons-material";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import AddIcon from "@mui/icons-material/Add";
+import RemoveIcon from "@mui/icons-material/Remove";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import SearchIcon from "@mui/icons-material/Search";

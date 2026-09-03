@@ -37,14 +37,11 @@ import { useRoundLifecycle } from "../../hooks/useRoundLifecycle";
 import {
   type TournamentPlayer,
   type Match,
-  type MatchWithPlayers,
   MATCH_STATUS,
   TOURNAMENT_PLAYER_COLUMNS,
-  toMatchWithPlayers,
 } from "../../types/match";
 import StandingsTable from "../../components/StandingsTable";
 import ErrorBoundary from "../../components/ErrorBoundary";
-import ScoreDialog from "./ScoreDialog";
 import DeleteRoundDialog from "./DeleteRoundDialog";
 import LateEntryDialog from "./LateEntryDialog";
 import { useWorkspacePlayers } from "../../hooks/useWorkspacePlayers";
@@ -73,13 +70,6 @@ const TournamentMatches: React.FC = () => {
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [sortBy, setSortBy] = useState<"match" | "status" | "record">("record");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
-  const [selectedMatch, setSelectedMatch] = useState<MatchWithPlayers | null>(
-    null,
-  );
-  const [selectedWinner, setSelectedWinner] = useState<string>("");
-  const [player1Wins, setPlayer1Wins] = useState<number>(0);
-  const [player2Wins, setPlayer2Wins] = useState<number>(0);
   const [updatingMatch, setUpdatingMatch] = useState(false);
   const [dropDialogOpen, setDropDialogOpen] = useState(false);
   const [togglingDrop, setTogglingDrop] = useState<string | null>(null);
@@ -388,207 +378,6 @@ const TournamentMatches: React.FC = () => {
     }
     return map;
   }, [players]);
-
-  // Reserved for future use: open score dialog with pre-selected match/winner
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- handler kept for wiring to UI
-  const handleOpenScoreDialog = (
-    match: MatchWithPlayers,
-    winnerId: string | null = null,
-  ) => {
-    setSelectedMatch(match);
-    // Pre-select winner if provided, otherwise check existing winner
-    if (winnerId) {
-      if (winnerId === match.player1_id) {
-        setSelectedWinner("player1");
-      } else if (winnerId === match.player2_id) {
-        setSelectedWinner("player2");
-      } else {
-        setSelectedWinner("");
-      }
-    } else if (match.winner_id) {
-      if (match.winner_id === match.player1_id) {
-        setSelectedWinner("player1");
-      } else if (match.winner_id === match.player2_id) {
-        setSelectedWinner("player2");
-      } else {
-        setSelectedWinner("");
-      }
-    } else {
-      setSelectedWinner("");
-    }
-
-    // Parse existing score if available (format: "2-0", "2-1", etc.)
-    if (match.result && match.result !== "bye" && match.result !== "Draw") {
-      const parts = match.result.split("-");
-      if (parts.length === 2) {
-        setPlayer1Wins(parseInt(parts[0], 10) || 0);
-        setPlayer2Wins(parseInt(parts[1], 10) || 0);
-      } else {
-        setPlayer1Wins(0);
-        setPlayer2Wins(0);
-      }
-    } else {
-      setPlayer1Wins(0);
-      setPlayer2Wins(0);
-    }
-
-    setScoreDialogOpen(true);
-  };
-
-  const handleCloseScoreDialog = () => {
-    setScoreDialogOpen(false);
-    setSelectedMatch(null);
-    setSelectedWinner("");
-    setPlayer1Wins(0);
-    setPlayer2Wins(0);
-  };
-
-  const getScoreValidationError = (): string | null => {
-    if (!selectedMatch || !selectedWinner) return null;
-
-    // Draws are not permitted in single-elimination
-    if (
-      selectedWinner === "draw" &&
-      tournament?.tournament_type === "single_elimination"
-    ) {
-      return "Draws are not allowed in single-elimination tournaments";
-    }
-
-    // Nothing to validate where the rules record only who won.
-    if (rules.scoring !== "best_of_3") return null;
-
-    // Validate score for non-draw matches
-    if (selectedWinner !== "draw" && selectedMatch.player2_id) {
-      if (player1Wins === 0 && player2Wins === 0) {
-        return "Please enter a valid score";
-      }
-      // Best-of-3: max 2 wins per player, max 3 games total
-      if (player1Wins > 2 || player2Wins > 2) {
-        return "Maximum 2 wins per player (best of 3)";
-      }
-      if (player1Wins + player2Wins > 3) {
-        return "Maximum 3 games total (best of 3)";
-      }
-      // Ensure winner has more wins
-      if (
-        (selectedWinner === "player1" && player1Wins <= player2Wins) ||
-        (selectedWinner === "player2" && player2Wins <= player1Wins)
-      ) {
-        return "Winner must have more wins than opponent";
-      }
-    }
-
-    return null;
-  };
-
-  const handleSaveMatchResult = async () => {
-    if (!selectedMatch || !selectedWinner) return;
-
-    const validationError = getScoreValidationError();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
-    try {
-      setUpdatingMatch(true);
-      setError(null);
-
-      // Determine winner_id based on selection
-      let winnerId: string | null = null;
-      if (selectedWinner === "player1") {
-        winnerId = selectedMatch.player1_id;
-      } else if (selectedWinner === "player2" && selectedMatch.player2_id) {
-        winnerId = selectedMatch.player2_id;
-      } else if (selectedWinner === "draw") {
-        // For draws, winner_id stays null
-        winnerId = null;
-      }
-
-      // Generate score string. Where the rules record only who won there is no
-      // game score to show, and the inputs were never offered — writing
-      // `${player1Wins}-${player2Wins}` would store a meaningless "0-0".
-      let resultString = "";
-      if (selectedWinner === "draw") {
-        resultString = "Draw";
-      } else if (!selectedMatch.player2_id) {
-        resultString = "Bye";
-      } else if (rules.scoring === "best_of_3") {
-        resultString = `${player1Wins}-${player2Wins}`;
-      } else {
-        resultString = "Win";
-      }
-
-      // Update match in database
-      const updateData: {
-        winner_id?: string | null;
-        result: string;
-        status: "completed" | "pending";
-      } = {
-        result: resultString,
-        status: selectedWinner === "draw" || winnerId ? "completed" : "pending",
-      };
-
-      if (winnerId !== undefined) {
-        updateData.winner_id = winnerId;
-      }
-
-      const { error: updateError } = await supabase
-        .from("tournament_matches")
-        .update(updateData)
-        .eq("id", selectedMatch.id);
-
-      if (updateError) {
-        throw new Error(updateError.message || "Failed to update match");
-      }
-
-      // Refresh matches - same stable order so match numbers stay fixed
-      const { data: matchesData, error: matchesError } = await supabase
-        .from("tournament_matches")
-        .select("*")
-        .eq("tournament_id", tournament!.id)
-        .order("round_number", { ascending: true })
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true });
-
-      if (matchesError) {
-        throw new Error(matchesError.message || "Failed to refresh matches");
-      }
-
-      // Fetch updated player names
-      const playerIds = new Set<string>();
-      matchesData?.forEach((match) => {
-        playerIds.add(match.player1_id);
-        if (match.player2_id) {
-          playerIds.add(match.player2_id);
-        }
-        if (match.winner_id) {
-          playerIds.add(match.winner_id);
-        }
-      });
-
-      const { data: playersData } = await supabase
-        .from("tournament_players")
-        .select("id, name")
-        .in("id", Array.from(playerIds));
-
-      const playersMap = new Map<string, string>();
-      playersData?.forEach((player) => {
-        playersMap.set(player.id, player.name);
-      });
-
-      const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
-        (match) => toMatchWithPlayers(match, (id) => playersMap.get(id) || "Unknown"),
-      );
-
-      setMatches(matchesWithPlayers);
-      handleCloseScoreDialog();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to update match");
-    } finally {
-      setUpdatingMatch(false);
-    }
-  };
 
   const {
     editingPairings,
@@ -1520,22 +1309,6 @@ const TournamentMatches: React.FC = () => {
         </Paper>
       )}
 
-      <ScoreDialog
-        open={scoreDialogOpen}
-        match={selectedMatch}
-        selectedWinner={selectedWinner}
-        setSelectedWinner={setSelectedWinner}
-        player1Wins={player1Wins}
-        setPlayer1Wins={setPlayer1Wins}
-        player2Wins={player2Wins}
-        setPlayer2Wins={setPlayer2Wins}
-        updatingMatch={updatingMatch}
-        getScoreValidationError={getScoreValidationError}
-        showGameScore={rules.scoring === "best_of_3"}
-        onSave={handleSaveMatchResult}
-        onClose={handleCloseScoreDialog}
-        setError={setError}
-      />
 
       <PlayerManagementDialog
         open={dropDialogOpen}

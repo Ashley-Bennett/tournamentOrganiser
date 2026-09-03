@@ -21,14 +21,12 @@ import {
   ToggleButtonGroup,
   ToggleButton,
 } from "@mui/material";
-import {
-  PersonOutline as PersonIcon,
-  WorkspacesOutlined as WorkspaceIcon,
-  DeleteOutlined as DeleteIcon,
-  PeopleOutlined as PeopleIcon,
-  ContentCopy as CopyIcon,
-  PersonRemoveOutlined as RemovePersonIcon,
-} from "@mui/icons-material";
+import PersonIcon from "@mui/icons-material/PersonOutline";
+import WorkspaceIcon from "@mui/icons-material/WorkspacesOutlined";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import PeopleIcon from "@mui/icons-material/PeopleOutlined";
+import CopyIcon from "@mui/icons-material/ContentCopy";
+import RemovePersonIcon from "@mui/icons-material/PersonRemoveOutlined";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";

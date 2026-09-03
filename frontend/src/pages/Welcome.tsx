@@ -12,11 +12,9 @@ import {
   Alert,
   CircularProgress,
 } from "@mui/material";
-import {
-  EmojiEvents as TrophyIcon,
-  QrCodeScanner as JoinIcon,
-  LinkOutlined as LinkIcon,
-} from "@mui/icons-material";
+import TrophyIcon from "@mui/icons-material/EmojiEvents";
+import JoinIcon from "@mui/icons-material/QrCodeScanner";
+import LinkIcon from "@mui/icons-material/LinkOutlined";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { getAllEntries } from "../utils/playerStorage";
