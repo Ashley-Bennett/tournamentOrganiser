@@ -120,4 +120,11 @@ export interface EarnedBadge {
    * game-agnostic badge travels between a chess night and a Pokémon one.
    */
   gameId?: string | null;
+  /**
+   * The date of every qualifying event, ascending. The database stores these
+   * rather than tier dates because it does not know that 25 events makes you
+   * a Regular — so the client reads the 25th entry to say when Silver was
+   * reached.
+   */
+  earnedAt?: string[];
 }
