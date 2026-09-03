@@ -117,3 +117,24 @@ export function sortForDisplay(earned: EarnedBadge[]): EarnedBadge[] {
     return ra[0] - rb[0] || ra[1] - rb[1] || ra[2] - rb[2];
   });
 }
+
+/**
+ * The badges that may be shown at an event for `gameId`.
+ *
+ * A badge with no game travels everywhere; one earned in another game is kept
+ * but hidden, because it is a claim about a game nobody in this room is
+ * playing. Passing null for the game — an account page with no event in
+ * context — shows everything.
+ */
+export function badgesForGame(
+  earned: EarnedBadge[],
+  gameId: string | null,
+): EarnedBadge[] {
+  if (gameId === null) return earned;
+  return earned.filter((e) => {
+    const badge = getBadge(e.badgeId);
+    if (!badge) return false;
+    if (!badge.perGame) return true;
+    return e.gameId === gameId;
+  });
+}

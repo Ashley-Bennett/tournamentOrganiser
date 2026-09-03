@@ -96,6 +96,15 @@ export interface BadgeDefinition {
   minFieldSize?: number;
   /** True when the badge is scoped to one league and shown with its name. */
   perLeague: boolean;
+  /**
+   * True when the badge is a claim about how you played a particular game,
+   * and so must not be shown at an event for a different one — a Champion of
+   * a chess evening says nothing about Pokémon.
+   *
+   * False for badges that describe the club rather than the play. Attendance
+   * is the same fact whichever night you turn up on.
+   */
+  perGame: boolean;
 }
 
 /** A badge a player holds, as it comes over the wire. */
@@ -106,4 +115,9 @@ export interface EarnedBadge {
   /** Set only for a per-league badge. */
   workspaceId?: string | null;
   workspaceName?: string | null;
+  /**
+   * The game it was earned in. Null means it shows anywhere, which is how a
+   * game-agnostic badge travels between a chess night and a Pokémon one.
+   */
+  gameId?: string | null;
 }

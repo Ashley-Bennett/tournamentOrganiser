@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BADGES, TIERS, getBadge, isTiered } from "./registry";
 import {
+  badgesForGame,
   resolveBadge,
   sortForDisplay,
   tierFor,
@@ -229,5 +230,50 @@ describe("sortForDisplay", () => {
     const input = [earned("attendance"), earned("spoiler")];
     sortForDisplay(input);
     expect(input.map((e) => e.badgeId)).toEqual(["attendance", "spoiler"]);
+  });
+});
+
+describe("badgesForGame", () => {
+  const earned = (
+    badgeId: string,
+    gameId: string | null = null,
+  ): EarnedBadge => ({ badgeId, count: 1, gameId });
+
+  // The point of the whole rule: a chess champion is not a Pokémon champion.
+  it("hides a badge earned in another game", () => {
+    const all = [earned("champion", "generic"), earned("champion", "pokemon")];
+    expect(badgesForGame(all, "pokemon")).toEqual([
+      earned("champion", "pokemon"),
+    ]);
+  });
+
+  // Attendance describes the club, not the play, so it travels.
+  it("keeps a game-agnostic badge whatever is being played", () => {
+    const all = [earned("attendance")];
+    expect(badgesForGame(all, "pokemon")).toHaveLength(1);
+    expect(badgesForGame(all, "generic")).toHaveLength(1);
+  });
+
+  it("shows everything when there is no game in context", () => {
+    const all = [earned("champion", "generic"), earned("attendance")];
+    expect(badgesForGame(all, null)).toHaveLength(2);
+  });
+
+  // A per-game badge whose game never arrived is not safe to show.
+  it("hides a per-game badge with no game recorded", () => {
+    expect(badgesForGame([earned("champion", null)], "pokemon")).toEqual([]);
+  });
+
+  it("drops an unknown badge rather than guessing", () => {
+    expect(badgesForGame([earned("mystery", "pokemon")], "pokemon")).toEqual([]);
+  });
+});
+
+describe("the registry, game scoping", () => {
+  it("scopes performance badges to a game and attendance to none", () => {
+    expect(getBadge("attendance")!.perGame).toBe(false);
+    ["top_cut", "champion", "spoiler", "bubble"].forEach((id) => {
+      expect(getBadge(id)!.perGame).toBe(true);
+    });
   });
 });

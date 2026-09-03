@@ -43,6 +43,7 @@ export const BADGES: BadgeDefinition[] = [
     metric: "events_at_league",
     thresholds: [1, 5, 25, 50, 100],
     perLeague: true,
+    perGame: false,
   },
   {
     id: "top_cut",
@@ -56,6 +57,7 @@ export const BADGES: BadgeDefinition[] = [
     // cut, which the RPC applies; this is the floor for counting at all.
     minFieldSize: 8,
     perLeague: false,
+    perGame: true,
   },
   {
     id: "champion",
@@ -69,6 +71,7 @@ export const BADGES: BadgeDefinition[] = [
     // Winning a three-person kitchen-table event is not the same achievement.
     minFieldSize: 8,
     perLeague: false,
+    perGame: true,
   },
   {
     id: "spoiler",
@@ -80,6 +83,7 @@ export const BADGES: BadgeDefinition[] = [
     thresholds: [],
     minFieldSize: 8,
     perLeague: false,
+    perGame: true,
   },
   {
     id: "bubble",
@@ -91,6 +95,7 @@ export const BADGES: BadgeDefinition[] = [
     thresholds: [],
     minFieldSize: 8,
     perLeague: false,
+    perGame: true,
   },
 ];
 

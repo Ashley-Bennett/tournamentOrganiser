@@ -20,18 +20,26 @@
 -- workspace into that key — so a regular who played under a bare name
 -- for six months and linked in July keeps those six months.
 --
+-- Performance badges carry the game they were earned in, because a
+-- Champion of a chess evening is not a claim about Pokemon and must not
+-- show at a Pokemon event. Attendance carries no game: it describes the
+-- club, not the play. A NULL game_id therefore means "shows anywhere".
+--
 -- Thresholds and tier names deliberately live in the frontend registry
 -- (src/badges/), not here. This returns an id and a count; the client
 -- decides that 25 events makes you a Regular. Adding a badge tier is
 -- then a code change rather than a migration.
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION public.get_my_badges()
+DROP FUNCTION IF EXISTS public.get_my_badges();
+
+CREATE FUNCTION public.get_my_badges()
 RETURNS TABLE(
   badge_id       TEXT,
   badge_count    INT,
   workspace_id   UUID,
-  workspace_name TEXT
+  workspace_name TEXT,
+  game_id        TEXT
 )
 LANGUAGE plpgsql
 STABLE
@@ -69,6 +77,7 @@ BEGIN
       m.tpid,
       m.tid,
       m.workspace_id,
+      t.game_id::TEXT  AS game_id,
       ts.position::INT AS finish,
       (
         SELECT COUNT(*)::INT
@@ -128,40 +137,48 @@ BEGIN
   ),
 
   -- ── The badges ─────────────────────────────────────────────────────
+  -- Attendance is a claim about the place, not the game: being a regular
+  -- at a club is true whichever night you come, so it carries no game and
+  -- shows at every event.
   attendance AS (
     SELECT
       'attendance'::TEXT AS badge_id,
       COUNT(*)::INT      AS badge_count,
       s.workspace_id,
-      (SELECT ws.name FROM public.workspaces ws WHERE ws.id = s.workspace_id)::TEXT AS workspace_name
+      (SELECT ws.name FROM public.workspaces ws WHERE ws.id = s.workspace_id)::TEXT AS workspace_name,
+      NULL::TEXT         AS game_id
     FROM scored s
     GROUP BY s.workspace_id
   ),
   top_cut AS (
-    SELECT 'top_cut'::TEXT, COUNT(*)::INT, NULL::UUID, NULL::TEXT
+    SELECT 'top_cut'::TEXT, COUNT(*)::INT, NULL::UUID, NULL::TEXT, s.game_id
     FROM scored s
     WHERE s.field_size >= 8
       AND s.finish IS NOT NULL
       AND s.finish <= s.cut_size
+    GROUP BY s.game_id
     HAVING COUNT(*) > 0
   ),
   champion AS (
-    SELECT 'champion'::TEXT, COUNT(*)::INT, NULL::UUID, NULL::TEXT
+    SELECT 'champion'::TEXT, COUNT(*)::INT, NULL::UUID, NULL::TEXT, s.game_id
     FROM scored s
     WHERE s.field_size >= 8 AND s.finish = 1
+    GROUP BY s.game_id
     HAVING COUNT(*) > 0
   ),
   bubble AS (
-    SELECT 'bubble'::TEXT, COUNT(*)::INT, NULL::UUID, NULL::TEXT
+    SELECT 'bubble'::TEXT, COUNT(*)::INT, NULL::UUID, NULL::TEXT, s.game_id
     FROM scored s
     WHERE s.field_size >= 8 AND s.finish = s.cut_size + 1
+    GROUP BY s.game_id
     HAVING COUNT(*) > 0
   ),
   spoiler AS (
-    SELECT 'spoiler'::TEXT, COUNT(*)::INT, NULL::UUID, NULL::TEXT
+    SELECT 'spoiler'::TEXT, COUNT(*)::INT, NULL::UUID, NULL::TEXT, s.game_id
     FROM scored s
     JOIN sole_losses sl ON sl.tid = s.tid AND sl.beater = s.tpid
     WHERE s.field_size >= 8
+    GROUP BY s.game_id
     HAVING COUNT(*) > 0
   )
   SELECT * FROM attendance
