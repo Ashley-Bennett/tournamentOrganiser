@@ -147,6 +147,100 @@ export type Database = {
           },
         ]
       }
+      player_badge: {
+        Row: {
+          badge_count: number
+          badge_id: string
+          earned_at: Json
+          game_id: string | null
+          updated_at: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          badge_count?: number
+          badge_id: string
+          earned_at?: Json
+          game_id?: string | null
+          updated_at?: string
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          badge_count?: number
+          badge_id?: string
+          earned_at?: Json
+          game_id?: string | null
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_badge_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_card: {
+        Row: {
+          game_id: string
+          partner_key: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          game_id: string
+          partner_key?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          game_id?: string
+          partner_key?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      player_card_slot: {
+        Row: {
+          badge_id: string
+          game_id: string
+          slot: number
+          updated_at: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          badge_id: string
+          game_id: string
+          slot: number
+          updated_at?: string
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          badge_id?: string
+          game_id?: string
+          slot?: number
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_card_slot_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -981,6 +1075,27 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      badge_counts: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          badge_count: number
+          badge_id: string
+          game_id: string
+          user_id: string
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
+      badge_events: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          badge_id: string
+          game_id: string
+          played_at: string
+          user_id: string
+          workspace_id: string
+        }[]
+      }
       begin_tournament_round: {
         Args: { p_round_number: number; p_tournament_id: string }
         Returns: undefined
@@ -1094,6 +1209,24 @@ export type Database = {
           player2_name: string
           player2_report: string
           round_number: number
+        }[]
+      }
+      get_my_badges: {
+        Args: never
+        Returns: {
+          badge_count: number
+          badge_id: string
+          game_id: string
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
+      get_my_card_games: {
+        Args: never
+        Returns: {
+          entries: number
+          game_id: string
+          last_played: string
         }[]
       }
       get_my_player_entries: {
@@ -1655,6 +1788,14 @@ export type Database = {
           tournament_name: string
         }[]
       }
+      get_tournament_player_cards: {
+        Args: { p_tournament_id: string }
+        Returns: {
+          partner_key: string
+          slots: Json
+          tournament_player_id: string
+        }[]
+      }
       get_tournaments_summary: {
         Args: { p_player_ids: string[]; p_tournament_ids: string[] }
         Returns: {
@@ -1756,6 +1897,7 @@ export type Database = {
         Args: { p_days?: number }
         Returns: number
       }
+      refresh_my_badges: { Args: never; Returns: number }
       remove_player_from_round: {
         Args: { p_player_id: string; p_round: number }
         Returns: undefined
@@ -1789,6 +1931,10 @@ export type Database = {
       }
       revoke_workspace_invite: {
         Args: { p_invite_id: string }
+        Returns: undefined
+      }
+      save_my_card: {
+        Args: { p_game_id: string; p_partner_key: string; p_slots?: Json }
         Returns: undefined
       }
       save_push_subscription: {
