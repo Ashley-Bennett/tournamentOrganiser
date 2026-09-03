@@ -9,6 +9,39 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
+    version: "0.7.1",
+    date: "2026-09-03",
+    entries: [
+      {
+        category: "New Features",
+        items: [
+          "Notifications: there is now a bell at the top of the screen. It tells you when your round is up, which table you are on and who you are playing, and it keeps them so you can look back at anything you missed while you were mid-game.",
+          "The number of unread notifications shows in your browser tab, so you can see something is waiting without switching back to Matchamp.",
+          "You do not need an account to get notifications. If you joined an event with a link or a QR code, the bell works for you too.",
+          "Organisers are told when every result for a round is in and the next round can be paired, when two players have reported results that disagree, and when someone adds themselves to an event that is already under way.",
+          "Click any player in your organiser stats to see their record: the decks they bring, every event they have played, and how you and everyone else have fared against them.",
+        ],
+      },
+      {
+        category: "Tournaments",
+        items: [
+          "When a round runs out of time, players who still have not entered a result are now asked for it, rather than just being told the time is up.",
+          "Manage Players now has a History panel showing what has changed for a player entry, and it works before pairings have been generated.",
+          "Matches and final standings now follow the rules of the game the event is actually being run under. Pokémon events no longer showed chess tiebreakers, and generic events are no longer ranked by Pokémon ones.",
+        ],
+      },
+      {
+        category: "Fixes & Polish",
+        items: [
+          "Notifications no longer disappear the moment the pop-up does. Anything you missed is still in the bell.",
+          "If you have notifications turned on for your phone, Matchamp now keeps its own copy too, so dismissing one on your lock screen does not lose it.",
+          "Player deck choices, results and account links are now recorded in your activity history, and anonymous players are named properly instead of showing as nobody.",
+          "Faster and safer under the hood: the app loads a little quicker and every known security advisory in our dependencies has been cleared.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.7.0",
     date: "2026-09-02",
     entries: [

@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.1] - 2026-09-03
+
+### Added
+- **Notification centre.** A bell in the header with an unread count, opening an inbox of recent events newest-first, each naming its tournament and age. Tapping a row deep-links to that round and marks only that row read; opening the panel marks nothing. Mark-all-read and clear sit in the panel header. The unread count is carried in the browser-tab title (`(n) Matchamp…`), stripped and reapplied so counts cannot stack. Renders for anonymous device-token players as well as signed-in users, hidden for a cold visitor with neither account nor notifications, and full-screen below `sm` to match `PickerDialog`/`PlayerIdentityDialog`.
+- **Notifications persist.** `utils/notificationStore.ts` — a `localStorage` store keyed `mc_notifications`, deliberately not `tj_`, which `playerStorage.getAllEntries` would parse as a joined tournament. Deterministic ids (`{tournamentId}:{type}:{round}`) make writes idempotent, so a re-derived event never duplicates. Capped at 50 entries, pruned at 30 days, corrupt contents reset to empty, cross-tab updates via the `storage` event. `useNotifications` and `useUnreadTitle` expose it.
+- **New notification events.** Player-side `result_needed`, raised when a round timer expires with your match unreported, replacing a bare "time's up". Organiser-side `results_all_in`, `result_conflict` (self-resolving once settled) and `late_join`, fed by a new `OrganiserWatcher` polling `get_organiser_alert_state` — the player watcher authenticates as a player and could never serve an organiser. Derivation is a pure module, `utils/organiserAlerts.ts`, so the transitions are testable without Supabase.
+- **Player drill-down on organiser stats.** Clicking a league-table row opens that player: their decks, their events, and a head-to-head table resolved through `workspace_player_identities`, so a regular entered under three spellings is one rival. Drilling is reciprocal — deck to pilots to player to decks — held in a single dialog with a breadcrumb view stack rather than nested modals. The stack is serialised into a `?drill=` query parameter, so browser and Android back pop it and a drill-down is a shareable link.
+- **Audit log made usable.** Anonymous player actions are attributed via a transaction-local actor label instead of recording as nobody. Result reports, identity merges, membership changes and player claims are now audited. A History panel in Manage Players appears only for entries that have actually changed since they were created.
+- **Player card foundation, not enabled.** Ships dark ahead of the 0.8 UI: `src/badges/` with five launch badges, a five-rung tier ladder carried by shape as well as colour, per-tier titles (Attendee to Institution, Champion to Legend), threshold-to-tier resolution, card assembly and equip validation; `src/games/partners.ts` with per-game partner sources; per-game card storage; badges derived from history, saved per account with a date per qualifying event, and readable for a whole event by unauthenticated viewers. Nothing imports or calls any of it.
+
+### Fixed
+- **Notifications were unrecoverable.** Events lived only for the ten seconds a Snackbar was on screen. Worse, when OS push permission was granted `handleAlert` returned early and recorded nothing, so the app kept no copy of what the service worker had already announced. Recording is now separated from surfacing: every event is stored, and push only suppresses the in-app toast.
+- **The matches page scored by the wrong rules.** The page never fetched the game, so Pokémon events showed Buchholz and hid decks, and final standings were stored under Pokémon tiebreakers for generic events.
+- **The audit log stored player device tokens.** `audit_log_trigger` copied `device_token` and `device_id` into `old_data`/`new_data`, an impersonation route that bypassed the July column-grant lockdown. Existing rows are scrubbed, and `changed_at` is indexed so the nightly retention purge stops sequential-scanning.
+- Manage Players was empty before pairings were generated. Record ids were lost on tables without an `id` column.
+- Five production dependency vulnerabilities closed, including a react-router XSS and a `ws` denial of service — 5 to 0.
+
+### Changed
+- **The database boundary is typed.** Generated types wired into the Supabase client, fixing 72 type errors including three inserts that would have written a null `workspace_id` into a NOT NULL column. CI regenerates types and function definitions and fails when the committed copies are stale. `supabase/functions_current/` holds the current definition of every SQL function, one per file.
+- **The dead Express backend is gone**, with its Render config and dev proxy — the app has talked only to Supabase for months. CI now runs typecheck, lint and the full suite on every push and pull request.
+- react-router 7, MUI 7, ESLint 9 with flat config. `date-fns` and `@mui/x-date-pickers` removed, having no references at all. Icon imports moved off the `@mui/icons-material` barrel, which broke a test under MUI 7 and halved suite runtime. The Record Match Result dialog is deleted, unreachable since the quick-result buttons replaced it in January.
+- `relativeTime`, and `pct`/`ordinal`/`placing`/`record`, extracted into `utils/`. Exporting a helper from a component file trips `react-refresh/only-export-components`, which the lint script treats as an error rather than a warning.
+
+### Migrations
+- `20260902010000_organiser_alert_state`, `20260902020000_organiser_alert_late_join` — one row per active tournament an organiser runs, carrying round progress, disputed-result counts and late arrivals. Auth is an `EXISTS` on `workspace_memberships` rather than `get_workspace_role()`, so there is no NULL-role hole to COALESCE around.
+- `20260902030000_organiser_player_detail` — `get_organiser_player_summary`, `_decks`, `_events` and `_opponents`. Returns `finish_position` rather than `position`, which is reserved inside a `RETURNS TABLE`.
+- `20260902040000_redact_audit_log_credentials`, `20260902050000_audit_coverage_and_actor`, `20260902060000_record_history_rpc`, `20260902070000_record_change_counts` — credential scrubbing, four newly audited tables, and the History panel's read path.
+- `20260902080000_player_badges` — badges derived from history. Superseded within the same release by the saved-row model below; kept because it had already been applied.
+- `20260902090000_player_card` — per-game `player_card` (partner) and `player_card_slot` (slot 0 the worn title, 1-3 badge icons), own-rows RLS, plus `get_my_card_games` so the account page only offers cards for games actually played.
+- `20260902100000_badge_counts_and_cards` — derivation extracted into `badge_counts(user_ids)` so one place decides what a Champion is; `get_tournament_player_cards` for the board.
+- `20260902110000_player_badge_store` — `player_badge`, written only by `refresh_my_badges`. It has a read policy and no write policy, so a browser cannot award itself a badge. Deriving on read could not serve the pairing board: `workspace_player_identities` rightly refuses without a login, and `SECURITY DEFINER` changes the role, not the JWT. Saving moves the derivation to where it is allowed — a signed-in player, about themselves — and the board reads rows. `earned_at` holds a date per qualifying event rather than tier dates, because thresholds live in the frontend registry; capped at 200 per badge.
+- `20260902120000_save_player_card` — `save_my_card` replaces a game's whole loadout in one statement, so a card cannot half-save across four client writes.
+
+### Tests
+- New suites: `utils/notificationStore.test.ts`, `components/NotificationBell.test.tsx`, `utils/organiserAlerts.test.ts`, `utils/statsDrill.test.ts`, `badges/tiers.test.ts`, `badges/card.test.ts`, `games/partners.test.ts`, `components/RecordHistory.test.tsx`, `games/rulesWiring.test.ts`.
+- Structural tests pin what types cannot: one threshold and one title per tier rung, a distinct shape per rung, worn titles capped at two words for chip width, explanations at six, and a file on disk for every declared partner option.
+- 522 passing, lint clean at `--max-warnings 0`.
+
+---
+
 ## [0.7.0] - 2026-09-02
 
 ### Added
