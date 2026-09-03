@@ -23,6 +23,11 @@ const POKEMON: GameDefinition = {
   rules: POKEMON_RULES,
   iconSrc: "/games/pokemon.svg",
   accent: "#F2C94C",
+  // Any species, from the sprite cache the deck pickers already use. Ditto is
+  // the default because it is the one Pokémon that means "not chosen yet" —
+  // affectionate rather than mocking, and it keeps Machamp free to be our own
+  // mark on MatchAmp-issued badges.
+  partner: { kind: "pokemon", defaultKey: "132" },
   defaults: { structure: "swiss", format: "standard" },
 };
 
@@ -41,6 +46,28 @@ const GENERIC: GameDefinition = {
   // Mid-tone on purpose: a darker slate vanishes against the dark theme and
   // a lighter one washes out on white.
   accent: "#8296B0",
+  // A declared set, because "generic" covers chess, board games, darts and
+  // five-a-side, and there is no species list to borrow. The pawn is the
+  // default for the same reason Ditto is: the humblest piece on the board
+  // reads as a starting point rather than a claim.
+  //
+  // ART DOES NOT EXIST YET. These paths are the commission — the set is
+  // declared first so the brief can ask for a known number of pieces at a
+  // known size, rather than art arriving that has nowhere to sit.
+  partner: {
+    kind: "set",
+    defaultKey: "pawn",
+    options: [
+      { key: "pawn", name: "Pawn", src: "/partners/generic/pawn.svg" },
+      { key: "knight", name: "Knight", src: "/partners/generic/knight.svg" },
+      { key: "rook", name: "Rook", src: "/partners/generic/rook.svg" },
+      { key: "queen", name: "Queen", src: "/partners/generic/queen.svg" },
+      { key: "d20", name: "D20", src: "/partners/generic/d20.svg" },
+      { key: "meeple", name: "Meeple", src: "/partners/generic/meeple.svg" },
+      { key: "football", name: "Football", src: "/partners/generic/football.svg" },
+      { key: "dart", name: "Dart", src: "/partners/generic/dart.svg" },
+    ],
+  },
   defaults: { structure: "swiss" },
 };
 
@@ -66,6 +93,8 @@ function comingSoon(
     rules: GENERIC_RULES,
     iconSrc: `/games/${id}.svg`,
     accent,
+    // A game nobody can pick yet needs no partner art commissioned for it.
+    partner: { kind: "none" },
     defaults: { structure: "swiss" },
   };
 }

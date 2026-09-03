@@ -63,6 +63,32 @@ export interface GameFormat {
   hint?: string;
 }
 
+/** One choosable partner in a game that declares a finite set of them. */
+export interface PartnerOption {
+  /** Stored in player_card.partner_key. */
+  key: string;
+  name: string;
+  /** Path under public/. */
+  src: string;
+}
+
+/**
+ * Where a game's partner art comes from.
+ *
+ * A partner is expression rather than achievement — the thing beside your name
+ * that says who you are. What it *is* differs by game: Pokémon has ten
+ * thousand species already cached, a generic event wants a chess piece or a
+ * football, and another TCG would want its own mascots. So the source is
+ * declared per game rather than assumed to be a species id.
+ */
+export type PartnerSource =
+  /** Any species, resolved through the existing sprite cache. */
+  | { kind: "pokemon"; defaultKey: string }
+  /** A finite, declared set shipped as assets. */
+  | { kind: "set"; defaultKey: string; options: PartnerOption[] }
+  /** This game has no partner slot at all. */
+  | { kind: "none" };
+
 export interface GameDefinition {
   id: string;
   /** Full name for headings and the join page. */
@@ -88,5 +114,7 @@ export interface GameDefinition {
   iconSrc: string;
   /** Tile accent colour when selected. */
   accent: string;
+  /** Where this game's player-card partner art comes from. */
+  partner: PartnerSource;
   defaults: { structure: TournamentStructure; format?: string };
 }
