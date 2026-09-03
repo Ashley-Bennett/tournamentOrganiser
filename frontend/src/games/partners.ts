@@ -1,5 +1,5 @@
 import { GAMES } from "./registry";
-import { getArtworkUrl, getSpriteUrl } from "../utils/pokemonCache";
+import { getArtworkUrl } from "../utils/pokemonCache";
 import type { PartnerOption, PartnerSource } from "./types";
 
 /**
@@ -45,17 +45,20 @@ export function partnerOptions(gameId: string | null): PartnerOption[] {
 }
 
 /**
- * Which rendering is wanted, matching how deck choosing already draws Pokémon.
- *
- * `sprite` is the small pixel art used in the search list — 32px, rendered
- * pixelated. `artwork` is the official illustration used for the chosen slot —
- * 56px, object-fit contain. The partner picker uses the same pair so choosing
- * a partner looks and behaves like choosing a deck.
- */
-export type PartnerImageVariant = "sprite" | "artwork";
-
-/**
  * The image for a partner key, or null when there is nothing to draw.
+ *
+ * There is deliberately **one** image per partner, used everywhere — the
+ * picker, the card, the reveal.
+ *
+ * Deck choosing legitimately uses two renderings: pixel sprites in the search
+ * list and official artwork for the chosen slot. That is fine for a deck,
+ * which is a fact being recorded. A partner is a picture being chosen, and
+ * showing one image while picking and another on the card is a bait and
+ * switch — you pick the art you want to show off and get something else.
+ * Taking the variant away means it cannot be got wrong by accident.
+ *
+ * Official artwork is the one, because the card is a showcase and artwork is
+ * framed consistently across species where the pixel sprites are not.
  *
  * Falls back to the game's default rather than to nothing: a key that no
  * longer resolves — a set item withdrawn, or a card written by an older
@@ -64,7 +67,6 @@ export type PartnerImageVariant = "sprite" | "artwork";
 export function partnerImage(
   gameId: string | null,
   key: string | null,
-  variant: PartnerImageVariant = "sprite",
 ): string | null {
   const source = partnerSourceFor(gameId);
   if (source.kind === "none") return null;
@@ -75,11 +77,10 @@ export function partnerImage(
     const asked = Number(wanted);
     const id =
       Number.isInteger(asked) && asked > 0 ? asked : Number(source.defaultKey);
-    return variant === "artwork" ? getArtworkUrl(id) : getSpriteUrl(id);
+    return getArtworkUrl(id);
   }
 
-  // A declared set ships one asset per option. These are drawn as vectors, so
-  // the same file serves both sizes and there is no second variant to pick.
+  // A declared set ships one vector per option, which serves every size.
   const found =
     source.options.find((o) => o.key === wanted) ??
     source.options.find((o) => o.key === source.defaultKey);

@@ -76,28 +76,17 @@ describe("partnerOptions", () => {
 });
 
 describe("partnerImage", () => {
-  it("resolves a species through the sprite cache", () => {
-    expect(partnerImage("pokemon", "25")).toContain("/25.png");
+  it("resolves a species to its official artwork", () => {
+    const url = partnerImage("pokemon", "25");
+    expect(url).toContain("/25.png");
+    expect(url).toContain("official-artwork");
   });
 
-  // Deck choosing draws the chosen slot as official artwork and the search
-  // rows as pixel sprites. Picking a partner uses the same pair, so the two
-  // pickers look like the same thing.
-  it("offers the artwork rendering deck choosing uses for a chosen slot", () => {
-    const artwork = partnerImage("pokemon", "25", "artwork");
-    expect(artwork).toContain("official-artwork");
-    expect(artwork).toContain("/25.png");
-  });
-
-  it("defaults to the sprite rendering used in the search list", () => {
-    expect(partnerImage("pokemon", "25")).not.toContain("official-artwork");
-  });
-
-  // A declared set ships vectors, so one file serves both sizes.
-  it("returns the same asset for both variants of a set item", () => {
-    expect(partnerImage("generic", "knight", "artwork")).toBe(
-      partnerImage("generic", "knight", "sprite"),
-    );
+  // The whole point: what you pick is what appears. Deck choosing shows pixel
+  // sprites while searching and artwork once chosen, which is fine for a deck
+  // but a bait and switch for a picture you chose to show off.
+  it("gives one image per partner, with no variant to get wrong", () => {
+    expect(partnerImage.length).toBe(2);
   });
 
   it("falls back to Ditto for an unusable species key", () => {
