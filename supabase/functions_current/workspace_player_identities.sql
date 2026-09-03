@@ -58,7 +58,7 @@ BEGIN
         PARTITION BY k.resolved_key
         -- An entry whose own name IS the identity's name wins. Otherwise
         -- merging "Dave S" and "Dve" into "Dave" would show the person as
-        -- whichever variant they entered most recently â€” quite possibly the
+        -- whichever variant they entered most recently — quite possibly the
         -- typo the organiser just merged away. Failing that, most recent
         -- wins, so someone correcting their own spelling still updates.
         ORDER BY

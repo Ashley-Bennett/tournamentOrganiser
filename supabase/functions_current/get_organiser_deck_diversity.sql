@@ -47,7 +47,7 @@ BEGIN
     SELECT
       pd.bucket_start,
       COUNT(*)::INT AS n_distinct,
-      -- exp(-Î£ pÂ·ln p). A period with a single deck gives ln(1)=0, so the
+      -- exp(-Σ p·ln p). A period with a single deck gives ln(1)=0, so the
       -- effective count is exactly 1 rather than undefined.
       EXP(-SUM((pd.n::FLOAT / pb.entries) * LN(pd.n::FLOAT / pb.entries))) AS effective
     FROM per_deck pd
