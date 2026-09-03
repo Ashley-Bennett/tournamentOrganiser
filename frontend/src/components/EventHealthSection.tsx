@@ -62,7 +62,7 @@ export default function EventHealthSection({
 }: {
   workspaceId: string;
   gameId: string | null;
-  periodArgsValue: { p_from: string | null; p_to: string | null };
+  periodArgsValue: { p_from: string | undefined; p_to: string | undefined };
 }) {
   const { p_from, p_to } = periodArgsValue;
   const periodDeps = [workspaceId, gameId, p_from, p_to];

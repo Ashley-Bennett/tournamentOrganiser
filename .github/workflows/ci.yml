@@ -40,3 +40,43 @@ jobs:
 
       - name: Test
         run: npm test
+
+  schema:
+    name: Generated schema files are current
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The committed types are generated from the migrations. If a migration
+      # changes the schema and nobody regenerates, every RPC call keeps
+      # type-checking against a schema the database no longer has — exactly the
+      # drift the typed client exists to catch.
+      - name: Start Supabase
+        run: npx supabase start
+
+      - name: Regenerate types
+        run: npx supabase gen types typescript --local > frontend/src/types/database.ts
+
+      # Functions live in migrations as a pile of CREATE OR REPLACE statements,
+      # so functions_current/ is the only place their present-day definition is
+      # readable. It is generated, so it rots the moment it stops being checked.
+      - name: Redump function definitions
+        run: npm run dump:functions
+
+      - name: Fail if either differs from what is committed
+        run: |
+          if ! git diff --exit-code -- frontend/src/types/database.ts; then
+            echo "::error::frontend/src/types/database.ts is out of date. Run 'npm run gen:types --workspace=frontend' and commit the result."
+            exit 1
+          fi
+          if ! git diff --exit-code -- supabase/functions_current; then
+            echo "::error::supabase/functions_current is out of date. Run 'npm run dump:functions' and commit the result."
+            exit 1
+          fi

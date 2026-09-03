@@ -1,7 +1,9 @@
 import { useState, useMemo } from "react";
 import { supabase } from "../supabaseClient";
 import type { TournamentSummary } from "../types/tournament";
-import { type MatchWithPlayers, MATCH_STATUS } from "../types/match";
+import { type MatchWithPlayers, MATCH_STATUS,
+  decisionLogToJson,
+} from "../types/match";
 
 interface UsePairingEditorParams {
   matches: MatchWithPlayers[];
@@ -117,6 +119,10 @@ export function usePairingEditor({
 
   const handleSavePairingEdits = async () => {
     if (!tournament) return;
+    if (!workspaceId) {
+      setError("Workspace not loaded, so pairings can't be saved");
+      return;
+    }
     setSavingPairings(true);
     setError(null);
     try {
@@ -127,7 +133,8 @@ export function usePairingEditor({
 
       const changedMatches: {
         match: MatchWithPlayers;
-        edited: { player1Id: string | null; player2Id: string | null };
+        // player1Id is non-null here — a row without one is skipped below.
+        edited: { player1Id: string; player2Id: string | null };
       }[] = [];
       for (const match of currentRoundMatches) {
         const edited = editedPairings.get(match.id);
@@ -136,7 +143,10 @@ export function usePairingEditor({
         const p2Changed = edited.player2Id !== match.player2_id;
         const isLegacyBye = match.status === MATCH_STATUS.BYE;
         if (!p1Changed && !p2Changed && !isLegacyBye) continue;
-        changedMatches.push({ match, edited });
+        changedMatches.push({
+          match,
+          edited: { ...edited, player1Id: edited.player1Id },
+        });
       }
 
       if (changedMatches.length > 0) {
@@ -163,7 +173,7 @@ export function usePairingEditor({
           temp_winner_id: null,
           temp_result: null,
           pairings_published: false,
-          pairing_decision_log: match.pairing_decision_log ?? null,
+          pairing_decision_log: decisionLogToJson(match.pairing_decision_log),
         }));
         const { error: insertError } = await supabase
           .from("tournament_matches")

@@ -28,78 +28,23 @@ import StatsDeckFilter from "../components/StatsDeckFilter";
 import { deckKey, deckName } from "../utils/deck";
 import { getGame } from "../games/registry";
 import { ALL_TIME, periodArgs, periodLabel, type StatsPeriod } from "../utils/statsPeriod";
+import type { RpcRow } from "../types/rpc";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface OverviewStats {
-  total_completed: number;
-  total_match_wins: number;
-  total_matches: number;
-  match_wins_no_byes: number;
-  matches_no_byes: number;
-  first_count: number;
-  top3_count: number;
-  top8_count: number;
-  ranked_events: number;
-  best_finish: number | null;
-  current_streak: number;
-  longest_win_streak: number;
-  longest_loss_streak: number;
-  nemesis_name: string | null;
-  nemesis_wins: number | null;
-  nemesis_losses: number | null;
-  victim_name: string | null;
-  victim_wins: number | null;
-  victim_losses: number | null;
-}
+type OverviewStats = RpcRow<"get_player_overview_stats">;
 
-interface DeckStat {
-  deck_pokemon1: number | null;
-  deck_pokemon2: number | null;
-  tournaments_played: number;
-  match_wins: number;
-  total_matches: number;
-  top3_count: number;
-  top8_count: number;
-  first_used: string;
-  last_used: string;
-}
+type DeckStat = RpcRow<"get_player_deck_stats">;
 
-interface MatchupRow {
-  opp_pokemon1: number | null;
-  opp_pokemon2: number | null;
-  matches_played: number;
-  wins: number;
-  losses: number;
-  draws: number;
-}
+type MatchupRow = RpcRow<"get_player_matchup_matrix">;
 
-interface RoundRow {
-  round_number: number;
-  wins: number;
-  total: number;
-}
+type RoundRow = RpcRow<"get_player_round_performance">;
 
-interface TrendRow {
-  period_label: string;
-  period_start: string;
-  wins: number;
-  total: number;
-}
+type TrendRow = RpcRow<"get_player_trend">;
 
-interface YearRow {
-  year: number;
-  tournaments: number;
-  matches: number;
-}
+type YearRow = RpcRow<"get_player_stats_years">;
 
-interface FirstSecondStats {
-  went_first_wins: number;
-  went_first_total: number;
-  went_second_wins: number;
-  went_second_total: number;
-  insights_count: number;
-}
+type FirstSecondStats = RpcRow<"get_player_first_second_stats">;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -442,10 +387,10 @@ function FirstSecondSection({
     setLoading(true);
     void supabase
       .rpc("get_player_first_second_stats", {
-        p_deck_pokemon1: selectedDeck?.deck_pokemon1 ?? null,
-        p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? null,
+        p_deck_pokemon1: selectedDeck?.deck_pokemon1 ?? undefined,
+        p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? undefined,
         ...periodArgs(period),
-        p_game_id: gameId,
+        p_game_id: gameId ?? undefined,
       })
       .then(({ data: rows }) => {
         setData(rows && rows.length > 0 ? (rows[0] as FirstSecondStats) : null);
@@ -528,10 +473,10 @@ function MatchupMatrixSection({
     setLoading(true);
     void supabase
       .rpc("get_player_matchup_matrix", {
-        p_deck_pokemon1: selectedDeck?.deck_pokemon1 ?? null,
-        p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? null,
+        p_deck_pokemon1: selectedDeck?.deck_pokemon1 ?? undefined,
+        p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? undefined,
         ...periodArgs(period),
-        p_game_id: gameId,
+        p_game_id: gameId ?? undefined,
       })
       .then(({ data: rows }) => {
         setData((rows ?? []) as MatchupRow[]);

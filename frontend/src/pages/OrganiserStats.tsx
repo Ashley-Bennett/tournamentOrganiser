@@ -32,47 +32,15 @@ import PlayerIdentityDialog, { type IdentityOption } from "../components/PlayerI
 import { getPokemonList } from "../utils/pokemonCache";
 import { getGame } from "../games/registry";
 import { ALL_TIME, periodArgs, periodLabel, type StatsPeriod } from "../utils/statsPeriod";
+import type { RpcRow } from "../types/rpc";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface OverviewStats {
-  events_total: number;
-  events_completed: number;
-  unique_players: number;
-  linked_players: number;
-  new_players: number;
-  returning_players: number;
-  total_entries: number;
-  total_matches: number;
-  avg_field_size: number | null;
-  largest_event_name: string | null;
-  largest_event_size: number | null;
-  dropped_entries: number;
-  late_entries: number;
-}
+type OverviewStats = RpcRow<"get_organiser_overview_stats">;
 
-interface AttendanceRow {
-  identity_key: string;
-  display_name: string;
-  is_linked: boolean;
-  events_played: number;
-  first_played: string;
-  last_played: string;
-  matches: number;
-  match_wins: number;
-  event_wins: number;
-  top3_finishes: number;
-}
+type AttendanceRow = RpcRow<"get_organiser_attendance">;
 
-interface TimelineRow {
-  period_label: string;
-  period_start: string;
-  events: number;
-  entries: number;
-  unique_players: number;
-  new_players: number;
-  avg_field_size: number | null;
-}
+type TimelineRow = RpcRow<"get_organiser_timeline">;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -267,7 +235,7 @@ const OrganiserStats: React.FC = () => {
   useEffect(() => {
     if (!workspaceId) return;
     void supabase
-      .rpc("get_organiser_stats_years", { p_workspace_id: workspaceId, p_game_id: gameId })
+      .rpc("get_organiser_stats_years", { p_workspace_id: workspaceId, p_game_id: gameId ?? undefined })
       .then(({ data }) => {
         const ys = (data ?? []).map((r: { year: number }) => r.year);
         setYears(ys);
@@ -285,7 +253,7 @@ const OrganiserStats: React.FC = () => {
         p_workspace_id: workspaceId,
         p_from,
         p_to,
-        p_game_id: gameId,
+        p_game_id: gameId ?? undefined,
       })
       .then(({ data }) => {
         setOverview(data && data.length > 0 ? (data[0] as OverviewStats) : null);
@@ -301,7 +269,7 @@ const OrganiserStats: React.FC = () => {
         p_workspace_id: workspaceId,
         p_from,
         p_to,
-        p_game_id: gameId,
+        p_game_id: gameId ?? undefined,
         // Deliberately generous: the table searches, sorts and pages client
         // side, so the limit only exists to bound the payload for a workspace
         // with years of history — not to decide what is worth showing.
@@ -321,7 +289,7 @@ const OrganiserStats: React.FC = () => {
         p_workspace_id: workspaceId,
         p_from,
         p_to,
-        p_game_id: gameId,
+        p_game_id: gameId ?? undefined,
         p_bucket: bucket,
       })
       .then(({ data }) => {

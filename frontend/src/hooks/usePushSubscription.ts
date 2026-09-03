@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { supabase } from "../supabaseClient";
+import { nullableArg } from "../utils/rpcArgs";
 
 // VAPID public key (base64url) — safe to expose to the client.
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as
@@ -113,7 +114,7 @@ export function usePushSubscription() {
           p_p256dh: s.p256dh,
           p_auth: s.auth,
           p_tournament_player_id: playerId,
-          p_device_token: deviceToken,
+          p_device_token: nullableArg(deviceToken),
         });
         return !error;
       } catch {

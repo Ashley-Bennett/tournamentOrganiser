@@ -33,6 +33,7 @@ import LiveIndicator from "../components/LiveIndicator";
 import MatchInsightsModal from "../components/MatchInsightsModal";
 import NormalizedSprite from "../components/NormalizedSprite";
 import PushOptIn from "../components/PushOptIn";
+import { nullableArg } from "../utils/rpcArgs";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -141,7 +142,7 @@ function MyMatchCard({
     const { data, error } = await supabase.rpc("submit_match_result", {
       p_match_id: match.id,
       p_player_id: entry.playerId,
-      p_device_token: entry.deviceToken,
+      p_device_token: nullableArg(entry.deviceToken),
       p_reported_outcome: selectedOutcome,
     });
     setSubmitting(false);
@@ -389,7 +390,7 @@ const PlayerTournamentView: React.FC = () => {
         {
           p_tournament_id: tournamentId,
           p_player_id: entry.playerId,
-          p_device_token: entry.deviceToken,
+          p_device_token: nullableArg(entry.deviceToken),
         },
       );
 
@@ -407,7 +408,9 @@ const PlayerTournamentView: React.FC = () => {
         return;
       }
 
-      const d = data as ViewData;
+      // get_player_tournament_view returns jsonb — Json here, so the shape
+      // it builds has to be asserted rather than inferred.
+      const d = data as unknown as ViewData;
       setViewData(d);
 
       // Auto-select round on first load
@@ -531,9 +534,9 @@ const PlayerTournamentView: React.FC = () => {
     const { data: fresh } = await supabase.rpc("get_player_tournament_view", {
       p_tournament_id: tournamentId,
       p_player_id: entry.playerId,
-      p_device_token: entry.deviceToken,
+      p_device_token: nullableArg(entry.deviceToken),
     });
-    if (fresh) setViewData(fresh as ViewData);
+    if (fresh) setViewData(fresh as unknown as ViewData);
   }, [tournamentId, entry]);
 
   const loadInsights = useCallback(async (matchIds: string[]) => {
@@ -621,9 +624,9 @@ const PlayerTournamentView: React.FC = () => {
       const { error: rpcError } = await supabase.rpc("set_player_deck", {
         p_tournament_id: tournamentId,
         p_player_id: entry.playerId,
-        p_device_token: entry.deviceToken,
-        p_pokemon1: p1,
-        p_pokemon2: p2,
+        p_device_token: nullableArg(entry.deviceToken),
+        p_pokemon1: nullableArg(p1),
+        p_pokemon2: nullableArg(p2),
       });
       if (rpcError) throw new Error(rpcError.message);
       await handleRefresh();

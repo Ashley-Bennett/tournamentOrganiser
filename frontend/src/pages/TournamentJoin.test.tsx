@@ -203,10 +203,13 @@ describe("TournamentJoin — a generic tournament", () => {
     expect(join).toBeEnabled();
 
     await user.click(join);
+    // No deck is sent at all: p_pokemon1 is `DEFAULT NULL` in SQL, so an
+    // omitted argument and an explicit null reach the function identically,
+    // and the generated Args type only admits the former.
     await waitFor(() =>
       expect(supabase.rpc).toHaveBeenCalledWith(
         "self_join_tournament",
-        expect.objectContaining({ p_player_name: "Dana", p_pokemon1: null }),
+        expect.objectContaining({ p_player_name: "Dana", p_pokemon1: undefined }),
       ),
     );
   });

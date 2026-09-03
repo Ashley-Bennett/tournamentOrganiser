@@ -54,6 +54,10 @@ const WorkspaceSettings = () => {
       setError("Workspace name is required.");
       return;
     }
+    if (!workspaceId) {
+      setError("Workspace not loaded, so the changes can't be saved.");
+      return;
+    }
 
     setLoading(true);
     const { error: updateError } = await supabase

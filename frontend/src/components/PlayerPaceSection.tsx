@@ -93,7 +93,7 @@ export default function PlayerPaceSection({
   gameId,
   nameMap,
 }: {
-  periodArgsValue: { p_from: string | null; p_to: string | null };
+  periodArgsValue: { p_from: string | undefined; p_to: string | undefined };
   gameId: string | null;
   nameMap: Map<number, string>;
 }) {

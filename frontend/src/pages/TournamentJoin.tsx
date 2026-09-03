@@ -26,6 +26,7 @@ import {
 import { useAuth } from "../AuthContext";
 import { formatDateTime } from "../utils/format";
 import { lateJoinMessage } from "../utils/lateEntry";
+import { nullableArg } from "../utils/rpcArgs";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -126,7 +127,7 @@ export default function TournamentJoin() {
         const { error: verifyError } = await supabase.rpc("get_player_tournament_view", {
           p_tournament_id: tournamentId,
           p_player_id: existing.playerId,
-          p_device_token: existing.deviceToken,
+          p_device_token: nullableArg(existing.deviceToken),
         });
         if (verifyError?.message.includes("Invalid player credentials")) {
           // Stale registration (player deleted) — clear it and fall through to the join form
@@ -172,8 +173,8 @@ export default function TournamentJoin() {
       p_tournament_id: tournamentId,
       p_player_name: nameInput.trim(),
       p_device_id: deviceProfile.deviceId,
-      p_pokemon1: deckPokemon1,
-      p_pokemon2: deckPokemon2,
+      p_pokemon1: deckPokemon1 ?? undefined,
+      p_pokemon2: deckPokemon2 ?? undefined,
       p_confirmed_distinct: confirmedDistinct,
     });
 

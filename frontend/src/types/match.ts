@@ -1,4 +1,32 @@
 import type { PairingDecisionLog } from "../utils/tournamentPairing";
+import type { Database } from "./database";
+
+/** A raw tournament_matches row, exactly as the generated schema describes it. */
+export type MatchRow = Database["public"]["Tables"]["tournament_matches"]["Row"];
+
+/**
+ * The columns `toMatch` needs. Spelled out rather than taking the whole row so
+ * that a partial select missing one of them fails to compile — the public
+ * pairings page, for instance, selects everything here but not the decision
+ * log, which is why that one is optional.
+ */
+export type MatchRowInput = Pick<
+  MatchRow,
+  | "id"
+  | "tournament_id"
+  | "round_number"
+  | "match_number"
+  | "player1_id"
+  | "player2_id"
+  | "winner_id"
+  | "result"
+  | "temp_winner_id"
+  | "temp_result"
+  | "pairings_published"
+  | "status"
+  | "confirmed_by"
+  | "created_at"
+> & { pairing_decision_log?: MatchRow["pairing_decision_log"] };
 
 export interface TournamentPlayer {
   id: string;
@@ -49,6 +77,49 @@ export interface MatchWithPlayers extends Match {
   winner_name: string | null;
 }
 
+/**
+ * Narrow a raw row to the domain `Match`.
+ *
+ * `status` and `confirmed_by` are CHECK-constrained text columns, and
+ * `pairing_decision_log` is jsonb — Postgres knows the allowed values but the
+ * type generator can only report `string` and `Json`. The unions on `Match`
+ * are the real contract, so this is the one place that assertion is made,
+ * rather than at each of the call sites that used to cast a whole row.
+ */
+export function toMatch(row: MatchRowInput): Match {
+  return {
+    id: row.id,
+    tournament_id: row.tournament_id,
+    round_number: row.round_number,
+    match_number: row.match_number,
+    player1_id: row.player1_id,
+    player2_id: row.player2_id,
+    winner_id: row.winner_id,
+    result: row.result,
+    temp_winner_id: row.temp_winner_id,
+    temp_result: row.temp_result,
+    pairings_published: row.pairings_published,
+    status: row.status as Match["status"],
+    confirmed_by: row.confirmed_by as Match["confirmed_by"],
+    pairing_decision_log:
+      (row.pairing_decision_log as PairingDecisionLog | null) ?? null,
+    created_at: row.created_at,
+  };
+}
+
+/** As `toMatch`, with the player names the organiser screens display. */
+export function toMatchWithPlayers(
+  row: MatchRowInput,
+  nameOf: (id: string) => string,
+): MatchWithPlayers {
+  return {
+    ...toMatch(row),
+    player1_name: nameOf(row.player1_id),
+    player2_name: row.player2_id ? nameOf(row.player2_id) : null,
+    winner_name: row.winner_id ? nameOf(row.winner_id) : null,
+  };
+}
+
 export interface MatchReportRow {
   match_id: string;
   player1_id: string;
@@ -83,15 +154,34 @@ export const humanizeFloatReason = (reason: string): string => {
   return reason;
 };
 
+/**
+ * A decision log on its way into jsonb.
+ *
+ * `floatReasons` is a Map, which is not JSON, so it becomes a plain object
+ * here. The return type is the column's own type so an insert type-checks
+ * without a cast at the call site.
+ */
 export const serializeDecisionLog = (
   log: PairingDecisionLog | undefined,
-): Record<string, unknown> | null => {
+): MatchRow["pairing_decision_log"] => {
   if (!log) return null;
   return {
     ...log,
     floatReasons: Object.fromEntries(log.floatReasons),
-  };
+  } as MatchRow["pairing_decision_log"];
 };
+
+/**
+ * A decision log read off a `Match` on its way back into jsonb unchanged.
+ *
+ * Rows fetched from the database already hold the serialized shape — `toMatch`
+ * only asserts the parsed type on the way out — so re-inserting one is the
+ * mirror of that assertion rather than a new one.
+ */
+export const decisionLogToJson = (
+  log: PairingDecisionLog | null | undefined,
+): MatchRow["pairing_decision_log"] =>
+  (log ?? null) as MatchRow["pairing_decision_log"];
 
 /**
  * Merges a pending result and a player-submitted report into the effective

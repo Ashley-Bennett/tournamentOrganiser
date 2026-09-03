@@ -396,6 +396,10 @@ export function useRoundLifecycle({
 
   const handleRegenerateRound1 = async () => {
     if (!tournament || !user) return;
+    if (!workspaceId) {
+      setError("Workspace not loaded, so pairings can't be generated");
+      return;
+    }
 
     try {
       setProcessingRound(true);
@@ -538,6 +542,10 @@ export function useRoundLifecycle({
 
   const handleNextRound = async () => {
     if (!tournament || !user) return;
+    if (!workspaceId) {
+      setError("Workspace not loaded, so pairings can't be generated");
+      return;
+    }
 
     try {
       setProcessingRound(true);

@@ -18,6 +18,7 @@ import {
   getSpriteUrl,
   type PokemonEntry,
 } from "../utils/pokemonCache";
+import { nullableArg } from "../utils/rpcArgs";
 
 function PokemonSlot({
   label,
@@ -169,9 +170,9 @@ const MatchInsightsModal: React.FC<Props> = ({
     setError(null);
     const { error: rpcError } = await supabase.rpc("upsert_match_insights", {
       p_match_id: matchId,
-      p_went_first: wentFirst,
-      p_opp_pokemon1: oppP1,
-      p_opp_pokemon2: oppP2,
+      p_went_first: nullableArg(wentFirst),
+      p_opp_pokemon1: nullableArg(oppP1),
+      p_opp_pokemon2: nullableArg(oppP2),
     });
     setSaving(false);
     if (rpcError) {

@@ -46,3 +46,21 @@ export interface TournamentPlayer {
   deck_pokemon1?: number | null;
   deck_pokemon2?: number | null;
 }
+
+/**
+ * Narrow a selected `tournaments` row to `TournamentSummary`.
+ *
+ * `tournament_type` is CHECK-constrained text, so the generator reports it as
+ * plain `string` while the union above is the real contract. Generic over the
+ * selected columns, because the screens select different subsets and each
+ * should keep its own shape rather than being widened to the whole row.
+ */
+export function toTournamentSummary<T extends { tournament_type: string }>(
+  row: T,
+): Omit<T, "tournament_type"> & {
+  tournament_type: TournamentSummary["tournament_type"];
+} {
+  return row as Omit<T, "tournament_type"> & {
+    tournament_type: TournamentSummary["tournament_type"];
+  };
+}

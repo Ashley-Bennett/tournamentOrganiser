@@ -294,6 +294,10 @@ const TournamentView: React.FC = () => {
 
   const handleAddPlayer = async (playerName: string, knownUserId: string | null = null) => {
     if (!tournament || !user) return;
+    if (!workspaceId) {
+      setPlayersError("Workspace not loaded, so the player can't be added");
+      return;
+    }
 
     try {
       setAddingPlayer(true);
@@ -324,7 +328,8 @@ const TournamentView: React.FC = () => {
             p_tournament_id: tournament.id,
             p_user_ids: [knownUserId],
             p_is_late_entry: tournament.status === "active",
-            p_late_entry_round: tournament.status === "active" ? maxRound : null,
+            p_late_entry_round:
+              tournament.status === "active" ? maxRound : undefined,
           },
         );
         if (rpcError) throw new Error(rpcError.message || "Failed to add player");
@@ -379,6 +384,10 @@ const TournamentView: React.FC = () => {
 
   const handleBulkAdd = async () => {
     if (!tournament || !user) return;
+    if (!workspaceId) {
+      setPlayersError("Workspace not loaded, so the players can't be added");
+      return;
+    }
     const names = bulkNames
       .split("\n")
       .map((n) => n.trim())

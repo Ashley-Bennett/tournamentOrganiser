@@ -125,10 +125,10 @@ export default function LeagueTableSection({
     void supabase
       .rpc("get_organiser_league_table", {
         p_workspace_id: workspaceId,
-        p_tournament_ids: mode === "pick" ? selectedKey.split(",") : null,
-        p_from: mode === "window" ? win.from.toISOString() : null,
-        p_to: mode === "window" ? win.to.toISOString() : null,
-        p_game_id: mode === "window" ? gameId : null,
+        p_tournament_ids: mode === "pick" ? selectedKey.split(",") : undefined,
+        p_from: mode === "window" ? win.from.toISOString() : undefined,
+        p_to: mode === "window" ? win.to.toISOString() : undefined,
+        p_game_id: mode === "window" ? (gameId ?? undefined) : undefined,
         p_placement_points: schemeKey === "" ? [] : schemeKey.split(",").map(Number),
       })
       .then(({ data }) => {

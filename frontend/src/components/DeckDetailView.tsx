@@ -78,12 +78,12 @@ export default function DeckDetailView({
     setLoading(true);
     const args = {
       p_workspace_id: workspaceId,
-      p_deck_pokemon1: p1,
-      p_deck_pokemon2: p2,
-      p_tournament_ids: tournamentIds,
-      p_from: null,
-      p_to: null,
-      p_game_id: gameId,
+      p_deck_pokemon1: p1 ?? undefined,
+      p_deck_pokemon2: p2 ?? undefined,
+      p_tournament_ids: tournamentIds ?? undefined,
+      p_from: undefined,
+      p_to: undefined,
+      p_game_id: gameId ?? undefined,
     };
     void Promise.all([
       supabase.rpc("get_organiser_deck_pilots", args),

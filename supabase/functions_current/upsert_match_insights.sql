@@ -1,0 +1,43 @@
+CREATE OR REPLACE FUNCTION public.upsert_match_insights(p_match_id uuid, p_went_first boolean, p_opp_pokemon1 integer, p_opp_pokemon2 integer)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  IF p_opp_pokemon1 IS NOT NULL AND (p_opp_pokemon1 < 1 OR p_opp_pokemon1 > 1025) THEN
+    RAISE EXCEPTION 'Invalid pokemon id';
+  END IF;
+  IF p_opp_pokemon2 IS NOT NULL AND (p_opp_pokemon2 < 1 OR p_opp_pokemon2 > 1025) THEN
+    RAISE EXCEPTION 'Invalid pokemon id';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.tournament_matches tm
+    JOIN public.tournament_players me
+      ON  me.tournament_id = tm.tournament_id
+      AND me.user_id = auth.uid()
+      AND (tm.player1_id = me.id OR tm.player2_id = me.id)
+    WHERE tm.id = p_match_id
+  ) THEN
+    -- Surfaced verbatim in MatchInsightsModal — keep it actionable. Insights
+    -- from unlinked entries never reach the stats RPCs anyway (they all join
+    -- through user_id-linked tournament_players rows).
+    RAISE EXCEPTION 'This tournament entry is not linked to your account yet — claim it from your dashboard, then save insights';
+  END IF;
+
+  INSERT INTO public.match_insights (match_id, player_id, went_first, opponent_deck_pokemon1, opponent_deck_pokemon2)
+  VALUES (p_match_id, auth.uid(), p_went_first, p_opp_pokemon1, p_opp_pokemon2)
+  ON CONFLICT (match_id, player_id)
+  DO UPDATE SET
+    went_first             = EXCLUDED.went_first,
+    opponent_deck_pokemon1 = EXCLUDED.opponent_deck_pokemon1,
+    opponent_deck_pokemon2 = EXCLUDED.opponent_deck_pokemon2,
+    submitted_at           = now();
+END;
+$function$

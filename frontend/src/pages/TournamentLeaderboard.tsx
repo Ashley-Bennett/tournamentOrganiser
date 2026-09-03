@@ -16,7 +16,7 @@ import { sortByProfile } from "../utils/tieBreaking";
 import { rulesFor } from "../games/registry";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { TournamentSummary, TournamentPlayer } from "../types/tournament";
-import { MatchWithPlayers } from "../types/match";
+import { MatchWithPlayers, toMatchWithPlayers } from "../types/match";
 import StandingsTable from "../components/StandingsTable";
 
 const TournamentLeaderboard: React.FC = () => {
@@ -117,17 +117,8 @@ const TournamentLeaderboard: React.FC = () => {
           .eq("tournament_id", id);
         setPlayers((allPlayersData as TournamentPlayer[]) ?? []);
 
-        const matchesWithPlayers: MatchWithPlayers[] = matchesData.map(
-          (match) => ({
-            ...match,
-            player1_name: playersMap.get(match.player1_id) || "Unknown",
-            player2_name: match.player2_id
-              ? playersMap.get(match.player2_id) || "Unknown"
-              : null,
-            winner_name: match.winner_id
-              ? playersMap.get(match.winner_id) || "Unknown"
-              : null,
-          }),
+        const matchesWithPlayers: MatchWithPlayers[] = matchesData.map((match) =>
+          toMatchWithPlayers(match, (id) => playersMap.get(id) || "Unknown"),
         );
 
         setMatches(matchesWithPlayers);

@@ -1,0 +1,7 @@
+# The database types are generated from the migrations and CI regenerates them
+# and diffs against this file. The committed line endings must therefore not
+# depend on which platform the contributor generated them on.
+frontend/src/types/database.ts text eol=lf
+
+# Same for the dumped function definitions.
+supabase/functions_current/*.sql text eol=lf

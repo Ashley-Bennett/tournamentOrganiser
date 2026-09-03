@@ -19,6 +19,24 @@ export interface Profile {
   default_workspace_id: string | null;
 }
 
+/**
+ * Narrow a selected `profiles` row to `Profile`.
+ *
+ * `onboarding_intent` is CHECK-constrained text, which the type generator can
+ * only report as `string`; the union above is the real contract.
+ */
+function toProfile(row: {
+  id: string;
+  display_name: string | null;
+  onboarding_intent: string | null;
+  default_workspace_id: string | null;
+}): Profile {
+  return {
+    ...row,
+    onboarding_intent: row.onboarding_intent as Profile["onboarding_intent"],
+  };
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -83,7 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       .select("id, display_name, onboarding_intent, default_workspace_id")
       .eq("id", userId)
       .maybeSingle();
-    setProfile(data ?? null);
+    setProfile(data ? toProfile(data) : null);
   }, []);
 
   useEffect(() => {
@@ -203,7 +221,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .select("id, display_name, onboarding_intent, default_workspace_id")
         .maybeSingle();
       if (error) throw new Error(error.message);
-      if (data) setProfile(data);
+      if (data) setProfile(toProfile(data));
     },
     [user],
   );

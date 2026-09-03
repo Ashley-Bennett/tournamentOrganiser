@@ -32,7 +32,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
 import { useAuth } from "../AuthContext";
-import { TournamentSummary } from "../types/tournament";
+import { TournamentSummary, toTournamentSummary } from "../types/tournament";
 import { formatLabel, getGame } from "../games/registry";
 import StatsGameFilter from "../components/StatsGameFilter";
 import { formatDate } from "../utils/format";
@@ -132,8 +132,8 @@ const OrganiserDashboard: React.FC = () => {
         return bTime.localeCompare(aTime);
       })[0] ?? null;
 
-      setActiveTournament(spotlight);
-      setRecentTournaments(all.slice(0, 5));
+      setActiveTournament(spotlight ? toTournamentSummary(spotlight) : null);
+      setRecentTournaments(all.slice(0, 5).map(toTournamentSummary));
       setStats({
         activeTournaments: active.length,
         totalParticipants: totalParticipants ?? 0,

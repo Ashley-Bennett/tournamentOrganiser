@@ -31,15 +31,21 @@ export function periodRange(period: StatsPeriod): DateRange | null {
   return period.year == null ? null : yearRange(period.year);
 }
 
-/** RPC arguments for a period — nulls mean "no bound", i.e. all time. */
+/**
+ * RPC arguments for a period — undefined means "no bound", i.e. all time.
+ *
+ * undefined rather than null because every one of these parameters is
+ * `DEFAULT NULL` in SQL, so an omitted argument and an explicit null reach the
+ * function identically, and the generated Args types only admit the former.
+ */
 export function periodArgs(period: StatsPeriod): {
-  p_from: string | null;
-  p_to: string | null;
+  p_from: string | undefined;
+  p_to: string | undefined;
 } {
   const range = periodRange(period);
   return {
-    p_from: range ? range.from.toISOString() : null,
-    p_to: range ? range.to.toISOString() : null,
+    p_from: range ? range.from.toISOString() : undefined,
+    p_to: range ? range.to.toISOString() : undefined,
   };
 }
 

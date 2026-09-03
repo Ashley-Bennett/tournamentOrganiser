@@ -45,7 +45,7 @@ export default function DeckDiversitySection({
   workspaceId: string;
   gameId: string | null;
   nameMap: Map<number, string>;
-  periodArgsValue: { p_from: string | null; p_to: string | null };
+  periodArgsValue: { p_from: string | undefined; p_to: string | undefined };
 }) {
   const [bucket, setBucket] = useState<TimelineBucket>("month");
 

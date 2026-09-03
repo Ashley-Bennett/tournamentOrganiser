@@ -167,9 +167,9 @@ export default function MetaShareSection({
       .rpc("get_organiser_meta_share", {
         p_workspace_id: workspaceId,
         p_tournament_ids: ids,
-        p_from: null,
-        p_to: null,
-        p_game_id: gameId,
+        p_from: undefined,
+        p_to: undefined,
+        p_game_id: gameId ?? undefined,
       })
       .then(({ data }) => {
         setRows((data ?? []) as MetaRow[]);

@@ -134,10 +134,10 @@ export default function PlayerDetailView({
     const args = {
       p_workspace_id: workspaceId,
       p_identity_key: identityKey,
-      p_tournament_ids: null,
-      p_from: null,
-      p_to: null,
-      p_game_id: gameId,
+      p_tournament_ids: undefined,
+      p_from: undefined,
+      p_to: undefined,
+      p_game_id: gameId ?? undefined,
     };
 
     void Promise.all([

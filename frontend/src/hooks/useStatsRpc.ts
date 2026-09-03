@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
+import type { Database } from "../types/database";
+
+/** Any function the database actually exposes. */
+type RpcName = keyof Database["public"]["Functions"];
 
 /**
  * One read-only stats RPC, fetched whenever its arguments change.
@@ -20,7 +24,7 @@ import { supabase } from "../supabaseClient";
  * failure so a section never mixes stale numbers with an error banner.
  */
 export function useStatsRpc<T>(
-  fn: string,
+  fn: RpcName,
   args: Record<string, unknown>,
   deps: unknown[],
 ): { rows: T[]; loading: boolean; error: string | null } {
@@ -31,7 +35,11 @@ export function useStatsRpc<T>(
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void supabase.rpc(fn, args).then(({ data, error: err }) => {
+    // `args` is checked against the specific function's Args where each
+    // caller builds it; this hook only knows the name is a real function.
+    void supabase
+      .rpc(fn, args as never)
+      .then(({ data, error: err }) => {
       if (cancelled) return;
       setError(err ? err.message : null);
       setRows(err ? [] : ((data ?? []) as T[]));
@@ -54,7 +62,7 @@ export function useStatsRpc<T>(
  * `error` before reading anything into a null.
  */
 export function useStatsRpcRow<T>(
-  fn: string,
+  fn: RpcName,
   args: Record<string, unknown>,
   deps: unknown[],
 ): { row: T | null; loading: boolean; error: string | null } {

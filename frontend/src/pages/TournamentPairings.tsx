@@ -34,8 +34,8 @@ import StandingsTable from "../components/StandingsTable";
 import RoundTimer from "../components/RoundTimer";
 import LiveIndicator from "../components/LiveIndicator";
 import { useAttentionAlert } from "../hooks/useAttentionAlert";
-import { TournamentSummary, TournamentPlayer } from "../types/tournament";
-import { MatchWithPlayers } from "../types/match";
+import { TournamentSummary, TournamentPlayer, toTournamentSummary } from "../types/tournament";
+import { MatchWithPlayers, toMatchWithPlayers } from "../types/match";
 
 const TournamentPairings: React.FC = () => {
   // Handles two routes:
@@ -105,7 +105,7 @@ const TournamentPairings: React.FC = () => {
           setLoading(false);
           return;
         }
-        tData = data;
+        tData = toTournamentSummary(data);
       } else {
         // Public route — fetch by public_slug, is_public = true required
         const { data, error: tErr } = await supabase
@@ -124,7 +124,7 @@ const TournamentPairings: React.FC = () => {
           setLoading(false);
           return;
         }
-        tData = data;
+        tData = toTournamentSummary(data);
       }
 
       if (!tData) return;
@@ -169,16 +169,9 @@ const TournamentPairings: React.FC = () => {
         return;
       }
 
-      const allEnriched: MatchWithPlayers[] = (mData ?? []).map((m) => ({
-        ...m,
-        player1_name: playerMap.get(m.player1_id) ?? "Unknown",
-        player2_name: m.player2_id
-          ? (playerMap.get(m.player2_id) ?? "Unknown")
-          : null,
-        winner_name: m.winner_id
-          ? (playerMap.get(m.winner_id) ?? "Unknown")
-          : null,
-      }));
+      const allEnriched: MatchWithPlayers[] = (mData ?? []).map((m) =>
+        toMatchWithPlayers(m, (id) => playerMap.get(id) ?? "Unknown"),
+      );
 
       // Only expose matches that have been published or are in progress/complete
       const enriched = allEnriched.filter(

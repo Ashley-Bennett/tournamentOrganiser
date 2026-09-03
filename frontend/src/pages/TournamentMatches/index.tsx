@@ -40,6 +40,7 @@ import {
   type MatchWithPlayers,
   MATCH_STATUS,
   TOURNAMENT_PLAYER_COLUMNS,
+  toMatchWithPlayers,
 } from "../../types/match";
 import StandingsTable from "../../components/StandingsTable";
 import ErrorBoundary from "../../components/ErrorBoundary";
@@ -577,16 +578,7 @@ const TournamentMatches: React.FC = () => {
       });
 
       const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map(
-        (match) => ({
-          ...match,
-          player1_name: playersMap.get(match.player1_id) || "Unknown",
-          player2_name: match.player2_id
-            ? playersMap.get(match.player2_id) || "Unknown"
-            : null,
-          winner_name: match.winner_id
-            ? playersMap.get(match.winner_id) || "Unknown"
-            : null,
-        }),
+        (match) => toMatchWithPlayers(match, (id) => playersMap.get(id) || "Unknown"),
       );
 
       setMatches(matchesWithPlayers);

@@ -13,6 +13,7 @@ import {
 import { useAttentionAlert } from "../hooks/useAttentionAlert";
 import { useAuth } from "../AuthContext";
 import OrganiserWatcher from "./OrganiserWatcher";
+import { nullableArg } from "../utils/rpcArgs";
 
 /**
  * App-level player notifications.
@@ -96,7 +97,7 @@ function TournamentWatcher({
       const { data, error } = await supabase.rpc("get_player_tournament_view", {
         p_tournament_id: tournamentId,
         p_player_id: playerId,
-        p_device_token: deviceToken,
+        p_device_token: nullableArg(deviceToken),
       });
       if (stopped || error || !data) {
         // Player was removed — forget this entry so we stop watching it.
@@ -109,7 +110,9 @@ function TournamentWatcher({
         return;
       }
 
-      const d = data as WatcherView;
+      // The RPC returns jsonb, so its type is Json; this asserts the shape
+      // that get_player_tournament_view is documented to build.
+      const d = data as unknown as WatcherView;
       setView(d);
 
       const publishedRounds = [

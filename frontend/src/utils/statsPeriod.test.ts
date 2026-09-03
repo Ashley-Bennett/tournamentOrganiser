@@ -35,8 +35,8 @@ describe("periodRange", () => {
 });
 
 describe("periodArgs", () => {
-  it("sends nulls for all time, so the RPC applies no bound", () => {
-    expect(periodArgs(ALL_TIME)).toEqual({ p_from: null, p_to: null });
+  it("omits both bounds for all time, so the RPC applies none", () => {
+    expect(periodArgs(ALL_TIME)).toEqual({ p_from: undefined, p_to: undefined });
   });
 
   it("sends ISO strings for a year", () => {

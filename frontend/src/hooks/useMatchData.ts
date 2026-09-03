@@ -6,6 +6,7 @@ import {
   type TournamentPlayer,
   type MatchWithPlayers,
   TOURNAMENT_PLAYER_COLUMNS,
+  toMatchWithPlayers,
 } from "../types/match";
 import type { PairingDecisionLog } from "../utils/tournamentPairing";
 
@@ -109,16 +110,9 @@ export function useMatchData({
         const playersMap = new Map<string, string>();
         playersData?.forEach((p) => playersMap.set(p.id, p.name));
 
-        const matchesWithPlayers: MatchWithPlayers[] = matchesData.map((match) => ({
-          ...match,
-          player1_name: playersMap.get(match.player1_id) || "Unknown",
-          player2_name: match.player2_id
-            ? playersMap.get(match.player2_id) || "Unknown"
-            : null,
-          winner_name: match.winner_id
-            ? playersMap.get(match.winner_id) || "Unknown"
-            : null,
-        }));
+        const matchesWithPlayers: MatchWithPlayers[] = matchesData.map((match) =>
+          toMatchWithPlayers(match, (id) => playersMap.get(id) || "Unknown"),
+        );
 
         setMatches(matchesWithPlayers);
 
@@ -185,12 +179,9 @@ export function useMatchData({
     const playersMap = new Map<string, string>();
     playersData?.forEach((p) => playersMap.set(p.id, p.name));
 
-    const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map((m) => ({
-      ...m,
-      player1_name: playersMap.get(m.player1_id) || "Unknown",
-      player2_name: m.player2_id ? playersMap.get(m.player2_id) || "Unknown" : null,
-      winner_name: m.winner_id ? playersMap.get(m.winner_id) || "Unknown" : null,
-    }));
+    const matchesWithPlayers: MatchWithPlayers[] = (matchesData || []).map((m) =>
+      toMatchWithPlayers(m, (id) => playersMap.get(id) || "Unknown"),
+    );
     setMatches(matchesWithPlayers);
 
     const { data: freshPlayers } = await supabase

@@ -38,7 +38,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { useAuth } from "../AuthContext";
 import { supabase } from "../supabaseClient";
 import { useWorkspace } from "../WorkspaceContext";
-import { TournamentSummary } from "../types/tournament";
+import { TournamentSummary, toTournamentSummary } from "../types/tournament";
 import GamePicker from "../components/GamePicker";
 import {
   formatLabel,
@@ -117,7 +117,7 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
         throw new Error(error.message);
       }
 
-      setTournaments(data || []);
+      setTournaments((data || []).map(toTournamentSummary));
       initialLoadDoneRef.current = true;
     } catch (error: unknown) {
       setError(

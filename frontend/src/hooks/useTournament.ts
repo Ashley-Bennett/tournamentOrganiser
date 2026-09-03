@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../supabaseClient";
-import type { TournamentSummary } from "../types/tournament";
+import { type TournamentSummary, toTournamentSummary } from "../types/tournament";
 import type { User } from "@supabase/supabase-js";
 
 export function useTournament(
@@ -42,7 +42,7 @@ export function useTournament(
         setError("Tournament not found");
         setTournament(null);
       } else {
-        setTournament(data);
+        setTournament(toTournamentSummary(data));
         initialLoadDoneRef.current = true;
       }
     } catch (e: unknown) {
