@@ -7,7 +7,11 @@ import {
   unlocksBetween,
   type BadgeSnapshot,
 } from "../badges/unlocks";
-import { ACCOUNT_SCOPE, addNotification } from "../utils/notificationStore";
+import {
+  ACCOUNT_SCOPE,
+  addNotification,
+  clearAccountScoped,
+} from "../utils/notificationStore";
 
 /**
  * Raises a bell notification when the signed-in player's badges move.
@@ -20,7 +24,20 @@ import { ACCOUNT_SCOPE, addNotification } from "../utils/notificationStore";
  * Renders nothing. It is a side effect with a mounting point.
  */
 
-const SNAPSHOT_KEY = "mc_badge_snapshot";
+/**
+ * Per account, not per browser.
+ *
+ * One key for the whole device meant two people sharing a browser diffed
+ * against each other's counts — the second to sign in would be told they had
+ * earned whatever the first held. The id keeps them apart, and it is not a
+ * secret: it is already in the session this code only runs inside.
+ */
+function snapshotKeyFor(userId: string) {
+  return `mc_badge_snapshot:${userId}`;
+}
+
+/** The single unscoped key earlier builds wrote. Removed on sight. */
+const LEGACY_SNAPSHOT_KEY = "mc_badge_snapshot";
 
 function badgeHref(unlock: { badge: { id: string }; gameId: string | null }) {
   const params = new URLSearchParams({ badge: unlock.badge.id });
@@ -28,9 +45,9 @@ function badgeHref(unlock: { badge: { id: string }; gameId: string | null }) {
   return `/me/badges?${params.toString()}`;
 }
 
-function readSnapshot(): BadgeSnapshot | null {
+function readSnapshot(userId: string): BadgeSnapshot | null {
   try {
-    const raw = localStorage.getItem(SNAPSHOT_KEY);
+    const raw = localStorage.getItem(snapshotKeyFor(userId));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
@@ -49,9 +66,10 @@ function readSnapshot(): BadgeSnapshot | null {
   }
 }
 
-function writeSnapshot(snapshot: BadgeSnapshot) {
+function writeSnapshot(userId: string, snapshot: BadgeSnapshot) {
   try {
-    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+    localStorage.removeItem(LEGACY_SNAPSHOT_KEY);
+    localStorage.setItem(snapshotKeyFor(userId), JSON.stringify(snapshot));
   } catch {
     // Quota or private-mode failures are not worth breaking anything over.
     // The cost is re-deriving next time, and addNotification is idempotent.
@@ -59,7 +77,7 @@ function writeSnapshot(snapshot: BadgeSnapshot) {
 }
 
 export default function BadgeWatcher() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   // `ready` rather than `!loading`: the hook reports "not loading" over an
   // empty list in the window between the session arriving and the fetch
   // starting, and seeding a snapshot from that would make every badge the
@@ -69,21 +87,30 @@ export default function BadgeWatcher() {
   const donePass = useRef(false);
 
   useEffect(() => {
+    // The session takes a moment to rehydrate, and during it `user` is null.
+    // Acting on that would wipe a signed-in player's notifications on every
+    // page load.
+    if (authLoading) return;
+
     if (!user) {
       donePass.current = false;
+      // Signed out — by logging out, or by a session simply expiring. Either
+      // way the account's notifications should not be sitting in the bell of
+      // a device someone is using as an accountless player.
+      clearAccountScoped();
       return;
     }
     if (!ready || donePass.current) return;
     donePass.current = true;
 
     const now = snapshotOf(badges);
-    const previous = readSnapshot();
+    const previous = readSnapshot(user.id);
 
     // First run seeds silently. A player who has been coming for a year does
     // not want a bell full of things they earned months ago the first time
     // this ships — and the badges are all still there on the wall.
     if (previous === null) {
-      writeSnapshot(now);
+      writeSnapshot(user.id, now);
       return;
     }
 
@@ -104,8 +131,8 @@ export default function BadgeWatcher() {
       });
     }
 
-    writeSnapshot(now);
-  }, [user, badges, ready]);
+    writeSnapshot(user.id, now);
+  }, [user, authLoading, badges, ready]);
 
   return null;
 }

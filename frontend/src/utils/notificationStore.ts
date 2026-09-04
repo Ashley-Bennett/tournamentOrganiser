@@ -240,6 +240,20 @@ export function clearTournament(tournamentId: string) {
   if (kept.length !== list.length) write(kept);
 }
 
+/**
+ * Drops everything scoped to the account rather than to a device.
+ *
+ * Called when there is no signed-in user. Badge notifications are about a
+ * person, not about this browser, and the same device is routinely handed to
+ * a walk-in who signs into nothing — "You are now Regular" is not theirs to
+ * read, and tapping it would send them to a page they cannot open.
+ */
+export function clearAccountScoped() {
+  const list = read();
+  const kept = list.filter((n) => n.tournamentId !== ACCOUNT_SCOPE);
+  if (kept.length !== list.length) write(kept);
+}
+
 export function clearAll() {
   try {
     localStorage.removeItem(STORE_KEY);
