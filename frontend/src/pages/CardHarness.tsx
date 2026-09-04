@@ -1,8 +1,14 @@
 import React from "react";
 import { Box, Divider, Paper, Typography } from "@mui/material";
 import PlayerCardView from "../components/PlayerCardView";
+import PlayerCardEditor from "../components/PlayerCardEditor";
 import BadgeMark from "../components/BadgeMark";
-import { assembleCard, type CardSlot } from "../badges/card";
+import {
+  assembleCard,
+  type CardSlot,
+  type EquippedSlot,
+} from "../badges/card";
+import type { EarnedBadge } from "../badges/types";
 import { BADGES, TIERS } from "../badges/registry";
 import { tierFor, titleFor } from "../badges/tiers";
 
@@ -39,6 +45,20 @@ const title = (badgeId: string, count: number, ws?: string): CardSlot =>
     workspaceId: ws ? WS : null,
     workspaceName: ws ?? null,
   });
+
+const EDITOR_HELD: EarnedBadge[] = [
+  { badgeId: "attendance", count: 31, workspaceId: WS, workspaceName: "Bulwark" },
+  { badgeId: "champion", count: 3, workspaceId: null, workspaceName: null },
+  { badgeId: "top_cut", count: 12, workspaceId: null, workspaceName: null },
+  { badgeId: "spoiler", count: 1, workspaceId: null, workspaceName: null },
+];
+
+const EDITOR_EQUIPPED: EquippedSlot[] = [
+  { slot: 0, badgeId: "attendance", workspaceId: WS },
+  { slot: 1, badgeId: "champion", workspaceId: null },
+  { slot: 2, badgeId: "top_cut", workspaceId: null },
+  { slot: 3, badgeId: "spoiler", workspaceId: null },
+];
 
 function Case({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -140,6 +160,47 @@ export default function CardHarness() {
             title("not_shipped_yet", 3),
             slot({ slot: 1, badgeId: "also_unknown", count: 2 }),
           ])}
+        />
+      </Case>
+
+      <Divider sx={{ my: 3 }} />
+      <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+        The editor
+      </Typography>
+      {/* A full loadout is hard to reach in local dev, where the database is
+          near-empty and badges come from tournament history. This is the only
+          place the take-off control gets looked at before somebody has one. */}
+      <Case label="editor · full loadout, no picker yet">
+        <PlayerCardEditor
+          name="Marcus Hale"
+          gameId="pokemon"
+          partnerKey="25"
+          equipped={EDITOR_EQUIPPED}
+          earned={EDITOR_HELD}
+          onChange={() => {}}
+        />
+      </Case>
+
+      <Case label="editor · nothing equipped, quiet empty slots">
+        <PlayerCardEditor
+          name="Dan Okafor"
+          gameId="pokemon"
+          partnerKey={null}
+          equipped={[]}
+          earned={EDITOR_HELD}
+          onChange={() => {}}
+        />
+      </Case>
+
+      <Case label="editor · with a picker, so the slots become controls">
+        <PlayerCardEditor
+          name="Dan Okafor"
+          gameId="pokemon"
+          partnerKey={null}
+          equipped={[]}
+          earned={EDITOR_HELD}
+          onChange={() => {}}
+          onPickSlot={() => {}}
         />
       </Case>
 

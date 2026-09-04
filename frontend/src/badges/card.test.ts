@@ -5,6 +5,7 @@ import { getBadge } from "./registry";
 import {
   assembleCard,
   canEquip,
+  hydrateSlots,
   equippableBadges,
   firstEarnedAt,
   isBareCard,
@@ -254,5 +255,71 @@ describe("first and last earned", () => {
   it("is null when nothing was stored", () => {
     expect(firstEarnedAt(earned())).toBeNull();
     expect(lastEarnedAt(earned())).toBeNull();
+  });
+});
+
+describe("hydrateSlots", () => {
+  const held: EarnedBadge[] = [
+    {
+      badgeId: "attendance",
+      count: 31,
+      workspaceId: WS,
+      workspaceName: "Bulwark",
+    },
+    { badgeId: "champion", count: 2, workspaceId: null, workspaceName: null },
+  ];
+
+  it("takes the count and the league name from the badge, not the slot", () => {
+    const [slot] = hydrateSlots(
+      [{ slot: 0, badgeId: "attendance", workspaceId: WS }],
+      held,
+    );
+    expect(slot.count).toBe(31);
+    expect(slot.workspaceName).toBe("Bulwark");
+  });
+
+  // Attending ten more events must move the number without the player having
+  // to take the badge off and put it back on.
+  it("follows the count as it grows", () => {
+    const grown = held.map((e) =>
+      e.badgeId === "attendance" ? { ...e, count: 60 } : e,
+    );
+    const [slot] = hydrateSlots(
+      [{ slot: 0, badgeId: "attendance", workspaceId: WS }],
+      grown,
+    );
+    expect(slot.count).toBe(60);
+  });
+
+  // A workspace can be deleted or an entry withdrawn. Drawing the badge from
+  // a slot row that outlived the history behind it would be a lie.
+  it("drops a slot whose badge is no longer held", () => {
+    expect(
+      hydrateSlots([{ slot: 1, badgeId: "spoiler", workspaceId: null }], held),
+    ).toEqual([]);
+  });
+
+  // Regular at two clubs is two badges, and the card has to say which.
+  it("matches on the league as well as the badge", () => {
+    const other = "11111111-2222-3333-4444-555555555555";
+    expect(
+      hydrateSlots(
+        [{ slot: 0, badgeId: "attendance", workspaceId: other }],
+        held,
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps a slot that carries no league", () => {
+    const [slot] = hydrateSlots(
+      [{ slot: 2, badgeId: "champion", workspaceId: null }],
+      held,
+    );
+    expect(slot.badgeId).toBe("champion");
+    expect(slot.workspaceName).toBeNull();
+  });
+
+  it("survives an empty loadout", () => {
+    expect(hydrateSlots([], held)).toEqual([]);
   });
 });

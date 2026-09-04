@@ -30,6 +30,19 @@ export interface CardSlot {
   count: number;
 }
 
+/**
+ * One equipped slot, exactly as stored.
+ *
+ * No count and no league name: those belong to the badge, not to the choice
+ * to wear it. Keeping them apart means a player who attends ten more events
+ * does not have to re-equip anything for the number to move.
+ */
+export interface EquippedSlot {
+  slot: number;
+  badgeId: string;
+  workspaceId: string | null;
+}
+
 /** One resolved badge, ready to draw. */
 export interface CardBadge {
   badge: BadgeDefinition;
@@ -115,6 +128,41 @@ export function assembleCard(input: {
     title,
     badges,
   };
+}
+
+/**
+ * Join equipped slots to earned badges, producing what a card draws.
+ *
+ * The editor and the pairing board both need this, and they must agree: a
+ * slot the board would drop because the count no longer resolves has to look
+ * dropped in the editor too, or somebody edits a card that is not the one the
+ * room sees.
+ *
+ * A slot whose badge is not in `earned` is left out. That is the honest
+ * result — a badge can stop being held (a workspace deleted, a tournament
+ * withdrawn), and drawing it from a stale slot row would be a lie.
+ */
+export function hydrateSlots(
+  equipped: EquippedSlot[],
+  earned: EarnedBadge[],
+): CardSlot[] {
+  return equipped.flatMap((slot) => {
+    const match = earned.find(
+      (e) =>
+        e.badgeId === slot.badgeId &&
+        (e.workspaceId ?? null) === (slot.workspaceId ?? null),
+    );
+    if (!match) return [];
+    return [
+      {
+        slot: slot.slot,
+        badgeId: slot.badgeId,
+        workspaceId: slot.workspaceId,
+        workspaceName: match.workspaceName ?? null,
+        count: match.count,
+      },
+    ];
+  });
 }
 
 /** True when the card has nothing on it but a partner. */
