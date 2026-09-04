@@ -1,3 +1,5 @@
+// @vitest-environment node
+// Pure logic: no DOM, so it skips the jsdom setup that dominates suite time.
 import { describe, it, expect } from "vitest";
 import {
   ALL_TIME,

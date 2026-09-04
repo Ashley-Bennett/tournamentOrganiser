@@ -1,3 +1,5 @@
+// @vitest-environment node
+// Pure logic: no DOM, so it skips the jsdom setup that dominates suite time.
 /**
  * Rules-profile behaviour of the tie-break library.
  *

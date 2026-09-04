@@ -1,3 +1,5 @@
+// @vitest-environment node
+// Pure logic: no DOM, so it skips the jsdom setup that dominates suite time.
 /**
  * Integration tests for the standings pipeline:
  *   buildStandingsFromMatches  (tournamentUtils.ts)
