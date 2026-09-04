@@ -29,6 +29,9 @@ import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { getSpriteUrl } from "../utils/pokemonCache";
 import StandingsTable from "../components/StandingsTable";
 import { useTournamentCards } from "../hooks/useTournamentCards";
+import PlayerCardView from "../components/PlayerCardView";
+import WornTitle from "../components/WornTitle";
+import type { PlayerCard } from "../badges/card";
 import DeckPickerDialog from "../components/DeckPickerDialog";
 import LiveIndicator from "../components/LiveIndicator";
 import MatchInsightsModal from "../components/MatchInsightsModal";
@@ -103,12 +106,21 @@ function MyMatchCard({
   myReport,
   entry,
   onRefresh,
+  opponentCard,
 }: {
   match: MatchWithNames | null;
   playerId: string;
   myReport: { reported_outcome: "win" | "loss" | "draw" } | null;
   entry: { playerId: string; deviceToken: string | null } | null;
   onRefresh: () => void;
+  /**
+   * The person across the table, as they chose to present themselves.
+   *
+   * This is the one surface with room for the whole card: one opponent, on
+   * your own phone, with nothing else competing for the space. The board and
+   * the standings only get the title because they are lists.
+   */
+  opponentCard?: PlayerCard;
 }) {
   const [selectedOutcome, setSelectedOutcome] = useState<"win" | "loss" | "draw" | null>(null);
   const [undone, setUndone] = useState(false);
@@ -212,19 +224,41 @@ function MyMatchCard({
         Your Match{tableNum != null ? ` · Table ${tableNum}` : ""}
       </Typography>
 
-      <Box display="flex" alignItems="center" gap={1.5} mt={0.5} mb={1}>
-        <Typography variant="h6" fontWeight={700}>
-          vs {isBye ? "BYE" : (opponentName ?? "Opponent")}
-        </Typography>
-        {isBye && <Chip label="BYE" size="small" />}
-        {outcomeLabel && (
-          <Chip
-            label={outcomeLabel}
-            color={outcomeColor as "success" | "error" | "default"}
-            size="small"
-          />
-        )}
-      </Box>
+      {/* With a card, the opponent gets drawn as one; without, the plain
+          heading this page has always had. Most players will have no card for
+          a long time yet, and a card-shaped frame around nothing but a name
+          is worse than the name on its own. */}
+      {!isBye && opponentCard && opponentName ? (
+        <Box mt={0.5} mb={1}>
+          <Box display="flex" alignItems="center" gap={1.5} mb={0.25}>
+            <Typography variant="overline" sx={{ color: "text.secondary" }}>
+              vs
+            </Typography>
+            {outcomeLabel && (
+              <Chip
+                label={outcomeLabel}
+                color={outcomeColor as "success" | "error" | "default"}
+                size="small"
+              />
+            )}
+          </Box>
+          <PlayerCardView name={opponentName} card={opponentCard} />
+        </Box>
+      ) : (
+        <Box display="flex" alignItems="center" gap={1.5} mt={0.5} mb={1}>
+          <Typography variant="h6" fontWeight={700}>
+            vs {isBye ? "BYE" : (opponentName ?? "Opponent")}
+          </Typography>
+          {isBye && <Chip label="BYE" size="small" />}
+          {outcomeLabel && (
+            <Chip
+              label={outcomeLabel}
+              color={outcomeColor as "success" | "error" | "default"}
+              size="small"
+            />
+          )}
+        </Box>
+      )}
 
       {/* Result submission — pending match */}
       {match.status === "pending" && !isBye && (
@@ -857,6 +891,15 @@ const PlayerTournamentView: React.FC = () => {
         myReport={my_report}
         entry={entry}
         onRefresh={() => void handleRefresh()}
+        opponentCard={
+          myRoundMatch
+            ? cards.get(
+                myRoundMatch.player1_id === player.id
+                  ? myRoundMatch.player2_id ?? ""
+                  : myRoundMatch.player1_id,
+              )
+            : undefined
+        }
       />
 
       {/* Match insights prompt — shown after player submits a result (or match is already completed for past rounds) */}
@@ -1005,6 +1048,13 @@ const PlayerTournamentView: React.FC = () => {
                           {recordMap.get(m.player1_id)}
                         </Typography>
                       )}
+                      {/* Not on a phone: this table already truncates names
+                          hard, and "Familiar F…" on a second line is noise
+                          rather than information. The opponent's whole card
+                          is above, which is the part that matters here. */}
+                      <Box sx={{ display: { xs: "none", sm: "block" } }}>
+                        <WornTitle card={cards.get(m.player1_id)} />
+                      </Box>
                     </TableCell>
                     <TableCell sx={{ textAlign: "center", fontSize: "0.75rem", px: 0, color: isMyRow ? "inherit" : "text.disabled" }}>
                       vs
@@ -1030,6 +1080,9 @@ const PlayerTournamentView: React.FC = () => {
                               {recordMap.get(m.player2_id)}
                             </Typography>
                           )}
+                          <Box sx={{ display: { xs: "none", sm: "block" } }}>
+                            <WornTitle card={cards.get(m.player2_id ?? "")} />
+                          </Box>
                         </>
                       )}
                     </TableCell>
