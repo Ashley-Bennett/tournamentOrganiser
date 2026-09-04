@@ -21,7 +21,8 @@ interface Payload {
     | "late_join"
     | "bye_paired"
     | "opponent_removed"
-    | "link_request";
+    | "link_request"
+    | "badge_earned";
   tournament_id: string;
   round?: number;
   /** late_join / bye_paired: who just added themselves.
@@ -31,6 +32,10 @@ interface Payload {
   /** bye_paired: the player whose bye was taken by the late entry.
    *  opponent_removed: the player left without an opponent. */
   player_id?: string;
+  /** badge_earned: the entries that gained a badge they had never held.
+   *  Entry ids rather than account ids, because a subscription belongs to
+   *  a browser attached to an entry rather than to a person. */
+  player_ids?: string[];
 }
 
 interface Subscription {
@@ -86,7 +91,7 @@ Deno.serve(async (req) => {
   } catch {
     return new Response("Bad request", { status: 400 });
   }
-  const { type, tournament_id, round, player_name, player_id } = payload;
+  const { type, tournament_id, round, player_name, player_id, player_ids } = payload;
   if (!type || !tournament_id) {
     return new Response("Bad request", { status: 400 });
   }
@@ -144,7 +149,11 @@ Deno.serve(async (req) => {
     }
   }
 
-  const url = `/t/${tournament_id}/me`;
+  // A badge notification belongs on the badge wall rather than in the event
+  // that happened to award it — the badge is the thing they were told about,
+  // and it outlives the tournament. Everything else is about this event.
+  const url =
+    type === "badge_earned" ? "/me/badges" : `/t/${tournament_id}/me`;
 
   // Resolve one message per endpoint (a browser may match several target rows).
   const toSend = new Map<string, { sub: Subscription; title: string; body: string }>();
@@ -174,6 +183,19 @@ Deno.serve(async (req) => {
       if (player_id && row.tournament_player_id === player_id) {
         title = `Round ${round}: you have a bye`;
         body = `${player_name ?? "Your opponent"} is out of this round, so you get the win.`;
+      }
+    } else if (type === "badge_earned") {
+      // Only the players who earned something they had never held. Wording is
+      // deliberately unspecific: which badge, and which rung of it, depends on
+      // thresholds that live in the frontend registry, and this function must
+      // not become a second place to keep them right. The app names it when
+      // they open it.
+      if (
+        row.tournament_player_id &&
+        (player_ids ?? []).includes(row.tournament_player_id)
+      ) {
+        title = "You earned a new badge";
+        body = "Tap to see what you picked up.";
       }
     } else if (type === "link_request") {
       // Organisers only — someone tried to sign themselves up as a player the

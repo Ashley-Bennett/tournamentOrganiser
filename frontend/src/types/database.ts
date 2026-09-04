@@ -1898,6 +1898,13 @@ export type Database = {
         Returns: number
       }
       refresh_my_badges: { Args: never; Returns: number }
+      refresh_tournament_badges: {
+        Args: { p_tournament_id: string }
+        Returns: {
+          earned_badge_id: string
+          earner_id: string
+        }[]
+      }
       remove_player_from_round: {
         Args: { p_player_id: string; p_round: number }
         Returns: undefined
