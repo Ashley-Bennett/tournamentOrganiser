@@ -22,6 +22,12 @@ import { ACCOUNT_SCOPE, addNotification } from "../utils/notificationStore";
 
 const SNAPSHOT_KEY = "mc_badge_snapshot";
 
+function badgeHref(unlock: { badge: { id: string }; gameId: string | null }) {
+  const params = new URLSearchParams({ badge: unlock.badge.id });
+  if (unlock.gameId) params.set("game", unlock.gameId);
+  return `/me/badges?${params.toString()}`;
+}
+
 function readSnapshot(): BadgeSnapshot | null {
   try {
     const raw = localStorage.getItem(SNAPSHOT_KEY);
@@ -87,7 +93,10 @@ export default function BadgeWatcher() {
         tournamentId: ACCOUNT_SCOPE,
         tournamentName: null,
         message: unlockMessage(unlock),
-        href: "/me/badges",
+        // Deep-linked, so tapping lands on the badge itself rather than on a
+        // wall of thirty and a hunt for which one moved. The game picks the
+        // tab: a Pokémon top cut under the generic tab reads as unearned.
+        href: badgeHref(unlock),
         // The rung is part of the key, so reaching Silver raises one
         // notification and staying on Silver raises none.
         idKey: `${unlock.key}:${unlock.tier?.id ?? "none"}`,

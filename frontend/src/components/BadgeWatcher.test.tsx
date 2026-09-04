@@ -105,7 +105,7 @@ describe("BadgeWatcher", () => {
     state.badges = [attendance(25)];
     render(<BadgeWatcher />);
     await waitFor(() => expect(getNotifications()).toHaveLength(1));
-    expect(getNotifications()[0].href).toBe("/me/badges");
+    expect(getNotifications()[0].href).toMatch(/^\/me\/badges\?/);
   });
 
   // A corrupt snapshot must read as a first run, not as a wall of promotions.
@@ -135,5 +135,32 @@ describe("BadgeWatcher", () => {
     // No snapshot written from a half-loaded state, which would look like a
     // player who holds nothing and then earns everything.
     expect(localStorage.getItem("mc_badge_snapshot")).toBeNull();
+  });
+});
+
+describe("where a badge notification leads", () => {
+  it("deep-links to the badge that moved", async () => {
+    localStorage.setItem(
+      "mc_badge_snapshot",
+      JSON.stringify({ [`attendance::${WS}::`]: 8 }),
+    );
+    state.badges = [attendance(25)];
+    render(<BadgeWatcher />);
+    await waitFor(() => expect(getNotifications()).toHaveLength(1));
+    expect(getNotifications()[0].href).toBe("/me/badges?badge=attendance");
+  });
+
+  // A Pokémon badge shown under the generic tab reads as unearned, so the
+  // link has to name the game as well.
+  it("names the game when the badge belongs to one", async () => {
+    localStorage.setItem("mc_badge_snapshot", JSON.stringify({ "champion::::pokemon": 0 }));
+    state.badges = [
+      { badgeId: "champion", count: 1, workspaceId: null, gameId: "pokemon" },
+    ];
+    render(<BadgeWatcher />);
+    await waitFor(() => expect(getNotifications()).toHaveLength(1));
+    expect(getNotifications()[0].href).toBe(
+      "/me/badges?badge=champion&game=pokemon",
+    );
   });
 });

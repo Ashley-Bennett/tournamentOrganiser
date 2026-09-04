@@ -46,6 +46,13 @@ export interface Unlock {
   badge: BadgeDefinition;
   tier: Tier | null;
   count: number;
+  /**
+   * The game it was earned in, or null for one that travels everywhere.
+   *
+   * Carried so a notification can land on the right tab of the badge case: a
+   * Pokémon top cut shown under the generic tab reads as unearned.
+   */
+  gameId: string | null;
   /** With the league name, where the badge carries one. */
   label: string;
 }
@@ -104,6 +111,7 @@ export function unlocksBetween(
         badge,
         tier: resolved.tier,
         count: e.count,
+        gameId: e.gameId ?? null,
         label: resolved.label,
       });
       continue;
@@ -125,6 +133,7 @@ export function unlocksBetween(
       badge,
       tier: nowTier,
       count: e.count,
+      gameId: e.gameId ?? null,
       label: resolved.label,
     });
   }

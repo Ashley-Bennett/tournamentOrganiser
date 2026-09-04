@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import BackIcon from "@mui/icons-material/ArrowBackIosNew";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import BadgeMark from "../components/BadgeMark";
 import { useMyBadges, useMyCardGames } from "../hooks/useMyBadges";
 import { caseRows, type CaseRow } from "../badges/badgeCase";
@@ -139,7 +139,15 @@ function Detail({ row, onClose }: { row: CaseRow | null; onClose: () => void }) 
             <LinearProgress
               variant="determinate"
               value={progress}
-              sx={{ height: 6, borderRadius: 3 }}
+              sx={{
+                height: 6,
+                borderRadius: 3,
+                // A neutral track, not the tinted one MUI derives from the
+                // primary colour: at this size on a dark ground that tint
+                // reads as a filled bar, so a badge at zero looked finished.
+                bgcolor: "action.selected",
+                "& .MuiLinearProgress-bar": { borderRadius: 3 },
+              }}
             />
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
               {row.next?.needed} more to {row.next?.tier.label}
@@ -196,14 +204,50 @@ function Detail({ row, onClose }: { row: CaseRow | null; onClose: () => void }) 
 export default function Badges() {
   const { games, loading: gamesLoading } = useMyCardGames();
   const { badges, loading: badgesLoading, error } = useMyBadges();
-  const [gameId, setGameId] = useState<string | null>(null);
-  const [open, setOpen] = useState<CaseRow | null>(null);
 
+  /**
+   * The open badge and the chosen game both live in the URL rather than in
+   * state, the same way the stats drill-down works. That is what lets a
+   * notification say "this one" — `?badge=champion&game=pokemon` opens the
+   * page with that badge already explained — and it makes the back button
+   * close the dialog rather than leave the page.
+   */
+  const [params, setParams] = useSearchParams();
+  const openId = params.get("badge");
+  const gameParam = params.get("game");
+
+  const [fallbackGame, setFallbackGame] = useState<string | null>(null);
   useEffect(() => {
-    if (!gameId && games.length > 0) setGameId(games[0].game_id);
-  }, [games, gameId]);
+    if (!fallbackGame && games.length > 0) setFallbackGame(games[0].game_id);
+  }, [games, fallbackGame]);
+
+  // A game named in the URL wins, but only if the account actually plays it —
+  // a stale link should not strand somebody on an empty tab.
+  const gameId =
+    gameParam && games.some((g) => g.game_id === gameParam)
+      ? gameParam
+      : fallbackGame;
 
   const rows = caseRows(badges, gameId);
+  const open = rows.find((r) => r.badge.id === openId) ?? null;
+
+  const show = (row: CaseRow | null) => {
+    const next = new URLSearchParams(params);
+    if (row) next.set("badge", row.badge.id);
+    else next.delete("badge");
+    // Replace rather than push: opening and closing a few badges should not
+    // bury the page the player came from under a stack of history.
+    setParams(next, { replace: true });
+  };
+
+  const chooseGame = (next: string) => {
+    const q = new URLSearchParams(params);
+    q.set("game", next);
+    // The open badge belongs to the tab it was opened on.
+    q.delete("badge");
+    setParams(q, { replace: true });
+    setFallbackGame(next);
+  };
 
   return (
     // width:100% is load-bearing: the app's Container is a flex parent, so
@@ -238,7 +282,7 @@ export default function Badges() {
       {games.length > 1 && (
         <Tabs
           value={gameId ?? false}
-          onChange={(_, next: string) => setGameId(next)}
+          onChange={(_, next: string) => chooseGame(next)}
           variant="scrollable"
           scrollButtons="auto"
           sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}
@@ -264,12 +308,12 @@ export default function Badges() {
           }}
         >
           {rows.map((row) => (
-            <Cell key={row.badge.id} row={row} onOpen={() => setOpen(row)} />
+            <Cell key={row.badge.id} row={row} onOpen={() => show(row)} />
           ))}
         </Box>
       )}
 
-      <Detail row={open} onClose={() => setOpen(null)} />
+      <Detail row={open} onClose={() => show(null)} />
     </Box>
   );
 }

@@ -32,9 +32,9 @@ vi.mock("../hooks/useMyBadges", () => ({
   }),
 }));
 
-function setup() {
+function setup(search = "") {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[`/me/badges${search}`]}>
       <Badges />
     </MemoryRouter>,
   );
@@ -97,6 +97,56 @@ describe("the badge wall", () => {
       "href",
       "/me",
     );
+  });
+});
+
+describe("deep links", () => {
+  // What a badge notification is for: "this one moved", not "here are thirty,
+  // find it yourself".
+  it("opens the badge named in the url", () => {
+    setup("?badge=attendance");
+    expect(
+      within(screen.getByRole("dialog")).getByText("8 events finished here"),
+    ).toBeInTheDocument();
+  });
+
+  it("opens nothing when no badge is named", () => {
+    setup();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  // A link that outlived its badge should land on the wall, not on an error.
+  it("ignores a badge the registry has never heard of", () => {
+    setup("?badge=not_shipped_yet");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("Badges")).toBeInTheDocument();
+  });
+
+  it("selects the game named in the url", () => {
+    state.games = [
+      { game_id: "pokemon", entries: 3, last_played: "2026-08-01" },
+      { game_id: "generic", entries: 1, last_played: "2026-07-01" },
+    ];
+    setup("?game=generic");
+    expect(screen.getByRole("tab", { name: /generic/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  // A stale link should not strand somebody on a tab for a game they do not
+  // play, where every badge reads as unearned.
+  it("falls back when the url names a game the account does not play", () => {
+    setup("?game=chess");
+    expect(
+      screen.getByRole("button", { name: "Familiar Face · Bulwark" }),
+    ).toBeInTheDocument();
+  });
+
+  it("closes back to the wall", async () => {
+    setup("?badge=attendance");
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 
