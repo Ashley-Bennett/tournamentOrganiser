@@ -277,7 +277,9 @@ export default function PlayerCardEditor({
           neither fits under a card editor. */}
       <Button
         component={RouterLink}
-        to="/me/badges"
+        // The game is already chosen here, so the wall opens on it rather than
+        // asking again.
+        to={`/me/badges?game=${encodeURIComponent(gameId)}`}
         size="small"
         endIcon={<ChevronIcon />}
         sx={{ mt: 2, ml: -1 }}

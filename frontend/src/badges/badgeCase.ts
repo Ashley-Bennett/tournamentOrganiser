@@ -10,9 +10,54 @@ import type { BadgeDefinition, EarnedBadge, Tier } from "./types";
  * are not the same screen: a list of things you cannot wear is information in
  * the case and an obstacle in the picker.
  *
- * Scoped to one game on purpose. Showing a chess player every Pokémon badge
- * they will never earn turns a catalogue into a list of ways they are behind.
+ * Scoped twice over. To one game, because showing a chess player every Pokémon
+ * badge they will never earn turns a catalogue into a list of ways they are
+ * behind. And to one *source* — the badges that belong to a club, or the ones
+ * that belong to nobody — because "Regular" means something different at each
+ * club a player attends, and stacking them in one list makes the same badge
+ * look like three.
  */
+
+/**
+ * Which slice of the catalogue is being looked at.
+ *
+ * The split is the catalogue's own `provenance`: a league badge is earned at
+ * one club and carries its name, a system badge is the same wherever it
+ * happened and carries none.
+ */
+export type CaseScope =
+  | { kind: "system" }
+  | { kind: "league"; workspaceId: string };
+
+/** One club a player holds league badges at. */
+export interface CaseLeague {
+  workspaceId: string;
+  name: string;
+}
+
+/**
+ * The clubs to offer as tabs, from what the player actually holds.
+ *
+ * There is no other source: a player is not a member of the workspace they
+ * play at, so their leagues are only knowable from the badges those events
+ * awarded. Attendance starts at one event, so a club appears as soon as
+ * somebody has finished a single tournament there.
+ */
+export function leaguesFrom(
+  earned: EarnedBadge[],
+  gameId: string | null,
+): CaseLeague[] {
+  const seen = new Map<string, string>();
+  for (const e of badgesForGame(earned, gameId)) {
+    if (!e.workspaceId) continue;
+    if (!seen.has(e.workspaceId)) {
+      seen.set(e.workspaceId, e.workspaceName ?? "Unnamed league");
+    }
+  }
+  return [...seen.entries()]
+    .map(([workspaceId, name]) => ({ workspaceId, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
 
 export interface CaseRow {
   badge: BadgeDefinition;
@@ -38,10 +83,21 @@ export interface CaseRow {
  * picker is where the individual instances matter, because that is where the
  * difference between them decides what the card says.
  */
-export function caseRows(earned: EarnedBadge[], gameId: string | null): CaseRow[] {
-  const relevant = sortForDisplay(badgesForGame(earned, gameId));
+export function caseRows(
+  earned: EarnedBadge[],
+  gameId: string | null,
+  scope: CaseScope = { kind: "system" },
+): CaseRow[] {
+  const inLeague = scope.kind === "league";
+  const relevant = sortForDisplay(badgesForGame(earned, gameId)).filter((e) =>
+    inLeague ? e.workspaceId === scope.workspaceId : !e.workspaceId,
+  );
 
-  const rows = BADGES.map((badge): CaseRow => {
+  const catalogue = BADGES.filter((b) =>
+    inLeague ? b.provenance === "league" : b.provenance !== "league",
+  );
+
+  const rows = catalogue.map((badge): CaseRow => {
     // sortForDisplay already put the best first, so the first match is it.
     const best = relevant.find((e) => e.badgeId === badge.id);
     const count = best?.count ?? 0;
@@ -75,6 +131,6 @@ export function caseRows(earned: EarnedBadge[], gameId: string | null): CaseRow[
       const bn = b.next?.needed ?? Infinity;
       if (an !== bn) return an - bn;
     }
-    return BADGES.indexOf(a.badge) - BADGES.indexOf(b.badge);
+    return catalogue.indexOf(a.badge) - catalogue.indexOf(b.badge);
   });
 }

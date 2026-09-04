@@ -201,9 +201,10 @@ describe("the badge case", () => {
   it("links out to the wall rather than unfolding one", () => {
     setup();
     expect(screen.queryByText("Spoiler")).toBeNull();
+    // The game is already chosen in the editor, so the wall opens on it.
     expect(screen.getByRole("link", { name: /all badges/i })).toHaveAttribute(
       "href",
-      "/me/badges",
+      "/me/badges?game=pokemon",
     );
   });
 });

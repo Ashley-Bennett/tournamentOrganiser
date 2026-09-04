@@ -19,7 +19,12 @@ import BackIcon from "@mui/icons-material/ArrowBackIosNew";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import BadgeMark from "../components/BadgeMark";
 import { useMyBadges, useMyCardGames } from "../hooks/useMyBadges";
-import { caseRows, type CaseRow } from "../badges/badgeCase";
+import {
+  caseRows,
+  leaguesFrom,
+  type CaseRow,
+  type CaseScope,
+} from "../badges/badgeCase";
 import { explanationFor } from "../badges/tiers";
 import { TIERS } from "../badges/registry";
 import { getGame } from "../games/registry";
@@ -33,11 +38,22 @@ import { getGame } from "../games/registry";
  * art at a size worth looking at, everything in view at once, and one tap to
  * find out what any of it means.
  *
+ * The page is about one game — it arrives already chosen, because the card
+ * this was opened from was for that game. So the tabs are free to answer the
+ * question a catalogue actually raises: where does this come from. Anywhere
+ * first, holding the badges that are the same whoever ran the event, then one
+ * tab per club, holding the ones that carry its name. "Regular" means
+ * something different at each club, and one flat list made the same badge look
+ * like three.
+ *
  * Locked badges are shown, dimmed. Hiding them would make the page a mirror of
  * what somebody already has and answer nothing — the point of a catalogue is
  * the part you have not got to yet. Nothing here counts how far off they are
  * in aggregate: a completion score would turn a wall into a chore list.
  */
+
+/** The tab value for badges that belong to no club. */
+const ANYWHERE = "anywhere";
 
 const CELL_PX = 84;
 
@@ -215,6 +231,7 @@ export default function Badges() {
   const [params, setParams] = useSearchParams();
   const openId = params.get("badge");
   const gameParam = params.get("game");
+  const leagueParam = params.get("league");
 
   const [fallbackGame, setFallbackGame] = useState<string | null>(null);
   useEffect(() => {
@@ -228,7 +245,21 @@ export default function Badges() {
       ? gameParam
       : fallbackGame;
 
-  const rows = caseRows(badges, gameId);
+  const leagues = leaguesFrom(badges, gameId);
+
+  // A league named in the URL wins, but only one the player actually has
+  // badges at — a stale link should not strand somebody on an empty club.
+  const league =
+    leagueParam && leagues.some((l) => l.workspaceId === leagueParam)
+      ? leagueParam
+      : null;
+  const tab = league ?? ANYWHERE;
+
+  const scope: CaseScope = league
+    ? { kind: "league", workspaceId: league }
+    : { kind: "system" };
+
+  const rows = caseRows(badges, gameId, scope);
   const open = rows.find((r) => r.badge.id === openId) ?? null;
 
   const show = (row: CaseRow | null) => {
@@ -243,10 +274,21 @@ export default function Badges() {
   const chooseGame = (next: string) => {
     const q = new URLSearchParams(params);
     q.set("game", next);
+    // Both the open badge and the club belong to the game being left: a club
+    // is only a club for the games it runs.
+    q.delete("badge");
+    q.delete("league");
+    setParams(q, { replace: true });
+    setFallbackGame(next);
+  };
+
+  const chooseTab = (next: string) => {
+    const q = new URLSearchParams(params);
+    if (next === ANYWHERE) q.delete("league");
+    else q.set("league", next);
     // The open badge belongs to the tab it was opened on.
     q.delete("badge");
     setParams(q, { replace: true });
-    setFallbackGame(next);
   };
 
   return (
@@ -267,28 +309,54 @@ export default function Badges() {
       <Typography variant="h5" sx={{ fontWeight: 700 }}>
         Badges
       </Typography>
-      <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
-        Everything there is to earn. Three go on your card at a time.
+      <Typography variant="body2" sx={{ color: "text.secondary" }}>
+        Everything there is to earn at {gameId ? getGame(gameId).name : "your"}{" "}
+        events. Three go on your card at a time.
       </Typography>
 
+      {/* The game is the page's subject rather than one of its tabs — it
+          arrived already chosen from the card. It still has to be changeable
+          for somebody who came here directly, so it sits under the sentence
+          that names it rather than competing with the tabs below. */}
+      {games.length > 1 && (
+        <Box sx={{ display: "flex", gap: 0.5, mt: 1, flexWrap: "wrap" }}>
+          {games.map((g) => (
+            <Button
+              key={g.game_id}
+              size="small"
+              onClick={() => chooseGame(g.game_id)}
+              variant={g.game_id === gameId ? "outlined" : "text"}
+              sx={{
+                textTransform: "none",
+                color: g.game_id === gameId ? "text.primary" : "text.secondary",
+              }}
+            >
+              {getGame(g.game_id).name}
+            </Button>
+          ))}
+        </Box>
+      )}
+
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mt: 2 }}>
           {error}
         </Alert>
       )}
 
-      {/* Scoped to one game: showing a chess player every Pokémon badge they
-          will never earn turns a catalogue into a list of ways to be behind. */}
-      {games.length > 1 && (
+      {/* Anywhere first, then a tab per club. A player with no club badges yet
+          sees no tabs at all, because one tab is a label pretending to be a
+          control. */}
+      {leagues.length > 0 && (
         <Tabs
-          value={gameId ?? false}
-          onChange={(_, next: string) => chooseGame(next)}
+          value={tab}
+          onChange={(_, next: string) => chooseTab(next)}
           variant="scrollable"
           scrollButtons="auto"
-          sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}
+          sx={{ mt: 2, mb: 2, borderBottom: 1, borderColor: "divider" }}
         >
-          {games.map((g) => (
-            <Tab key={g.game_id} value={g.game_id} label={getGame(g.game_id).name} />
+          <Tab value={ANYWHERE} label="Anywhere" />
+          {leagues.map((l) => (
+            <Tab key={l.workspaceId} value={l.workspaceId} label={l.name} />
           ))}
         </Tabs>
       )}
