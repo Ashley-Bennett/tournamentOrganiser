@@ -3,11 +3,12 @@ import { Box, Chip, Collapse, Divider, IconButton, Typography } from "@mui/mater
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 /**
- * A collapsible section of the stats page.
+ * A collapsible section with a remembered open state.
  *
- * The page has five sections, each with its own filters and a table, and an
- * organiser almost always wants one of them at a time. Collapsing the rest
- * turns a page of scrolling into a list of headings.
+ * Written for the stats page, where five sections each with their own filters
+ * and table meant an organiser almost always wanted one of them at a time, and
+ * collapsing the rest turned a page of scrolling into a list of headings. The
+ * badge case wants the same shape for the same reason.
  *
  * Open/closed is remembered per browser so someone who lives in the meta share
  * is not re-opening it every visit. A `summary` keeps a collapsed section
@@ -19,6 +20,10 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
  * collapsing it does not throw away its filters or refetch on re-open.
  */
 
+/**
+ * Still the stats key, deliberately. Renaming it would forget every section
+ * state anybody has, to fix a name nobody sees.
+ */
 const STORAGE_KEY = "matchamp_stats_sections";
 
 function readOpenState(id: string, fallback: boolean): boolean {
@@ -45,7 +50,7 @@ function writeOpenState(id: string, open: boolean): void {
   }
 }
 
-export default function StatsSection({
+export default function CollapsibleSection({
   id,
   title,
   hint,

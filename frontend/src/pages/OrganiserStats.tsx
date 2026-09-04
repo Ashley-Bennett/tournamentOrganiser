@@ -25,7 +25,7 @@ import MetaShareSection from "../components/MetaShareSection";
 import DeckDiversitySection from "../components/DeckDiversitySection";
 import EventHealthSection from "../components/EventHealthSection";
 import StatsTable, { type StatsColumn } from "../components/StatsTable";
-import StatsSection from "../components/StatsSection";
+import CollapsibleSection from "../components/CollapsibleSection";
 import { StatsDrillProvider } from "../components/StatsDrill";
 import MergeSuggestions from "../components/MergeSuggestions";
 import PlayerIdentityDialog, { type IdentityOption } from "../components/PlayerIdentityDialog";
@@ -459,7 +459,7 @@ const OrganiserStats: React.FC = () => {
         </Grid>
       )}
 
-      <StatsSection
+      <CollapsibleSection
         id="attendance"
         title="Attendance over time"
         defaultOpen
@@ -491,19 +491,19 @@ const OrganiserStats: React.FC = () => {
               ))}
           </Box>
         )}
-      </StatsSection>
+      </CollapsibleSection>
 
-      <StatsSection
+      <CollapsibleSection
         id="league"
         title="League table"
         defaultOpen
         hint="A running table across several events. Match points come from the standings each event already showed; placement points reward finishing high. Events still in progress contribute match points only."
       >
         <LeagueTableSection workspaceId={workspaceId} gameId={gameId} />
-      </StatsSection>
+      </CollapsibleSection>
 
       {hasDecks && (
-        <StatsSection
+        <CollapsibleSection
           id="meta"
           title="Meta share"
           hint="What people brought, by share of entries. A deck played three times by one person and one played once each by three people take up the same room, so 'pilots' is shown alongside."
@@ -514,11 +514,11 @@ const OrganiserStats: React.FC = () => {
             nameMap={nameMap}
             onScopeChange={setDeckScope}
           />
-        </StatsSection>
+        </CollapsibleSection>
       )}
 
       {hasDecks && (
-        <StatsSection
+        <CollapsibleSection
           id="diversity"
           title="Deck diversity"
           hint="Whether the meta is spreading out or concentrating. Counts how many decks the field effectively plays like, which — unlike a plain count of decks — does not simply rise and fall with turnout."
@@ -529,10 +529,10 @@ const OrganiserStats: React.FC = () => {
             nameMap={nameMap}
             periodArgsValue={periodArgsValue}
           />
-        </StatsSection>
+        </CollapsibleSection>
       )}
 
-      <StatsSection
+      <CollapsibleSection
         id="regulars"
         title="Regulars"
         summary={attendance.length > 0 ? `${attendance.length} players` : undefined}
@@ -581,9 +581,9 @@ const OrganiserStats: React.FC = () => {
           }
           maxRows={10}
         />
-      </StatsSection>
+      </CollapsibleSection>
 
-      <StatsSection
+      <CollapsibleSection
         id="health"
         title="Event health"
         hint="How the events themselves ran: how long rounds took, which round people dropped in, and who entered the results."
@@ -593,7 +593,7 @@ const OrganiserStats: React.FC = () => {
           gameId={gameId}
           periodArgsValue={periodArgsValue}
         />
-      </StatsSection>
+      </CollapsibleSection>
 
       <PlayerIdentityDialog
         workspaceId={workspaceId}

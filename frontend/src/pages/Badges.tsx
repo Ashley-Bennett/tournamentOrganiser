@@ -1,4 +1,3 @@
-
 import {
   Box,
   Typography,
@@ -13,7 +12,6 @@ import {
   CircularProgress,
   Alert,
   Button,
-  Chip,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import BackIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -25,11 +23,11 @@ import {
   hasClosedSets,
   leaguesFrom,
   type CaseRow,
-  type CaseScope,
 } from "../badges/badgeCase";
 import { explanationFor } from "../badges/tiers";
 import { TIERS } from "../badges/registry";
 import { getGame } from "../games/registry";
+import CollapsibleSection from "../components/CollapsibleSection";
 
 /**
  * The badge wall.
@@ -45,20 +43,21 @@ import { getGame } from "../games/registry";
  * here, since being asked again for something already decided is the kind of
  * question a screen should answer for itself.
  *
- * So the tabs are free for the question a catalogue actually raises: where
- * does this come from. System badges anybody can go and earn tonight, closed
- * sets nobody can join any more, and the league shelf where each club keeps
- * its own. "Regular" means something different at each club, and one flat list
- * made the same badge look like three.
+ * The page is then one section per provenance, collapsible in the same shape
+ * the stats page uses: badges anybody can go and earn tonight, closed sets
+ * nobody can join any more, and the league section where each club keeps its
+ * own — with a tab per club inside it, because "Regular" means something
+ * different at each and one flat list made the same badge look like three.
+ *
+ * Sections rather than tabs because these are not alternatives to choose
+ * between. A player wants to see what they have; the collapse is for when the
+ * catalogue is long, not to hide two thirds of it behind a choice.
  *
  * Locked badges are shown, dimmed. Hiding them would make the page a mirror of
  * what somebody already has and answer nothing — the point of a catalogue is
  * the part you have not got to yet. Nothing here counts how far off they are
  * in aggregate: a completion score would turn a wall into a chore list.
  */
-
-/** Which shelf is open. Mirrors the catalogue's own provenance. */
-type Shelf = "system" | "closed" | "league";
 
 const CELL_PX = 84;
 
@@ -112,14 +111,25 @@ function Cell({ row, onOpen }: { row: CaseRow; onOpen: () => void }) {
   );
 }
 
-function Detail({ row, onClose }: { row: CaseRow | null; onClose: () => void }) {
+function Detail({
+  row,
+  onClose,
+}: {
+  row: CaseRow | null;
+  onClose: () => void;
+}) {
   if (!row) return null;
 
   const ladder = row.badge.thresholds;
-  const reachedIndex = row.tier ? TIERS.findIndex((t) => t.id === row.tier?.id) : -1;
+  const reachedIndex = row.tier
+    ? TIERS.findIndex((t) => t.id === row.tier?.id)
+    : -1;
   const progress =
     row.next && ladder.length > 0
-      ? Math.min(100, Math.round((row.count / (row.count + row.next.needed)) * 100))
+      ? Math.min(
+          100,
+          Math.round((row.count / (row.count + row.next.needed)) * 100),
+        )
       : null;
 
   return (
@@ -209,7 +219,10 @@ function Detail({ row, onClose }: { row: CaseRow | null; onClose: () => void }) 
                   <Typography variant="body2" sx={{ flex: 1 }} noWrap>
                     {row.badge.tierTitles?.[i] ?? tier?.label}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: "text.secondary" }}
+                  >
                     {threshold}
                   </Typography>
                 </Box>
@@ -219,6 +232,51 @@ function Detail({ row, onClose }: { row: CaseRow | null; onClose: () => void }) 
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * The count shown beside a collapsed heading.
+ *
+ * Deliberately without a denominator. "3 earned" says what is in the section;
+ * "3 of 12" turns a catalogue into a completion bar, which is the one thing
+ * this page is trying not to be.
+ */
+function heldSummary(rows: CaseRow[]): string | undefined {
+  const held = rows.filter((r) => r.held).length;
+  return held > 0 ? `${held} earned` : undefined;
+}
+
+/** A grid of badges, at a size worth looking at. */
+function Wall({
+  rows,
+  onOpen,
+}: {
+  rows: CaseRow[];
+  onOpen: (row: CaseRow) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <Typography variant="body2" sx={{ color: "text.disabled", py: 1 }}>
+        Nothing here yet.
+      </Typography>
+    );
+  }
+
+  return (
+    <Box
+      sx={{
+        display: "grid",
+        // Four across on a phone, filling out on wider screens. The wall is
+        // the point, so cells stay small enough to see many at once.
+        gridTemplateColumns: `repeat(auto-fill, minmax(${CELL_PX}px, 1fr))`,
+        gap: 0.5,
+      }}
+    >
+      {rows.map((row) => (
+        <Cell key={row.badge.id} row={row} onOpen={() => onOpen(row)} />
+      ))}
+    </Box>
   );
 }
 
@@ -236,7 +294,6 @@ export default function Badges() {
   const [params, setParams] = useSearchParams();
   const openId = params.get("badge");
   const gameParam = params.get("game");
-  const shelfParam = params.get("shelf");
   const leagueParam = params.get("league");
 
   // A game named in the URL wins, but only if the account actually plays it —
@@ -246,7 +303,7 @@ export default function Badges() {
   const gameId =
     gameParam && games.some((g) => g.game_id === gameParam)
       ? gameParam
-      : games[0]?.game_id ?? null;
+      : (games[0]?.game_id ?? null);
 
   const leagues = leaguesFrom(badges, gameId);
   const closedShelf = hasClosedSets();
@@ -256,27 +313,22 @@ export default function Badges() {
   const league =
     leagueParam && leagues.some((l) => l.workspaceId === leagueParam)
       ? leagueParam
-      : leagues[0]?.workspaceId ?? null;
+      : (leagues[0]?.workspaceId ?? null);
 
-  // A shelf that is not there falls back to System rather than showing an
-  // empty page: links outlive the thing they pointed at.
-  const asked = shelfParam as Shelf | null;
-  const shelf: Shelf =
-    asked === "league" && league
-      ? "league"
-      : asked === "closed" && closedShelf
-        ? "closed"
-        : "system";
+  const systemRows = caseRows(badges, gameId, { kind: "system" });
+  const closedRows = closedShelf
+    ? caseRows(badges, gameId, { kind: "closed" })
+    : [];
+  const leagueRows = league
+    ? caseRows(badges, gameId, { kind: "league", workspaceId: league })
+    : [];
 
-  const scope: CaseScope =
-    shelf === "league" && league
-      ? { kind: "league", workspaceId: league }
-      : shelf === "closed"
-        ? { kind: "closed" }
-        : { kind: "system" };
-
-  const rows = caseRows(badges, gameId, scope);
-  const open = rows.find((r) => r.badge.id === openId) ?? null;
+  // Searched across every section, because a notification names a badge
+  // without knowing which shelf it ended up on.
+  const open =
+    [...systemRows, ...closedRows, ...leagueRows].find(
+      (r) => r.badge.id === openId,
+    ) ?? null;
 
   const show = (row: CaseRow | null) => {
     const next = new URLSearchParams(params);
@@ -287,18 +339,10 @@ export default function Badges() {
     setParams(next, { replace: true });
   };
 
-  const chooseShelf = (next: Shelf) => {
-    const q = new URLSearchParams(params);
-    q.set("shelf", next);
-    // The open badge belongs to the shelf it was opened on.
-    q.delete("badge");
-    setParams(q, { replace: true });
-  };
-
   const chooseLeague = (workspaceId: string) => {
     const q = new URLSearchParams(params);
-    q.set("shelf", "league");
     q.set("league", workspaceId);
+    // The open badge belongs to the club it was opened on.
     q.delete("badge");
     setParams(q, { replace: true });
   };
@@ -332,61 +376,67 @@ export default function Badges() {
         </Alert>
       )}
 
-      {/* One shelf per provenance. Closed sets only appear once the catalogue
-          has any, and the league shelf only once somebody has played at a
-          club, so nothing here is a tab leading to an empty room. */}
-      <Tabs
-        value={shelf}
-        onChange={(_, next: Shelf) => chooseShelf(next)}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{ mt: 2, borderBottom: 1, borderColor: "divider" }}
-      >
-        <Tab value="system" label="System" />
-        {closedShelf && <Tab value="closed" label="Unique" />}
-        {leagues.length > 0 && <Tab value="league" label="Leagues" />}
-      </Tabs>
-
-      {/* Which club, in the labelled-chip shape the stats filters use. One
-          club needs no chooser: the shelf is already about it. */}
-      {shelf === "league" && leagues.length > 1 && (
-        <Box
-          sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center", mt: 2 }}
-        >
-          <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
-            League
-          </Typography>
-          {leagues.map((l) => (
-            <Chip
-              key={l.workspaceId}
-              label={l.name}
-              size="small"
-              onClick={() => chooseLeague(l.workspaceId)}
-              color={l.workspaceId === league ? "primary" : "default"}
-              variant={l.workspaceId === league ? "filled" : "outlined"}
-            />
-          ))}
-        </Box>
-      )}
-
       {gamesLoading || badgesLoading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
           <CircularProgress size={24} />
         </Box>
       ) : (
-        <Box
-          sx={{
-            display: "grid",
-            // Four across on a phone, filling out on wider screens. The wall
-            // is the point, so cells stay small enough to see many at once.
-            gridTemplateColumns: `repeat(auto-fill, minmax(${CELL_PX}px, 1fr))`,
-            gap: 0.5,
-            mt: 2,
-          }}
-        >
-          {rows.map((row) => (
-            <Cell key={row.badge.id} row={row} onOpen={() => show(row)} />
-          ))}
+        <Box sx={{ mt: 1 }}>
+          <CollapsibleSection
+            id="badges-system"
+            title="System Badges"
+            hint="Earned by playing, wherever the event was."
+            summary={heldSummary(systemRows)}
+            defaultOpen
+          >
+            <Wall rows={systemRows} onOpen={show} />
+          </CollapsibleSection>
+
+          {/* Only once the catalogue has any. A heading promising a shelf
+              that holds nothing is worse than no heading. */}
+          {closedShelf && (
+            <CollapsibleSection
+              id="badges-closed"
+              title="Promo Badges"
+              hint="Given out once, to a group that is now closed."
+              summary={heldSummary(closedRows)}
+              defaultOpen
+            >
+              <Wall rows={closedRows} onOpen={show} />
+            </CollapsibleSection>
+          )}
+
+          {leagues.length > 0 && (
+            <CollapsibleSection
+              id="badges-leagues"
+              title="League Badges"
+              hint="Earned at one club, and shown with its name."
+              summary={heldSummary(leagueRows)}
+              defaultOpen
+            >
+              {/* A tab per club, inside the section rather than above it: the
+                  clubs are alternatives to each other, which the shelves are
+                  not. One club needs no tabs — the section is already it. */}
+              {leagues.length > 1 && (
+                <Tabs
+                  value={league ?? false}
+                  onChange={(_, next: string) => chooseLeague(next)}
+                  variant="scrollable"
+                  scrollButtons="auto"
+                  sx={{ mb: 1, borderBottom: 1, borderColor: "divider" }}
+                >
+                  {leagues.map((l) => (
+                    <Tab
+                      key={l.workspaceId}
+                      value={l.workspaceId}
+                      label={l.name}
+                    />
+                  ))}
+                </Tabs>
+              )}
+              <Wall rows={leagueRows} onOpen={show} />
+            </CollapsibleSection>
+          )}
         </Box>
       )}
 

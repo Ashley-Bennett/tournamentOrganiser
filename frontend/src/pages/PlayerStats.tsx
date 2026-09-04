@@ -22,7 +22,7 @@ import StatsPeriodFilter from "../components/StatsPeriodFilter";
 import StatsGameFilter from "../components/StatsGameFilter";
 import StatsTimeline, { type TimelineBucket, type TimelinePoint } from "../components/StatsTimeline";
 import StatsTable, { type StatsColumn } from "../components/StatsTable";
-import StatsSection from "../components/StatsSection";
+import CollapsibleSection from "../components/CollapsibleSection";
 import PlayerPaceSection from "../components/PlayerPaceSection";
 import StatsDeckFilter from "../components/StatsDeckFilter";
 import { deckKey, deckName } from "../utils/deck";
@@ -292,7 +292,7 @@ function OverviewSection({ data, loading }: { data: OverviewStats | null; loadin
 
 // ── Deck stats section ─────────────────────────────────────────────────────────
 
-function DeckStatsSection({ data, loading, nameMap, period }: { data: DeckStat[]; loading: boolean; nameMap: Map<number, string>; period: StatsPeriod }) {
+function DeckCollapsibleSection({ data, loading, nameMap, period }: { data: DeckStat[]; loading: boolean; nameMap: Map<number, string>; period: StatsPeriod }) {
   const deckCount = data.length;
   const loyaltyLabel = deckCount === 0 ? null : deckCount === 1 ? "Specialist" : deckCount >= 5 ? "Meta Chaser" : "Flexible";
 
@@ -816,17 +816,17 @@ const PlayerStats: React.FC = () => {
         Going first still means something without decks, so it stays.
       */}
       {hasDecks && (
-        <StatsSection
+        <CollapsibleSection
           id="player-decks"
           title="Deck History"
           defaultOpen
           summary={decks.length > 0 ? `${decks.length} deck${decks.length === 1 ? "" : "s"}` : undefined}
         >
-          <DeckStatsSection data={decks} loading={decksLoading} nameMap={nameMap} period={period} />
-        </StatsSection>
+          <DeckCollapsibleSection data={decks} loading={decksLoading} nameMap={nameMap} period={period} />
+        </CollapsibleSection>
       )}
 
-      <StatsSection id="player-first-second" title="Going First vs Second">
+      <CollapsibleSection id="player-first-second" title="Going First vs Second">
         <FirstSecondSection
           decks={decks}
           nameMap={nameMap}
@@ -834,34 +834,34 @@ const PlayerStats: React.FC = () => {
           gameId={gameId}
           hasDecks={hasDecks}
         />
-      </StatsSection>
+      </CollapsibleSection>
 
       {hasDecks && (
-        <StatsSection id="player-matchups" title="Matchup Matrix">
+        <CollapsibleSection id="player-matchups" title="Matchup Matrix">
           <MatchupMatrixSection decks={decks} nameMap={nameMap} period={period} gameId={gameId} />
-        </StatsSection>
+        </CollapsibleSection>
       )}
 
-      <StatsSection id="player-pace" title="Game Pace">
+      <CollapsibleSection id="player-pace" title="Game Pace">
         <PlayerPaceSection
           periodArgsValue={periodArgsValue}
           gameId={gameId}
           nameMap={nameMap}
         />
-      </StatsSection>
+      </CollapsibleSection>
 
-      <StatsSection id="player-rounds" title="Round-by-Round Performance">
+      <CollapsibleSection id="player-rounds" title="Round-by-Round Performance">
         <RoundPerformanceSection data={rounds} loading={roundsLoading} />
-      </StatsSection>
+      </CollapsibleSection>
 
-      <StatsSection id="player-trend" title="Win Rate Trend" defaultOpen>
+      <CollapsibleSection id="player-trend" title="Win Rate Trend" defaultOpen>
         <TrendSection
           data={trend}
           loading={trendLoading}
           bucket={trendBucket}
           onBucketChange={setTrendBucket}
         />
-      </StatsSection>
+      </CollapsibleSection>
 
       <Box pb={4} />
     </Box>
