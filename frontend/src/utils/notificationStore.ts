@@ -142,9 +142,32 @@ function read(): StoredNotification[] {
   }
 }
 
+/**
+ * Trims to MAX_ENTRIES, dropping the cheap entries first.
+ *
+ * Round events are derived from the tournament and cost nothing to recompute —
+ * losing one to the cap loses nothing. A badge unlock is the opposite: it is
+ * the only record that somebody crossed a rung on a particular day, and the
+ * wall shows where they are now rather than when they got there. Two busy
+ * weeks of round chatter would otherwise evict it, read or not.
+ */
+function capped(list: StoredNotification[]): StoredNotification[] {
+  if (list.length <= MAX_ENTRIES) return list;
+
+  const account = list.filter((n) => n.tournamentId === ACCOUNT_SCOPE);
+  const keptAccount = new Set(account.slice(0, MAX_ENTRIES));
+  const room = MAX_ENTRIES - keptAccount.size;
+  const keptDevice = new Set(
+    list.filter((n) => n.tournamentId !== ACCOUNT_SCOPE).slice(0, Math.max(0, room)),
+  );
+
+  // Filtered from the original so the newest-first order survives the split.
+  return list.filter((n) => keptAccount.has(n) || keptDevice.has(n));
+}
+
 function write(list: StoredNotification[]) {
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(list.slice(0, MAX_ENTRIES)));
+    localStorage.setItem(STORE_KEY, JSON.stringify(capped(list)));
   } catch {
     // Quota or private-mode failures are not worth breaking a round over.
   }

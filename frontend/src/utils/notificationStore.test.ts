@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
+  ACCOUNT_SCOPE,
   addNotification,
   clearAll,
   clearTournament,
@@ -88,6 +89,77 @@ describe("addNotification", () => {
     const all = getNotifications(t0 + 60_000);
     expect(all).toHaveLength(50);
     expect(all[0]?.id).toBe("t1:round_published:59");
+  });
+
+  // A round event is derived from the tournament and costs nothing to
+  // recompute. A badge unlock is the only record that somebody crossed a rung
+  // on a particular day, so it must not be the thing that falls off the end.
+  it("evicts round chatter before a badge unlock", () => {
+    const t0 = Date.UTC(2026, 0, 1);
+    addNotification(
+      {
+        type: "badge_promoted",
+        tournamentId: ACCOUNT_SCOPE,
+        tournamentName: null,
+        message: "You are now Regular · Bulwark",
+        href: "/me/badges",
+        source: "server",
+      },
+      t0,
+    );
+    for (let i = 0; i < 60; i++) {
+      addNotification(roundUp({ roundNumber: i }), t0 + (i + 1) * 1000);
+    }
+
+    const all = getNotifications(t0 + 90_000);
+    expect(all).toHaveLength(50);
+    expect(all.map((n) => n.message)).toContain("You are now Regular · Bulwark");
+    // The oldest round event is what went instead.
+    expect(all.map((n) => n.id)).not.toContain("t1:round_published:0");
+  });
+
+  it("still caps when the account entries alone would overflow", () => {
+    const t0 = Date.UTC(2026, 0, 1);
+    for (let i = 0; i < 60; i++) {
+      addNotification(
+        {
+          type: "badge_earned",
+          tournamentId: ACCOUNT_SCOPE,
+          tournamentName: null,
+          message: `Badge ${i}`,
+          href: "/me/badges",
+          idKey: i,
+          source: "server",
+        },
+        t0 + i * 1000,
+      );
+    }
+    expect(getNotifications(t0 + 90_000)).toHaveLength(50);
+  });
+
+  it("keeps the newest of each when both kinds are present", () => {
+    const t0 = Date.UTC(2026, 0, 1);
+    for (let i = 0; i < 30; i++) {
+      addNotification(roundUp({ roundNumber: i }), t0 + i * 1000);
+    }
+    for (let i = 0; i < 30; i++) {
+      addNotification(
+        {
+          type: "badge_earned",
+          tournamentId: ACCOUNT_SCOPE,
+          tournamentName: null,
+          message: `Badge ${i}`,
+          href: "/me/badges",
+          idKey: i,
+          source: "server",
+        },
+        t0 + (100 + i) * 1000,
+      );
+    }
+    const all = getNotifications(t0 + 900_000);
+    expect(all).toHaveLength(50);
+    // All 30 badges survive; 20 of the 30 round events do.
+    expect(all.filter((n) => n.tournamentId === ACCOUNT_SCOPE)).toHaveLength(30);
   });
 });
 

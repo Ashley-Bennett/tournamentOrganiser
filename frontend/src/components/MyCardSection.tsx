@@ -66,6 +66,7 @@ export default function MyCardSection({ name }: { name: string }) {
       </Typography>
       <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
         What the room sees next to your name on the pairings.
+        {games.length > 1 && " Each game has its own card."}
       </Typography>
 
       {/* One card per game, and the tabs only appear when there is a choice to
@@ -95,6 +96,14 @@ export default function MyCardSection({ name }: { name: string }) {
           cheap read look like a page load. */}
       <Fade in={!cardLoading && !badgesLoading}>
         <Box>
+          {gameId && games.length > 1 && (
+            <Typography
+              variant="caption"
+              sx={{ display: "block", color: "text.disabled", mb: 0.5 }}
+            >
+              Shown at {getGame(gameId).name} events
+            </Typography>
+          )}
           {gameId && (
             <PlayerCardEditor
               name={name}

@@ -16,7 +16,7 @@ import {
   ListItemText,
   Divider,
 } from "@mui/material";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -165,6 +165,16 @@ const steps = [
 ];
 
 export default function Landing() {
+  /**
+   * Where the visitor was actually trying to go.
+   *
+   * RequireAuth sends anyone signed-out to this page rather than straight to
+   * a login form, carrying their intended destination in the router state.
+   * Login already knows how to honour it — it just never arrived, because
+   * these links dropped the state on the way. A badge notification tapped on
+   * a signed-out phone landed on the dashboard instead of the badge.
+   */
+  const location = useLocation();
   const { mode, toggleTheme } = useThemeMode();
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -271,6 +281,7 @@ export default function Landing() {
               <Button
                 component={Link}
                 to="/login"
+                state={location.state}
                 sx={{
                   color: TEXT_MUTED,
                   textTransform: "none",
@@ -359,7 +370,7 @@ export default function Landing() {
                   <ListItem disablePadding>
                     <ListItemButton
                       onClick={() => {
-                        navigate("/login");
+                        navigate("/login", { state: location.state });
                         setDrawerOpen(false);
                       }}
                     >
@@ -492,6 +503,7 @@ export default function Landing() {
             <Button
               component={Link}
               to="/login"
+              state={location.state}
               size="large"
               sx={{
                 color: "rgba(255,255,255,0.6)",
