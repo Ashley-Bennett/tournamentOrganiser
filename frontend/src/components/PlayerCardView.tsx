@@ -125,7 +125,16 @@ export default function PlayerCardView({
         />
       )}
 
+      {/* Name first. It is the primary thing on the card, and putting the
+          title above it sandwiched the person between two pieces of badge
+          metadata. Title and explanation now sit together, so the line that
+          explains the claim is adjacent to the claim it explains: who, then
+          what they claim, then what that means. */}
       <Box sx={{ minWidth: 0, flex: "1 1 160px" }}>
+        <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ lineHeight: 1.25 }}>
+          {name}
+        </Typography>
+
         {card.title && (
           <Typography
             variant="caption"
@@ -138,7 +147,7 @@ export default function PlayerCardView({
               py: 0.2,
               borderRadius: 1,
               bgcolor: "action.selected",
-              mb: 0.25,
+              mt: 0.25,
               maxWidth: "100%",
             }}
             noWrap
@@ -146,10 +155,6 @@ export default function PlayerCardView({
             {card.title.label}
           </Typography>
         )}
-
-        <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ lineHeight: 1.2 }}>
-          {name}
-        </Typography>
 
         {/* The badge's own explanation, identical on everyone who wears it —
             never this player's record, which would be scouting data. */}
@@ -173,7 +178,9 @@ export default function PlayerCardView({
             // than hugging the right edge under the name.
             width: { xs: "100%", sm: "auto" },
             flex: { xs: "1 0 100%", sm: "none" },
-            justifyContent: { xs: "flex-start", sm: "flex-end" },
+            // Spread across the row on a phone: one badge centres, three sit
+            // evenly, and neither looks like it was left over at an edge.
+            justifyContent: { xs: "space-evenly", sm: "flex-end" },
           }}
         >
           {card.badges.map((b) => (
@@ -182,6 +189,7 @@ export default function PlayerCardView({
               badge={b.badge}
               tier={b.tier}
               title={b.title}
+              count={b.count}
               size={badgeSize}
             />
           ))}

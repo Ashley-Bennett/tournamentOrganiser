@@ -192,6 +192,7 @@ export default function CardHarness() {
                 tier={tier}
                 size={size}
                 title={tier.label}
+                count={12}
               />
             ))}
             <BadgeMark badge={BADGES[3]} tier={null} size={size} title="Spoiler" />
@@ -218,6 +219,7 @@ export default function CardHarness() {
                 badge={badge}
                 tier={tierFor(badge, count)}
                 title={titleFor(badge, count)}
+                count={count}
               />
               <Box>
                 <Typography variant="body2" fontWeight={600}>
