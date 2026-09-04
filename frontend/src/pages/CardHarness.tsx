@@ -114,6 +114,18 @@ export default function CardHarness() {
         />
       </Case>
 
+      <Case label="no account — no partner at all, which is the incentive to claim">
+        <PlayerCardView
+          name="Walk In"
+          card={assembleCard({
+            gameId: "pokemon",
+            partnerKey: null,
+            slots: [],
+            hasAccount: false,
+          })}
+        />
+      </Case>
+
       <Case label="no partner chosen — falls back to the game default">
         <PlayerCardView
           name="Aisha Bello"

@@ -101,6 +101,28 @@ describe("assembleCard", () => {
     expect(card.partnerImage).toContain("/132.png");
   });
 
+  // A card that already looks finished gives an accountless walk-in no reason
+  // to claim their entry. The empty slot is the incentive.
+  it("gives an accountless player no partner at all, not even the default", () => {
+    const card = assembleCard({
+      gameId: "pokemon",
+      partnerKey: null,
+      slots: [],
+      hasAccount: false,
+    });
+    expect(card.partnerImage).toBeNull();
+  });
+
+  it("withholds the partner even if a key somehow survives", () => {
+    const card = assembleCard({
+      gameId: "pokemon",
+      partnerKey: "25",
+      slots: [],
+      hasAccount: false,
+    });
+    expect(card.partnerImage).toBeNull();
+  });
+
   it("has no partner for a game that does not have them", () => {
     const card = assembleCard({ gameId: null, partnerKey: null, slots: [] });
     expect(card.partnerImage).toBeNull();

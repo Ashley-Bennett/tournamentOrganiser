@@ -57,6 +57,42 @@ describe("full density", () => {
     expect(screen.queryAllByRole("img")).toHaveLength(0);
   });
 
+  it("shows no partner for a player without an account", () => {
+    const card = assembleCard({
+      gameId: "pokemon",
+      partnerKey: null,
+      slots: [],
+      hasAccount: false,
+    });
+    render(<PlayerCardView name="Walk In" card={card} />);
+
+    expect(screen.getByText("Walk In")).toBeInTheDocument();
+    expect(screen.queryByRole("presentation", { hidden: true })).toBeNull();
+    expect(document.querySelector("canvas")).toBeNull();
+  });
+
+  // A mark small enough to be a favicon is not worth showing across a room.
+  it("draws badges at the badge-case size, not the dense-list size", () => {
+    render(
+      <PlayerCardView
+        name="Marcus Hale"
+        card={cardWith([titleSlot, slot({ slot: 1, badgeId: "top_cut", count: 4 })])}
+      />,
+    );
+    expect(screen.getByRole("img")).toHaveStyle({ width: "46px" });
+  });
+
+  it("lets a caller ask for a different badge size", () => {
+    render(
+      <PlayerCardView
+        name="Marcus Hale"
+        card={cardWith([titleSlot, slot({ slot: 1, badgeId: "top_cut", count: 4 })])}
+        badgeSize={96}
+      />,
+    );
+    expect(screen.getByRole("img")).toHaveStyle({ width: "96px" });
+  });
+
   it("omits the partner entirely when there is nothing to draw", () => {
     const card = assembleCard({ gameId: null, partnerKey: null, slots: [] });
     render(<PlayerCardView name="Marcus Hale" card={card} />);

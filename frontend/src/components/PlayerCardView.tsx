@@ -25,8 +25,13 @@ export type CardDensity =
   | "line";
 
 const PARTNER_PX = 48;
-/** Badges on a card are 26px, per the design brief. */
-const BADGE_PX = 26;
+
+/**
+ * Badges on a full card are drawn at the badge-case size rather than the
+ * 26px used in a dense list. This card goes on a projector, and a mark small
+ * enough to be a favicon is not worth showing at all across a room.
+ */
+const BADGE_PX = 46;
 
 function Partner({
   gameId,
@@ -68,11 +73,13 @@ export default function PlayerCardView({
   card,
   density = "full",
   partnerSize = PARTNER_PX,
+  badgeSize = BADGE_PX,
 }: {
   name: string;
   card: PlayerCard;
   density?: CardDensity;
   partnerSize?: number;
+  badgeSize?: number;
 }) {
   if (density === "line") {
     return (
@@ -99,8 +106,13 @@ export default function PlayerCardView({
     <Box
       sx={{
         display: "flex",
+        // On a narrow screen the badges wrap onto their own row beneath, which
+        // gives the title and the name the full width rather than squeezing
+        // them into whatever the badges leave behind.
+        flexWrap: "wrap",
         alignItems: "center",
-        gap: 1.5,
+        rowGap: 1,
+        columnGap: 1.5,
         minWidth: 0,
         py: 0.5,
       }}
@@ -113,7 +125,7 @@ export default function PlayerCardView({
         />
       )}
 
-      <Box sx={{ minWidth: 0, flex: 1 }}>
+      <Box sx={{ minWidth: 0, flex: "1 1 160px" }}>
         {card.title && (
           <Typography
             variant="caption"
@@ -153,14 +165,24 @@ export default function PlayerCardView({
       </Box>
 
       {card.badges.length > 0 && (
-        <Box sx={{ display: "flex", gap: 0.75, flex: "none" }}>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            // Full width below sm so the wrapped row spans the card rather
+            // than hugging the right edge under the name.
+            width: { xs: "100%", sm: "auto" },
+            flex: { xs: "1 0 100%", sm: "none" },
+            justifyContent: { xs: "flex-start", sm: "flex-end" },
+          }}
+        >
           {card.badges.map((b) => (
             <BadgeMark
               key={`${b.badge.id}:${b.workspaceName ?? ""}`}
               badge={b.badge}
               tier={b.tier}
               title={b.title}
-              size={BADGE_PX}
+              size={badgeSize}
             />
           ))}
         </Box>

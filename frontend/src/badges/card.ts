@@ -82,6 +82,15 @@ export function assembleCard(input: {
   gameId: string | null;
   partnerKey: string | null;
   slots: CardSlot[];
+  /**
+   * Whether this player has an account.
+   *
+   * An accountless walk-in gets no partner at all — not even the game's
+   * default. The empty slot is the point: a card that already looks finished
+   * gives somebody no reason to claim their entry, and the partner is the one
+   * thing a new player could fill in immediately once they do.
+   */
+  hasAccount?: boolean;
 }): PlayerCard {
   const title =
     input.slots
@@ -96,9 +105,13 @@ export function assembleCard(input: {
     .filter((b): b is CardBadge => b !== null)
     .slice(0, MAX_BADGE_SLOTS);
 
+  const hasAccount = input.hasAccount ?? true;
+
   return {
     gameId: input.gameId,
-    partnerImage: partnerImage(input.gameId, input.partnerKey),
+    partnerImage: hasAccount
+      ? partnerImage(input.gameId, input.partnerKey)
+      : null,
     title,
     badges,
   };
