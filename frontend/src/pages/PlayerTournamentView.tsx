@@ -100,27 +100,71 @@ interface InsightsData {
 
 // ── MyMatchCard ───────────────────────────────────────────────────────────────
 
+/**
+ * Who you are playing, as its own thing on the page.
+ *
+ * It used to sit inside the result form, which made somebody's card read as
+ * decoration on a piece of admin. It is the answer to the question a player
+ * actually opens this page with — who am I up against — so it gets its own
+ * panel, above the business of reporting a score.
+ *
+ * Always present, card or not. An opponent with nothing equipped is drawn as
+ * their name, because the panel is about the person rather than about whether
+ * they have got round to decorating.
+ */
+function OpponentPanel({
+  match,
+  playerId,
+  card,
+}: {
+  match: MatchWithNames | null;
+  playerId: string;
+  card?: PlayerCard;
+}) {
+  if (!match) return null;
+
+  const isBye = match.player2_id === null || match.status === "bye";
+  const name =
+    match.player1_id === playerId ? match.player2_name : match.player1_name;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2.5, mb: 2, borderRadius: 2 }}>
+      <Typography
+        variant="overline"
+        sx={{ fontSize: "0.7rem", letterSpacing: 2, color: "text.secondary" }}
+      >
+        {isBye ? "This round" : "Your opponent"}
+      </Typography>
+
+      <Box mt={0.5}>
+        {isBye ? (
+          <Typography variant="h6" fontWeight={700} color="text.secondary">
+            No opponent — you have a bye
+          </Typography>
+        ) : card ? (
+          <PlayerCardView name={name ?? "Opponent"} card={card} />
+        ) : (
+          <Typography variant="h6" fontWeight={700}>
+            {name ?? "Opponent"}
+          </Typography>
+        )}
+      </Box>
+    </Paper>
+  );
+}
+
 function MyMatchCard({
   match,
   playerId,
   myReport,
   entry,
   onRefresh,
-  opponentCard,
 }: {
   match: MatchWithNames | null;
   playerId: string;
   myReport: { reported_outcome: "win" | "loss" | "draw" } | null;
   entry: { playerId: string; deviceToken: string | null } | null;
   onRefresh: () => void;
-  /**
-   * The person across the table, as they chose to present themselves.
-   *
-   * This is the one surface with room for the whole card: one opponent, on
-   * your own phone, with nothing else competing for the space. The board and
-   * the standings only get the title because they are lists.
-   */
-  opponentCard?: PlayerCard;
 }) {
   const [selectedOutcome, setSelectedOutcome] = useState<"win" | "loss" | "draw" | null>(null);
   const [undone, setUndone] = useState(false);
@@ -186,7 +230,6 @@ function MyMatchCard({
 
   const isBye = match.player2_id === null || match.status === "bye";
   const isCompleted = match.status === "completed";
-  const opponentName = match.player1_id === playerId ? match.player2_name : match.player1_name;
   const iWon = match.winner_id === playerId;
   const iLost = match.winner_id !== null && match.winner_id !== playerId;
   const isDraw = isCompleted && match.winner_id === null;
@@ -221,44 +264,26 @@ function MyMatchCard({
         variant="overline"
         sx={{ fontSize: "0.7rem", letterSpacing: 2, color: "primary.main" }}
       >
-        Your Match{tableNum != null ? ` · Table ${tableNum}` : ""}
+        Your Match
       </Typography>
 
-      {/* With a card, the opponent gets drawn as one; without, the plain
-          heading this page has always had. Most players will have no card for
-          a long time yet, and a card-shaped frame around nothing but a name
-          is worse than the name on its own. */}
-      {!isBye && opponentCard && opponentName ? (
-        <Box mt={0.5} mb={1}>
-          <Box display="flex" alignItems="center" gap={1.5} mb={0.25}>
-            <Typography variant="overline" sx={{ color: "text.secondary" }}>
-              vs
-            </Typography>
-            {outcomeLabel && (
-              <Chip
-                label={outcomeLabel}
-                color={outcomeColor as "success" | "error" | "default"}
-                size="small"
-              />
-            )}
-          </Box>
-          <PlayerCardView name={opponentName} card={opponentCard} />
-        </Box>
-      ) : (
-        <Box display="flex" alignItems="center" gap={1.5} mt={0.5} mb={1}>
-          <Typography variant="h6" fontWeight={700}>
-            vs {isBye ? "BYE" : (opponentName ?? "Opponent")}
-          </Typography>
-          {isBye && <Chip label="BYE" size="small" />}
-          {outcomeLabel && (
-            <Chip
-              label={outcomeLabel}
-              color={outcomeColor as "success" | "error" | "default"}
-              size="small"
-            />
-          )}
-        </Box>
-      )}
+      {/* The opponent is not named here. They have their own panel above,
+          where the card has room to be a card rather than a decoration on a
+          results form. This one is about the match: which table, and what
+          happened. */}
+      <Box display="flex" alignItems="center" gap={1.5} mt={0.5} mb={1}>
+        <Typography variant="h6" fontWeight={700}>
+          {isBye ? "You have a bye" : `Table ${tableNum ?? "—"}`}
+        </Typography>
+        {isBye && <Chip label="BYE" size="small" />}
+        {outcomeLabel && (
+          <Chip
+            label={outcomeLabel}
+            color={outcomeColor as "success" | "error" | "default"}
+            size="small"
+          />
+        )}
+      </Box>
 
       {/* Result submission — pending match */}
       {match.status === "pending" && !isBye && (
@@ -884,14 +909,11 @@ const PlayerTournamentView: React.FC = () => {
         deviceToken={entry.deviceToken}
       />
 
-      {/* Player's own match */}
-      <MyMatchCard
+      {/* Who you are playing, then the match itself. */}
+      <OpponentPanel
         match={myRoundMatch}
         playerId={player.id}
-        myReport={my_report}
-        entry={entry}
-        onRefresh={() => void handleRefresh()}
-        opponentCard={
+        card={
           myRoundMatch
             ? cards.get(
                 myRoundMatch.player1_id === player.id
@@ -900,6 +922,14 @@ const PlayerTournamentView: React.FC = () => {
               )
             : undefined
         }
+      />
+
+      <MyMatchCard
+        match={myRoundMatch}
+        playerId={player.id}
+        myReport={my_report}
+        entry={entry}
+        onRefresh={() => void handleRefresh()}
       />
 
       {/* Match insights prompt — shown after player submits a result (or match is already completed for past rounds) */}
