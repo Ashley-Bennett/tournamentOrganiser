@@ -33,6 +33,7 @@ import OrganiserStats from "./pages/OrganiserStats";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import PlayerNotifications from "./components/PlayerNotifications";
+import BadgeWatcher from "./components/BadgeWatcher";
 import { useAuth } from "./AuthContext";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 import { getAllEntries } from "./utils/playerStorage";
@@ -177,6 +178,7 @@ function App() {
     <WorkspaceProvider>
       <AutoClaimer />
       <PlayerNotifications />
+      <BadgeWatcher />
       <Routes>
         {/* ── Landing: full-screen, own nav ───────────────────────── */}
         <Route path="/" element={<RootRoute />} />

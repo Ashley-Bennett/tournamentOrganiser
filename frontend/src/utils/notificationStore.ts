@@ -33,7 +33,11 @@ export type NotificationType =
   // Organiser-facing, derived from get_organiser_alert_state.
   | "results_all_in"
   | "result_conflict"
-  | "late_join";
+  | "late_join"
+  // Account-facing, derived from the player's saved badges. Not tied to a
+  // tournament: a badge outlives the event that awarded it.
+  | "badge_earned"
+  | "badge_promoted";
 
 export interface StoredNotification {
   /**
@@ -69,6 +73,13 @@ export type NewNotification = Omit<
   idKey?: string | number;
   source?: StoredNotification["source"];
 };
+
+/**
+ * Stands in for the tournament id on notifications that belong to the account
+ * rather than to an event. Badges are earned at a tournament but are not about
+ * it, and tapping one goes to the badge wall.
+ */
+export const ACCOUNT_SCOPE = "account";
 
 /** `{tournamentId}:{type}`, plus a key where one event per tournament is too few. */
 export function notificationId(

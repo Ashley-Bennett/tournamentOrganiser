@@ -128,11 +128,35 @@ export default function NotificationBell({
               <ListItem key={n.id} disablePadding>
                 <ListItemButton
                   onClick={() => openRow(n)}
+                  aria-label={
+                    n.readAt === null ? `${n.message} (unread)` : n.message
+                  }
                   sx={{
                     alignItems: "flex-start",
+                    gap: 1.25,
+                    // Read rows recede rather than vanish: the list is also a
+                    // short history of the event, so what has been seen stays
+                    // readable while the unseen carries the weight.
+                    opacity: n.readAt === null ? 1 : 0.55,
                     bgcolor: n.readAt === null ? "action.hover" : "transparent",
                   }}
                 >
+                  {/* The dot is the thing that actually reads as "unread".
+                      Weight and a faint tint alone are near-invisible on a
+                      dark ground, so marking read looked like it had failed.
+                      The space is held either way, so nothing shifts. */}
+                  <Box
+                    aria-hidden
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      mt: 0.9,
+                      flex: "none",
+                      borderRadius: "50%",
+                      bgcolor:
+                        n.readAt === null ? "primary.main" : "transparent",
+                    }}
+                  />
                   <ListItemText
                     primary={n.message}
                     secondary={subtitle(n, now)}

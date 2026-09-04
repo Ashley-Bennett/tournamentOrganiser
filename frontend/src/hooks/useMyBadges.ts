@@ -65,6 +65,16 @@ function toEarned(row: BadgeRow): EarnedBadge {
 export function useMyBadges(enabled = true) {
   const [badges, setBadges] = useState<EarnedBadge[]>([]);
   const [loading, setLoading] = useState(enabled);
+  /**
+   * True only once a fetch has actually finished.
+   *
+   * `loading` cannot answer this. It starts as `enabled`, so while the auth
+   * session is still rehydrating it reads false — and there is a render in
+   * which the user has arrived, `load()` has not yet run, and the hook is
+   * reporting "not loading" over an empty list. Anything that treats that as
+   * a real answer concludes the player holds nothing.
+   */
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -81,11 +91,13 @@ export function useMyBadges(enabled = true) {
       setBadges(((data ?? []) as BadgeRow[]).map(toEarned));
     }
     setLoading(false);
+    setReady(true);
   }, []);
 
   useEffect(() => {
     if (!enabled) {
       setLoading(false);
+      setReady(false);
       return;
     }
     let stale = false;
@@ -97,7 +109,7 @@ export function useMyBadges(enabled = true) {
     };
   }, [enabled, load]);
 
-  return { badges, loading, error, reload: load };
+  return { badges, loading, ready, error, reload: load };
 }
 
 interface CardGameRow {

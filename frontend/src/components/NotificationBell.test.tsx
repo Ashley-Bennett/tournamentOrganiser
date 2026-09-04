@@ -224,3 +224,61 @@ describe("live updates", () => {
     );
   });
 });
+
+describe("telling read from unread", () => {
+  // Weight and a faint tint alone are near-invisible on a dark ground, so
+  // marking something read looked to a player like it had failed.
+  it("marks the unread row in its accessible name", async () => {
+    addNotification(event({ message: "Round 2 is up" }));
+    addNotification(event({ message: "Round 1 is up", roundNumber: 1 }));
+    renderBell();
+
+    await userEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    expect(
+      screen.getByRole("button", { name: "Round 2 is up (unread)" }),
+    ).toBeInTheDocument();
+  });
+
+  it("drops the marker once a row has been read", async () => {
+    addNotification(event({ message: "Round 2 is up" }));
+    renderBell();
+
+    await userEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Round 2 is up (unread)" }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    expect(
+      screen.getByRole("button", { name: "Round 2 is up" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /\(unread\)/ })).toBeNull();
+  });
+
+  it("marks every row read at once", async () => {
+    addNotification(event({ message: "Round 2 is up" }));
+    addNotification(event({ message: "Round 1 is up", roundNumber: 1 }));
+    renderBell();
+
+    await userEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Mark all read" }));
+
+    await waitFor(() =>
+      expect(getNotifications().every((n) => n.readAt !== null)).toBe(true),
+    );
+    expect(screen.queryByRole("button", { name: /\(unread\)/ })).toBeNull();
+  });
+
+  // Read rows recede rather than vanish: the list is also a short history.
+  it("keeps a read notification in the list", async () => {
+    addNotification(event({ message: "Round 2 is up" }));
+    renderBell();
+
+    await userEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Round 2 is up (unread)" }),
+    );
+
+    expect(getNotifications()).toHaveLength(1);
+  });
+});
