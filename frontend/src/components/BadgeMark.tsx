@@ -51,6 +51,16 @@ export default function BadgeMark({
         background: fill,
         clipPath: clip ?? undefined,
         borderRadius: radiusFor(shape, size),
+        // A hairline so the shape is defined against its own background. The
+        // white rung is all but invisible on a light card without it, and a
+        // border cannot be used because clip-path cuts it away — a drop-shadow
+        // follows the clipped silhouette instead.
+        filter: (theme) =>
+          `drop-shadow(0 0 1px ${
+            theme.palette.mode === "light"
+              ? "rgba(18,26,40,.30)"
+              : "rgba(255,255,255,.22)"
+          })`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

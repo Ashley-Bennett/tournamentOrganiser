@@ -26,6 +26,7 @@ import PlayerTournamentView from "./pages/PlayerTournamentView";
 import DeviceTournaments from "./pages/DeviceTournaments";
 import JoinLanding from "./pages/JoinLanding";
 import WhatsNew from "./pages/WhatsNew";
+import CardHarness from "./pages/CardHarness";
 import PlayerStats from "./pages/PlayerStats";
 import OrganiserStats from "./pages/OrganiserStats";
 import Privacy from "./pages/Privacy";
@@ -204,6 +205,14 @@ function App() {
                 <Route path="/join/:tournamentId" element={<TournamentJoin />} />
                 <Route path="/t/:tournamentId/me" element={<PlayerTournamentView />} />
                 <Route path="/my-tournaments" element={<DeviceTournaments />} />
+
+                {/* ── Card harness ─────────────────────────────────
+                    Dev only: every card state on one page, including the ones
+                    that are awkward to reach with real data. Stripped from a
+                    production build by the DEV guard. */}
+                {import.meta.env.DEV && (
+                  <Route path="/dev/cards" element={<CardHarness />} />
+                )}
 
                 {/* ── What's New ───────────────────────────────── */}
                 <Route path="/whats-new" element={<WhatsNew />} />
