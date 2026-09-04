@@ -26,8 +26,21 @@ import type { BadgeDefinition, EarnedBadge, Tier } from "./types";
  * happened and carries none.
  */
 export type CaseScope =
+  /** Earned by playing, the same wherever it happened. */
   | { kind: "system" }
+  /**
+   * A closed set: a cohort nobody can join any more, or something minted by
+   * hand. History cannot describe these, so they are the badges that will need
+   * stored grants rather than derivation.
+   */
+  | { kind: "closed" }
+  /** Earned at one club, and shown with its name. */
   | { kind: "league"; workspaceId: string };
+
+/** True when the catalogue has any closed-set badges to show at all. */
+export function hasClosedSets(): boolean {
+  return BADGES.some((b) => b.provenance === "closed");
+}
 
 /** One club a player holds league badges at. */
 export interface CaseLeague {
@@ -93,9 +106,10 @@ export function caseRows(
     inLeague ? e.workspaceId === scope.workspaceId : !e.workspaceId,
   );
 
-  const catalogue = BADGES.filter((b) =>
-    inLeague ? b.provenance === "league" : b.provenance !== "league",
-  );
+  // Exactly one provenance per shelf. Lumping the closed sets in with the
+  // system badges would put a cohort nobody can join beside things anybody
+  // can go and earn tonight.
+  const catalogue = BADGES.filter((b) => b.provenance === scope.kind);
 
   const rows = catalogue.map((badge): CaseRow => {
     // sortForDisplay already put the best first, so the first match is it.

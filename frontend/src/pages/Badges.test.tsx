@@ -56,7 +56,7 @@ beforeEach(() => {
   state.games = [{ game_id: "pokemon", entries: 3, last_played: "2026-08-01" }];
 });
 
-describe("the wall opens on the badges that belong to nobody", () => {
+describe("the wall opens on the system shelf", () => {
   it("shows the system badges, not the club ones", () => {
     setup();
     expect(
@@ -93,35 +93,50 @@ describe("the wall opens on the badges that belong to nobody", () => {
   });
 });
 
-describe("club tabs", () => {
-  it("offers Anywhere plus a tab per club", () => {
+describe("shelves", () => {
+  it("offers System and Leagues", () => {
     setup();
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
-      "Anywhere",
-      "Bulwark",
+      "System",
+      "Leagues",
     ]);
   });
 
-  // One tab is a label pretending to be a control.
-  it("shows no tabs for a player with no club badges yet", () => {
+  // A tab leading to an empty room is worse than no tab.
+  it("hides Leagues for a player who has played at no club", () => {
     state.badges = [
       { badgeId: "champion", count: 1, workspaceId: null, gameId: "pokemon" },
     ];
     setup();
-    expect(screen.queryByRole("tab")).toBeNull();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "System",
+    ]);
   });
 
-  it("shows a club's badges when its tab is chosen", async () => {
+  // Nothing in the catalogue is a closed set yet, so the shelf stays hidden
+  // until one exists. It appears on its own the moment one is added.
+  it("hides Unique while the catalogue has no closed sets", () => {
     setup();
-    await userEvent.click(screen.getByRole("tab", { name: "Bulwark" }));
+    expect(screen.queryByRole("tab", { name: "Unique" })).toBeNull();
+  });
+
+  it("shows a club's badges on the league shelf", async () => {
+    setup();
+    await userEvent.click(screen.getByRole("tab", { name: "Leagues" }));
     expect(
       screen.getByRole("button", { name: "Familiar Face · Bulwark" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Champion" })).toBeNull();
   });
 
+  it("needs no club chooser when there is only one", async () => {
+    setup();
+    await userEvent.click(screen.getByRole("tab", { name: "Leagues" }));
+    expect(screen.queryByText("League")).toBeNull();
+  });
+
   // "Regular" means something different at each club.
-  it("counts each club separately", async () => {
+  it("chooses between clubs, counting each separately", async () => {
     state.badges = [
       { badgeId: "attendance", count: 30, workspaceId: WS, workspaceName: "Bulwark" },
       {
@@ -132,7 +147,12 @@ describe("club tabs", () => {
       },
     ];
     setup();
-    await userEvent.click(screen.getByRole("tab", { name: "Red Dragon" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Leagues" }));
+    expect(
+      screen.getByRole("button", { name: "Regular · Bulwark" }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Red Dragon" }));
     expect(
       screen.getByRole("button", { name: "Attendee · Red Dragon" }),
     ).toBeInTheDocument();
@@ -148,8 +168,8 @@ describe("deep links", () => {
     ).toBeInTheDocument();
   });
 
-  it("opens a club badge when the club is named too", () => {
-    setup(`?league=${WS}&badge=attendance`);
+  it("opens a club badge when the shelf and club are named too", () => {
+    setup(`?shelf=league&league=${WS}&badge=attendance`);
     expect(
       within(screen.getByRole("dialog")).getByText("8 events finished here"),
     ).toBeInTheDocument();
@@ -168,9 +188,17 @@ describe("deep links", () => {
   });
 
   // A stale link should not strand somebody on a club they have never played.
-  it("falls back to Anywhere when the url names an unknown club", () => {
-    setup("?league=00000000-0000-0000-0000-000000000000");
-    expect(screen.getByRole("tab", { name: "Anywhere" })).toHaveAttribute(
+  it("falls back to the player's own club when the url names an unknown one", () => {
+    setup("?shelf=league&league=00000000-0000-0000-0000-000000000000");
+    expect(
+      screen.getByRole("button", { name: "Familiar Face · Bulwark" }),
+    ).toBeInTheDocument();
+  });
+
+  // Links outlive the thing they pointed at.
+  it("falls back to System when the url names a shelf that is not there", () => {
+    setup("?shelf=closed");
+    expect(screen.getByRole("tab", { name: "System" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -194,33 +222,23 @@ describe("deep links", () => {
   });
 });
 
-describe("switching game", () => {
-  it("offers a button per game, and only when there is a choice", () => {
-    setup();
+describe("the game", () => {
+  // It arrives already chosen from the card. Being asked again for something
+  // already decided is the question this page exists to not ask.
+  it("offers no game picker", () => {
+    twoGames();
+    setup("?game=pokemon");
     expect(screen.queryByRole("button", { name: "Generic tournament" })).toBeNull();
-
-    twoGames();
-    setup();
-    expect(
-      screen.getByRole("button", { name: "Generic tournament" }),
-    ).toBeInTheDocument();
-  });
-
-  // A club is only a club for the games it runs.
-  it("drops the chosen club when the game changes", async () => {
-    twoGames();
-    setup(`?league=${WS}`);
-    await userEvent.click(
-      screen.getByRole("button", { name: "Generic tournament" }),
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).not.toContain(
+      "Generic tournament",
     );
-    expect(screen.getByText(/Generic tournament events/)).toBeInTheDocument();
   });
 });
 
 describe("opening a badge", () => {
   it("explains what it is, with the number in it", async () => {
     setup();
-    await userEvent.click(screen.getByRole("tab", { name: "Bulwark" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Leagues" }));
     await userEvent.click(
       screen.getByRole("button", { name: "Familiar Face · Bulwark" }),
     );
@@ -232,7 +250,7 @@ describe("opening a badge", () => {
   // Somebody should be able to see where a badge goes, not only the next step.
   it("shows the whole ladder", async () => {
     setup();
-    await userEvent.click(screen.getByRole("tab", { name: "Bulwark" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Leagues" }));
     await userEvent.click(
       screen.getByRole("button", { name: "Familiar Face · Bulwark" }),
     );

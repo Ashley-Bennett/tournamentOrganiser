@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+
 import {
   Box,
   Typography,
@@ -13,6 +13,7 @@ import {
   CircularProgress,
   Alert,
   Button,
+  Chip,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import BackIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -21,6 +22,7 @@ import BadgeMark from "../components/BadgeMark";
 import { useMyBadges, useMyCardGames } from "../hooks/useMyBadges";
 import {
   caseRows,
+  hasClosedSets,
   leaguesFrom,
   type CaseRow,
   type CaseScope,
@@ -38,13 +40,16 @@ import { getGame } from "../games/registry";
  * art at a size worth looking at, everything in view at once, and one tap to
  * find out what any of it means.
  *
- * The page is about one game — it arrives already chosen, because the card
- * this was opened from was for that game. So the tabs are free to answer the
- * question a catalogue actually raises: where does this come from. Anywhere
- * first, holding the badges that are the same whoever ran the event, then one
- * tab per club, holding the ones that carry its name. "Regular" means
- * something different at each club, and one flat list made the same badge look
- * like three.
+ * The page is about one game. It arrives already chosen, because the card this
+ * was opened from was for that game — there is deliberately no game picker
+ * here, since being asked again for something already decided is the kind of
+ * question a screen should answer for itself.
+ *
+ * So the tabs are free for the question a catalogue actually raises: where
+ * does this come from. System badges anybody can go and earn tonight, closed
+ * sets nobody can join any more, and the league shelf where each club keeps
+ * its own. "Regular" means something different at each club, and one flat list
+ * made the same badge look like three.
  *
  * Locked badges are shown, dimmed. Hiding them would make the page a mirror of
  * what somebody already has and answer nothing — the point of a catalogue is
@@ -52,8 +57,8 @@ import { getGame } from "../games/registry";
  * in aggregate: a completion score would turn a wall into a chore list.
  */
 
-/** The tab value for badges that belong to no club. */
-const ANYWHERE = "anywhere";
+/** Which shelf is open. Mirrors the catalogue's own provenance. */
+type Shelf = "system" | "closed" | "league";
 
 const CELL_PX = 84;
 
@@ -231,33 +236,44 @@ export default function Badges() {
   const [params, setParams] = useSearchParams();
   const openId = params.get("badge");
   const gameParam = params.get("game");
+  const shelfParam = params.get("shelf");
   const leagueParam = params.get("league");
 
-  const [fallbackGame, setFallbackGame] = useState<string | null>(null);
-  useEffect(() => {
-    if (!fallbackGame && games.length > 0) setFallbackGame(games[0].game_id);
-  }, [games, fallbackGame]);
-
   // A game named in the URL wins, but only if the account actually plays it —
-  // a stale link should not strand somebody on an empty tab.
+  // a stale link should not strand somebody on an empty page. Everything else
+  // falls back to the most recently played, which is all somebody arriving
+  // here directly can be assumed to mean.
   const gameId =
     gameParam && games.some((g) => g.game_id === gameParam)
       ? gameParam
-      : fallbackGame;
+      : games[0]?.game_id ?? null;
 
   const leagues = leaguesFrom(badges, gameId);
+  const closedShelf = hasClosedSets();
 
   // A league named in the URL wins, but only one the player actually has
   // badges at — a stale link should not strand somebody on an empty club.
   const league =
     leagueParam && leagues.some((l) => l.workspaceId === leagueParam)
       ? leagueParam
-      : null;
-  const tab = league ?? ANYWHERE;
+      : leagues[0]?.workspaceId ?? null;
 
-  const scope: CaseScope = league
-    ? { kind: "league", workspaceId: league }
-    : { kind: "system" };
+  // A shelf that is not there falls back to System rather than showing an
+  // empty page: links outlive the thing they pointed at.
+  const asked = shelfParam as Shelf | null;
+  const shelf: Shelf =
+    asked === "league" && league
+      ? "league"
+      : asked === "closed" && closedShelf
+        ? "closed"
+        : "system";
+
+  const scope: CaseScope =
+    shelf === "league" && league
+      ? { kind: "league", workspaceId: league }
+      : shelf === "closed"
+        ? { kind: "closed" }
+        : { kind: "system" };
 
   const rows = caseRows(badges, gameId, scope);
   const open = rows.find((r) => r.badge.id === openId) ?? null;
@@ -271,22 +287,18 @@ export default function Badges() {
     setParams(next, { replace: true });
   };
 
-  const chooseGame = (next: string) => {
+  const chooseShelf = (next: Shelf) => {
     const q = new URLSearchParams(params);
-    q.set("game", next);
-    // Both the open badge and the club belong to the game being left: a club
-    // is only a club for the games it runs.
+    q.set("shelf", next);
+    // The open badge belongs to the shelf it was opened on.
     q.delete("badge");
-    q.delete("league");
     setParams(q, { replace: true });
-    setFallbackGame(next);
   };
 
-  const chooseTab = (next: string) => {
+  const chooseLeague = (workspaceId: string) => {
     const q = new URLSearchParams(params);
-    if (next === ANYWHERE) q.delete("league");
-    else q.set("league", next);
-    // The open badge belongs to the tab it was opened on.
+    q.set("shelf", "league");
+    q.set("league", workspaceId);
     q.delete("badge");
     setParams(q, { replace: true });
   };
@@ -314,51 +326,47 @@ export default function Badges() {
         events. Three go on your card at a time.
       </Typography>
 
-      {/* The game is the page's subject rather than one of its tabs — it
-          arrived already chosen from the card. It still has to be changeable
-          for somebody who came here directly, so it sits under the sentence
-          that names it rather than competing with the tabs below. */}
-      {games.length > 1 && (
-        <Box sx={{ display: "flex", gap: 0.5, mt: 1, flexWrap: "wrap" }}>
-          {games.map((g) => (
-            <Button
-              key={g.game_id}
-              size="small"
-              onClick={() => chooseGame(g.game_id)}
-              variant={g.game_id === gameId ? "outlined" : "text"}
-              sx={{
-                textTransform: "none",
-                color: g.game_id === gameId ? "text.primary" : "text.secondary",
-              }}
-            >
-              {getGame(g.game_id).name}
-            </Button>
-          ))}
-        </Box>
-      )}
-
       {error && (
         <Alert severity="error" sx={{ mt: 2 }}>
           {error}
         </Alert>
       )}
 
-      {/* Anywhere first, then a tab per club. A player with no club badges yet
-          sees no tabs at all, because one tab is a label pretending to be a
-          control. */}
-      {leagues.length > 0 && (
-        <Tabs
-          value={tab}
-          onChange={(_, next: string) => chooseTab(next)}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ mt: 2, mb: 2, borderBottom: 1, borderColor: "divider" }}
+      {/* One shelf per provenance. Closed sets only appear once the catalogue
+          has any, and the league shelf only once somebody has played at a
+          club, so nothing here is a tab leading to an empty room. */}
+      <Tabs
+        value={shelf}
+        onChange={(_, next: Shelf) => chooseShelf(next)}
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={{ mt: 2, borderBottom: 1, borderColor: "divider" }}
+      >
+        <Tab value="system" label="System" />
+        {closedShelf && <Tab value="closed" label="Unique" />}
+        {leagues.length > 0 && <Tab value="league" label="Leagues" />}
+      </Tabs>
+
+      {/* Which club, in the labelled-chip shape the stats filters use. One
+          club needs no chooser: the shelf is already about it. */}
+      {shelf === "league" && leagues.length > 1 && (
+        <Box
+          sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center", mt: 2 }}
         >
-          <Tab value={ANYWHERE} label="Anywhere" />
+          <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
+            League
+          </Typography>
           {leagues.map((l) => (
-            <Tab key={l.workspaceId} value={l.workspaceId} label={l.name} />
+            <Chip
+              key={l.workspaceId}
+              label={l.name}
+              size="small"
+              onClick={() => chooseLeague(l.workspaceId)}
+              color={l.workspaceId === league ? "primary" : "default"}
+              variant={l.workspaceId === league ? "filled" : "outlined"}
+            />
           ))}
-        </Tabs>
+        </Box>
       )}
 
       {gamesLoading || badgesLoading ? (
@@ -373,6 +381,7 @@ export default function Badges() {
             // is the point, so cells stay small enough to see many at once.
             gridTemplateColumns: `repeat(auto-fill, minmax(${CELL_PX}px, 1fr))`,
             gap: 0.5,
+            mt: 2,
           }}
         >
           {rows.map((row) => (
