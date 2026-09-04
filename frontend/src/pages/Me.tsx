@@ -379,15 +379,10 @@ const Me = () => {
         </Stack>
       </Paper>
 
-      {/* ── Player card ───────────────────────────────────
-          Dev-only until the badge picker lands. Until then a player can take
-          badges off but not put them on, and shipping that would be a card
-          editor that only takes things away. */}
-      {import.meta.env.DEV && (
-        <Box sx={{ mb: 4 }}>
-          <MyCardSection name={displayName ?? "You"} />
-        </Box>
-      )}
+      {/* ── Player card ─────────────────────────────────── */}
+      <Box sx={{ mb: 4 }}>
+        <MyCardSection name={displayName ?? "You"} />
+      </Box>
 
       {/* ── Workspaces ──────────────────────────────────────── */}
       <Stack direction="row" spacing={1} alignItems="center" mb={2}>

@@ -55,6 +55,10 @@ export default function MyCardSection({ name }: { name: string }) {
     void save({ partnerKey: loadout.partnerKey, slots });
   };
 
+  const handlePartner = (partnerKey: string) => {
+    void save({ partnerKey, slots: loadout.slots });
+  };
+
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
       <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -99,6 +103,7 @@ export default function MyCardSection({ name }: { name: string }) {
               equipped={loadout.slots}
               earned={badges}
               onChange={handleChange}
+              onPartnerChange={handlePartner}
             />
           )}
         </Box>

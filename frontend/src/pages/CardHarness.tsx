@@ -170,7 +170,7 @@ export default function CardHarness() {
       {/* A full loadout is hard to reach in local dev, where the database is
           near-empty and badges come from tournament history. This is the only
           place the take-off control gets looked at before somebody has one. */}
-      <Case label="editor · full loadout, no picker yet">
+      <Case label="editor · full loadout">
         <PlayerCardEditor
           name="Marcus Hale"
           gameId="pokemon"
@@ -178,6 +178,7 @@ export default function CardHarness() {
           equipped={EDITOR_EQUIPPED}
           earned={EDITOR_HELD}
           onChange={() => {}}
+          onPartnerChange={() => {}}
         />
       </Case>
 
@@ -189,18 +190,7 @@ export default function CardHarness() {
           equipped={[]}
           earned={EDITOR_HELD}
           onChange={() => {}}
-        />
-      </Case>
-
-      <Case label="editor · with a picker, so the slots become controls">
-        <PlayerCardEditor
-          name="Dan Okafor"
-          gameId="pokemon"
-          partnerKey={null}
-          equipped={[]}
-          earned={EDITOR_HELD}
-          onChange={() => {}}
-          onPickSlot={() => {}}
+          onPartnerChange={() => {}}
         />
       </Case>
 
