@@ -28,6 +28,7 @@ import { getGame, rulesFor } from "../games/registry";
 import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { getSpriteUrl } from "../utils/pokemonCache";
 import StandingsTable from "../components/StandingsTable";
+import { useTournamentCards } from "../hooks/useTournamentCards";
 import DeckPickerDialog from "../components/DeckPickerDialog";
 import LiveIndicator from "../components/LiveIndicator";
 import MatchInsightsModal from "../components/MatchInsightsModal";
@@ -605,6 +606,10 @@ const PlayerTournamentView: React.FC = () => {
   // way the organiser's do and no deck surface appears where there are none.
   const game = getGame(viewData?.tournament.game_id);
   const rules = rulesFor(viewData?.tournament.game_id);
+  const cards = useTournamentCards(
+    tournamentId,
+    viewData?.tournament.game_id ?? null,
+  );
   const hasDecks = game.deck !== "none";
 
   const deckMap = useMemo(() => {
@@ -788,7 +793,7 @@ const PlayerTournamentView: React.FC = () => {
       <Box>
         {header}
         {roundTabs}
-        <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap.size > 0 ? deckMap : undefined} currentPlayerId={entry?.playerId} showTiebreakers={tournamentStatus === "completed"} rules={rules} />
+        <StandingsTable standings={standings} droppedMap={droppedMap} deckMap={deckMap.size > 0 ? deckMap : undefined} currentPlayerId={entry?.playerId} showTiebreakers={tournamentStatus === "completed"} rules={rules} cardMap={cards} />
         <Box textAlign="center" mt={2}>
           <LiveIndicator isLive={liveStatus === "SUBSCRIBED"} />
         </Box>

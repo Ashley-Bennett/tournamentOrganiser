@@ -18,6 +18,7 @@ import { buildStandingsFromMatches } from "../utils/tournamentUtils";
 import { TournamentSummary, TournamentPlayer } from "../types/tournament";
 import { MatchWithPlayers, toMatchWithPlayers } from "../types/match";
 import StandingsTable from "../components/StandingsTable";
+import { useTournamentCards } from "../hooks/useTournamentCards";
 
 const TournamentLeaderboard: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -153,6 +154,7 @@ const TournamentLeaderboard: React.FC = () => {
 
   // Rank under the rules the event was actually run by.
   const rules = rulesFor(tournament?.game_id);
+  const cards = useTournamentCards(tournament?.id, tournament?.game_id ?? null);
 
   const finalStandings = useMemo(() => {
     if (!matches.length) return [];
@@ -218,7 +220,7 @@ const TournamentLeaderboard: React.FC = () => {
         </Paper>
       ) : (
         <Box sx={{ flex: 1, minHeight: 0 }}>
-          <StandingsTable standings={finalStandings} droppedMap={droppedMap} deckMap={deckMap.size > 0 ? deckMap : undefined} rules={rules} />
+          <StandingsTable standings={finalStandings} droppedMap={droppedMap} deckMap={deckMap.size > 0 ? deckMap : undefined} rules={rules} cardMap={cards} />
         </Box>
       )}
     </Box>

@@ -26,6 +26,8 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import PrintIcon from "@mui/icons-material/Print";
 import PrintView from "../components/PrintView";
+import WornTitle from "../components/WornTitle";
+import { useTournamentCards } from "../hooks/useTournamentCards";
 import { supabase } from "../supabaseClient";
 import { sortByProfile } from "../utils/tieBreaking";
 import { rulesFor } from "../games/registry";
@@ -455,6 +457,10 @@ const TournamentPairings: React.FC = () => {
   // Rank under the rules the event is run by.
   const rules = rulesFor(tournament?.game_id);
 
+  // Worn titles for everyone in the event. Fails silently: a name that loses
+  // its title still renders, and nothing on this page waits for it.
+  const cards = useTournamentCards(tournament?.id, tournament?.game_id ?? null);
+
   const standings = useMemo(() => {
     const completed = matches.filter(
       (m) => m.status === "completed" || m.status === "bye",
@@ -586,6 +592,7 @@ const TournamentPairings: React.FC = () => {
             droppedMap={droppedMap}
             rules={rules}
             deckMap={deckMap.size > 0 ? deckMap : undefined}
+            cardMap={cards}
           />
         </Box>
         {footer}
@@ -660,6 +667,7 @@ const TournamentPairings: React.FC = () => {
                 >
                   {m.player1_name}
                 </Typography>
+                <WornTitle card={cards.get(m.player1_id)} align="center" />
 
                 {/* vs / bye divider */}
                 {isBye ? (
@@ -689,6 +697,9 @@ const TournamentPairings: React.FC = () => {
                   >
                     {m.player2_name}
                   </Typography>
+                )}
+                {!isBye && (
+                  <WornTitle card={cards.get(m.player2_id ?? "")} align="center" />
                 )}
               </Paper>
             );
@@ -780,6 +791,7 @@ const TournamentPairings: React.FC = () => {
                     >
                       {m.player1_name}
                     </Typography>
+                    <WornTitle card={cards.get(m.player1_id)} />
                   </Box>
                   <Typography
                     variant="caption"
@@ -805,6 +817,7 @@ const TournamentPairings: React.FC = () => {
                     >
                       {isBye ? "Bye" : m.player2_name}
                     </Typography>
+                    {!isBye && <WornTitle card={cards.get(m.player2_id ?? "")} />}
                   </Box>
                 </Box>
               );
@@ -868,6 +881,7 @@ const TournamentPairings: React.FC = () => {
                       }}
                     >
                       {m.player1_name}
+                      <WornTitle card={cards.get(m.player1_id)} />
                     </TableCell>
                     <TableCell sx={{ textAlign: "center", color: "text.disabled", fontSize: "0.75rem", px: 0 }}>
                       vs
@@ -886,6 +900,7 @@ const TournamentPairings: React.FC = () => {
                       }}
                     >
                       {isBye ? "Bye" : m.player2_name}
+                      {!isBye && <WornTitle card={cards.get(m.player2_id ?? "")} />}
                     </TableCell>
                     <TableCell sx={{ textAlign: "right" }}>
                       {isBye ? (

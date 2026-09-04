@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import StandingsTable from "./StandingsTable";
 import type { PlayerWithTieBreakers } from "../utils/tieBreaking";
 import { GENERIC_RULES } from "../games/rules";
+import { assembleCard } from "../badges/card";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -211,5 +212,63 @@ describe("StandingsTable — tiebreaker columns per rules profile", () => {
     expect(screen.getByText("9")).toBeInTheDocument();
     expect(screen.queryByText("OMW%")).not.toBeInTheDocument();
     expect(screen.queryByText("OOMW%")).not.toBeInTheDocument();
+  });
+});
+
+describe("worn titles", () => {
+  const WS = "cd77badf-b822-4f30-b059-93e1c3c77a68";
+  const withTitle = assembleCard({
+    gameId: "pokemon",
+    partnerKey: "25",
+    slots: [
+      {
+        slot: 0,
+        badgeId: "attendance",
+        count: 31,
+        workspaceId: WS,
+        workspaceName: "Bulwark",
+      },
+    ],
+  });
+
+  const two = [
+    makePlayer({ id: "p1", name: "Marcus Hale" }),
+    makePlayer({ id: "p2", name: "Dan Okafor" }),
+  ];
+
+  it("puts a player's title under their name", () => {
+    render(
+      <StandingsTable
+        standings={two}
+        droppedMap={NO_DROPS}
+        rules={GENERIC_RULES}
+        cardMap={new Map([["p1", withTitle]])}
+      />,
+    );
+    expect(screen.getByText("Regular · Bulwark")).toBeInTheDocument();
+  });
+
+  // Most players will have nothing on for a long time yet, and a blank line
+  // on every other row would read as broken.
+  it("adds nothing to a player without one", () => {
+    render(
+      <StandingsTable
+        standings={two}
+        droppedMap={NO_DROPS}
+        rules={GENERIC_RULES}
+        cardMap={new Map([["p1", withTitle]])}
+      />,
+    );
+    expect(screen.getAllByText("Regular · Bulwark")).toHaveLength(1);
+  });
+
+  // Every surface that shows standings has to keep working before badges
+  // have loaded, and some never load them at all.
+  it("renders exactly as before when no cards are passed", () => {
+    render(
+      <StandingsTable standings={two} droppedMap={NO_DROPS} rules={GENERIC_RULES} />,
+    );
+    expect(screen.getByText("Marcus Hale")).toBeInTheDocument();
+    expect(screen.queryByText(/Bulwark/)).toBeNull();
   });
 });

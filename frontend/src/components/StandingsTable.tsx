@@ -19,6 +19,8 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import type { PlayerWithTieBreakers } from "../utils/tieBreaking";
 import { POKEMON_RULES } from "../games/rules";
 import type { RulesProfile, TiebreakerId } from "../games/types";
+import WornTitle from "./WornTitle";
+import type { PlayerCard } from "../badges/card";
 
 /**
  * How each tiebreaker is headed and formatted. The standings show whichever
@@ -55,6 +57,12 @@ interface Props {
   showTiebreakers?: boolean;
   /** Rules the event is scored under — decides which tiebreaker columns show. */
   rules?: RulesProfile;
+  /**
+   * Optional: player id → their card, for the worn title under each name.
+   * Absent on surfaces that have not loaded them, and the table renders
+   * exactly as it did before badges existed.
+   */
+  cardMap?: Map<string, PlayerCard>;
 }
 
 const getRankDisplay = (rank: number): string => {
@@ -92,6 +100,7 @@ interface ChunkTableProps {
   currentPlayerId?: string;
   showTiebreakers?: boolean;
   rules: RulesProfile;
+  cardMap?: Map<string, PlayerCard>;
 }
 
 const ChunkTable: React.FC<ChunkTableProps> = ({
@@ -105,6 +114,7 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
   currentPlayerId,
   showTiebreakers,
   rules,
+  cardMap,
 }) => (
   <Paper sx={{ overflow: "hidden", height: "100%" }}>
     <TableContainer>
@@ -204,6 +214,9 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                       />
                     )}
                   </Box>
+                  {/* Under the name and the "You" chip together, so the title
+                      does not push the chip off the end on a narrow screen. */}
+                  <WornTitle card={cardMap?.get(player.id)} />
                 </TableCell>
                 {deckMap && (
                   <TableCell sx={{ px: 0.5, py: 0, width: size === "small" ? 72 : 108 }}>
@@ -284,6 +297,7 @@ const StandingsTable: React.FC<Props> = ({
   currentPlayerId,
   showTiebreakers,
   rules = POKEMON_RULES,
+  cardMap,
 }) => {
   const theme = useTheme();
   const isMd = useMediaQuery(theme.breakpoints.up("md"));
@@ -331,6 +345,7 @@ const StandingsTable: React.FC<Props> = ({
             currentPlayerId={currentPlayerId}
             showTiebreakers={showTiebreakers}
             rules={rules}
+            cardMap={cardMap}
           />
         </Box>
       ))}

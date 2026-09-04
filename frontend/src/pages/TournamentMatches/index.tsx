@@ -41,6 +41,7 @@ import {
   TOURNAMENT_PLAYER_COLUMNS,
 } from "../../types/match";
 import StandingsTable from "../../components/StandingsTable";
+import { useTournamentCards } from "../../hooks/useTournamentCards";
 import ErrorBoundary from "../../components/ErrorBoundary";
 import DeleteRoundDialog from "./DeleteRoundDialog";
 import LateEntryDialog from "./LateEntryDialog";
@@ -332,6 +333,7 @@ const TournamentMatches: React.FC = () => {
 
   // Rank and score under the rules the event is run by.
   const rules = rulesFor(tournament?.game_id);
+  const cards = useTournamentCards(tournament?.id, tournament?.game_id ?? null);
   const game = getGame(tournament?.game_id);
 
   const deckPlayersMap = useMemo(() => {
@@ -881,6 +883,7 @@ const TournamentMatches: React.FC = () => {
                                   ? deckPlayersMap
                                   : undefined
                               }
+                              cardMap={cards}
                             />
                           )}
                         </Box>
