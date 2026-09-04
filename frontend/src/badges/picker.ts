@@ -1,4 +1,4 @@
-import { equippableBadges, type EquippedSlot } from "./card";
+import { TITLE_SLOT, equippableBadges, type EquippedSlot } from "./card";
 import { resolveBadge, sortForDisplay } from "./tiers";
 import type { BadgeDefinition, EarnedBadge, Tier } from "./types";
 
@@ -50,10 +50,17 @@ export interface SlotOption {
 /**
  * The badges offered for one slot, best first.
  *
- * A badge already worn in a *different* slot is left out — the same mark
- * three times is not a loadout, it is a mistake nobody meant to make. It is
- * kept in the list for the slot it currently occupies, so opening a filled
- * slot shows what is in it rather than a list that mysteriously omits it.
+ * The same mark twice in the badge row is not a loadout, it is a mistake
+ * nobody meant to make, so a badge worn in another *icon* slot is left out.
+ *
+ * The title is a different question. Wearing a badge as your title and also
+ * showing it is not a duplicate — one is a claim in words and the other is
+ * the artwork — so the title slot and the icon row do not exclude each other.
+ * Not forced, just not forbidden.
+ *
+ * Either way a badge stays listed for the slot it currently occupies, so
+ * opening a filled slot shows what is in it rather than a list that
+ * mysteriously omits the thing being looked at.
  */
 export function slotOptions(
   earned: EarnedBadge[],
@@ -61,9 +68,10 @@ export function slotOptions(
   equipped: EquippedSlot[],
   slot: number,
 ): SlotOption[] {
+  const isTitle = slot === TITLE_SLOT;
   const takenElsewhere = new Set(
     equipped
-      .filter((s) => s.slot !== slot)
+      .filter((s) => s.slot !== slot && (s.slot === TITLE_SLOT) === isTitle)
       .map((s) => badgeKey(s.badgeId, s.workspaceId)),
   );
 
@@ -91,8 +99,9 @@ export function slotOptions(
  * Put a badge in a slot, returning the whole loadout.
  *
  * Replaces whatever was in that slot, and takes the badge out of any other
- * slot it was sitting in — moving a badge from slot 3 to slot 1 is a move,
- * not a copy, and leaving the original behind would duplicate it.
+ * slot *of the same kind* — moving a badge from icon slot 3 to icon slot 1 is
+ * a move, not a copy. The title is left alone by a change to the icon row and
+ * vice versa, because wearing the same badge as both is allowed.
  */
 export function equipInSlot(
   equipped: EquippedSlot[],
@@ -100,9 +109,15 @@ export function equipInSlot(
   option: { badgeId: string; workspaceId: string | null },
 ): EquippedSlot[] {
   const key = badgeKey(option.badgeId, option.workspaceId);
+  const isTitle = slot === TITLE_SLOT;
   return [
     ...equipped.filter(
-      (s) => s.slot !== slot && badgeKey(s.badgeId, s.workspaceId) !== key,
+      (s) =>
+        s.slot !== slot &&
+        !(
+          (s.slot === TITLE_SLOT) === isTitle &&
+          badgeKey(s.badgeId, s.workspaceId) === key
+        ),
     ),
     { slot, badgeId: option.badgeId, workspaceId: option.workspaceId },
   ].sort((a, b) => a.slot - b.slot);

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import PlayerCardEditor from "./PlayerCardEditor";
 import type { EquippedSlot } from "../badges/card";
@@ -46,7 +47,8 @@ function setup(over: Partial<Parameters<typeof PlayerCardEditor>[0]> = {}) {
   const onChange = vi.fn();
   const onPartnerChange = vi.fn();
   render(
-    <PlayerCardEditor
+    <MemoryRouter>
+      <PlayerCardEditor
       name="Marcus Hale"
       gameId="pokemon"
       partnerKey="25"
@@ -54,8 +56,9 @@ function setup(over: Partial<Parameters<typeof PlayerCardEditor>[0]> = {}) {
       earned={held}
       onChange={onChange}
       onPartnerChange={onPartnerChange}
-      {...over}
-    />,
+        {...over}
+      />
+    </MemoryRouter>,
   );
   return { onChange, onPartnerChange };
 }
@@ -193,10 +196,14 @@ describe("the partner", () => {
 });
 
 describe("the badge case", () => {
-  it("stays folded away until asked for", async () => {
+  // The catalogue is a page of its own: the art at a size worth looking at,
+  // everything in view at once, neither of which fits under a card editor.
+  it("links out to the wall rather than unfolding one", () => {
     setup();
     expect(screen.queryByText("Spoiler")).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "All badges" }));
-    expect(screen.getByText("Spoiler")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /all badges/i })).toHaveAttribute(
+      "href",
+      "/me/badges",
+    );
   });
 });

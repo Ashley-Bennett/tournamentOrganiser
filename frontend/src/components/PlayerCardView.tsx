@@ -3,6 +3,7 @@ import { Box, Typography } from "@mui/material";
 import NormalizedSprite from "./NormalizedSprite";
 import BadgeMark from "./BadgeMark";
 import { partnerSourceFor } from "../games/partners";
+import { explanationFor } from "../badges/tiers";
 import type { PlayerCard } from "../badges/card";
 
 /**
@@ -156,15 +157,19 @@ export default function PlayerCardView({
           </Typography>
         )}
 
-        {/* The badge's own explanation, identical on everyone who wears it —
-            never this player's record, which would be scouting data. */}
+        {/* The badge's own explanation, carrying the player's number where the
+            badge counts: "8 events finished here". The count is already drawn
+            on the badge itself, so the sentence is saying out loud what the
+            card already shows rather than volunteering anything new. Still
+            never this player's *record* — wins and losses are scouting data
+            and are not on a card. */}
         {card.title && (
           <Typography
             variant="caption"
             sx={{ display: "block", color: "text.disabled" }}
             noWrap
           >
-            {card.title.badge.explanation}
+            {explanationFor(card.title.badge, card.title.count)}
           </Typography>
         )}
       </Box>

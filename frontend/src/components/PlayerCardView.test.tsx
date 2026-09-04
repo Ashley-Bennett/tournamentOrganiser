@@ -31,7 +31,9 @@ describe("full density", () => {
 
     expect(screen.getByText("Familiar Face · Bulwark")).toBeInTheDocument();
     expect(screen.getByText("Marcus Hale")).toBeInTheDocument();
-    expect(screen.getByText("Events finished here")).toBeInTheDocument();
+    // The count is already drawn on the badge, so the sentence says out loud
+    // what the card already shows rather than volunteering anything new.
+    expect(screen.getByText("8 events finished here")).toBeInTheDocument();
   });
 
   it("draws every equipped badge", () => {

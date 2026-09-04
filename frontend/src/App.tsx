@@ -27,6 +27,7 @@ import DeviceTournaments from "./pages/DeviceTournaments";
 import JoinLanding from "./pages/JoinLanding";
 import WhatsNew from "./pages/WhatsNew";
 import CardHarness from "./pages/CardHarness";
+import Badges from "./pages/Badges";
 import PlayerStats from "./pages/PlayerStats";
 import OrganiserStats from "./pages/OrganiserStats";
 import Privacy from "./pages/Privacy";
@@ -243,6 +244,15 @@ function App() {
                   element={
                     <RequireAuth>
                       <Me />
+                    </RequireAuth>
+                  }
+                />
+
+                <Route
+                  path="/me/badges"
+                  element={
+                    <RequireAuth>
+                      <Badges />
                     </RequireAuth>
                   }
                 />

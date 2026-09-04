@@ -94,6 +94,16 @@ export interface BadgeDefinition {
    * player event is attendance with extra steps.
    */
   minFieldSize?: number;
+  /**
+   * The explanation with the player's own number in it — "8 events finished
+   * here" rather than "Events finished here".
+   *
+   * `{n}` is the count and `{s}` is a plural "s", so one template covers both
+   * "1 event" and "8 events". Set only on a badge that counts; an untiered
+   * badge either happened or did not, and "1 winner's only loss" is not a
+   * sentence anybody wants to read.
+   */
+  countedExplanation?: string;
   /** True when the badge is scoped to one league and shown with its name. */
   perLeague: boolean;
   /**

@@ -4,6 +4,7 @@ import { describe, it, expect } from "vitest";
 import { BADGES, TIERS, getBadge, isTiered } from "./registry";
 import {
   badgesForGame,
+  explanationFor,
   resolveBadge,
   sortForDisplay,
   tierFor,
@@ -276,6 +277,47 @@ describe("the registry, game scoping", () => {
     expect(getBadge("attendance")!.perGame).toBe(false);
     ["top_cut", "champion", "spoiler", "bubble"].forEach((id) => {
       expect(getBadge(id)!.perGame).toBe(true);
+    });
+  });
+});
+
+describe("explanationFor", () => {
+  const attendance = getBadge("attendance")!;
+  const topCut = getBadge("top_cut")!;
+  const spoiler = getBadge("spoiler")!;
+
+  // The number is already drawn on the badge; putting it in the sentence is
+  // what stops the sentence being a caption for somebody else's badge.
+  it("puts the count in the sentence", () => {
+    expect(explanationFor(attendance, 8)).toBe("8 events finished here");
+  });
+
+  it("does not say “1 events”", () => {
+    expect(explanationFor(attendance, 1)).toBe("1 event finished here");
+  });
+
+  it("handles a plural that is not just an s", () => {
+    expect(explanationFor(topCut, 1)).toBe("1 top-eight finish");
+    expect(explanationFor(topCut, 12)).toBe("12 top-eight finishes");
+  });
+
+  // Spoiler either happened or it did not, and "1 winner's only loss" is not
+  // a sentence anybody wants to read.
+  it("leaves an untiered badge's wording alone", () => {
+    expect(explanationFor(spoiler, 1)).toBe(spoiler.explanation);
+  });
+
+  it("falls back to the plain wording with nothing to count", () => {
+    expect(explanationFor(attendance, 0)).toBe("Events finished here");
+    expect(explanationFor(attendance, null)).toBe("Events finished here");
+    expect(explanationFor(attendance, undefined)).toBe("Events finished here");
+  });
+
+  // Every badge that counts should read with its number, or the card says
+  // less than it could.
+  it("gives every tiered badge a counted form", () => {
+    BADGES.filter((b) => b.thresholds.length > 0).forEach((badge) => {
+      expect(explanationFor(badge, 7)).toContain("7");
     });
   });
 });

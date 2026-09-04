@@ -1,10 +1,10 @@
 import { Box } from "@mui/material";
 import PickerDialog, { type PickerItem } from "./PickerDialog";
 import BadgeMark from "./BadgeMark";
-import { toNextTier } from "../badges/tiers";
+import { explanationFor, toNextTier } from "../badges/tiers";
 import { TITLE_SLOT, type EquippedSlot } from "../badges/card";
 import { badgeKey, parseBadgeKey, slotOptions } from "../badges/picker";
-import type { EarnedBadge } from "../badges/types";
+import type { BadgeDefinition, EarnedBadge } from "../badges/types";
 
 /**
  * Choosing what goes in a slot.
@@ -19,12 +19,13 @@ import type { EarnedBadge } from "../badges/types";
 const ROW_BADGE_PX = 30;
 
 function secondaryFor(option: {
-  badge: { explanation: string };
+  badge: BadgeDefinition;
   count: number;
   next: string | null;
 }): string {
-  const parts = [option.badge.explanation];
-  if (option.count > 1) parts.push(`×${option.count}`);
+  // The count is in the explanation now — "8 events finished here" — so there
+  // is no separate "×8" to append.
+  const parts = [explanationFor(option.badge, option.count)];
   if (option.next) parts.push(option.next);
   return parts.join(" · ");
 }

@@ -64,12 +64,32 @@ describe("slotOptions", () => {
     expect(labels).toContain("Familiar Face · Red Dragon");
   });
 
-  // The same mark three times is not a loadout, it is a mistake nobody meant.
-  it("leaves out a badge worn in another slot", () => {
+  // The same mark twice in the badge row is not a loadout, it is a mistake.
+  it("leaves out a badge worn in another icon slot", () => {
     const equipped: EquippedSlot[] = [
       { slot: 1, badgeId: "champion", workspaceId: null },
     ];
     expect(keys(slotOptions(held, "pokemon", equipped, 2))).not.toContain(
+      badgeKey("champion", null),
+    );
+  });
+
+  // Wearing a badge as your title and also showing it is not a duplicate:
+  // one is a claim in words, the other is the artwork.
+  it("still offers a badge worn as the title for an icon slot", () => {
+    const equipped: EquippedSlot[] = [
+      { slot: 0, badgeId: "champion", workspaceId: null },
+    ];
+    expect(keys(slotOptions(held, "pokemon", equipped, 1))).toContain(
+      badgeKey("champion", null),
+    );
+  });
+
+  it("still offers a badge worn as an icon for the title", () => {
+    const equipped: EquippedSlot[] = [
+      { slot: 2, badgeId: "champion", workspaceId: null },
+    ];
+    expect(keys(slotOptions(held, "pokemon", equipped, 0))).toContain(
       badgeKey("champion", null),
     );
   });
@@ -149,9 +169,33 @@ describe("equipInSlot", () => {
     ]);
   });
 
-  // The picker does not offer a badge worn elsewhere, so this is a guard
-  // rather than a path: nothing should be able to produce a duplicate.
-  it("moves a badge rather than copying it", () => {
+  it("leaves the title alone when the same badge goes in an icon slot", () => {
+    const equipped: EquippedSlot[] = [
+      { slot: 0, badgeId: "champion", workspaceId: null },
+    ];
+    expect(
+      equipInSlot(equipped, 1, { badgeId: "champion", workspaceId: null }),
+    ).toEqual([
+      { slot: 0, badgeId: "champion", workspaceId: null },
+      { slot: 1, badgeId: "champion", workspaceId: null },
+    ]);
+  });
+
+  it("leaves an icon alone when the same badge becomes the title", () => {
+    const equipped: EquippedSlot[] = [
+      { slot: 1, badgeId: "champion", workspaceId: null },
+    ];
+    expect(
+      equipInSlot(equipped, 0, { badgeId: "champion", workspaceId: null }),
+    ).toEqual([
+      { slot: 0, badgeId: "champion", workspaceId: null },
+      { slot: 1, badgeId: "champion", workspaceId: null },
+    ]);
+  });
+
+  // The picker does not offer a badge worn in another icon slot, so this is a
+  // guard rather than a path: nothing should produce a duplicate icon.
+  it("moves a badge between icon slots rather than copying it", () => {
     const equipped: EquippedSlot[] = [
       { slot: 1, badgeId: "champion", workspaceId: null },
     ];

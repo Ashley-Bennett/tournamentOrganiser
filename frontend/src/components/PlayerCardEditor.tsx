@@ -1,21 +1,20 @@
 import { useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
   Typography,
   ButtonBase,
   Tooltip,
   IconButton,
-  Collapse,
   Button,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ClearIcon from "@mui/icons-material/CloseOutlined";
-import ExpandIcon from "@mui/icons-material/ExpandMore";
+import ChevronIcon from "@mui/icons-material/ChevronRight";
 import BadgeMark from "./BadgeMark";
 import PlayerCardView from "./PlayerCardView";
 import BadgePickerDialog from "./BadgePickerDialog";
 import PartnerPickerDialog from "./PartnerPickerDialog";
-import BadgeCase from "./BadgeCase";
 import {
   MAX_BADGE_SLOTS,
   TITLE_SLOT,
@@ -164,7 +163,6 @@ export default function PlayerCardEditor({
 }) {
   const [pickingSlot, setPickingSlot] = useState<number | null>(null);
   const [pickingPartner, setPickingPartner] = useState(false);
-  const [caseOpen, setCaseOpen] = useState(false);
 
   const hydrated = hydrateSlots(equipped, earned);
   const card = assembleCard({ gameId, partnerKey, slots: hydrated });
@@ -274,29 +272,18 @@ export default function PlayerCardEditor({
         })}
       </Box>
 
-      {/* Collapsed by default. The catalogue is worth having and is not what
-          somebody came here to do, and unfolding it is one tap. */}
+      {/* A link out rather than an unfolding panel. The catalogue wants the
+          art at a size worth looking at and everything in view at once, and
+          neither fits under a card editor. */}
       <Button
+        component={RouterLink}
+        to="/me/badges"
         size="small"
-        onClick={() => setCaseOpen((o) => !o)}
-        endIcon={
-          <ExpandIcon
-            sx={{
-              transition: "transform .15s",
-              transform: caseOpen ? "rotate(180deg)" : "none",
-            }}
-          />
-        }
+        endIcon={<ChevronIcon />}
         sx={{ mt: 2, ml: -1 }}
-        aria-expanded={caseOpen}
       >
-        {caseOpen ? "Hide all badges" : "All badges"}
+        All badges
       </Button>
-      <Collapse in={caseOpen} unmountOnExit>
-        <Box sx={{ mt: 1 }}>
-          <BadgeCase earned={earned} gameId={gameId} />
-        </Box>
-      </Collapse>
 
       <BadgePickerDialog
         open={pickingSlot !== null}

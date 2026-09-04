@@ -92,6 +92,30 @@ export function resolveBadge(earned: EarnedBadge): {
 }
 
 /**
+ * The explanation, with the player's own number in it where there is one.
+ *
+ * "8 events finished here" says more than "Events finished here" and costs
+ * nothing: the number is already on the card, and putting it in the sentence
+ * is what stops the sentence being a caption for somebody else's badge.
+ *
+ * Falls back to the plain wording for an untiered badge, for a count of zero,
+ * and for any badge that has not been given a counted form — a missing
+ * template is a badge that reads better without a number, not a bug.
+ */
+export function explanationFor(
+  badge: BadgeDefinition,
+  count: number | null | undefined,
+): string {
+  if (!badge.countedExplanation || !count || count <= 0) {
+    return badge.explanation;
+  }
+  return badge.countedExplanation
+    .replace(/\{n\}/g, String(count))
+    .replace(/\{es\}/g, count === 1 ? "" : "es")
+    .replace(/\{s\}/g, count === 1 ? "" : "s");
+}
+
+/**
  * Sorts a player's badges for display, best first.
  *
  * Rarity leads, because a mythic is the thing worth seeing on a card that only
