@@ -284,7 +284,7 @@ export default function PlayerCardEditor({
         endIcon={<ChevronIcon />}
         sx={{ mt: 2, ml: -1 }}
       >
-        All badges
+        Badge case
       </Button>
 
       <BadgePickerDialog

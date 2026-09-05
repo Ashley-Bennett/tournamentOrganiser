@@ -202,7 +202,7 @@ describe("the badge case", () => {
     setup();
     expect(screen.queryByText("Spoiler")).toBeNull();
     // The game is already chosen in the editor, so the wall opens on it.
-    expect(screen.getByRole("link", { name: /all badges/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /badge case/i })).toHaveAttribute(
       "href",
       "/me/badges?game=pokemon",
     );

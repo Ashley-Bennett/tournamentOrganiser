@@ -64,8 +64,8 @@ const section = (name: RegExp | string) => screen.getByRole("button", { name, ex
 describe("the sections", () => {
   it("shows a heading per provenance the player has something in", () => {
     setup();
-    expect(section(/^System/)).toBeInTheDocument();
-    expect(section(/Leagues/)).toBeInTheDocument();
+    expect(section(/^Open Badges/)).toBeInTheDocument();
+    expect(section(/^League Badges/)).toBeInTheDocument();
   });
 
   it("keeps each provenance in its own section", () => {
@@ -85,22 +85,24 @@ describe("the sections", () => {
     ).toBe(SYSTEM_COUNT - 1);
   });
 
-  // "3 of 12" would turn a catalogue into a completion bar.
-  it("counts what is earned without a denominator", () => {
+  // A badge case is a thing you fill, so how much is left is the question
+  // somebody opens it with.
+  it("counts what is collected against what there is", () => {
     setup();
-    expect(screen.getAllByText("1 earned").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/of \d/)).toBeNull();
+    expect(screen.getByText(`1/${SYSTEM_COUNT} collected`)).toBeInTheDocument();
+    // The league shelf has its own total, counted separately.
+    expect(screen.getByText("1/1 collected")).toBeInTheDocument();
   });
 
   it("collapses a section without touching the others", async () => {
     setup();
-    await userEvent.click(section(/^System/));
+    await userEvent.click(section(/^Open Badges/));
 
     expect(
-      screen.getByRole("button", { name: /^System/ }),
+      screen.getByRole("button", { name: /^Open Badges/ }),
     ).toHaveAttribute("aria-expanded", "false");
     expect(
-      screen.getByRole("button", { name: /^Leagues/ }),
+      screen.getByRole("button", { name: /^League Badges/ }),
     ).toHaveAttribute("aria-expanded", "true");
   });
 
@@ -125,14 +127,14 @@ describe("clubs, inside the leagues section", () => {
       { badgeId: "champion", count: 1, workspaceId: null, gameId: "pokemon" },
     ];
     setup();
-    expect(screen.queryByRole("button", { name: /Leagues/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /League Badges/ })).toBeNull();
   });
 
   // Nothing in the catalogue is a closed set yet, so the section stays hidden
   // until one exists. It appears on its own the moment one is added.
   it("hides Promos while the catalogue has no closed sets", () => {
     setup();
-    expect(screen.queryByRole("button", { name: /Promos/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Promo Badges/ })).toBeNull();
   });
 
   it("needs no club tabs when there is only one", () => {
@@ -192,7 +194,7 @@ describe("deep links", () => {
   it("ignores a badge the registry has never heard of", () => {
     setup("?badge=not_shipped_yet");
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByText("Badges")).toBeInTheDocument();
+    expect(screen.getByText("Badge Case")).toBeInTheDocument();
   });
 
   // A stale link should not strand somebody on a club they have never played.

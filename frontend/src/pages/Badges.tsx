@@ -236,15 +236,18 @@ function Detail({
 }
 
 /**
- * The count shown beside a collapsed heading.
+ * The count shown beside a heading, visible while collapsed.
  *
- * Deliberately without a denominator. "3 earned" says what is in the section;
- * "3 of 12" turns a catalogue into a completion bar, which is the one thing
- * this page is trying not to be.
+ * With the denominator: a badge case is a thing you fill, and how much is
+ * left is the question somebody opens it with. It is only honest because
+ * every section is a closed set — the whole catalogue for that provenance is
+ * on the shelf, locked ones included — so the total is a real target rather
+ * than a moving one.
  */
-function heldSummary(rows: CaseRow[]): string | undefined {
+function collectedSummary(rows: CaseRow[]): string | undefined {
+  if (rows.length === 0) return undefined;
   const held = rows.filter((r) => r.held).length;
-  return held > 0 ? `${held} earned` : undefined;
+  return `${held}/${rows.length} collected`;
 }
 
 /** A grid of badges, at a size worth looking at. */
@@ -363,7 +366,7 @@ export default function Badges() {
       </Button>
 
       <Typography variant="h5" sx={{ fontWeight: 700 }}>
-        Badges
+        Badge Case
       </Typography>
       <Typography variant="body2" sx={{ color: "text.secondary" }}>
         Everything there is to earn at {gameId ? getGame(gameId).name : "your"}{" "}
@@ -383,10 +386,10 @@ export default function Badges() {
       ) : (
         <Box sx={{ mt: 1 }}>
           <CollapsibleSection
-            id="badges-system"
-            title="System Badges"
+            id="badges-open"
+            title="Open Badges"
             hint="Earned by playing, wherever the event was."
-            summary={heldSummary(systemRows)}
+            summary={collectedSummary(systemRows)}
             defaultOpen
           >
             <Wall rows={systemRows} onOpen={show} />
@@ -399,7 +402,7 @@ export default function Badges() {
               id="badges-closed"
               title="Promo Badges"
               hint="Given out once, to a group that is now closed."
-              summary={heldSummary(closedRows)}
+              summary={collectedSummary(closedRows)}
               defaultOpen
             >
               <Wall rows={closedRows} onOpen={show} />
@@ -411,7 +414,7 @@ export default function Badges() {
               id="badges-leagues"
               title="League Badges"
               hint="Earned at one club, and shown with its name."
-              summary={heldSummary(leagueRows)}
+              summary={collectedSummary(leagueRows)}
               defaultOpen
             >
               {/* A tab per club, inside the section rather than above it: the
