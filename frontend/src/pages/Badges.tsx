@@ -387,7 +387,7 @@ export default function Badges() {
         <Box sx={{ mt: 1 }}>
           <CollapsibleSection
             id="badges-open"
-            title="Open Badges"
+            title="Open Play Badges"
             hint="Earned by playing, wherever the event was."
             summary={collectedSummary(systemRows)}
             defaultOpen

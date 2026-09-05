@@ -64,7 +64,7 @@ const section = (name: RegExp | string) => screen.getByRole("button", { name, ex
 describe("the sections", () => {
   it("shows a heading per provenance the player has something in", () => {
     setup();
-    expect(section(/^Open Badges/)).toBeInTheDocument();
+    expect(section(/^Open Play Badges/)).toBeInTheDocument();
     expect(section(/^League Badges/)).toBeInTheDocument();
   });
 
@@ -96,10 +96,10 @@ describe("the sections", () => {
 
   it("collapses a section without touching the others", async () => {
     setup();
-    await userEvent.click(section(/^Open Badges/));
+    await userEvent.click(section(/^Open Play Badges/));
 
     expect(
-      screen.getByRole("button", { name: /^Open Badges/ }),
+      screen.getByRole("button", { name: /^Open Play Badges/ }),
     ).toHaveAttribute("aria-expanded", "false");
     expect(
       screen.getByRole("button", { name: /^League Badges/ }),
