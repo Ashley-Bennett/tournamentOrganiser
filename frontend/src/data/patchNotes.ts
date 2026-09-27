@@ -9,12 +9,19 @@ export interface PatchNote {
 
 const patchNotes: PatchNote[] = [
   {
-    version: "0.7.1",
-    date: "2026-09-03",
+    version: "0.8.0",
+    date: "2026-09-27",
     entries: [
       {
         category: "New Features",
         items: [
+          "Player cards: every game you play now has a card with your name, a title, up to three badges and a partner. Set it up from your account page and watch a live preview as you go.",
+          "Badges: earn badges for turning up, finishing and winning. Each one climbs a ladder of ranks, and badges that count show how far you have got, like \"8 events finished here\".",
+          "The Badge Case lists every badge for a game, including ones you have not earned yet. Badges are grouped by where they come from, with a tab for each club you play at, and tapping one shows what it means and every rank above it.",
+          "Pick a partner for your card: any Pokémon for Pokémon events, and a set of icons for other games. Players need an account to have a partner, so claiming your entry is what unlocks one.",
+          "Your badges update for everyone who played as soon as the organiser closes an event, and you get a notification when you earn a new one. Tapping it takes you straight to that badge.",
+          "Worn titles show under player names on the pairings and the standings, including on a projector and for players without an account.",
+          "On the player view, your opponent now gets their own panel above the match, showing their card: partner, title and badges.",
           "Notifications: there is now a bell at the top of the screen. It tells you when your round is up, which table you are on and who you are playing, and it keeps them so you can look back at anything you missed while you were mid-game.",
           "The number of unread notifications shows in your browser tab, so you can see something is waiting without switching back to Matchamp.",
           "You do not need an account to get notifications. If you joined an event with a link or a QR code, the bell works for you too.",
@@ -34,6 +41,9 @@ const patchNotes: PatchNote[] = [
         category: "Fixes & Polish",
         items: [
           "Notifications no longer disappear the moment the pop-up does. Anything you missed is still in the bell.",
+          "Read notifications now look read. Unread ones have a dot, and read ones are dimmed.",
+          "Signing out now clears your account notifications from that device. If you joined an event with a link, you still get alerts for your own rounds.",
+          "Badge notifications are never pushed out of the list by round updates, and a link you tap while signed out still works after you log in.",
           "If you have notifications turned on for your phone, Matchamp now keeps its own copy too, so dismissing one on your lock screen does not lose it.",
           "Player deck choices, results and account links are now recorded in your activity history, and anonymous players are named properly instead of showing as nobody.",
           "Faster and safer under the hood: the app loads a little quicker and every known security advisory in our dependencies has been cleared.",
