@@ -1,3 +1,9 @@
+-- upsert_match_insights still capped opponent deck IDs at 1025, so entering a
+-- Mega/regional/Gigantamax form on the Insights page failed with
+-- "Invalid pokemon id" (e.g. Mega Chandelure = 10291). PokéAPI assigns form
+-- IDs from 10001+; align the bound with set_player_deck and
+-- self_join_tournament (1–99999). Body is otherwise unchanged.
+
 CREATE OR REPLACE FUNCTION public.upsert_match_insights(p_match_id uuid, p_went_first boolean, p_opp_pokemon1 integer, p_opp_pokemon2 integer)
  RETURNS void
  LANGUAGE plpgsql
@@ -42,3 +48,4 @@ BEGIN
     submitted_at           = now();
 END;
 $function$
+;
