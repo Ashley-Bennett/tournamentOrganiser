@@ -16,7 +16,7 @@ BEGIN
   INSERT INTO public.profiles (id, display_name, default_workspace_id)
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
+    LEFT(COALESCE(NEW.raw_user_meta_data->>'name', NEW.email), 50),
     v_workspace_id
   )
   ON CONFLICT (id) DO NOTHING;

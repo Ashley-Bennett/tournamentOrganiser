@@ -318,6 +318,7 @@ const Me = () => {
             <TextField
               label="Display name"
               value={editName}
+              inputProps={{ maxLength: 50 }}
               onChange={(e) => setEditName(e.target.value)}
               size="small"
               fullWidth

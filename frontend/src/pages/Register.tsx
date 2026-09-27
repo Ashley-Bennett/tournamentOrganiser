@@ -91,6 +91,7 @@ const Register = () => {
           <TextField
             label="Name"
             value={name}
+            inputProps={{ maxLength: 50 }}
             onChange={(e) => setName(e.target.value)}
             required
             fullWidth
