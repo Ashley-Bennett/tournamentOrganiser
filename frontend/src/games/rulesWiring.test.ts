@@ -47,7 +47,6 @@ describe("rules fallback", () => {
 const FILES_SELECTING_TOURNAMENTS = [
   "pages/TournamentMatches/index.tsx",
   "pages/TournamentPairings.tsx",
-  "pages/TournamentLeaderboard.tsx",
   "hooks/useTournament.ts",
 ];
 

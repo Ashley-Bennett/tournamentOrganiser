@@ -147,6 +147,10 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
     const id = pendingDelete?.id;
     if (!id) return;
     setDeleteDialogOpen(false);
+    if (!workspaceId) {
+      setError("Workspace not loaded, so the tournament can't be deleted");
+      return;
+    }
     setDeletingId(id);
     setError(null);
     setSuccess(null);
@@ -155,7 +159,7 @@ const Tournaments: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
         .from("tournaments")
         .delete()
         .eq("id", id)
-        .eq("workspace_id", workspaceId ?? "");
+        .eq("workspace_id", workspaceId);
 
       if (error) {
         throw new Error(error.message || "Failed to delete tournament.");

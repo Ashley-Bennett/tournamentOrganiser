@@ -458,20 +458,27 @@ const TournamentView: React.FC = () => {
   };
 
   const handleSetRounds = async (target: number) => {
-    if (!tournament || tournament.status !== "draft" || !user) return;
+    if (!tournament || tournament.status !== "draft" || !user || !workspaceId) return;
     const next = Math.min(20, Math.max(1, target));
     if (next === numRounds) return;
+    const previous = numRounds;
     setNumRounds(next);
     const { data, error } = await supabase
       .from("tournaments")
       .update({ num_rounds: next })
       .eq("id", tournament.id)
-      .eq("workspace_id", workspaceId ?? "")
+      .eq("workspace_id", workspaceId)
       .select(
         "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, allow_late_join, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description, game_id",
       )
       .maybeSingle();
-    if (!error && data) setTournament(data as TournamentSummary);
+    if (!error && data) {
+      setTournament(data as TournamentSummary);
+    } else {
+      // The stepper moved before the save; put it back rather than show a
+      // round count that was never stored.
+      setNumRounds(previous);
+    }
   };
 
   const handleRoundStep = (delta: number) => {

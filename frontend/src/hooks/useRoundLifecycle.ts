@@ -306,6 +306,10 @@ export function useRoundLifecycle({
 
   const handleCompleteTournament = async () => {
     if (!tournament || !user) return;
+    if (!workspaceId) {
+      setError("Workspace not loaded, so the tournament can't be completed");
+      return;
+    }
 
     try {
       setProcessingRound(true);
@@ -325,7 +329,7 @@ export function useRoundLifecycle({
           round_is_paused: false,
         })
         .eq("id", tournament.id)
-        .eq("workspace_id", workspaceId ?? "");
+        .eq("workspace_id", workspaceId);
 
       if (updateError) {
         throw new Error(updateError.message || "Failed to complete tournament");
@@ -495,6 +499,10 @@ export function useRoundLifecycle({
 
   const handleAddRound = async () => {
     if (!tournament || !user) return;
+    if (!workspaceId) {
+      setError("Workspace not loaded, so the round can't be added");
+      return;
+    }
     const current = tournament.num_rounds ?? 0;
     if (current >= 20) return;
     const finalRoundMatches = matches.filter((m) => m.round_number === current);
@@ -508,7 +516,7 @@ export function useRoundLifecycle({
       .from("tournaments")
       .update({ num_rounds: next })
       .eq("id", tournament.id)
-      .eq("workspace_id", workspaceId ?? "")
+      .eq("workspace_id", workspaceId)
       .select(
         "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note",
       )
@@ -518,6 +526,10 @@ export function useRoundLifecycle({
 
   const handleDeleteRound = async (roundNumber: number) => {
     if (!tournament || !user) return;
+    if (!workspaceId) {
+      setError("Workspace not loaded, so the round can't be removed");
+      return;
+    }
     if (roundNumber !== tournament.num_rounds) return;
     if (matches.some((m) => m.round_number === roundNumber)) return;
     const newCount = roundNumber - 1;
@@ -526,7 +538,7 @@ export function useRoundLifecycle({
       .from("tournaments")
       .update({ num_rounds: newCount })
       .eq("id", tournament.id)
-      .eq("workspace_id", workspaceId ?? "")
+      .eq("workspace_id", workspaceId)
       .select("id, name, status, tournament_type, num_rounds, created_at, created_by")
       .maybeSingle();
     if (!error && data) {

@@ -16,7 +16,7 @@ The pairing algorithm in `frontend/src/utils/tournamentPairing.ts` currently get
 
 ## 1. **Materialized “standings” / “round state” (high impact)**
 
-**Problem:** Standings (match points, wins, losses, draws, opponents, byes) are recomputed in several places (TournamentMatches, TournamentLeaderboard, next-round generation) from raw matches. If any of those derivations disagree (e.g. what counts as “completed”, draws, byes), you get inconsistent standings and the pairing assertions can fail.
+**Problem:** Standings (match points, wins, losses, draws, opponents, byes) are recomputed in several places (TournamentMatches, the public pairings page, next-round generation) from raw matches. If any of those derivations disagree (e.g. what counts as “completed”, draws, byes), you get inconsistent standings and the pairing assertions can fail.
 
 **Recommendation:** Store standings (or at least the values the pairer needs) in the database, updated when match results are saved.
 
