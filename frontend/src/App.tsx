@@ -1,37 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Box, Container } from "@mui/material";
 import Header from "./components/Header";
 import ErrorBoundary from "./components/ErrorBoundary";
-import Dashboard from "./pages/Dashboard";
-import Tournaments from "./pages/Tournaments";
-import CreateTournament from "./pages/CreateTournament";
-import TournamentView from "./pages/TournamentView";
-import TournamentMatches from "./pages/TournamentMatches";
-import TournamentPairings from "./pages/TournamentPairings";
-import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Welcome from "./pages/Welcome";
-import Me from "./pages/Me";
-import WorkspaceSettings from "./pages/WorkspaceSettings";
-import CreateWorkspace from "./pages/CreateWorkspace";
-import AcceptInvite from "./pages/AcceptInvite";
-import ClaimPlayer from "./pages/ClaimPlayer";
-import TournamentJoin from "./pages/TournamentJoin";
-import TournamentJoinDisplay from "./pages/TournamentJoinDisplay";
-import PlayerTournamentView from "./pages/PlayerTournamentView";
-import DeviceTournaments from "./pages/DeviceTournaments";
-import JoinLanding from "./pages/JoinLanding";
-import WhatsNew from "./pages/WhatsNew";
-import CardHarness from "./pages/CardHarness";
-import Badges from "./pages/Badges";
-import PlayerStats from "./pages/PlayerStats";
-import OrganiserStats from "./pages/OrganiserStats";
-import Privacy from "./pages/Privacy";
-import Terms from "./pages/Terms";
+import PageLoading from "./components/PageLoading";
 import PlayerNotifications from "./components/PlayerNotifications";
 import BadgeWatcher from "./components/BadgeWatcher";
 import { useAuth } from "./AuthContext";
@@ -39,6 +11,42 @@ import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 import { getAllEntries } from "./utils/playerStorage";
 import { supabase } from "./supabaseClient";
 import { slugify, randomSuffix } from "./utils/slugify";
+
+// Every page is its own chunk, so a player opening a join link does not
+// download the organiser stats, the Badge Case and the landing page first.
+// The shell above (header, contexts, watchers) stays in the main bundle.
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Tournaments = lazy(() => import("./pages/Tournaments"));
+const CreateTournament = lazy(() => import("./pages/CreateTournament"));
+const TournamentView = lazy(() => import("./pages/TournamentView"));
+const TournamentMatches = lazy(() => import("./pages/TournamentMatches"));
+const TournamentPairings = lazy(() => import("./pages/TournamentPairings"));
+const Landing = lazy(() => import("./pages/Landing"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Welcome = lazy(() => import("./pages/Welcome"));
+const Me = lazy(() => import("./pages/Me"));
+const WorkspaceSettings = lazy(() => import("./pages/WorkspaceSettings"));
+const CreateWorkspace = lazy(() => import("./pages/CreateWorkspace"));
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
+const ClaimPlayer = lazy(() => import("./pages/ClaimPlayer"));
+const TournamentJoin = lazy(() => import("./pages/TournamentJoin"));
+const TournamentJoinDisplay = lazy(() => import("./pages/TournamentJoinDisplay"));
+const PlayerTournamentView = lazy(() => import("./pages/PlayerTournamentView"));
+const DeviceTournaments = lazy(() => import("./pages/DeviceTournaments"));
+const JoinLanding = lazy(() => import("./pages/JoinLanding"));
+const WhatsNew = lazy(() => import("./pages/WhatsNew"));
+// Dev only. Behind the DEV check so a production build does not even emit it.
+const CardHarness = import.meta.env.DEV
+  ? lazy(() => import("./pages/CardHarness"))
+  : () => null;
+const Badges = lazy(() => import("./pages/Badges"));
+const PlayerStats = lazy(() => import("./pages/PlayerStats"));
+const OrganiserStats = lazy(() => import("./pages/OrganiserStats"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
 
 // Silently claims any localStorage tournament entries for the logged-in user.
 // Runs once per session per user — guards against re-running with sessionStorage.
@@ -141,7 +149,13 @@ function RootRoute() {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (user) return <Navigate to="/dashboard" replace />;
-  return <Landing />;
+  return (
+    // Landing has no shell around it, so there is nothing to show while its
+    // chunk loads — and on a fast connection a spinner would only flash.
+    <Suspense fallback={null}>
+      <Landing />
+    </Suspense>
+  );
 }
 
 /**
@@ -165,7 +179,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
           }}
         >
           <ErrorBoundary section="page">
-            {children}
+            {/* Inside the layout, so the header stays put while a page loads. */}
+            <Suspense fallback={<PageLoading />}>{children}</Suspense>
           </ErrorBoundary>
         </Container>
       </Box>
