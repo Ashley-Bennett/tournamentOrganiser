@@ -168,7 +168,7 @@ You can add or remove players until the tournament is started.
 
 - When the player list is ready, click **Start tournament**.  
 - Round 1 is paired automatically.  
-- After starting, you can still use **Matches**, **Pairings**, and **Leaderboard**.
+- After starting, run the event from **Matches**; the **Standings** tab there shows the live table.
 
 ### 7. Enter match results
 
@@ -176,10 +176,10 @@ You can add or remove players until the tournament is started.
 2. For each match, enter or confirm the result (e.g. winner, score).  
 3. When results are in, you can generate the next round.
 
-### 8. View pairings and leaderboard
+### 8. View pairings and standings
 
 - **Pairings** — view rounds and who plays whom; optional standings tab.  
-- **Leaderboard** — tournament standings.  
+- **Standings** — the last tab on **Matches**.  
 - If the tournament is **public**, the **Pairings** page has a **public link** (e.g. `/public/t/<publicSlug>`). Share that link so anyone can view pairings without logging in.
 
 ### 9. Player claim links (link account to entry)
@@ -232,18 +232,14 @@ You can open **Me** from the header to switch between “organiser” and “pla
 - **Tournament view** at `/w/:workspaceSlug/tournaments/:id`:
   - Add/remove players (single or bulk).  
   - Start tournament.  
-  - Links to **Matches**, **Pairings**, **Leaderboard**.  
+  - Links to **Matches** and **Pairings**.  
   - Manager-only: claim links, static seating, pairings link.  
 
 ### Matches & pairings
 
-- **Matches** at `/w/:workspaceSlug/tournaments/:id/matches` — enter or confirm match results.  
+- **Matches** at `/w/:workspaceSlug/tournaments/:id/matches` — enter or confirm match results; the **Standings** tab shows the live table.  
 - **Pairings** at `/w/:workspaceSlug/tournaments/:id/pairings` — view pairings by round; optional standings tab.  
 - **Public pairings** at `/public/t/:publicSlug` — same view, no login; requires tournament to be public and have a `public_slug`.
-
-### Leaderboard & standings
-
-- **Leaderboard** at `/w/:workspaceSlug/tournaments/:id/leaderboard` — tournament standings.
 
 ### Player–user linking
 
