@@ -98,6 +98,42 @@ interface ViewData {
 
 type SubmitStatus = "submitted" | "agreed" | "conflict" | null;
 
+/**
+ * A name in the pairings table with its running record. Only the name
+ * truncates: the record is the reason to glance at this table between rounds,
+ * so a long name must not push it out of sight. On a phone the columns are too
+ * narrow to share a line, so the record drops underneath and the name gets the
+ * whole cell.
+ */
+function NameWithRecord({ name, record }: { name: string | null; record?: string }) {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: { xs: "column", sm: "row" },
+        alignItems: { xs: "flex-start", sm: "baseline" },
+        minWidth: 0,
+      }}
+    >
+      <Box
+        component="span"
+        sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, maxWidth: "100%" }}
+      >
+        {name}
+      </Box>
+      {record && (
+        <Typography
+          component="span"
+          variant="caption"
+          sx={{ ml: { xs: 0, sm: 0.75 }, opacity: 0.6, fontWeight: 400, flexShrink: 0, whiteSpace: "nowrap" }}
+        >
+          {record}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 interface InsightsData {
   went_first: boolean | null;
   opponent_deck_pokemon1: number | null;
@@ -1162,12 +1198,7 @@ const PlayerTournamentView: React.FC = () => {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {m.player1_name}
-                      {recordMap.has(m.player1_id) && (
-                        <Typography component="span" variant="caption" sx={{ ml: 0.75, opacity: 0.6, fontWeight: 400 }}>
-                          {recordMap.get(m.player1_id)}
-                        </Typography>
-                      )}
+                      <NameWithRecord name={m.player1_name} record={recordMap.get(m.player1_id)} />
                       {/* Not on a phone: this table already truncates names
                           hard, and "Familiar F…" on a second line is noise
                           rather than information. The opponent's whole card
@@ -1194,12 +1225,10 @@ const PlayerTournamentView: React.FC = () => {
                     >
                       {isBye ? "Bye" : (
                         <>
-                          {m.player2_name}
-                          {m.player2_id && recordMap.has(m.player2_id) && (
-                            <Typography component="span" variant="caption" sx={{ ml: 0.75, opacity: 0.6, fontWeight: 400 }}>
-                              {recordMap.get(m.player2_id)}
-                            </Typography>
-                          )}
+                          <NameWithRecord
+                            name={m.player2_name}
+                            record={m.player2_id ? recordMap.get(m.player2_id) : undefined}
+                          />
                           <Box sx={{ display: { xs: "none", sm: "block" } }}>
                             <WornTitle card={cards.get(m.player2_id ?? "")} />
                           </Box>

@@ -122,6 +122,8 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
         size={size}
         sx={{
           "& .MuiTableCell-root": {
+            // Numbers never wrap; the player's name opts back in below.
+            whiteSpace: "nowrap",
             ...(cellPy !== undefined && { py: cellPy }),
             ...(cellPx !== undefined && { px: cellPx }),
           },
@@ -197,11 +199,20 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                     </Typography>
                   </Box>
                 </TableCell>
-                <TableCell>
-                  <Box display="flex" alignItems="center" gap={0.75}>
+                {/* width 100% + maxWidth 0: the name column takes whatever the
+                    numbers leave rather than setting the table's width, so a
+                    long name wraps instead of pushing the tiebreakers into a
+                    horizontal scroll. */}
+                <TableCell sx={{ width: "100%", maxWidth: 0 }}>
+                  <Box display="flex" alignItems="center" gap={0.75} minWidth={0}>
                     <Typography
                       variant="body2"
-                      sx={{ fontWeight: isTopThree || isCurrentPlayer ? "bold" : "normal" }}
+                      sx={{
+                        fontWeight: isTopThree || isCurrentPlayer ? "bold" : "normal",
+                        minWidth: 0,
+                        whiteSpace: "normal",
+                        overflowWrap: "anywhere",
+                      }}
                     >
                       {player.name}
                     </Typography>
@@ -210,7 +221,7 @@ const ChunkTable: React.FC<ChunkTableProps> = ({
                         label="You"
                         size="small"
                         color="primary"
-                        sx={{ height: 18, fontSize: "0.65rem", fontWeight: "bold" }}
+                        sx={{ height: 18, fontSize: "0.65rem", fontWeight: "bold", flexShrink: 0 }}
                       />
                     )}
                   </Box>
