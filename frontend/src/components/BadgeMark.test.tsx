@@ -29,7 +29,7 @@ describe("BadgeMark", () => {
   });
 
   it("takes its fill from the tier", () => {
-    render(<BadgeMark badge={attendance} tier={TIERS[3]} />);
+    render(<BadgeMark badge={attendance} tier={TIERS[3]} frame="shape" />);
     // Gold.
     expect(shape()).toHaveStyle({ background: TIERS[3].hex });
   });
@@ -37,8 +37,16 @@ describe("BadgeMark", () => {
   // Spoiler and Bubble have no rung. Giving them the circle would read as
   // white, the lowest tier, which is wrong for a mythic.
   it("uses the untiered fill for a badge with no tier", () => {
-    render(<BadgeMark badge={spoiler} tier={null} />);
+    render(<BadgeMark badge={spoiler} tier={null} frame="shape" />);
     expect(shape()).toHaveStyle({ background: UNTIERED_HEX });
+  });
+
+  // The outline frame carries the tier in the outline, not a fill, so the art
+  // is the same size on every rung.
+  it("outlines the art in the tier colour by default", () => {
+    render(<BadgeMark badge={attendance} tier={TIERS[3]} />);
+    expect(shape().style.background).toBe("");
+    expect(getComputedStyle(shape()).filter).toContain(TIERS[3].hex);
   });
 
   it("honours the size it is given", () => {
@@ -111,7 +119,7 @@ describe("BadgeMark", () => {
   it("draws the tier the count resolves to", () => {
     // 8 events is bronze on Attendance's ladder.
     const tier = tierFor(attendance, 8);
-    render(<BadgeMark badge={attendance} tier={tier} />);
+    render(<BadgeMark badge={attendance} tier={tier} frame="shape" />);
     expect(shape()).toHaveStyle({ background: TIERS[1].hex });
   });
 });
