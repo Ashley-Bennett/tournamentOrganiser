@@ -217,10 +217,9 @@ export default function CardHarness() {
         The tier ladder, at every rung
       </Typography>
       <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-        {(["outline", "shape"] as const).flatMap((frame) =>
-          [26, 46, 96].map((size) => (
+        {[26, 46, 96].map((size) => (
           <Box
-            key={`${frame}-${size}`}
+            key={size}
             sx={{
               display: "flex",
               gap: 1.5,
@@ -232,9 +231,9 @@ export default function CardHarness() {
           >
             <Typography
               variant="caption"
-              sx={{ width: 96, color: "text.disabled", fontFamily: "monospace" }}
+              sx={{ width: 42, color: "text.disabled", fontFamily: "monospace" }}
             >
-              {frame} {size}px
+              {size}px
             </Typography>
             {TIERS.map((tier) => (
               <BadgeMark
@@ -244,22 +243,14 @@ export default function CardHarness() {
                 size={size}
                 title={tier.label}
                 count={12}
-                frame={frame}
               />
             ))}
-            <BadgeMark
-              badge={BADGES[3]}
-              tier={null}
-              size={size}
-              title="Spoiler"
-              frame={frame}
-            />
+            <BadgeMark badge={BADGES[3]} tier={null} size={size} title="Spoiler" />
           </Box>
-          )),
-        )}
+        ))}
         <Typography variant="caption" color="text.secondary">
           White, bronze, silver, gold, diamond — then an untiered badge. The
-          outline frame traces the art; the shape frame contains it.
+          glow grows with the rung, and white has none.
         </Typography>
       </Paper>
 

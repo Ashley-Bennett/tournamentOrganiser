@@ -57,13 +57,13 @@ export default function PartnerPickerDialog({
       setSpecies(
         list.map((p) => ({
           id: String(p.id),
-          label: p.name,
+          label: p.displayName,
           // The card's artwork, not the small list sprite. Picking one picture
           // and being handed another is the whole thing this avoids, and the
           // dialog only renders a page of rows at a time, so the size of the
           // full species list is not what is being loaded.
           icon: rowIcon(partnerImage(gameId, String(p.id)) ?? ""),
-          keywords: String(p.id),
+          keywords: `${p.name} ${p.id}`,
         })),
       );
     });

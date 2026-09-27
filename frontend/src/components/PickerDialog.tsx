@@ -22,6 +22,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
+import { matchesSearch } from "../utils/search";
 
 /**
  * A searchable pick-from-a-long-list dialog, shared by the event and deck
@@ -99,13 +100,8 @@ export default function PickerDialog({
   const draftSet = useMemo(() => new Set(draft), [draft]);
 
   const matches = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (q === "") return items;
-    return items.filter(
-      (i) =>
-        i.label.toLowerCase().includes(q) ||
-        (i.keywords ?? "").toLowerCase().includes(q),
-    );
+    if (search.trim() === "") return items;
+    return items.filter((i) => matchesSearch(search, i.label, i.keywords));
   }, [items, search]);
 
   const visible = matches.slice(0, shown);

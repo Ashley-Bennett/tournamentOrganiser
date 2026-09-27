@@ -28,10 +28,11 @@ describe("the registry", () => {
     ]);
   });
 
-  // The shape is what makes a tier legible at 26px, so every rung needs its own.
-  it("gives every rung a distinct shape", () => {
-    const shapes = TIERS.map((t) => t.shape);
-    expect(new Set(shapes).size).toBe(shapes.length);
+  // The glow is what separates the pale rungs, so it must climb with them.
+  it("glows more at every rung, and not at all on white", () => {
+    const glows = TIERS.map((t) => t.glow);
+    expect(glows[0]).toBe(0);
+    glows.slice(1).forEach((g, i) => expect(g).toBeGreaterThan(glows[i]));
   });
 
   it("ships the five launch badges", () => {
@@ -45,7 +46,7 @@ describe("the registry", () => {
   });
 
   // A tiered badge needs exactly one threshold per rung, or a count could
-  // resolve to a tier that has no shape to draw.
+  // resolve to a tier that has no colour to draw.
   it("gives every tiered badge one threshold per rung", () => {
     BADGES.filter(isTiered).forEach((b) => {
       expect(b.thresholds).toHaveLength(TIERS.length);

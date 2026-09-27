@@ -19,6 +19,7 @@ import {
   type PokemonEntry,
 } from "../utils/pokemonCache";
 import { nullableArg } from "../utils/rpcArgs";
+import { matchesSearch } from "../utils/search";
 
 function PokemonSlot({
   label,
@@ -147,11 +148,7 @@ const MatchInsightsModal: React.FC<Props> = ({
   const searchResults =
     search.trim().length > 0
       ? allPokemon
-          .filter((p) => {
-            const words = search.toLowerCase().trim().split(/\s+/);
-            const name = p.displayName.toLowerCase();
-            return words.every((w) => name.includes(w));
-          })
+          .filter((p) => matchesSearch(search, p.displayName, p.name))
           .slice(0, 3)
       : [];
 

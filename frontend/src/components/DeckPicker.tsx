@@ -17,6 +17,7 @@ import {
   getSpriteUrl,
   type PokemonEntry,
 } from "../utils/pokemonCache";
+import { matchesSearch } from "../utils/search";
 
 interface Props {
   pokemon1: number | null;
@@ -128,11 +129,7 @@ const DeckPicker: React.FC<Props> = ({ pokemon1, pokemon2, onChange }) => {
   const searchResults =
     searchQuery.trim().length > 0
       ? allPokemon
-          .filter((p) => {
-            const words = searchQuery.toLowerCase().trim().split(/\s+/);
-            const name = p.displayName.toLowerCase();
-            return words.every((w) => name.includes(w));
-          })
+          .filter((p) => matchesSearch(searchQuery, p.displayName, p.name))
           .slice(0, 3)
       : [];
 

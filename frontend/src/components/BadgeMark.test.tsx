@@ -1,21 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import BadgeMark from "./BadgeMark";
-import { BADGES, TIERS, getBadge } from "../badges/registry";
+import { BADGES, TIERS, UNTIERED_HEX, getBadge } from "../badges/registry";
 import { tierFor } from "../badges/tiers";
-import { UNTIERED_HEX } from "../badges/shapes";
 
 const attendance = getBadge("attendance")!;
 const spoiler = getBadge("spoiler")!;
 
-/** The labelled wrapper: sizing, and the counter that hangs off the shape. */
+/** The labelled wrapper: sizing, and the counter that hangs off the art. */
 const mark = () => screen.getByRole("img");
 
 /**
- * The shape itself. It is a child rather than the wrapper because clip-path
- * would cut the counter away, so the fill lives one level in.
+ * The outlined art. A child rather than the wrapper, so the outline filter
+ * does not also trace the counter.
  */
-const shape = () => mark().firstElementChild as HTMLElement;
+const outlined = () => mark().firstElementChild as HTMLElement;
+
+const filterOf = () => getComputedStyle(outlined()).filter;
 
 describe("BadgeMark", () => {
   it("labels itself with the worn title, not the badge's catalogue name", () => {
@@ -28,34 +29,31 @@ describe("BadgeMark", () => {
     expect(screen.getByRole("img", { name: "Attendance" })).toBeInTheDocument();
   });
 
-  it("takes its fill from the tier", () => {
-    render(<BadgeMark badge={attendance} tier={TIERS[3]} frame="shape" />);
-    // Gold.
-    expect(shape()).toHaveStyle({ background: TIERS[3].hex });
-  });
-
-  // Spoiler and Bubble have no rung. Giving them the circle would read as
-  // white, the lowest tier, which is wrong for a mythic.
-  it("uses the untiered fill for a badge with no tier", () => {
-    render(<BadgeMark badge={spoiler} tier={null} frame="shape" />);
-    expect(shape()).toHaveStyle({ background: UNTIERED_HEX });
-  });
-
-  // The outline frame carries the tier in the outline, not a fill, so the art
-  // is the same size on every rung.
-  it("outlines the art in the tier colour by default", () => {
+  it("outlines the art in the tier colour", () => {
     render(<BadgeMark badge={attendance} tier={TIERS[3]} />);
-    expect(shape().style.background).toBe("");
-    expect(getComputedStyle(shape()).filter).toContain(TIERS[3].hex);
+    // Gold.
+    expect(filterOf()).toContain(TIERS[3].hex);
+  });
+
+  // Spoiler and Bubble have no rung. Borrowing a pale colour would read as one
+  // more rung of the ladder, which is wrong for a mythic.
+  it("uses the untiered colour for a badge with no tier", () => {
+    render(<BadgeMark badge={spoiler} tier={null} />);
+    expect(filterOf()).toContain(UNTIERED_HEX);
+  });
+
+  // A tiered badge nobody has reached yet is locked, not special.
+  it("draws a tiered badge with no rung yet on white, not the untiered colour", () => {
+    render(<BadgeMark badge={attendance} tier={null} />);
+    expect(filterOf()).toContain(TIERS[0].hex);
+    expect(filterOf()).not.toContain(UNTIERED_HEX);
   });
 
   // White and silver are both pale; the glow is what tells them apart.
   it("glows on silver but not on white", () => {
     const blurred = (tier: (typeof TIERS)[number]) => {
       const { unmount } = render(<BadgeMark badge={attendance} tier={tier} />);
-      const glows = /drop-shadow\(0 0 [1-9]\d*px #/.test(
-        getComputedStyle(shape()).filter,
-      );
+      const glows = /drop-shadow\(0 0 [1-9]\d*px #/.test(filterOf());
       unmount();
       return glows;
     };
@@ -68,11 +66,11 @@ describe("BadgeMark", () => {
     expect(mark()).toHaveStyle({ width: "26px", height: "26px" });
   });
 
-  it("draws the badge's art inside the container", () => {
+  it("draws the badge's art", () => {
     render(<BadgeMark badge={attendance} tier={TIERS[2]} title="Regular" />);
-    const art = shape().querySelector("img");
+    const art = outlined().querySelector("img");
     expect(art).toHaveAttribute("src", "/badges/attendance.png");
-    expect(shape()).not.toHaveTextContent("R");
+    expect(outlined()).not.toHaveTextContent("R");
   });
 
   // Every registered badge has art, so a missing file would otherwise only
@@ -84,18 +82,18 @@ describe("BadgeMark", () => {
   it("shows a stand-in letter for a badge with no art", () => {
     const undrawn = { ...attendance, artSrc: undefined };
     render(<BadgeMark badge={undrawn} tier={TIERS[2]} title="Regular" />);
-    expect(shape()).toHaveTextContent("R");
-    expect(shape().querySelector("img")).toBeNull();
+    expect(outlined()).toHaveTextContent("R");
+    expect(outlined().querySelector("img")).toBeNull();
   });
 
   it("falls back to the letter when the art fails to load", () => {
     render(<BadgeMark badge={attendance} tier={TIERS[2]} title="Regular" />);
-    fireEvent.error(shape().querySelector("img")!);
-    expect(shape()).toHaveTextContent("R");
+    fireEvent.error(outlined().querySelector("img")!);
+    expect(outlined()).toHaveTextContent("R");
   });
 
-  // Every rung shape must be reachable — a count resolving to a tier whose
-  // shape does not render is the failure this guards.
+  // Every rung must be reachable — a count resolving to a tier that does not
+  // render is the failure this guards.
   it("renders at every rung without throwing", () => {
     TIERS.forEach((tier) => {
       const { unmount } = render(
@@ -133,7 +131,7 @@ describe("BadgeMark", () => {
   it("draws the tier the count resolves to", () => {
     // 8 events is bronze on Attendance's ladder.
     const tier = tierFor(attendance, 8);
-    render(<BadgeMark badge={attendance} tier={tier} frame="shape" />);
-    expect(shape()).toHaveStyle({ background: TIERS[1].hex });
+    render(<BadgeMark badge={attendance} tier={tier} />);
+    expect(filterOf()).toContain(TIERS[1].hex);
   });
 });

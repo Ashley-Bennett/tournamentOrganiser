@@ -8,20 +8,27 @@ import type { BadgeDefinition, Tier, TierId } from "./types";
  */
 
 /**
- * The tier ladder, low to high. Shape carries the tier as much as colour does,
- * so a rung is legible at 26px across a room.
- *
- * The progression reads blank → cut → pointed → radiant → gem, which people
- * rank correctly without being taught it. Star sits below rhombus on purpose:
- * a star is a rank, a gem is a treasure.
+ * The tier ladder, low to high. Each rung is an outline colour and a glow that
+ * grows as you climb — white has no glow at all, so the glow itself is what
+ * you earn, and it separates the pale rungs when their colours look alike.
  */
 export const TIERS: Tier[] = [
-  { id: "white", label: "White", shape: "circle", hex: "#EDF0F5", glow: 0 },
-  { id: "bronze", label: "Bronze", shape: "hexagon", hex: "#A9784A", glow: 0.5 },
-  { id: "silver", label: "Silver", shape: "shield", hex: "#C3C9D2", glow: 0.8 },
-  { id: "gold", label: "Gold", shape: "star", hex: "#D9AC3F", glow: 1 },
-  { id: "diamond", label: "Diamond", shape: "rhombus", hex: "#8FD3DA", glow: 1.4 },
+  { id: "white", label: "White", hex: "#EDF0F5", glow: 0 },
+  { id: "bronze", label: "Bronze", hex: "#A9784A", glow: 0.5 },
+  { id: "silver", label: "Silver", hex: "#C3C9D2", glow: 0.8 },
+  { id: "gold", label: "Gold", hex: "#D9AC3F", glow: 1 },
+  { id: "diamond", label: "Diamond", hex: "#8FD3DA", glow: 1.4 },
 ];
+
+/**
+ * The colour of a badge with no tier. Purple, because no rung is anywhere
+ * near it — a grey-blue here read as one more pale rung beside white and
+ * silver, which is exactly what an untiered badge is not.
+ */
+export const UNTIERED_HEX = "#A77BFF";
+
+/** Untiered badges glow at full strength; they are the rare ones. */
+export const UNTIERED_GLOW = 1;
 
 export const BADGES: BadgeDefinition[] = [
   {

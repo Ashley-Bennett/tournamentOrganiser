@@ -6,33 +6,23 @@
  *
  * Definitions live in the frontend rather than the database because they are
  * static. The wire carries a badge id and a count; the client renders the
- * title, explanation, container and colour. That keeps the pairing board's
+ * title, explanation, art and colour. That keeps the pairing board's
  * payload small — thirty-two players' badges cost a handful of integers — and
  * means adding a badge is a code change rather than a migration.
  */
 
 /**
- * The five rungs, low to high. Each is a shape as well as a colour, so the tier
- * survives at 26px on a projector where colour alone would not.
+ * The five rungs, low to high. Each is a colour and a glow strength, so the
+ * tier survives on a projector where two pale colours alone would not.
  *
- * There is no copper: it was the weakest pair against bronze on both hue and
- * silhouette, and a rung you have to squint at is worse than one fewer rung.
+ * There is no copper: it was the weakest pair against bronze, and a rung you
+ * have to squint at is worse than one fewer rung.
  */
 export type TierId = "white" | "bronze" | "silver" | "gold" | "diamond";
-
-export type ContainerShape =
-  | "circle"
-  | "hexagon"
-  | "shield"
-  | "star"
-  | "rhombus"
-  /** Untiered badges sit outside the ladder entirely. */
-  | "plaque";
 
 export interface Tier {
   id: TierId;
   label: string;
-  shape: ContainerShape;
   /** Starting values. The designer may return a different ramp. */
   hex: string;
   /**
@@ -93,7 +83,7 @@ export interface BadgeDefinition {
   metric: BadgeMetric;
   /**
    * Ascending thresholds, one per tier, for a tiered badge. Empty for an
-   * untiered one, which always renders in the plaque container.
+   * untiered one, which is drawn in the untiered colour.
    */
   thresholds: number[];
   /**
@@ -123,10 +113,9 @@ export interface BadgeDefinition {
    */
   perGame: boolean;
   /**
-   * The mark drawn inside the tier container, served from public/badges/.
-   * One image for every rung — the container carries the tier, the art carries
-   * the badge. Absent until a badge is drawn, and the mark falls back to a
-   * letter.
+   * The badge's art, served from public/badges/. One image for every rung —
+   * the outline and glow carry the tier, the art carries the badge. Absent
+   * until a badge is drawn, and the mark falls back to a letter.
    */
   artSrc?: string;
 }

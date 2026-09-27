@@ -213,7 +213,7 @@ const OrganiserStats: React.FC = () => {
   useEffect(() => {
     if (!hasDecks) return;
     void getPokemonList().then((list) => {
-      setNameMap(new Map(list.map((p) => [p.id, p.name])));
+      setNameMap(new Map(list.map((p) => [p.id, p.displayName])));
     });
   }, [hasDecks]);
 

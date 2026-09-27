@@ -1,49 +1,22 @@
 import React from "react";
 import { Box } from "@mui/material";
-import {
-  UNTIERED_GLOW,
-  UNTIERED_HEX,
-  UNTIERED_SHAPE,
-  clipPathFor,
-  radiusFor,
-} from "../badges/shapes";
-import { isTiered } from "../badges/registry";
-import type { BadgeDefinition, ContainerShape, Tier } from "../badges/types";
+import { TIERS, UNTIERED_GLOW, UNTIERED_HEX, isTiered } from "../badges/registry";
+import type { BadgeDefinition, Tier } from "../badges/types";
 
 /**
  * One badge, drawn.
  *
- * The art says which badge; the tier colour says which rung. A badge with no
- * art yet, or whose image fails to load, shows the first letter of its title
- * instead.
- *
- * Two frames, while we decide between them:
- *  - "outline" traces the art's own silhouette in the tier colour and adds a
- *    glow. The art is the same size on every rung.
- *  - "shape" sits the art inside a tier-shaped container. The shape carries
- *    the tier without colour, but the star and rhombus leave the art small.
+ * The art says which badge; an outline traced around the art's own silhouette,
+ * and a glow off it, say which rung. The art is the same size on every rung. A
+ * badge with no art yet, or whose image fails to load, shows the first letter
+ * of its title instead.
  */
-export type BadgeFrame = "outline" | "shape";
 
 /** Below this the counter is illegible, so it is dropped rather than drawn. */
 const MIN_SIZE_FOR_COUNT = 32;
 
-/**
- * How much of the container the art may fill, per shape. Each is roughly the
- * largest centred square that stays inside the silhouette — the rhombus and
- * the star lose their corners to the clip, so their art has to be smaller.
- */
-const ART_SCALE: Record<ContainerShape, number> = {
-  circle: 0.7,
-  hexagon: 0.68,
-  shield: 0.62,
-  star: 0.42,
-  rhombus: 0.52,
-  plaque: 0.74,
-};
-
-/** In the outline frame, the art leaves room in its box for the outline. */
-const OUTLINE_ART_SCALE = 0.86;
+/** The art leaves room in its box for the outline. */
+const ART_SCALE = 0.86;
 
 /**
  * The outline and glow, as a filter chain.
@@ -84,10 +57,12 @@ export default function BadgeMark({
   size = 46,
   title,
   count,
-  frame = "outline",
 }: {
   badge: BadgeDefinition;
-  /** Null for an untiered badge, which uses the plaque rather than a rung. */
+  /**
+   * Null for an untiered badge, which uses the untiered colour — or for a
+   * tiered one not yet reached, which is drawn on the bottom rung.
+   */
   tier: Tier | null;
   size?: number;
   /** The worn title at this rung, used for the stand-in letter and the label. */
@@ -98,14 +73,13 @@ export default function BadgeMark({
    * and a "1" on one would invite the question of what a 2 would mean.
    */
   count?: number;
-  frame?: BadgeFrame;
 }) {
-  const shape = tier?.shape ?? UNTIERED_SHAPE;
-  const fill = tier?.hex ?? UNTIERED_HEX;
-  const glow = tier?.glow ?? UNTIERED_GLOW;
-  const clip = clipPathFor(shape);
+  // A locked Champion must not borrow the untiered purple, or it reads as a
+  // special badge rather than one you have not earned yet.
+  const rung = tier ?? (isTiered(badge) ? TIERS[0] : null);
+  const colour = rung?.hex ?? UNTIERED_HEX;
+  const glow = rung?.glow ?? UNTIERED_GLOW;
   const label = title ?? badge.title;
-  const outlined = frame === "outline";
 
   // Reset when the badge changes, so one broken image does not leave every
   // later badge in this slot on the letter.
@@ -120,18 +94,15 @@ export default function BadgeMark({
     size >= MIN_SIZE_FOR_COUNT;
 
   const counterSize = Math.round(size * 0.4);
-  const artSize = Math.round(
-    size * (outlined ? OUTLINE_ART_SCALE : ART_SCALE[shape]),
-  );
+  const artSize = Math.round(size * ART_SCALE);
 
   return (
     <Box
       sx={{
         position: "relative",
         width: size,
-        // Room for the counter to hang below the shape without being clipped
-        // by a parent — the shape itself cannot hold it, since clip-path would
-        // cut it away.
+        // Room for the counter to hang below the art without being clipped by
+        // a parent.
         height: showCount ? size + Math.round(counterSize * 0.3) : size,
         flex: "none",
       }}
@@ -147,40 +118,15 @@ export default function BadgeMark({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          // Dark ink inside a tier-coloured outline reads on both themes.
+          color: "#16202F",
           fontFamily: "monospace",
           fontWeight: 600,
+          fontSize: Math.round(size * 0.6),
           lineHeight: 1,
           userSelect: "none",
-          ...(outlined
-            ? {
-                // Dark ink inside a tier-coloured outline reads on both themes.
-                color: "#16202F",
-                fontSize: Math.round(size * 0.6),
-                filter: (theme) =>
-                  outlineFilter(fill, glow, size, theme.palette.mode),
-              }
-            : {
-                background: fill,
-                clipPath: clip ?? undefined,
-                borderRadius: radiusFor(shape, size),
-                // A hairline so the shape is defined against its own
-                // background. The white rung is all but invisible on a light
-                // card without it, and a border cannot be used because
-                // clip-path cuts it away — a drop-shadow follows the clipped
-                // silhouette instead.
-                filter: (theme) =>
-                  `drop-shadow(0 0 1px ${
-                    theme.palette.mode === "light"
-                      ? "rgba(18,26,40,.30)"
-                      : "rgba(255,255,255,.22)"
-                  })`,
-                // Every rung colour is light or mid, so dark ink reads on all
-                // five.
-                color: "#16202F",
-                // The star loses a lot of its area to points, so its letter
-                // needs to be smaller than the others to stay inside the shape.
-                fontSize: Math.round(size * (shape === "star" ? 0.3 : 0.42)),
-              }),
+          filter: (theme) =>
+            outlineFilter(colour, glow, size, theme.palette.mode),
         }}
       >
         {showArt ? (

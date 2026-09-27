@@ -17,6 +17,7 @@ import { deckKey } from "../utils/deck";
 import StatsTable, { type StatsColumn } from "./StatsTable";
 import EventPicker, { type EventOption } from "./EventPicker";
 import { useStatsDrill } from "../hooks/useStatsDrill";
+import { matchesSearch } from "../utils/search";
 
 /**
  * What the room actually brought.
@@ -185,16 +186,12 @@ export default function MetaShareSection({
   );
 
   const visibleRows = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return rows.filter((r) => {
       if (!showOneOffs && r.entries < 2) return false;
-      if (q === "") return true;
-      const label = [r.deck_pokemon1, r.deck_pokemon2]
+      const names = [r.deck_pokemon1, r.deck_pokemon2]
         .filter((id): id is number => id != null)
-        .map((id) => nameMap.get(id) ?? `#${id}`)
-        .join(" / ")
-        .toLowerCase();
-      return label.includes(q);
+        .map((id) => nameMap.get(id) ?? `#${id}`);
+      return matchesSearch(search, ...names);
     });
   }, [rows, search, showOneOffs, nameMap]);
 
