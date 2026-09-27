@@ -1010,6 +1010,15 @@ export type Database = {
         Args: { p_name: string; p_tournament_id: string }
         Returns: string
       }
+      _insert_round_matches: {
+        Args: {
+          p_matches: Json
+          p_round_number: number
+          p_tournament_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       _normalise_player_name: { Args: { p_name: string }; Returns: string }
       _remove_player_from_round_unchecked: {
         Args: { p_player_id: string; p_round: number; p_tournament_id: string }
@@ -2056,11 +2065,7 @@ export type Database = {
         Returns: string
       }
       start_tournament: {
-        Args: {
-          p_matches: Json
-          p_num_rounds: number
-          p_tournament_id: string
-        }
+        Args: { p_matches: Json; p_num_rounds: number; p_tournament_id: string }
         Returns: undefined
       }
       submit_match_result: {
