@@ -60,7 +60,7 @@ const TournamentMatches: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { workspaceId, wPath } = useWorkspace();
+  const { workspaceId, wPath, loading: workspaceLoading } = useWorkspace();
   const { knownPlayers } = useWorkspacePlayers(workspaceId);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -231,6 +231,17 @@ const TournamentMatches: React.FC = () => {
       navigate("/login", { replace: true });
       return;
     }
+    // Querying before the workspace resolves would filter on an empty id,
+    // which Postgres rejects as an invalid uuid.
+    if (workspaceLoading) return;
+    if (!workspaceId) {
+      if (!initialTournamentLoadDoneRef.current) {
+        setError("Tournament not found or you do not have access");
+        setTournament(null);
+        setLoading(false);
+      }
+      return;
+    }
 
     const fetchTournament = async () => {
       const isInitialLoad = !initialTournamentLoadDoneRef.current;
@@ -244,7 +255,7 @@ const TournamentMatches: React.FC = () => {
             "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, game_id",
           )
           .eq("id", id)
-          .eq("workspace_id", workspaceId ?? "")
+          .eq("workspace_id", workspaceId)
           .maybeSingle();
 
         if (error) {
@@ -295,7 +306,7 @@ const TournamentMatches: React.FC = () => {
     };
 
     void fetchTournament();
-  }, [id, user, authLoading, navigate, workspaceId]);
+  }, [id, user, authLoading, navigate, workspaceId, workspaceLoading]);
 
   const { matchReports } = useMatchReports({
     tournamentId: tournament?.id,
