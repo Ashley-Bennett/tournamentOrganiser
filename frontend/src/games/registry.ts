@@ -18,7 +18,7 @@ const POKEMON: GameDefinition = {
     { id: "expanded", name: "Expanded", hint: "Black & White onwards" },
     { id: "glc", name: "Gym Leader Challenge", hint: "Singleton, one type" },
   ],
-  structures: ["swiss", "round_robin"],
+  structures: ["swiss", "single_elimination", "round_robin"],
   deck: "pokemon",
   rules: POKEMON_RULES,
   iconSrc: "/games/pokemon.svg",
@@ -39,7 +39,7 @@ const GENERIC: GameDefinition = {
   // No formats: a generic event is not a specific game, so there is nothing
   // to pick between. The create dialog skips the format step entirely.
   formats: [],
-  structures: ["swiss", "round_robin"],
+  structures: ["swiss", "single_elimination", "round_robin"],
   deck: "none",
   rules: GENERIC_RULES,
   iconSrc: "/games/generic.svg",

@@ -104,8 +104,8 @@ function ScreenshotFrame({
 const features = [
   {
     icon: <SpeedIcon fontSize="large" />,
-    title: "Swiss & Single Elimination",
-    desc: "Auto-generate pairings for any format. Swiss rounds handle byes and rematches for you, so nobody has to redo the maths.",
+    title: "Swiss Pairings",
+    desc: "Auto-generate every round. Swiss pairing handles byes and rematches for you, so nobody has to redo the maths. Single elimination is coming soon.",
   },
   {
     icon: <LeaderboardIcon fontSize="large" />,
@@ -138,7 +138,7 @@ const steps = [
   {
     n: "1",
     title: "Create a tournament",
-    desc: "Name it, pick Swiss or single-elimination, set the number of rounds, and add a round timer if you need one.",
+    desc: "Name it, pick your game, set the number of rounds, and add a round timer if you need one.",
     img: "/screenshots/setup.png",
     imgAlt: "Tournament setup screen",
     imgWidth: 1061,
@@ -431,7 +431,7 @@ export default function Landing() {
 
         <Container maxWidth="md" sx={{ position: "relative" }}>
           <Chip
-            label="Swiss · Single Elimination · Live Standings"
+            label="Swiss · Live Standings · Public Pairings"
             size="small"
             sx={{
               mb: 3,
@@ -545,20 +545,26 @@ export default function Landing() {
             sx={{ gap: { xs: 2.5, md: 4 } }}
           >
             {[
-              "Swiss pairings",
-              "Single elimination",
-              "Live standings",
-              "Public share links",
-              "Round timers",
-              "Team workspaces",
-            ].map((label) => (
+              { label: "Swiss pairings" },
+              { label: "Live standings" },
+              { label: "Public share links" },
+              { label: "Round timers" },
+              { label: "Team workspaces" },
+              // Not built yet. A clock rather than a tick, so the strip never
+              // claims something an organiser cannot actually pick.
+              { label: "Single elimination", soon: true },
+            ].map(({ label, soon }) => (
               <Stack
                 key={label}
                 direction="row"
                 spacing={0.75}
                 alignItems="center"
               >
-                <CheckIcon sx={{ fontSize: 15, color: ACCENT }} />
+                {soon ? (
+                  <AccessTimeIcon sx={{ fontSize: 15, color: textMuted }} />
+                ) : (
+                  <CheckIcon sx={{ fontSize: 15, color: ACCENT }} />
+                )}
                 <Typography
                   sx={{
                     fontSize: "0.82rem",
@@ -567,6 +573,23 @@ export default function Landing() {
                   }}
                 >
                   {label}
+                  {soon && (
+                    <Box
+                      component="span"
+                      sx={{
+                        ml: 0.75,
+                        px: 0.75,
+                        py: 0.125,
+                        fontSize: "0.7rem",
+                        fontWeight: 600,
+                        letterSpacing: "0.02em",
+                        borderRadius: 1,
+                        border: `1px solid ${border}`,
+                      }}
+                    >
+                      Coming soon
+                    </Box>
+                  )}
                 </Typography>
               </Stack>
             ))}

@@ -1,6 +1,6 @@
 # Matchamp — Tournament Organiser
 
-**Matchamp** is a full-stack tournament organiser app. Create workspaces, run Swiss or single-elimination tournaments, manage players, enter match results, and share standings and pairings with participants—including public, shareable pairings pages and player claim links so competitors can link their account to their entries.
+**Matchamp** is a full-stack tournament organiser app. Create workspaces, run Swiss tournaments (single elimination is coming soon), manage players, enter match results, and share standings and pairings with participants—including public, shareable pairings pages and player claim links so competitors can link their account to their entries.
 
 ---
 
@@ -151,7 +151,7 @@ You can do both organising and playing with one account.
 1. In a workspace, open **Tournaments** and click **Create tournament**.  
 2. Fill in:
    - **Name** (e.g. “Friday Night Swiss”)  
-   - **Type**: **Swiss** or **Single elimination**  
+   - **Game** and **Structure**: Swiss today; single elimination and round robin are listed as coming soon  
    - **Public**: turn on if you want a shareable pairings page (no login).  
 3. Save. You’re taken to the tournament detail page.
 
@@ -167,14 +167,14 @@ You can add or remove players until the tournament is started.
 ### 6. Start the tournament
 
 - When the player list is ready, click **Start tournament**.  
-- The first round is generated (Swiss: pairings; single elimination: bracket).  
+- Round 1 is paired automatically.  
 - After starting, you can still use **Matches**, **Pairings**, and **Leaderboard**.
 
 ### 7. Enter match results
 
 1. Open **Matches** (or the “Matches” link from the tournament view).  
 2. For each match, enter or confirm the result (e.g. winner, score).  
-3. When results are in, you can generate the next round (Swiss) or advance the bracket (single elimination).
+3. When results are in, you can generate the next round.
 
 ### 8. View pairings and leaderboard
 
@@ -228,7 +228,7 @@ You can open **Me** from the header to switch between “organiser” and “pla
 ### Tournaments
 
 - **List** at `/w/:workspaceSlug/tournaments` — filter by status/name, create, delete (with confirmation).  
-- **Create** at `/w/:workspaceSlug/tournaments/create` — name, type (Swiss / single elimination), public toggle.  
+- **Create** at `/w/:workspaceSlug/tournaments/create` — name, game, structure (Swiss; single elimination and round robin coming soon), public toggle.  
 - **Tournament view** at `/w/:workspaceSlug/tournaments/:id`:
   - Add/remove players (single or bulk).  
   - Start tournament.  
