@@ -20,6 +20,7 @@ interface Payload {
     | "standings_ready"
     | "late_join"
     | "player_dropped"
+    | "opponent_dropped"
     | "bye_paired"
     | "opponent_removed"
     | "link_request"
@@ -27,12 +28,13 @@ interface Payload {
   tournament_id: string;
   round?: number;
   /** late_join / bye_paired: who just added themselves.
-   *  player_dropped: who just dropped themselves.
+   *  player_dropped / opponent_dropped: who just dropped themselves.
    *  opponent_removed: who was taken out of the round.
    *  link_request: the entry a player says is theirs. */
   player_name?: string;
   /** bye_paired: the player whose bye was taken by the late entry.
-   *  opponent_removed: the player left without an opponent. */
+   *  opponent_removed: the player left without an opponent.
+   *  opponent_dropped: the player awarded the win. */
   player_id?: string;
   /** badge_earned: the entries that gained a badge they had never held.
    *  Entry ids rather than account ids, because a subscription belongs to
@@ -217,10 +219,17 @@ Deno.serve(async (req) => {
       }
     } else if (type === "player_dropped") {
       // Organisers only — a player has dropped themselves, which may have
-      // handed someone in the next round a bye.
+      // conceded a match in the current round.
       if (row.is_organiser) {
         title = `${player_name ?? "A player"} dropped`;
-        body = "They left the tournament — tap to check the pairings.";
+        body = "They left the tournament — tap to check the round.";
+      }
+    } else if (type === "opponent_dropped") {
+      // Just the opponent of a player who dropped before their match had a
+      // result — the drop counts as a win for them.
+      if (player_id && row.tournament_player_id === player_id) {
+        title = `Round ${round}: you win`;
+        body = `${player_name ?? "Your opponent"} dropped from the tournament, so the match goes to you.`;
       }
     } else if (type === "time_up") {
       if (row.is_organiser || (row.tournament_player_id && roundPlayerIds.has(row.tournament_player_id))) {

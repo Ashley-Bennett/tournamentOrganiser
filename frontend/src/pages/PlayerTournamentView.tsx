@@ -883,8 +883,8 @@ const PlayerTournamentView: React.FC = () => {
         <DialogContent>
           <DialogContentText>
             You keep your record so far, but you won&apos;t be paired in any
-            more rounds. If you&apos;re in the middle of a match, finish or
-            concede it first. Only the organiser can undo this.
+            more rounds. If your current match doesn&apos;t have a result yet,
+            it counts as a loss for you. Only the organiser can undo this.
           </DialogContentText>
           {dropError && (
             <Alert severity="error" sx={{ mt: 2 }}>
