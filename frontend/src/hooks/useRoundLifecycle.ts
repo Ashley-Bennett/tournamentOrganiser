@@ -61,6 +61,15 @@ async function recordRoundEvent(
   }
 }
 
+/**
+ * `create_round` refuses a round that already has matches. That only happens
+ * when another tab or organiser paired it first, so the right response is to
+ * show their round rather than an error.
+ */
+function isAlreadyPaired(error: { message?: string }): boolean {
+  return /has already been paired/.test(error.message ?? "");
+}
+
 export function useRoundLifecycle({
   tournament,
   setTournament,
@@ -438,16 +447,6 @@ export function useRoundLifecycle({
         throw new Error("Failed to generate pairings");
       }
 
-      const { error: deleteError } = await supabase
-        .from("tournament_matches")
-        .delete()
-        .eq("tournament_id", tournament.id)
-        .eq("round_number", 1);
-
-      if (deleteError) {
-        throw new Error(deleteError.message || "Failed to delete existing round 1 matches");
-      }
-
       const staticSeatsR1 = new Map<string, number>();
       playersData.forEach((p) => {
         if (p.has_static_seating && p.static_seat_number != null) {
@@ -463,25 +462,23 @@ export function useRoundLifecycle({
         pairingResult.decisionLog.seatConflicts = seatConflictsR1;
       }
 
-      const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
-        tournament_id: tournament.id,
-        workspace_id: workspaceId,
-        round_number: 1,
+      const roundMatches = pairingResult.pairings.map((pairing, index) => ({
         match_number: seatAssignmentsR1[index].matchNumber,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
-        status: MATCH_STATUS.READY,
-        result: null,
-        winner_id: null,
         pairing_decision_log:
           index === 0 ? serializeDecisionLog(pairingResult.decisionLog) : null,
       }));
 
-      const { error: insertError } = await supabase
-        .from("tournament_matches")
-        .insert(matchesToInsert);
+      // One transaction: the round is written whole or not at all, and a round
+      // another tab has already paired is refused rather than paired twice.
+      const { error: insertError } = await supabase.rpc("create_round", {
+        p_tournament_id: tournament.id,
+        p_round_number: 1,
+        p_matches: roundMatches,
+      });
 
-      if (insertError) {
+      if (insertError && !isAlreadyPaired(insertError)) {
         throw new Error(insertError.message || "Failed to create round 1 matches");
       }
 
@@ -690,40 +687,34 @@ export function useRoundLifecycle({
         pairingResult.decisionLog.seatConflicts = seatConflictsNext;
       }
 
-      const matchesToInsert = pairingResult.pairings.map((pairing, index) => ({
-        tournament_id: tournament.id,
-        workspace_id: workspaceId,
-        round_number: nextRoundNumber,
+      const roundMatches = pairingResult.pairings.map((pairing, index) => ({
         match_number: seatAssignments[index].matchNumber,
         player1_id: pairing.player1Id,
         player2_id: pairing.player2Id,
-        status: MATCH_STATUS.READY,
-        result: null,
-        winner_id: null,
         pairing_decision_log:
           index === 0 ? serializeDecisionLog(pairingResult.decisionLog) : null,
       }));
 
-      const { error: insertError } = await supabase
-        .from("tournament_matches")
-        .insert(matchesToInsert);
+      // One transaction that also clears the round clock, so the new round
+      // never starts with the last round's timer running. A second tab that
+      // got here first makes this fail with "already been paired".
+      const { error: insertError } = await supabase.rpc("create_round", {
+        p_tournament_id: tournament.id,
+        p_round_number: nextRoundNumber,
+        p_matches: roundMatches,
+      });
 
       if (insertError) {
+        if (isAlreadyPaired(insertError)) {
+          await refreshMatches();
+          setSelectedRound(nextRoundNumber);
+          return;
+        }
         throw new Error(insertError.message || "Failed to create next round");
       }
 
-      // Close the outgoing round's history before the timer is cleared.
       await recordRoundEvent("end_tournament_round", tournament.id, selectedRound);
 
-      // Clear the round timer so the new round starts without a running clock
-      await supabase
-        .from("tournaments")
-        .update({
-          current_round_started_at: null,
-          round_elapsed_seconds: 0,
-          round_is_paused: false,
-        })
-        .eq("id", tournament.id);
       setTournament((prev) =>
         prev
           ? {

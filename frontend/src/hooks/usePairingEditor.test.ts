@@ -5,7 +5,7 @@ import type { MatchWithPlayers } from "../types/match";
 import type { TournamentSummary } from "../types/tournament";
 
 vi.mock("../supabaseClient", () => ({
-  supabase: { from: vi.fn() },
+  supabase: { from: vi.fn(), rpc: vi.fn() },
 }));
 
 import { supabase } from "../supabaseClient";
@@ -172,5 +172,70 @@ describe("usePairingEditor", () => {
     // No slot changes — changedMatches will be empty, only update runs
     await act(async () => result.current.handleSavePairingEdits());
     expect(refreshMatches).toHaveBeenCalled();
+  });
+});
+
+describe("usePairingEditor — saving edits", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const MATCHES = [
+    makeMatch({ id: "m1", match_number: 1, player1_id: "p1", player1_name: "Alice", player2_id: "p2", player2_name: "Bob" }),
+    makeMatch({ id: "m2", match_number: 2, player1_id: "p3", player1_name: "Carol", player2_id: "p4", player2_name: "Dave" }),
+  ];
+
+  function swapBobAndCarol(result: { current: ReturnType<typeof usePairingEditor> }) {
+    act(() => result.current.handleEditPairings());
+    act(() => result.current.removeFromSlot("m1", "player2"));
+    act(() => result.current.removeFromSlot("m2", "player1"));
+    act(() => result.current.assignToSlot("m1", "player2", "p3"));
+    act(() => result.current.assignToSlot("m2", "player1", "p2"));
+  }
+
+  it("replaces the changed matches in one replace_round_matches call and writes no rows itself", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue(
+      { data: null, error: null } as unknown as Awaited<ReturnType<typeof supabase.rpc>>,
+    );
+    const refreshMatches = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      usePairingEditor({ ...defaultParams, matches: MATCHES, refreshMatches }),
+    );
+
+    swapBobAndCarol(result);
+    await act(async () => result.current.handleSavePairingEdits());
+
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    expect(supabase.rpc).toHaveBeenCalledWith("replace_round_matches", {
+      p_tournament_id: "t1",
+      p_round_number: 1,
+      p_match_ids: ["m1", "m2"],
+      p_matches: [
+        { match_number: 1, player1_id: "p1", player2_id: "p3", pairing_decision_log: null },
+        { match_number: 2, player1_id: "p2", player2_id: "p4", pairing_decision_log: null },
+      ],
+    });
+    expect(refreshMatches).toHaveBeenCalled();
+    expect(result.current.editingPairings).toBe(false);
+  });
+
+  it("keeps the editor open with the error when the save is refused", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue(
+      {
+        data: null,
+        error: { message: "These pairings have changed since you opened them. Refresh and try again." },
+      } as unknown as Awaited<ReturnType<typeof supabase.rpc>>,
+    );
+    const setError = vi.fn();
+    const { result } = renderHook(() =>
+      usePairingEditor({ ...defaultParams, matches: MATCHES, setError }),
+    );
+
+    swapBobAndCarol(result);
+    await act(async () => result.current.handleSavePairingEdits());
+
+    expect(setError).toHaveBeenCalledWith(
+      "These pairings have changed since you opened them. Refresh and try again.",
+    );
+    expect(result.current.editingPairings).toBe(true);
   });
 });

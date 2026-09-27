@@ -1116,6 +1116,14 @@ export type Database = {
           token: string
         }[]
       }
+      create_round: {
+        Args: {
+          p_matches: Json
+          p_round_number: number
+          p_tournament_id: string
+        }
+        Returns: undefined
+      }
       create_workspace: {
         Args: {
           p_name: string
@@ -1935,6 +1943,15 @@ export type Database = {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      replace_round_matches: {
+        Args: {
+          p_match_ids: string[]
+          p_matches: Json
+          p_round_number: number
+          p_tournament_id: string
+        }
+        Returns: undefined
+      }
       request_player_entry_link: {
         Args: { p_entry_name: string; p_tournament_id: string }
         Returns: undefined
@@ -2037,6 +2054,14 @@ export type Database = {
       split_workspace_player_entries: {
         Args: { p_entry_ids: string[]; p_workspace_id: string }
         Returns: string
+      }
+      start_tournament: {
+        Args: {
+          p_matches: Json
+          p_num_rounds: number
+          p_tournament_id: string
+        }
+        Returns: undefined
       }
       submit_match_result: {
         Args: {

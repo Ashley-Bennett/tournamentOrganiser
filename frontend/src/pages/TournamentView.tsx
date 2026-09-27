@@ -656,26 +656,6 @@ const handleSetRoundDuration = async (minutes: number | null) => {
       setStartingTournament(true);
       setError(null);
 
-      const { data: tournamentData, error: tournamentError } = await supabase
-        .from("tournaments")
-        .update({ status: "active", num_rounds: numRounds, join_enabled: false })
-        .eq("id", tournament.id)
-        .eq("workspace_id", workspaceId)
-        .select(
-          "id, name, status, tournament_type, num_rounds, created_at, created_by, is_public, public_slug, join_enabled, join_code, allow_late_join, round_duration_minutes, current_round_started_at, round_elapsed_seconds, round_is_paused, round_note, starts_at, game_format, location, description, game_id",
-        )
-        .maybeSingle();
-
-      if (tournamentError) {
-        throw new Error(
-          tournamentError.message || "Failed to start tournament",
-        );
-      }
-
-      if (!tournamentData) {
-        throw new Error("Failed to update tournament");
-      }
-
       const pairings = generateRound1Pairings(
         tournament.tournament_type,
         players,
@@ -696,55 +676,32 @@ const handleSetRoundDuration = async (minutes: number | null) => {
       });
       const seatAssignments = assignMatchNumbers(pairings, staticSeats);
 
-      const matchesToInsert = pairings.map((pairing, index) => ({
-        tournament_id: tournament.id,
-        workspace_id: workspaceId,
-        round_number: 1,
-        match_number: seatAssignments[index].matchNumber,
-        player1_id: pairing.player1Id,
-        player2_id: pairing.player2Id,
-        status: "ready",
-        result: null,
-        winner_id: null,
-      }));
+      // Going live and pairing round 1 happen in one transaction, so a failed
+      // pairing leaves the tournament in draft rather than active with no round.
+      const { error: startError } = await supabase.rpc("start_tournament", {
+        p_tournament_id: tournament.id,
+        p_num_rounds: numRounds,
+        p_matches: pairings.map((pairing, index) => ({
+          match_number: seatAssignments[index].matchNumber,
+          player1_id: pairing.player1Id,
+          player2_id: pairing.player2Id,
+        })),
+      });
 
-      const { data: insertedMatches, error: matchesError } = await supabase
-        .from("tournament_matches")
-        .insert(matchesToInsert)
-        .select();
-
-      if (matchesError) {
-        const { error: rollbackError } = await supabase
-          .from("tournaments")
-          .update({ status: "draft" })
-          .eq("id", tournament.id);
-        if (rollbackError) {
-          throw new Error(
-            `Failed to create round 1 matches: ${matchesError.message}. Tournament status could not be reverted: ${rollbackError.message}`,
-          );
-        }
-        throw new Error(
-          `Failed to create round 1 matches: ${matchesError.message}`,
-        );
+      if (startError) {
+        throw new Error(startError.message || "Failed to start tournament");
       }
 
-      if (!insertedMatches || insertedMatches.length === 0) {
-        const { error: rollbackError } = await supabase
-          .from("tournaments")
-          .update({ status: "draft" })
-          .eq("id", tournament.id);
-        if (rollbackError) {
-          throw new Error(
-            `Failed to create matches and tournament status could not be reverted: ${rollbackError.message}`,
-          );
-        }
-        throw new Error(
-          `Failed to create matches - expected ${matchesToInsert.length} matches but got ${insertedMatches?.length ?? 0}`,
-        );
-      }
-
-      setTournament(tournamentData as TournamentSummary);
-      navigate(wPath(`/tournaments/${tournamentData.id}/matches`));
+      setTournament({
+        ...tournament,
+        status: "active",
+        num_rounds: numRounds,
+        join_enabled: false,
+        current_round_started_at: null,
+        round_elapsed_seconds: 0,
+        round_is_paused: false,
+      });
+      navigate(wPath(`/tournaments/${tournament.id}/matches`));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to start tournament");
     } finally {

@@ -150,44 +150,34 @@ export function usePairingEditor({
       }
 
       if (changedMatches.length > 0) {
-        // DELETE then re-INSERT changed matches to avoid the unique constraint
-        // on player1_id firing mid-loop when players are swapped between rows.
-        const idsToDelete = changedMatches.map(({ match }) => match.id);
-        const { error: deleteError } = await supabase
+        // Replaces the changed rows in one transaction and unpublishes the
+        // round. It still deletes before inserting, so swapping players between
+        // rows cannot trip the per-round unique indexes, but a failure part-way
+        // now rolls the delete back instead of losing the pairings.
+        const { error: replaceError } = await supabase.rpc(
+          "replace_round_matches",
+          {
+            p_tournament_id: tournament.id,
+            p_round_number: selectedRound as number,
+            p_match_ids: changedMatches.map(({ match }) => match.id),
+            p_matches: changedMatches.map(({ match, edited }) => ({
+              match_number: match.match_number,
+              player1_id: edited.player1Id,
+              player2_id: edited.player2Id,
+              pairing_decision_log: decisionLogToJson(match.pairing_decision_log),
+            })),
+          },
+        );
+        if (replaceError)
+          throw new Error(replaceError.message || "Failed to update pairings");
+      } else {
+        await supabase
           .from("tournament_matches")
-          .delete()
-          .in("id", idsToDelete);
-        if (deleteError)
-          throw new Error(deleteError.message || "Failed to update pairings");
-
-        const rowsToInsert = changedMatches.map(({ match, edited }) => ({
-          tournament_id: match.tournament_id,
-          workspace_id: workspaceId,
-          round_number: match.round_number,
-          match_number: match.match_number,
-          player1_id: edited.player1Id,
-          player2_id: edited.player2Id,
-          status: MATCH_STATUS.READY,
-          result: null,
-          winner_id: null,
-          temp_winner_id: null,
-          temp_result: null,
-          pairings_published: false,
-          pairing_decision_log: decisionLogToJson(match.pairing_decision_log),
-        }));
-        const { error: insertError } = await supabase
-          .from("tournament_matches")
-          .insert(rowsToInsert);
-        if (insertError)
-          throw new Error(insertError.message || "Failed to update pairings");
+          .update({ pairings_published: false })
+          .eq("tournament_id", tournament.id)
+          .eq("round_number", selectedRound as number)
+          .eq("status", MATCH_STATUS.READY);
       }
-
-      await supabase
-        .from("tournament_matches")
-        .update({ pairings_published: false })
-        .eq("tournament_id", tournament.id)
-        .eq("round_number", selectedRound as number)
-        .eq("status", MATCH_STATUS.READY);
 
       await refreshMatches();
       setEditingPairings(false);
