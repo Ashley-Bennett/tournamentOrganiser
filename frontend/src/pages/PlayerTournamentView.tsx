@@ -412,6 +412,7 @@ const PlayerTournamentView: React.FC = () => {
   } | null>(null);
 
   const didInitRoundRef = useRef(false);
+  const hasLoadedRef = useRef(false);
   const initialRoundsLoadedRef = useRef(false);
   const prevRoundCountRef = useRef(0);
   const prevTournamentStatusRef = useRef<string | null>(null);
@@ -472,10 +473,17 @@ const PlayerTournamentView: React.FC = () => {
           navigate(`/join/${tournamentId}`, { replace: true });
           return;
         }
-        setError("Failed to load tournament data.");
-        setLoading(false);
+        // A background refresh (poll, realtime, waking the phone) keeps the
+        // data already on screen. Waking fires before the network and the
+        // session token are back, so that first request routinely fails and
+        // the next poll recovers it — only a failed first load is an error.
+        if (!hasLoadedRef.current) {
+          setError("Failed to load tournament data.");
+          setLoading(false);
+        }
         return;
       }
+      hasLoadedRef.current = true;
 
       // get_player_tournament_view returns jsonb — Json here, so the shape
       // it builds has to be asserted rather than inferred.

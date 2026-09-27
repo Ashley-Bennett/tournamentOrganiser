@@ -283,8 +283,12 @@ const TournamentMatches: React.FC = () => {
         }
         initialTournamentLoadDoneRef.current = true;
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Failed to load tournament");
-        setTournament(null);
+        // A refetch (e.g. after the session refreshes on waking the phone)
+        // that fails keeps the tournament already on screen.
+        if (isInitialLoad) {
+          setError(e instanceof Error ? e.message : "Failed to load tournament");
+          setTournament(null);
+        }
       } finally {
         if (isInitialLoad) setLoading(false);
       }
