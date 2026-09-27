@@ -10,8 +10,9 @@ import { useStatsRpcRow } from "../hooks/useStatsRpc";
 /**
  * How long the player's games actually take.
  *
- * Measured from when the round started to when the result was recorded, less
- * any time the round was paused. That includes walking to the desk, so it reads
+ * Measured from when the round started to when the result was first entered (a
+ * player's report or the desk typing it in), less any time the round was paused.
+ * That includes reporting time, so it reads
  * a little long — it is a pace measure, not a stopwatch, and the caption says
  * so rather than implying more precision than there is.
  *
@@ -134,7 +135,7 @@ export default function PlayerPaceSection({
       {!loading && (
         <Typography variant="body2" color="text.secondary" mb={2}>
           Across {timed} timed game{timed === 1 ? "" : "s"}. Measured from the round starting to your
-          result being recorded, so it includes getting to the desk.
+          result being reported, so it includes a little time after the game ends.
         </Typography>
       )}
 
