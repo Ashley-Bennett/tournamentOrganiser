@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION public.get_player_matchup_matrix(p_deck_pokemon1 integer DEFAULT NULL::integer, p_deck_pokemon2 integer DEFAULT NULL::integer, p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone, p_game_id text DEFAULT NULL::text)
+CREATE OR REPLACE FUNCTION public.get_player_matchup_matrix(p_deck_pokemon1 integer DEFAULT NULL::integer, p_deck_pokemon2 integer DEFAULT NULL::integer, p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone, p_game_id text DEFAULT NULL::text, p_stack_variants boolean DEFAULT false)
  RETURNS TABLE(opp_pokemon1 integer, opp_pokemon2 integer, matches_played integer, wins integer, losses integer, draws integer)
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -24,8 +24,6 @@ BEGIN
     SELECT
       tm.id                                                                   AS match_id,
       me.player_id                                                            AS my_player_id,
-      me.deck_pokemon1                                                        AS my_p1,
-      me.deck_pokemon2                                                        AS my_p2,
       CASE WHEN tm.player1_id = me.player_id THEN tm.player2_id
            ELSE tm.player1_id END                                             AS opp_player_id,
       tm.winner_id,
@@ -34,39 +32,46 @@ BEGIN
     JOIN my_entries me ON me.tournament_id = tm.tournament_id
       AND (tm.player1_id = me.player_id OR tm.player2_id = me.player_id)
     WHERE tm.status = 'completed' AND tm.player2_id IS NOT NULL
-      -- Filter is active when EITHER slot is provided — decks can legitimately
-      -- have a NULL first slot, and p1-only checks would silently disable the filter.
-      AND ((p_deck_pokemon1 IS NULL AND p_deck_pokemon2 IS NULL) OR (
-        me.deck_pokemon1 IS NOT DISTINCT FROM p_deck_pokemon1
-        AND me.deck_pokemon2 IS NOT DISTINCT FROM p_deck_pokemon2
-      ))
+      AND ((p_deck_pokemon1 IS NULL AND p_deck_pokemon2 IS NULL) OR
+        public.deck_stats_key(me.deck_pokemon1, me.deck_pokemon2, p_stack_variants)
+          = public.deck_stats_key(p_deck_pokemon1, p_deck_pokemon2, p_stack_variants))
   ),
   -- Resolve opponent deck: prefer match_insights (player-reported), fall back to tournament_players.
   -- match_insights.player_id is auth.users.id (v_uid), not tournament_players.id.
   with_opp_deck AS (
     SELECT
-      mm.match_id,
       mm.my_player_id,
       mm.winner_id,
-      COALESCE(mi.opponent_deck_pokemon1, opp_tp.deck_pokemon1) AS opp_p1,
-      COALESCE(mi.opponent_deck_pokemon2, opp_tp.deck_pokemon2) AS opp_p2
+      CASE WHEN mi.opponent_deck_pokemon1 IS NOT NULL OR mi.opponent_deck_pokemon2 IS NOT NULL
+           THEN mi.opponent_deck_pokemon1 ELSE opp_tp.deck_pokemon1 END AS r1,
+      CASE WHEN mi.opponent_deck_pokemon1 IS NOT NULL OR mi.opponent_deck_pokemon2 IS NOT NULL
+           THEN mi.opponent_deck_pokemon2 ELSE opp_tp.deck_pokemon2 END AS r2
     FROM my_matches mm
     LEFT JOIN public.tournament_players opp_tp
       ON opp_tp.id = mm.opp_player_id AND opp_tp.tournament_id = mm.tournament_id
     LEFT JOIN public.match_insights mi
       ON mi.match_id = mm.match_id AND mi.player_id = v_uid
+  ),
+  keyed AS (
+    SELECT wod.*, public.deck_stats_key(wod.r1, wod.r2, p_stack_variants) AS k
+    FROM with_opp_deck wod
+    WHERE wod.r1 IS NOT NULL OR wod.r2 IS NOT NULL
+  ),
+  grouped AS (
+    SELECT
+      CASE WHEN COUNT(DISTINCT public.deck_norm(kd.r1, kd.r2)) = 1
+           THEN mode() WITHIN GROUP (ORDER BY public.deck_entered(kd.r1, kd.r2))
+           ELSE kd.k END AS shown,
+      COUNT(*)::INT                                                AS n_played,
+      COUNT(*) FILTER (WHERE kd.winner_id = kd.my_player_id)::INT AS n_wins,
+      COUNT(*) FILTER (WHERE kd.winner_id IS NOT NULL
+                         AND kd.winner_id != kd.my_player_id)::INT AS n_losses,
+      COUNT(*) FILTER (WHERE kd.winner_id IS NULL)::INT            AS n_draws
+    FROM keyed kd
+    GROUP BY kd.k
   )
-  SELECT
-    wod.opp_p1 AS opp_pokemon1,
-    wod.opp_p2 AS opp_pokemon2,
-    COUNT(*)::INT                                              AS matches_played,
-    COUNT(*) FILTER (WHERE wod.winner_id = wod.my_player_id)::INT AS wins,
-    COUNT(*) FILTER (WHERE wod.winner_id IS NOT NULL
-                       AND wod.winner_id != wod.my_player_id)::INT AS losses,
-    COUNT(*) FILTER (WHERE wod.winner_id IS NULL)::INT         AS draws
-  FROM with_opp_deck wod
-  WHERE wod.opp_p1 IS NOT NULL OR wod.opp_p2 IS NOT NULL
-  GROUP BY wod.opp_p1, wod.opp_p2
-  ORDER BY matches_played DESC;
+  SELECT g.shown[1], g.shown[2], g.n_played, g.n_wins, g.n_losses, g.n_draws
+  FROM grouped g
+  ORDER BY g.n_played DESC;
 END;
 $function$

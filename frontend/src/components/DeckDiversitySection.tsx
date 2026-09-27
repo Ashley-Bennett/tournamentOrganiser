@@ -6,6 +6,7 @@ import { getSpriteUrl } from "../utils/pokemonCache";
 import { deckName } from "../utils/deck";
 import StatsTimeline, { type TimelineBucket, type TimelinePoint } from "./StatsTimeline";
 import { useStatsRpc } from "../hooks/useStatsRpc";
+import { useStackVariants } from "../hooks/useStackVariants";
 
 /**
  * Is the meta narrowing?
@@ -48,6 +49,7 @@ export default function DeckDiversitySection({
   periodArgsValue: { p_from: string | undefined; p_to: string | undefined };
 }) {
   const [bucket, setBucket] = useState<TimelineBucket>("month");
+  const [stacked] = useStackVariants();
 
   const { p_from, p_to } = periodArgsValue;
 
@@ -59,8 +61,9 @@ export default function DeckDiversitySection({
       p_to,
       p_game_id: gameId,
       p_bucket: bucket,
+      p_stack_variants: stacked,
     },
-    [workspaceId, gameId, p_from, p_to, bucket],
+    [workspaceId, gameId, p_from, p_to, bucket, stacked],
   );
 
   const points: TimelinePoint[] = useMemo(

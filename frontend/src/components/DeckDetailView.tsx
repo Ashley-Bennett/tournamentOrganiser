@@ -7,6 +7,7 @@ import StatsTable, { type StatsColumn } from "./StatsTable";
 import StatBox from "./StatBox";
 import { deckLabel, ordinal, pct } from "../utils/statsFormat";
 import type { DetailView } from "../utils/statsDrill";
+import { useStackVariants } from "../hooks/useStackVariants";
 
 /**
  * Drill-down for one row of the meta share table: who piloted this deck and
@@ -70,6 +71,9 @@ export default function DeckDetailView({
   const [pilots, setPilots] = useState<PilotRow[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
+  // A stacked deck is the whole family folded into it, so the drill-down has to
+  // match the same way the table row that opened it did.
+  const [stacked] = useStackVariants();
 
   const p1 = deck.deck_pokemon1;
   const p2 = deck.deck_pokemon2;
@@ -84,6 +88,7 @@ export default function DeckDetailView({
       p_from: undefined,
       p_to: undefined,
       p_game_id: gameId ?? undefined,
+      p_stack_variants: stacked,
     };
     void Promise.all([
       supabase.rpc("get_organiser_deck_pilots", args),
@@ -93,9 +98,11 @@ export default function DeckDetailView({
       setEvents((eventRes.data ?? []) as EventRow[]);
       setLoading(false);
     });
-  }, [workspaceId, gameId, p1, p2, tournamentIds]);
+  }, [workspaceId, gameId, p1, p2, tournamentIds, stacked]);
 
-  const deckName = deckLabel(p1, p2, nameMap);
+  // Stacked, a lone Pokémon stands for its variants too — say so in the crumb.
+  const deckName =
+    deckLabel(p1, p2, nameMap) + (stacked && (p1 == null || p2 == null) ? " (all variants)" : "");
 
   useEffect(() => {
     onLabel(deckName);

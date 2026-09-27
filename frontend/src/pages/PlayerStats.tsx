@@ -25,6 +25,8 @@ import StatsTable, { type StatsColumn } from "../components/StatsTable";
 import CollapsibleSection from "../components/CollapsibleSection";
 import PlayerPaceSection from "../components/PlayerPaceSection";
 import StatsDeckFilter from "../components/StatsDeckFilter";
+import StackVariantsToggle, { VariantsHint } from "../components/StackVariantsToggle";
+import { useStackVariants } from "../hooks/useStackVariants";
 import { deckKey, deckName } from "../utils/deck";
 import { getGame } from "../games/registry";
 import { ALL_TIME, periodArgs, periodLabel, type StatsPeriod } from "../utils/statsPeriod";
@@ -302,7 +304,12 @@ function DeckCollapsibleSection({ data, loading, nameMap, period }: { data: Deck
         key: "deck",
         label: "Deck",
         sortValue: (d) => deckName(d, nameMap).toLowerCase(),
-        render: (d) => <DeckLabel p1={d.deck_pokemon1} p2={d.deck_pokemon2} nameMap={nameMap} />,
+        render: (d) => (
+          <Box display="flex" alignItems="center" gap={1}>
+            <DeckLabel p1={d.deck_pokemon1} p2={d.deck_pokemon2} nameMap={nameMap} />
+            <VariantsHint count={d.variants} />
+          </Box>
+        ),
       },
       {
         key: "tournaments",
@@ -382,6 +389,13 @@ function FirstSecondSection({
   const [selectedDeck, setSelectedDeck] = useState<DeckStat | null>(null);
   const [data, setData] = useState<FirstSecondStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stacked] = useStackVariants();
+
+  // The deck list is regrouped when stacking flips, so the old pick may no
+  // longer exist as its own entry.
+  useEffect(() => {
+    setSelectedDeck(null);
+  }, [stacked]);
 
   useEffect(() => {
     setLoading(true);
@@ -391,12 +405,13 @@ function FirstSecondSection({
         p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? undefined,
         ...periodArgs(period),
         p_game_id: gameId ?? undefined,
+        p_stack_variants: stacked,
       })
       .then(({ data: rows }) => {
         setData(rows && rows.length > 0 ? (rows[0] as FirstSecondStats) : null);
         setLoading(false);
       });
-  }, [selectedDeck, period, gameId]);
+  }, [selectedDeck, period, gameId, stacked]);
 
   const firstRate = data ? pct(data.went_first_wins, data.went_first_total) : "—";
   const secondRate = data ? pct(data.went_second_wins, data.went_second_total) : "—";
@@ -468,6 +483,11 @@ function MatchupMatrixSection({
   const [selectedDeck, setSelectedDeck] = useState<DeckStat | null>(null);
   const [data, setData] = useState<MatchupRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stacked] = useStackVariants();
+
+  useEffect(() => {
+    setSelectedDeck(null);
+  }, [stacked]);
 
   useEffect(() => {
     setLoading(true);
@@ -477,12 +497,13 @@ function MatchupMatrixSection({
         p_deck_pokemon2: selectedDeck?.deck_pokemon2 ?? undefined,
         ...periodArgs(period),
         p_game_id: gameId ?? undefined,
+        p_stack_variants: stacked,
       })
       .then(({ data: rows }) => {
         setData((rows ?? []) as MatchupRow[]);
         setLoading(false);
       });
-  }, [selectedDeck, period, gameId]);
+  }, [selectedDeck, period, gameId, stacked]);
 
   const matchupColumns: StatsColumn<MatchupRow>[] = useMemo(
     () => [
@@ -712,6 +733,7 @@ const PlayerStats: React.FC = () => {
   const [roundsLoading, setRoundsLoading] = useState(true);
   const [trend, setTrend] = useState<TrendRow[]>([]);
   const [trendLoading, setTrendLoading] = useState(true);
+  const [stacked] = useStackVariants();
 
   useEffect(() => {
     void getPokemonList().then((list) => {
@@ -753,7 +775,6 @@ const PlayerStats: React.FC = () => {
     const args = { p_from, p_to, p_game_id: gameId };
 
     setOverviewLoading(true);
-    setDecksLoading(true);
     setRoundsLoading(true);
     setTrendLoading(true);
 
@@ -762,10 +783,6 @@ const PlayerStats: React.FC = () => {
       setOverviewLoading(false);
     });
 
-    void supabase.rpc("get_player_deck_stats", args).then(({ data }) => {
-      setDecks((data ?? []) as DeckStat[]);
-      setDecksLoading(false);
-    });
 
     void supabase.rpc("get_player_round_performance", args).then(({ data }) => {
       setRounds((data ?? []) as RoundRow[]);
@@ -777,6 +794,18 @@ const PlayerStats: React.FC = () => {
       setTrendLoading(false);
     });
   }, [user, p_from, p_to, gameId, trendBucket]);
+
+  // Separate from the batch above so flipping stacking refetches only the decks.
+  useEffect(() => {
+    if (!user || !gameId) return;
+    setDecksLoading(true);
+    void supabase
+      .rpc("get_player_deck_stats", { p_from, p_to, p_game_id: gameId, p_stack_variants: stacked })
+      .then(({ data }) => {
+        setDecks((data ?? []) as DeckStat[]);
+        setDecksLoading(false);
+      });
+  }, [user, p_from, p_to, gameId, stacked]);
 
   const hasDecks = getGame(gameId).deck !== "none";
 
@@ -805,6 +834,7 @@ const PlayerStats: React.FC = () => {
 
       {/* Season / quarter picker */}
       <StatsPeriodFilter years={years} value={period} onChange={setPeriod} />
+      {hasDecks && <StackVariantsToggle />}
 
       {/* Overview */}
       <OverviewSection data={overview} loading={overviewLoading} />

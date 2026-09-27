@@ -1159,6 +1159,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      deck_entered: { Args: { p1: number; p2: number }; Returns: number[] }
+      deck_norm: { Args: { p1: number; p2: number }; Returns: number[] }
+      deck_solo_count: { Args: { p_pokemon: number }; Returns: number }
+      deck_stats_key: {
+        Args: { p_stack: boolean; p1: number; p2: number }
+        Returns: number[]
+      }
       delete_account: { Args: never; Returns: undefined }
       delete_push_subscription: {
         Args: { p_endpoint: string }
@@ -1305,6 +1312,7 @@ export type Database = {
           p_bucket?: string
           p_from?: string
           p_game_id?: string
+          p_stack_variants?: boolean
           p_to?: string
           p_workspace_id: string
         }
@@ -1326,6 +1334,7 @@ export type Database = {
           p_deck_pokemon2?: number
           p_from?: string
           p_game_id?: string
+          p_stack_variants?: boolean
           p_to?: string
           p_tournament_ids?: string[]
           p_workspace_id: string
@@ -1348,6 +1357,7 @@ export type Database = {
           p_deck_pokemon2?: number
           p_from?: string
           p_game_id?: string
+          p_stack_variants?: boolean
           p_to?: string
           p_tournament_ids?: string[]
           p_workspace_id: string
@@ -1395,6 +1405,7 @@ export type Database = {
         Args: {
           p_from?: string
           p_game_id?: string
+          p_stack_variants?: boolean
           p_to?: string
           p_tournament_ids?: string[]
           p_workspace_id: string
@@ -1410,6 +1421,7 @@ export type Database = {
           pilots: number
           top3_count: number
           total_matches: number
+          variants: number
         }[]
       }
       get_organiser_overview_stats: {
@@ -1440,6 +1452,7 @@ export type Database = {
           p_from?: string
           p_game_id?: string
           p_identity_key: string
+          p_stack_variants?: boolean
           p_to?: string
           p_tournament_ids?: string[]
           p_workspace_id: string
@@ -1455,6 +1468,7 @@ export type Database = {
           last_used: string
           losses: number
           matches_played: number
+          variants: number
           wins: number
         }[]
       }
@@ -1617,7 +1631,12 @@ export type Database = {
         }[]
       }
       get_player_deck_stats: {
-        Args: { p_from?: string; p_game_id?: string; p_to?: string }
+        Args: {
+          p_from?: string
+          p_game_id?: string
+          p_stack_variants?: boolean
+          p_to?: string
+        }
         Returns: {
           deck_pokemon1: number
           deck_pokemon2: number
@@ -1628,6 +1647,7 @@ export type Database = {
           top8_count: number
           total_matches: number
           tournaments_played: number
+          variants: number
         }[]
       }
       get_player_first_second_stats: {
@@ -1636,6 +1656,7 @@ export type Database = {
           p_deck_pokemon2?: number
           p_from?: string
           p_game_id?: string
+          p_stack_variants?: boolean
           p_to?: string
         }
         Returns: {
@@ -1670,6 +1691,7 @@ export type Database = {
           p_deck_pokemon2?: number
           p_from?: string
           p_game_id?: string
+          p_stack_variants?: boolean
           p_to?: string
         }
         Returns: {

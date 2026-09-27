@@ -1,5 +1,5 @@
-CREATE OR REPLACE FUNCTION public.get_organiser_meta_share(p_workspace_id uuid, p_tournament_ids uuid[] DEFAULT NULL::uuid[], p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone, p_game_id text DEFAULT NULL::text)
- RETURNS TABLE(deck_pokemon1 integer, deck_pokemon2 integer, entries integer, pilots integer, match_wins integer, total_matches integer, top3_count integer, event_wins integer, first_seen timestamp with time zone, last_seen timestamp with time zone)
+CREATE OR REPLACE FUNCTION public.get_organiser_meta_share(p_workspace_id uuid, p_tournament_ids uuid[] DEFAULT NULL::uuid[], p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone, p_game_id text DEFAULT NULL::text, p_stack_variants boolean DEFAULT false)
+ RETURNS TABLE(deck_pokemon1 integer, deck_pokemon2 integer, variants integer, entries integer, pilots integer, match_wins integer, total_matches integer, top3_count integer, event_wins integer, first_seen timestamp with time zone, last_seen timestamp with time zone)
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
@@ -33,8 +33,9 @@ BEGIN
       c.tournament_id        AS tid,
       c.identity_key         AS ikey,
       c.played_at,
-      tp.deck_pokemon1       AS p1,
-      tp.deck_pokemon2       AS p2
+      tp.deck_pokemon1       AS r1,
+      tp.deck_pokemon2       AS r2,
+      public.deck_stats_key(tp.deck_pokemon1, tp.deck_pokemon2, p_stack_variants) AS k
     FROM chosen c
     JOIN public.tournament_players tp ON tp.id = c.tournament_player_id
     -- An entry with no deck registered is not a share of the meta; counting
@@ -43,7 +44,7 @@ BEGIN
   ),
   match_stats AS (
     SELECT
-      d.p1, d.p2,
+      d.k,
       COUNT(tm.id)::INT AS n_matches,
       COUNT(tm.id) FILTER (
         WHERE tm.status = 'bye'
@@ -54,11 +55,11 @@ BEGIN
       ON tm.tournament_id = d.tid
      AND (tm.player1_id = d.tpid OR tm.player2_id = d.tpid)
      AND tm.status IN ('completed', 'bye')
-    GROUP BY d.p1, d.p2
+    GROUP BY d.k
   ),
   finishes AS (
     SELECT
-      d.p1, d.p2,
+      d.k,
       COUNT(*) FILTER (WHERE ts.position <= 3 AND fs.n >= 3)::INT AS n_top3,
       COUNT(*) FILTER (WHERE ts.position = 1)::INT                AS n_event_wins
     FROM decked d
@@ -70,21 +71,28 @@ BEGIN
       FROM public.tournament_standings ts2
       GROUP BY ts2.tournament_id
     ) fs ON fs.tid = d.tid
-    GROUP BY d.p1, d.p2
+    GROUP BY d.k
   ),
   summary AS (
     SELECT
-      d.p1, d.p2,
+      d.k,
+      -- One variant: that deck, in the order players entered it most often.
+      -- Several (stacked): the Pokémon they were folded into.
+      CASE WHEN COUNT(DISTINCT public.deck_norm(d.r1, d.r2)) = 1
+           THEN mode() WITHIN GROUP (ORDER BY public.deck_entered(d.r1, d.r2))
+           ELSE d.k END AS shown,
+      COUNT(DISTINCT public.deck_norm(d.r1, d.r2))::INT AS n_variants,
       COUNT(*)::INT                  AS n_entries,
       COUNT(DISTINCT d.ikey)::INT    AS n_pilots,
       MIN(d.played_at)               AS first_at,
       MAX(d.played_at)               AS last_at
     FROM decked d
-    GROUP BY d.p1, d.p2
+    GROUP BY d.k
   )
   SELECT
-    s.p1,
-    s.p2,
+    s.shown[1],
+    s.shown[2],
+    s.n_variants,
     s.n_entries,
     s.n_pilots,
     COALESCE(ms.n_wins, 0),
@@ -94,10 +102,8 @@ BEGIN
     s.first_at,
     s.last_at
   FROM summary s
-  LEFT JOIN match_stats ms ON ms.p1 IS NOT DISTINCT FROM s.p1
-                          AND ms.p2 IS NOT DISTINCT FROM s.p2
-  LEFT JOIN finishes    f  ON f.p1  IS NOT DISTINCT FROM s.p1
-                          AND f.p2  IS NOT DISTINCT FROM s.p2
+  LEFT JOIN match_stats ms ON ms.k = s.k
+  LEFT JOIN finishes    f  ON f.k  = s.k
   ORDER BY s.n_entries DESC, s.last_at DESC;
 END;
 $function$

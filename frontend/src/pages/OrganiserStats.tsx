@@ -22,6 +22,7 @@ import StatsGameFilter from "../components/StatsGameFilter";
 import StatsTimeline, { type TimelineBucket, type TimelinePoint } from "../components/StatsTimeline";
 import LeagueTableSection from "../components/LeagueTableSection";
 import MetaShareSection from "../components/MetaShareSection";
+import StackVariantsToggle from "../components/StackVariantsToggle";
 import DeckDiversitySection from "../components/DeckDiversitySection";
 import EventHealthSection from "../components/EventHealthSection";
 import StatsTable, { type StatsColumn } from "../components/StatsTable";
@@ -358,6 +359,7 @@ const OrganiserStats: React.FC = () => {
 
       <StatsGameFilter gameIds={gameIds} value={gameId} onChange={setGameId} />
       <StatsPeriodFilter years={years} value={period} onChange={setPeriod} />
+      {hasDecks && <StackVariantsToggle />}
 
       {!overviewLoading && overview && overview.events_total === 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>

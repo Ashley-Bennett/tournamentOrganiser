@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION public.get_organiser_deck_diversity(p_workspace_id uuid, p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone, p_game_id text DEFAULT NULL::text, p_bucket text DEFAULT 'month'::text)
+CREATE OR REPLACE FUNCTION public.get_organiser_deck_diversity(p_workspace_id uuid, p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone, p_game_id text DEFAULT NULL::text, p_bucket text DEFAULT 'month'::text, p_stack_variants boolean DEFAULT false)
  RETURNS TABLE(period_label text, period_start timestamp with time zone, events integer, decked_entries integer, distinct_decks integer, effective_decks numeric, top_deck_share numeric, top_deck1 integer, top_deck2 integer)
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
@@ -21,8 +21,9 @@ BEGIN
     SELECT
       DATE_TRUNC(p_bucket, i.played_at) AS bucket_start,
       i.tournament_id                   AS tid,
-      tp.deck_pokemon1                  AS p1,
-      tp.deck_pokemon2                  AS p2
+      tp.deck_pokemon1                  AS r1,
+      tp.deck_pokemon2                  AS r2,
+      public.deck_stats_key(tp.deck_pokemon1, tp.deck_pokemon2, p_stack_variants) AS k
     FROM public.workspace_player_identities(p_workspace_id) i
     JOIN public.tournament_players tp ON tp.id = i.tournament_player_id
     WHERE (p_game_id IS NULL OR i.game_id = p_game_id)
@@ -31,9 +32,15 @@ BEGIN
       AND (tp.deck_pokemon1 IS NOT NULL OR tp.deck_pokemon2 IS NOT NULL)
   ),
   per_deck AS (
-    SELECT d.bucket_start, d.p1, d.p2, COUNT(*)::INT AS n
+    SELECT
+      d.bucket_start,
+      d.k,
+      CASE WHEN COUNT(DISTINCT public.deck_norm(d.r1, d.r2)) = 1
+           THEN mode() WITHIN GROUP (ORDER BY public.deck_entered(d.r1, d.r2))
+           ELSE d.k END AS shown,
+      COUNT(*)::INT AS n
     FROM decked d
-    GROUP BY d.bucket_start, d.p1, d.p2
+    GROUP BY d.bucket_start, d.k
   ),
   per_bucket AS (
     SELECT
@@ -56,9 +63,9 @@ BEGIN
   ),
   top_deck AS (
     SELECT DISTINCT ON (pd.bucket_start)
-      pd.bucket_start, pd.p1, pd.p2, pd.n
+      pd.bucket_start, pd.shown, pd.n
     FROM per_deck pd
-    ORDER BY pd.bucket_start, pd.n DESC, pd.p1 NULLS LAST, pd.p2 NULLS LAST
+    ORDER BY pd.bucket_start, pd.n DESC, pd.k
   )
   SELECT
     CASE p_bucket
@@ -73,8 +80,8 @@ BEGIN
     s.n_distinct,
     ROUND(s.effective::NUMERIC, 1),
     ROUND((td.n::NUMERIC / pb.entries) * 100, 0),
-    td.p1,
-    td.p2
+    td.shown[1],
+    td.shown[2]
   FROM per_bucket pb
   JOIN shannon  s  ON s.bucket_start  = pb.bucket_start
   JOIN top_deck td ON td.bucket_start = pb.bucket_start

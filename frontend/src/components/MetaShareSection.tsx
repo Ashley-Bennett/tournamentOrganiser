@@ -18,6 +18,8 @@ import StatsTable, { type StatsColumn } from "./StatsTable";
 import EventPicker, { type EventOption } from "./EventPicker";
 import { useStatsDrill } from "../hooks/useStatsDrill";
 import { matchesSearch } from "../utils/search";
+import { useStackVariants } from "../hooks/useStackVariants";
+import { VariantsHint } from "./StackVariantsToggle";
 
 /**
  * What the room actually brought.
@@ -37,6 +39,8 @@ import { matchesSearch } from "../utils/search";
 interface MetaRow {
   deck_pokemon1: number | null;
   deck_pokemon2: number | null;
+  /** Distinct decks folded into this row; above 1 only when stacking. */
+  variants: number;
   entries: number;
   pilots: number;
   match_wins: number;
@@ -112,6 +116,7 @@ export default function MetaShareSection({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showOneOffs, setShowOneOffs] = useState(false);
+  const [stacked] = useStackVariants();
 
   useEffect(() => {
     let cancelled = false;
@@ -171,12 +176,13 @@ export default function MetaShareSection({
         p_from: undefined,
         p_to: undefined,
         p_game_id: gameId ?? undefined,
+        p_stack_variants: stacked,
       })
       .then(({ data }) => {
         setRows((data ?? []) as MetaRow[]);
         setLoading(false);
       });
-  }, [workspaceId, gameId, activeKey]);
+  }, [workspaceId, gameId, activeKey, stacked]);
 
   // Share is always of the whole field, not of what survives the filters —
   // otherwise hiding one-offs would silently inflate everything else.
@@ -209,7 +215,10 @@ export default function MetaShareSection({
             .join(" / ")
             .toLowerCase(),
         render: (r) => (
-          <DeckLabel p1={r.deck_pokemon1} p2={r.deck_pokemon2} nameMap={nameMap} />
+          <Box display="flex" alignItems="center" gap={1}>
+            <DeckLabel p1={r.deck_pokemon1} p2={r.deck_pokemon2} nameMap={nameMap} />
+            <VariantsHint count={r.variants} />
+          </Box>
         ),
       },
       {

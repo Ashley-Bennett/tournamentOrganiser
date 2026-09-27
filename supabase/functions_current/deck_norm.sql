@@ -1,0 +1,12 @@
+CREATE OR REPLACE FUNCTION public.deck_norm(p1 integer, p2 integer)
+ RETURNS integer[]
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE
+AS $function$
+  SELECT CASE
+    WHEN p1 IS NULL AND p2 IS NULL THEN NULL
+    WHEN p1 IS NULL OR p2 IS NULL OR p1 = p2 THEN ARRAY[COALESCE(p1, p2)]
+    WHEN p1 < p2 THEN ARRAY[p1, p2]
+    ELSE ARRAY[p2, p1]
+  END
+$function$

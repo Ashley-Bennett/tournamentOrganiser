@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION public.get_organiser_deck_events(p_workspace_id uuid, p_deck_pokemon1 integer DEFAULT NULL::integer, p_deck_pokemon2 integer DEFAULT NULL::integer, p_tournament_ids uuid[] DEFAULT NULL::uuid[], p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone, p_game_id text DEFAULT NULL::text)
+CREATE OR REPLACE FUNCTION public.get_organiser_deck_events(p_workspace_id uuid, p_deck_pokemon1 integer DEFAULT NULL::integer, p_deck_pokemon2 integer DEFAULT NULL::integer, p_tournament_ids uuid[] DEFAULT NULL::uuid[], p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone, p_game_id text DEFAULT NULL::text, p_stack_variants boolean DEFAULT false)
  RETURNS TABLE(tournament_id uuid, tournament_name text, played_at timestamp with time zone, event_status text, copies integer, field_size integer, best_finish integer, match_wins integer, total_matches integer)
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
@@ -33,8 +33,8 @@ BEGIN
       c.played_at
     FROM chosen c
     JOIN public.tournament_players tp ON tp.id = c.tournament_player_id
-    WHERE tp.deck_pokemon1 IS NOT DISTINCT FROM p_deck_pokemon1
-      AND tp.deck_pokemon2 IS NOT DISTINCT FROM p_deck_pokemon2
+    WHERE public.deck_stats_key(tp.deck_pokemon1, tp.deck_pokemon2, p_stack_variants)
+          = public.deck_stats_key(p_deck_pokemon1, p_deck_pokemon2, p_stack_variants)
   ),
   per_event AS (
     SELECT

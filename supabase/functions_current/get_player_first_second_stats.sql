@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION public.get_player_first_second_stats(p_deck_pokemon1 integer DEFAULT NULL::integer, p_deck_pokemon2 integer DEFAULT NULL::integer, p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone, p_game_id text DEFAULT NULL::text)
+CREATE OR REPLACE FUNCTION public.get_player_first_second_stats(p_deck_pokemon1 integer DEFAULT NULL::integer, p_deck_pokemon2 integer DEFAULT NULL::integer, p_from timestamp with time zone DEFAULT NULL::timestamp with time zone, p_to timestamp with time zone DEFAULT NULL::timestamp with time zone, p_game_id text DEFAULT NULL::text, p_stack_variants boolean DEFAULT false)
  RETURNS TABLE(went_first_wins integer, went_first_total integer, went_second_wins integer, went_second_total integer, insights_count integer)
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -36,11 +36,9 @@ BEGIN
       AND mi.went_first IS NOT NULL
       AND tm.status = 'completed'
       AND tm.player2_id IS NOT NULL
-      -- Same either-slot filter semantics as get_player_matchup_matrix.
-      AND ((p_deck_pokemon1 IS NULL AND p_deck_pokemon2 IS NULL) OR (
-        me.deck_pokemon1 IS NOT DISTINCT FROM p_deck_pokemon1
-        AND me.deck_pokemon2 IS NOT DISTINCT FROM p_deck_pokemon2
-      ))
+      AND ((p_deck_pokemon1 IS NULL AND p_deck_pokemon2 IS NULL) OR
+        public.deck_stats_key(me.deck_pokemon1, me.deck_pokemon2, p_stack_variants)
+          = public.deck_stats_key(p_deck_pokemon1, p_deck_pokemon2, p_stack_variants))
   )
   SELECT
     COUNT(*) FILTER (WHERE went_first = TRUE  AND outcome = 'win')::INT  AS went_first_wins,

@@ -7,6 +7,8 @@ import StatsTable, { type StatsColumn } from "./StatsTable";
 import StatBox from "./StatBox";
 import { deckLabel, pct, placing, record } from "../utils/statsFormat";
 import type { DetailView } from "../utils/statsDrill";
+import { useStackVariants } from "../hooks/useStackVariants";
+import { VariantsHint } from "./StackVariantsToggle";
 
 /**
  * Drill-down for one person: what they bring, where they play, and who they
@@ -36,6 +38,7 @@ interface SummaryRow {
 interface DeckRow {
   deck_pokemon1: number | null;
   deck_pokemon2: number | null;
+  variants: number;
   entries: number;
   wins: number;
   losses: number;
@@ -126,6 +129,7 @@ export default function PlayerDetailView({
   const [events, setEvents] = useState<EventRow[]>([]);
   const [opponents, setOpponents] = useState<OpponentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stacked] = useStackVariants();
 
   useEffect(() => {
     let stale = false;
@@ -142,7 +146,7 @@ export default function PlayerDetailView({
 
     void Promise.all([
       supabase.rpc("get_organiser_player_summary", args),
-      supabase.rpc("get_organiser_player_decks", args),
+      supabase.rpc("get_organiser_player_decks", { ...args, p_stack_variants: stacked }),
       supabase.rpc("get_organiser_player_events", args),
       supabase.rpc("get_organiser_player_opponents", args),
     ]).then(([s, d, e, o]) => {
@@ -162,7 +166,7 @@ export default function PlayerDetailView({
     // onLabel is called once per load; excluding it keeps this from refetching
     // every time the parent re-renders with a new closure.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId, gameId, identityKey]);
+  }, [workspaceId, gameId, identityKey, stacked]);
 
   const deckColumns: StatsColumn<DeckRow>[] = [
     {
@@ -170,7 +174,10 @@ export default function PlayerDetailView({
       label: "Deck",
       sortValue: (r) => deckLabel(r.deck_pokemon1, r.deck_pokemon2, nameMap),
       render: (r) => (
-        <DeckCell p1={r.deck_pokemon1} p2={r.deck_pokemon2} nameMap={nameMap} />
+        <Box display="flex" alignItems="center" gap={1}>
+          <DeckCell p1={r.deck_pokemon1} p2={r.deck_pokemon2} nameMap={nameMap} />
+          <VariantsHint count={r.variants} />
+        </Box>
       ),
     },
     {
