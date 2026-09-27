@@ -86,8 +86,7 @@ export default function CardHarness() {
         Card states
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Dev only. Placeholder badge art — the container is real, the letter
-        inside is standing in for a mark nobody has drawn yet.
+        Dev only. Every card state, including ones real data rarely reaches.
       </Typography>
 
       <Case label="bare — a player who has just joined, and the majority case at launch">

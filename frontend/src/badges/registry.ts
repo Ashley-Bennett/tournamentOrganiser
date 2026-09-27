@@ -5,9 +5,6 @@ import type { BadgeDefinition, Tier, TierId } from "./types";
  *
  * Adding one should mean adding an entry here. Nothing outside this directory
  * should branch on a badge id.
- *
- * NOT YET ENABLED. Nothing renders these; the module exists so the data model
- * and the tier maths can be built and tested ahead of any UI.
  */
 
 /**
@@ -45,6 +42,7 @@ export const BADGES: BadgeDefinition[] = [
     thresholds: [1, 5, 25, 50, 100],
     perLeague: true,
     perGame: false,
+    artSrc: "/badges/attendance.png",
   },
   {
     id: "top_cut",
@@ -60,6 +58,7 @@ export const BADGES: BadgeDefinition[] = [
     minFieldSize: 8,
     perLeague: false,
     perGame: true,
+    artSrc: "/badges/top_cut.png",
   },
   {
     id: "champion",
@@ -75,6 +74,7 @@ export const BADGES: BadgeDefinition[] = [
     minFieldSize: 8,
     perLeague: false,
     perGame: true,
+    artSrc: "/badges/champion.png",
   },
   {
     id: "spoiler",
@@ -87,6 +87,7 @@ export const BADGES: BadgeDefinition[] = [
     minFieldSize: 8,
     perLeague: false,
     perGame: true,
+    artSrc: "/badges/spoiler.png",
   },
   {
     id: "bubble",
@@ -99,6 +100,7 @@ export const BADGES: BadgeDefinition[] = [
     minFieldSize: 8,
     perLeague: false,
     perGame: true,
+    artSrc: "/badges/bubble.png",
   },
 ];
 

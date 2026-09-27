@@ -115,6 +115,13 @@ export interface BadgeDefinition {
    * is the same fact whichever night you turn up on.
    */
   perGame: boolean;
+  /**
+   * The mark drawn inside the tier container, served from public/badges/.
+   * One image for every rung — the container carries the tier, the art carries
+   * the badge. Absent until a badge is drawn, and the mark falls back to a
+   * letter.
+   */
+  artSrc?: string;
 }
 
 /** A badge a player holds, as it comes over the wire. */

@@ -7,20 +7,32 @@ import {
   radiusFor,
 } from "../badges/shapes";
 import { isTiered } from "../badges/registry";
-import type { BadgeDefinition, Tier } from "../badges/types";
+import type { BadgeDefinition, ContainerShape, Tier } from "../badges/types";
 
 /**
  * One badge, drawn.
  *
- * PLACEHOLDER ART. The container — tier shape, tier colour, sizing, the count
- * — is final; what sits inside it is a letter standing in for a mark nobody
- * has drawn yet. The props are the ones the real component will take, so
- * replacing the inside is an edit rather than a rewrite, and every screen
- * above this can be built and reviewed before the artwork lands.
+ * The container — tier shape, tier colour, sizing, the count — says which
+ * rung; the art inside it says which badge. A badge with no art yet, or whose
+ * image fails to load, shows the first letter of its title instead.
  */
 
 /** Below this the counter is illegible, so it is dropped rather than drawn. */
 const MIN_SIZE_FOR_COUNT = 32;
+
+/**
+ * How much of the container the art may fill, per shape. Each is roughly the
+ * largest centred square that stays inside the silhouette — the rhombus and
+ * the star lose their corners to the clip, so their art has to be smaller.
+ */
+const ART_SCALE: Record<ContainerShape, number> = {
+  circle: 0.7,
+  hexagon: 0.68,
+  shield: 0.62,
+  star: 0.42,
+  rhombus: 0.52,
+  plaque: 0.74,
+};
 
 export default function BadgeMark({
   badge,
@@ -46,6 +58,12 @@ export default function BadgeMark({
   const fill = tier?.hex ?? UNTIERED_HEX;
   const clip = clipPathFor(shape);
   const label = title ?? badge.title;
+
+  // Reset when the badge changes, so one broken image does not leave every
+  // later badge in this slot on the letter.
+  const [artFailed, setArtFailed] = React.useState(false);
+  React.useEffect(() => setArtFailed(false), [badge.artSrc]);
+  const showArt = Boolean(badge.artSrc) && !artFailed;
 
   const showCount =
     isTiered(badge) &&
@@ -102,7 +120,24 @@ export default function BadgeMark({
           userSelect: "none",
         }}
       >
-        {label.trim().charAt(0).toUpperCase()}
+        {showArt ? (
+          <Box
+            component="img"
+            src={badge.artSrc}
+            alt=""
+            draggable={false}
+            onError={() => setArtFailed(true)}
+            sx={{
+              width: Math.round(size * ART_SCALE[shape]),
+              height: Math.round(size * ART_SCALE[shape]),
+              // The art is pixel art; smoothing it on scale-up blurs it.
+              imageRendering: "pixelated",
+              pointerEvents: "none",
+            }}
+          />
+        ) : (
+          label.trim().charAt(0).toUpperCase()
+        )}
       </Box>
 
       {showCount && (

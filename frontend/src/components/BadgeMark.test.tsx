@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import BadgeMark from "./BadgeMark";
-import { TIERS, getBadge } from "../badges/registry";
+import { BADGES, TIERS, getBadge } from "../badges/registry";
 import { tierFor } from "../badges/tiers";
 import { UNTIERED_HEX } from "../badges/shapes";
 
@@ -46,8 +46,29 @@ describe("BadgeMark", () => {
     expect(mark()).toHaveStyle({ width: "26px", height: "26px" });
   });
 
-  it("shows a stand-in letter until the artwork exists", () => {
+  it("draws the badge's art inside the container", () => {
     render(<BadgeMark badge={attendance} tier={TIERS[2]} title="Regular" />);
+    const art = shape().querySelector("img");
+    expect(art).toHaveAttribute("src", "/badges/attendance.png");
+    expect(shape()).not.toHaveTextContent("R");
+  });
+
+  // Every registered badge has art, so a missing file would otherwise only
+  // show up as a broken image in the running app.
+  it("gives every registered badge art", () => {
+    BADGES.forEach((badge) => expect(badge.artSrc).toBeTruthy());
+  });
+
+  it("shows a stand-in letter for a badge with no art", () => {
+    const undrawn = { ...attendance, artSrc: undefined };
+    render(<BadgeMark badge={undrawn} tier={TIERS[2]} title="Regular" />);
+    expect(shape()).toHaveTextContent("R");
+    expect(shape().querySelector("img")).toBeNull();
+  });
+
+  it("falls back to the letter when the art fails to load", () => {
+    render(<BadgeMark badge={attendance} tier={TIERS[2]} title="Regular" />);
+    fireEvent.error(shape().querySelector("img")!);
     expect(shape()).toHaveTextContent("R");
   });
 
