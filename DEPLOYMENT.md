@@ -29,14 +29,29 @@ VITE_SUPABASE_ANON_KEY=<anon key>
 The anon key is publishable by design; it is safe in the bundle because every
 table is protected by Row Level Security. Never put the service role key here.
 
-### Files that matter in the build
+### Rewrites and security headers
 
-- `frontend/public/_redirects` — `/* /index.html 200`. Without it, refreshing a
-  deep link like `/tournaments/abc` returns 404, because React Router handles
-  those paths in the browser.
-- `frontend/public/_headers` — CSP and other security headers. Adding a new
-  external origin (font host, image CDN, API) means updating the CSP here or the
-  browser blocks it silently.
+Both live in `render.yaml`. Render does not read Netlify-style `_redirects` or
+`_headers` files from the publish directory — a `_headers` file sat in
+`frontend/public/` for months and none of it was ever served.
+
+- `routes` — rewrites `/*` to `/index.html`. Without it, refreshing a deep link
+  like `/tournaments/abc` returns 404, because React Router handles those paths
+  in the browser.
+- `headers` — CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy.
+  Adding a new external origin (image CDN, API, font host) means updating the
+  CSP there, or the browser blocks it silently in production.
+
+`render.yaml` only takes effect if the service is managed as a Render
+**Blueprint**. If the service was created by hand in the dashboard, set the
+same headers under the service's **Headers** settings instead, and keep them in
+step with this file.
+
+To check what production actually serves:
+
+```bash
+curl -sI https://matchamp.win
+```
 
 ## Database
 

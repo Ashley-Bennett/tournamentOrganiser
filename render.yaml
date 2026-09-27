@@ -5,3 +5,38 @@ services:
     runtime: static
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
+
+    # React Router handles every path in the browser, so a refreshed deep link
+    # has to be served index.html rather than a 404.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    # Render does not read Netlify-style `_headers` files; headers are only
+    # served if they are declared here. Adding a new external origin (image
+    # host, API, font provider) means adding it to the CSP below, or the
+    # browser blocks it silently in production.
+    headers:
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=(), payment=()
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      # style-src needs 'unsafe-inline' because MUI (Emotion) injects <style>
+      # tags at runtime. img-src allows raw.githubusercontent.com for the
+      # Pokémon sprites. Fonts are bundled via @fontsource, so no font host —
+      # but Vite inlines the smaller font files as data: URIs, hence data:.
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https://raw.githubusercontent.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self'; manifest-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"

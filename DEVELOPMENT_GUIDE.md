@@ -34,7 +34,7 @@ browser, not by a server. In development the Vite dev server serves `index.html`
 for any path, so refreshing a deep link works.
 
 In production the app is a Render static site. The rewrite that sends unknown
-paths to `index.html` lives in `frontend/public/_redirects`; without it, a
+paths to `index.html` is the `routes` entry in `render.yaml`; without it, a
 refresh on a deep link 404s.
 
 ## Checks
@@ -63,8 +63,9 @@ npx supabase db push
 
 ## Troubleshooting
 
-**A deep link 404s in production** — check `frontend/public/_redirects` is
-present in the build output.
+**A deep link 404s in production** — check the `routes` rewrite in
+`render.yaml` (or the service's Redirects/Rewrites settings on Render, if it is
+not Blueprint-managed).
 
 **Stats or player pages read zero** — `/stats` and the player views need a
 `tournament_players` row with `user_id` set. Organising a tournament is not
