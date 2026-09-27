@@ -49,6 +49,20 @@ describe("BadgeMark", () => {
     expect(getComputedStyle(shape()).filter).toContain(TIERS[3].hex);
   });
 
+  // White and silver are both pale; the glow is what tells them apart.
+  it("glows on silver but not on white", () => {
+    const blurred = (tier: (typeof TIERS)[number]) => {
+      const { unmount } = render(<BadgeMark badge={attendance} tier={tier} />);
+      const glows = /drop-shadow\(0 0 [1-9]\d*px #/.test(
+        getComputedStyle(shape()).filter,
+      );
+      unmount();
+      return glows;
+    };
+    expect(blurred(TIERS[0])).toBe(false);
+    expect(blurred(TIERS[2])).toBe(true);
+  });
+
   it("honours the size it is given", () => {
     render(<BadgeMark badge={attendance} tier={TIERS[0]} size={26} />);
     expect(mark()).toHaveStyle({ width: "26px", height: "26px" });

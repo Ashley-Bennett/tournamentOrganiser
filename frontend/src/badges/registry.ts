@@ -16,11 +16,11 @@ import type { BadgeDefinition, Tier, TierId } from "./types";
  * a star is a rank, a gem is a treasure.
  */
 export const TIERS: Tier[] = [
-  { id: "white", label: "White", shape: "circle", hex: "#EDF0F5" },
-  { id: "bronze", label: "Bronze", shape: "hexagon", hex: "#A9784A" },
-  { id: "silver", label: "Silver", shape: "shield", hex: "#C3C9D2" },
-  { id: "gold", label: "Gold", shape: "star", hex: "#D9AC3F" },
-  { id: "diamond", label: "Diamond", shape: "rhombus", hex: "#8FD3DA" },
+  { id: "white", label: "White", shape: "circle", hex: "#EDF0F5", glow: 0 },
+  { id: "bronze", label: "Bronze", shape: "hexagon", hex: "#A9784A", glow: 0.5 },
+  { id: "silver", label: "Silver", shape: "shield", hex: "#C3C9D2", glow: 0.8 },
+  { id: "gold", label: "Gold", shape: "star", hex: "#D9AC3F", glow: 1 },
+  { id: "diamond", label: "Diamond", shape: "rhombus", hex: "#8FD3DA", glow: 1.4 },
 ];
 
 export const BADGES: BadgeDefinition[] = [

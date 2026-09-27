@@ -35,6 +35,13 @@ export interface Tier {
   shape: ContainerShape;
   /** Starting values. The designer may return a different ramp. */
   hex: string;
+  /**
+   * How strongly the outline glows, 0 to about 1.5. It climbs with the rung so
+   * the tier reads from the glow as well as the colour — white has none at
+   * all, which is what separates it from silver when the two pale colours
+   * look alike.
+   */
+  glow: number;
 }
 
 /** Where a badge came from, which decides its rim treatment. */

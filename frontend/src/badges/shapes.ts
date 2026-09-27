@@ -46,5 +46,12 @@ export function radiusFor(shape: ContainerShape, size: number): string {
  */
 export const UNTIERED_SHAPE: ContainerShape = "plaque";
 
-/** Neutral fill for a badge with no tier, since there is no rung colour. */
-export const UNTIERED_HEX = "#8296B0";
+/**
+ * The colour of a badge with no tier. Purple, because no rung is anywhere
+ * near it — a grey-blue here read as one more pale rung beside white and
+ * silver, which is exactly what an untiered badge is not.
+ */
+export const UNTIERED_HEX = "#A77BFF";
+
+/** Untiered badges glow at full strength; they are the rare ones. */
+export const UNTIERED_GLOW = 1;

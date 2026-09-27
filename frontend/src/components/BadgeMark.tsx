@@ -1,6 +1,7 @@
 import React from "react";
 import { Box } from "@mui/material";
 import {
+  UNTIERED_GLOW,
   UNTIERED_HEX,
   UNTIERED_SHAPE,
   clipPathFor,
@@ -52,9 +53,14 @@ const OUTLINE_ART_SCALE = 0.86;
  * applied to the result of the one before, the diagonals fill in too. The
  * blurred shadows after them glow off the outline rather than the art.
  */
-function outlineFilter(colour: string, size: number, mode: "light" | "dark") {
+function outlineFilter(
+  colour: string,
+  strength: number,
+  size: number,
+  mode: "light" | "dark",
+) {
   const w = Math.max(1, Math.round(size / 40));
-  const glow = Math.max(2, Math.round(size * 0.08));
+  const glow = Math.max(2, Math.round(size * 0.08 * strength));
   return [
     `drop-shadow(${w}px 0 0 ${colour})`,
     `drop-shadow(-${w}px 0 0 ${colour})`,
@@ -62,8 +68,13 @@ function outlineFilter(colour: string, size: number, mode: "light" | "dark") {
     `drop-shadow(0 -${w}px 0 ${colour})`,
     // The white rung vanishes against a light card, so give it an edge there.
     ...(mode === "light" ? ["drop-shadow(0 0 1px rgba(18,26,40,.45))"] : []),
-    `drop-shadow(0 0 ${glow}px ${colour})`,
-    `drop-shadow(0 0 ${Math.round(glow / 2)}px ${colour})`,
+    // No glow at all on the lowest rung — the glow is what you earn.
+    ...(strength > 0
+      ? [
+          `drop-shadow(0 0 ${glow}px ${colour})`,
+          `drop-shadow(0 0 ${Math.max(1, Math.round(glow / 2))}px ${colour})`,
+        ]
+      : []),
   ].join(" ");
 }
 
@@ -91,6 +102,7 @@ export default function BadgeMark({
 }) {
   const shape = tier?.shape ?? UNTIERED_SHAPE;
   const fill = tier?.hex ?? UNTIERED_HEX;
+  const glow = tier?.glow ?? UNTIERED_GLOW;
   const clip = clipPathFor(shape);
   const label = title ?? badge.title;
   const outlined = frame === "outline";
@@ -145,7 +157,7 @@ export default function BadgeMark({
                 color: "#16202F",
                 fontSize: Math.round(size * 0.6),
                 filter: (theme) =>
-                  outlineFilter(fill, size, theme.palette.mode),
+                  outlineFilter(fill, glow, size, theme.palette.mode),
               }
             : {
                 background: fill,
