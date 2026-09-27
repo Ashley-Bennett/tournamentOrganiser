@@ -69,6 +69,30 @@ export function usePushSubscription() {
     supported ? Notification.permission : "denied",
   );
   const [subscribing, setSubscribing] = useState(false);
+  // Follow the permission while the page is open, so a player who unblocks
+  // notifications in the browser's settings comes back to a working switch
+  // rather than a stale "blocked". The change event is not everywhere (older
+  // Safari), so returning to the tab re-reads it as well.
+  useEffect(() => {
+    if (!supported) return;
+    const sync = () => setPermission(Notification.permission);
+    let status: PermissionStatus | null = null;
+    void navigator.permissions
+      ?.query({ name: "notifications" })
+      .then((s) => {
+        status = s;
+        s.addEventListener("change", sync);
+      })
+      .catch(() => {});
+    window.addEventListener("focus", sync);
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      status?.removeEventListener("change", sync);
+      window.removeEventListener("focus", sync);
+      document.removeEventListener("visibilitychange", sync);
+    };
+  }, [supported]);
+
   /** Whether this browser currently holds a push subscription; null until checked. */
   const [subscribed, setSubscribed] = useState<boolean | null>(
     supported ? null : false,

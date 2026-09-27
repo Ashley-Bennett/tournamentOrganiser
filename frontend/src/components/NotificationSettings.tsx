@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { Alert, Box, Divider, Stack, Switch, Typography } from "@mui/material";
+import { Alert, Box, Button, Divider, Stack, Switch, Typography } from "@mui/material";
+import CopyIcon from "@mui/icons-material/ContentCopy";
+import CheckIcon from "@mui/icons-material/Check";
+import { blockedNotificationHelp } from "../utils/notificationHelp";
 import { usePushSubscription } from "../hooks/usePushSubscription";
 import { useNotificationPrefs } from "../hooks/useNotificationPrefs";
 
@@ -37,6 +40,59 @@ function SettingRow({
 }
 
 /**
+ * Notifications were refused, and a page can neither re-ask nor open the
+ * browser's settings — so spell out where the switch is in this browser.
+ */
+function BlockedHelpAlert({ standalone }: { standalone: boolean }) {
+  const help = blockedNotificationHelp(
+    navigator.userAgent,
+    window.location.origin,
+    standalone,
+  );
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    if (!help.settingsUrl) return;
+    try {
+      await navigator.clipboard.writeText(help.settingsUrl);
+      setCopied(true);
+    } catch {
+      // Clipboard refused — the steps above still get them there.
+    }
+  };
+
+  return (
+    <Alert severity="info" variant="outlined">
+      <Typography variant="body2" fontWeight={600} mb={0.5}>
+        Notifications are blocked for MatchAmp. To allow them in {help.browser}:
+      </Typography>
+      <Box component="ol" sx={{ m: 0, pl: 2.5 }}>
+        {help.steps.map((step) => (
+          <Typography component="li" variant="body2" key={step}>
+            {step}
+          </Typography>
+        ))}
+      </Box>
+      {help.settingsUrl && (
+        <Box mt={1.5}>
+          <Typography variant="body2" color="text.secondary" mb={0.5}>
+            Or go straight there: copy this address and paste it into a new tab.
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={copied ? <CheckIcon /> : <CopyIcon />}
+            onClick={() => void copy()}
+          >
+            {copied ? "Copied" : "Copy settings address"}
+          </Button>
+        </Box>
+      )}
+    </Alert>
+  );
+}
+
+/**
  * Per-device notification switches: in-app pop-ups, and OS push for this
  * browser. Both live on the device rather than the account — push is a
  * browser subscription, and most players have no account at all.
@@ -47,6 +103,7 @@ export default function NotificationSettings() {
     supported,
     permission,
     subscribed,
+    standalone,
     iosNeedsInstall,
     inApp,
     subscribing,
@@ -67,10 +124,8 @@ export default function NotificationSettings() {
       "On iPhone and iPad, add MatchAmp to your Home Screen (Share → Add to Home Screen) to get push notifications.";
   } else if (!supported) {
     pushBlocker = "This browser doesn't support push notifications.";
-  } else if (permission === "denied") {
-    pushBlocker =
-      "Notifications are blocked for MatchAmp in your browser settings. Allow them there, then come back to turn push on.";
   }
+  const blocked = !pushBlocker && permission === "denied";
 
   const togglePush = async (next: boolean) => {
     setPushError("");
@@ -98,7 +153,7 @@ export default function NotificationSettings() {
           title="Push notifications on this device"
           description="Get told about new pairings, round timers and results even when MatchAmp is closed."
           checked={pushOn}
-          disabled={!!pushBlocker || subscribing || subscribed === null}
+          disabled={!!pushBlocker || blocked || subscribing || subscribed === null}
           onChange={(next) => void togglePush(next)}
         />
         {pushBlocker && (
@@ -106,6 +161,7 @@ export default function NotificationSettings() {
             {pushBlocker}
           </Alert>
         )}
+        {blocked && <BlockedHelpAlert standalone={standalone} />}
         {pushError && <Alert severity="error">{pushError}</Alert>}
       </Stack>
     </Stack>
