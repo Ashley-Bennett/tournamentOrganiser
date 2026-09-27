@@ -19,6 +19,7 @@ interface Payload {
     | "time_up"
     | "standings_ready"
     | "late_join"
+    | "player_dropped"
     | "bye_paired"
     | "opponent_removed"
     | "link_request"
@@ -26,6 +27,7 @@ interface Payload {
   tournament_id: string;
   round?: number;
   /** late_join / bye_paired: who just added themselves.
+   *  player_dropped: who just dropped themselves.
    *  opponent_removed: who was taken out of the round.
    *  link_request: the entry a player says is theirs. */
   player_name?: string;
@@ -212,6 +214,13 @@ Deno.serve(async (req) => {
         body = round
           ? `Added during round ${round} — tap to check the pairings.`
           : "Tap to check the pairings.";
+      }
+    } else if (type === "player_dropped") {
+      // Organisers only — a player has dropped themselves, which may have
+      // handed someone in the next round a bye.
+      if (row.is_organiser) {
+        title = `${player_name ?? "A player"} dropped`;
+        body = "They left the tournament — tap to check the pairings.";
       }
     } else if (type === "time_up") {
       if (row.is_organiser || (row.tournament_player_id && roundPlayerIds.has(row.tournament_player_id))) {

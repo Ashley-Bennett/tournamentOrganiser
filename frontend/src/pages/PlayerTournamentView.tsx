@@ -5,6 +5,11 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   Paper,
   Table,
@@ -19,6 +24,7 @@ import {
   Alert,
 } from "@mui/material";
 import CatchingPokemonIcon from "@mui/icons-material/CatchingPokemon";
+import ExitToAppIcon from "@mui/icons-material/ExitToApp";
 import { supabase } from "../supabaseClient";
 import { getEntry, clearEntry, saveEntry, type TjEntry } from "../utils/playerStorage";
 import { useAuth } from "../AuthContext";
@@ -390,6 +396,9 @@ const PlayerTournamentView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedRound, setSelectedRound] = useState<number | "standings">(1);
   const [deckPickerOpen, setDeckPickerOpen] = useState(false);
+  const [dropConfirmOpen, setDropConfirmOpen] = useState(false);
+  const [dropping, setDropping] = useState(false);
+  const [dropError, setDropError] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<string>("connecting");
   const [insightsMap, setInsightsMap] = useState<Map<string, InsightsData>>(new Map());
   const [oppWentFirstMap, setOppWentFirstMap] = useState<Map<string, boolean | null>>(new Map());
@@ -698,6 +707,24 @@ const PlayerTournamentView: React.FC = () => {
     [tournamentId, entry, handleRefresh],
   );
 
+  const handleSelfDrop = useCallback(async () => {
+    if (!tournamentId || !entry) return;
+    setDropping(true);
+    setDropError(null);
+    const { error: rpcError } = await supabase.rpc("self_drop_from_tournament", {
+      p_tournament_id: tournamentId,
+      p_player_id: entry.playerId,
+      p_device_token: nullableArg(entry.deviceToken),
+    });
+    setDropping(false);
+    if (rpcError) {
+      setDropError(rpcError.message);
+      return;
+    }
+    setDropConfirmOpen(false);
+    await handleRefresh();
+  }, [tournamentId, entry, handleRefresh]);
+
   const standings = useMemo(() => {
     const completed = matches.filter(
       (m) => m.status === "completed" || m.status === "bye",
@@ -823,7 +850,62 @@ const PlayerTournamentView: React.FC = () => {
             style={{ width: 32, height: 32, imageRendering: "pixelated" }}
           />
         )}
+        {player.dropped ? (
+          <Chip
+            label={
+              player.dropped_at_round
+                ? `Dropped after Round ${player.dropped_at_round}`
+                : "Dropped"
+            }
+            size="small"
+            variant="outlined"
+            sx={{ ml: "auto" }}
+          />
+        ) : (
+          tournament.status === "active" && (
+            <Button
+              size="small"
+              color="error"
+              startIcon={<ExitToAppIcon />}
+              onClick={() => {
+                setDropError(null);
+                setDropConfirmOpen(true);
+              }}
+              sx={{ ml: "auto" }}
+            >
+              Drop
+            </Button>
+          )
+        )}
       </Box>
+      <Dialog open={dropConfirmOpen} onClose={() => !dropping && setDropConfirmOpen(false)}>
+        <DialogTitle>Drop from {tournament.name}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            You keep your record so far, but you won&apos;t be paired in any
+            more rounds. If you&apos;re in the middle of a match, finish or
+            concede it first. Only the organiser can undo this.
+          </DialogContentText>
+          {dropError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {dropError}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDropConfirmOpen(false)} disabled={dropping}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => void handleSelfDrop()}
+            disabled={dropping}
+          >
+            {dropping ? "Dropping…" : "Drop"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 

@@ -1965,6 +1965,14 @@ export type Database = {
           tournament_name: string
         }[]
       }
+      self_drop_from_tournament: {
+        Args: {
+          p_device_token: string
+          p_player_id: string
+          p_tournament_id: string
+        }
+        Returns: undefined
+      }
       self_join_tournament: {
         Args: {
           p_confirmed_distinct?: boolean
