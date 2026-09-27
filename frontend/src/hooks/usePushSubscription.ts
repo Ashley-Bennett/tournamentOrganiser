@@ -1,6 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { nullableArg } from "../utils/rpcArgs";
+import { getAllEntries } from "../utils/playerStorage";
+import { setPrefs } from "../utils/notificationPrefs";
 
 // VAPID public key (base64url) — safe to expose to the client.
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as
@@ -67,6 +69,27 @@ export function usePushSubscription() {
     supported ? Notification.permission : "denied",
   );
   const [subscribing, setSubscribing] = useState(false);
+  /** Whether this browser currently holds a push subscription; null until checked. */
+  const [subscribed, setSubscribed] = useState<boolean | null>(
+    supported ? null : false,
+  );
+
+  useEffect(() => {
+    if (!supported) return;
+    let cancelled = false;
+    void navigator.serviceWorker
+      .getRegistration("/sw.js")
+      .then((reg) => reg?.pushManager.getSubscription() ?? null)
+      .then((sub) => {
+        if (!cancelled) setSubscribed(!!sub);
+      })
+      .catch(() => {
+        if (!cancelled) setSubscribed(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [supported]);
 
   const standalone =
     typeof window !== "undefined" ? detectStandalone() : false;
@@ -96,6 +119,8 @@ export function usePushSubscription() {
     }
     const json = sub.toJSON();
     if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return null;
+    setSubscribed(true);
+    setPrefs({ push: true });
     return {
       endpoint: json.endpoint,
       p256dh: json.keys.p256dh,
@@ -148,14 +173,88 @@ export function usePushSubscription() {
     [doSubscribe],
   );
 
+  /**
+   * Turns push on from the account page rather than from a tournament: links
+   * this browser to every tournament it follows — each one joined on this
+   * device, plus every active event the signed-in user helps run.
+   */
+  const subscribeEverywhere = useCallback(async (): Promise<boolean> => {
+    setSubscribing(true);
+    try {
+      const s = await doSubscribe();
+      if (!s) return false;
+      const keys = { p_endpoint: s.endpoint, p_p256dh: s.p256dh, p_auth: s.auth };
+
+      // One bad link (a stale entry, a tournament since removed) must not stop
+      // the rest, so each is attempted and failures are ignored.
+      const links: PromiseLike<unknown>[] = getAllEntries().map((e) =>
+        supabase.rpc("save_push_subscription", {
+          ...keys,
+          p_tournament_player_id: e.playerId,
+          p_device_token: nullableArg(e.deviceToken),
+        }),
+      );
+
+      const { data: auth } = await supabase.auth.getSession();
+      if (auth.session) {
+        const { data } = await supabase.rpc("get_organiser_alert_state");
+        for (const row of (data ?? []) as { tournament_id: string }[]) {
+          links.push(
+            supabase.rpc("link_organiser_push", {
+              ...keys,
+              p_tournament_id: row.tournament_id,
+            }),
+          );
+        }
+      }
+
+      await Promise.allSettled(links);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setSubscribing(false);
+    }
+  }, [doSubscribe]);
+
+  /**
+   * Stops push on this device. The browser permission stays granted — a page
+   * cannot revoke it — so the opt-out is recorded in the device preferences
+   * too, which is what brings the in-app banners back.
+   */
+  const unsubscribe = useCallback(async (): Promise<boolean> => {
+    setSubscribing(true);
+    try {
+      setPrefs({ push: false });
+      if (!supported) return true;
+      const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+      const sub = await reg?.pushManager.getSubscription();
+      if (sub) {
+        await supabase.rpc("delete_push_subscription", {
+          p_endpoint: sub.endpoint,
+        });
+        await sub.unsubscribe();
+      }
+      setSubscribed(false);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setSubscribing(false);
+    }
+  }, [supported]);
+
   return {
     supported,
     permission,
+    subscribed,
     standalone,
     iosNeedsInstall,
     inApp,
     subscribing,
     subscribeAsPlayer,
     subscribeAsOrganiser,
+    subscribeEverywhere,
+    unsubscribe,
   };
 }

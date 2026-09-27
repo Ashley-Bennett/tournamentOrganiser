@@ -17,6 +17,9 @@ vi.mock("react-router-dom", async () => {
   return { ...actual, useNavigate: () => navigate };
 });
 
+// The settings dialog reaches the push RPCs; the bell tests never open it.
+vi.mock("../supabaseClient", () => ({ supabase: {} }));
+
 const event = (overrides: Partial<NewNotification> = {}): NewNotification => ({
   type: "round_published",
   tournamentId: "t1",

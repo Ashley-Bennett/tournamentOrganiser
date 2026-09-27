@@ -27,11 +27,13 @@ import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import CopyIcon from "@mui/icons-material/ContentCopy";
 import RemovePersonIcon from "@mui/icons-material/PersonRemoveOutlined";
+import NotificationsIcon from "@mui/icons-material/NotificationsNone";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { useWorkspace } from "../WorkspaceContext";
 import { supabase } from "../supabaseClient";
 import MyCardSection from "../components/MyCardSection";
+import NotificationSettings from "../components/NotificationSettings";
 
 interface MemberRow {
   user_id: string;
@@ -377,6 +379,15 @@ const Me = () => {
             </Alert>
           )}
         </Stack>
+      </Paper>
+
+      {/* ── Notifications ───────────────────────────────────── */}
+      <Stack direction="row" spacing={1} alignItems="center" mb={2}>
+        <NotificationsIcon sx={{ color: "text.secondary" }} />
+        <Typography variant="h6">Notifications</Typography>
+      </Stack>
+      <Paper variant="outlined" sx={{ p: 3, mb: 4 }} id="notifications">
+        <NotificationSettings />
       </Paper>
 
       {/* ── Player card ─────────────────────────────────── */}

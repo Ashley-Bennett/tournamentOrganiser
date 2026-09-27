@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Alert, Button, Box } from "@mui/material";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import { usePushSubscription } from "../hooks/usePushSubscription";
+import { getPrefs } from "../utils/notificationPrefs";
 
 interface Props {
   variant: "player" | "organiser";
@@ -42,7 +43,9 @@ export default function PushOptIn({
   );
   const [done, setDone] = useState(false);
 
-  if (dismissed || done) return null;
+  // Switched off in the notification settings — that is an answer, not a
+  // prompt to ask again.
+  if (dismissed || done || !getPrefs().push) return null;
 
   const dismiss = () => {
     localStorage.setItem(dismissKey(variant, tournamentId), "1");

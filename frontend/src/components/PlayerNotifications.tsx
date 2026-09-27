@@ -10,6 +10,7 @@ import {
   resolveNotification,
   type NewNotification,
 } from "../utils/notificationStore";
+import { getPrefs, pushDelivers } from "../utils/notificationPrefs";
 import { useAttentionAlert } from "../hooks/useAttentionAlert";
 import { useAuth } from "../AuthContext";
 import OrganiserWatcher from "./OrganiserWatcher";
@@ -320,16 +321,12 @@ export default function PlayerNotifications() {
       const stored = addNotification(n);
       if (!stored) return;
 
-      // When OS push is granted, the service worker shows the notification for
+      // When OS push is on, the service worker shows the notification for
       // every event (foreground included) — so skip the in-app toast to avoid
       // doubling up. The event is still recorded above, so the app keeps its
-      // own copy of anything the OS announced.
-      if (
-        typeof Notification !== "undefined" &&
-        Notification.permission === "granted"
-      ) {
-        return;
-      }
+      // own copy of anything the OS announced. Pop-ups switched off in the
+      // notification settings stay in the bell only.
+      if (pushDelivers() || !getPrefs().popups) return;
       setAlert({ tournamentId: n.tournamentId, message: n.message });
       notify(n.message);
     },

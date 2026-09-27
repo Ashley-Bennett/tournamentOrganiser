@@ -4,6 +4,10 @@ import {
   Badge,
   Box,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   List,
@@ -15,6 +19,8 @@ import {
   Typography,
 } from "@mui/material";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
+import SettingsIcon from "@mui/icons-material/SettingsOutlined";
+import NotificationSettings from "./NotificationSettings";
 import { useNotifications, useUnreadTitle } from "../hooks/useNotifications";
 import type { StoredNotification } from "../utils/notificationStore";
 import { relativeTime } from "../utils/relativeTime";
@@ -35,6 +41,7 @@ export default function NotificationBell({
   const navigate = useNavigate();
   const { items, unread, markRead, markAllRead, clearAll } = useNotifications();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useUnreadTitle(unread);
 
@@ -112,6 +119,18 @@ export default function NotificationBell({
             >
               Clear
             </Button>
+            <Tooltip title="Notification settings">
+              <IconButton
+                size="small"
+                aria-label="Notification settings"
+                onClick={() => {
+                  setAnchorEl(null);
+                  setSettingsOpen(true);
+                }}
+              >
+                <SettingsIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
         </Box>
         <Divider />
@@ -172,6 +191,21 @@ export default function NotificationBell({
           </List>
         )}
       </Popover>
+
+      <Dialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Notification settings</DialogTitle>
+        <DialogContent>
+          <NotificationSettings />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSettingsOpen(false)}>Done</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
