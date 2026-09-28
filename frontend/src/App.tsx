@@ -38,8 +38,11 @@ const PlayerTournamentView = lazy(() => import("./pages/PlayerTournamentView"));
 const DeviceTournaments = lazy(() => import("./pages/DeviceTournaments"));
 const JoinLanding = lazy(() => import("./pages/JoinLanding"));
 const WhatsNew = lazy(() => import("./pages/WhatsNew"));
-// Dev only. Behind the DEV check so a production build does not even emit it.
-const CardHarness = import.meta.env.DEV
+// Dev server, or a deployed build with VITE_DEV_TOOLS=true (the dev site).
+// Production leaves the flag unset, so its build does not even emit the page.
+const showCardHarness =
+  import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === "true";
+const CardHarness = showCardHarness
   ? lazy(() => import("./pages/CardHarness"))
   : () => null;
 const Badges = lazy(() => import("./pages/Badges"));
@@ -225,10 +228,10 @@ function App() {
                 <Route path="/my-tournaments" element={<DeviceTournaments />} />
 
                 {/* ── Card harness ─────────────────────────────────
-                    Dev only: every card state on one page, including the ones
-                    that are awkward to reach with real data. Stripped from a
-                    production build by the DEV guard. */}
-                {import.meta.env.DEV && (
+                    Dev server and dev site only: every card state on one page,
+                    including the ones that are awkward to reach with real data.
+                    Stripped from a production build by the showCardHarness guard. */}
+                {showCardHarness && (
                   <Route path="/dev/cards" element={<CardHarness />} />
                 )}
 
