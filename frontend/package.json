@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "gen:types": "npx supabase gen types typescript --local > src/types/database.ts"
+    "gen:types": "node ../scripts/genTypes.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",

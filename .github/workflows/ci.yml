@@ -58,11 +58,18 @@ jobs:
       # changes the schema and nobody regenerates, every RPC call keeps
       # type-checking against a schema the database no longer has — exactly the
       # drift the typed client exists to catch.
+      #
+      # The CLI is pinned because it is not a project dependency: bare
+      # `npx supabase` fetches whatever is newest, so the images it starts could
+      # change between two runs of the same commit. Only the database and API
+      # are needed, so the rest of the stack is skipped.
       - name: Start Supabase
-        run: npx supabase start
+        run: npx --yes supabase@2.118.0 start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit
 
+      # Uses a pinned postgres-meta image rather than `supabase gen types`, whose
+      # output formatting varies with the image version. See the script header.
       - name: Regenerate types
-        run: npx supabase gen types typescript --local > frontend/src/types/database.ts
+        run: npm run gen:types
 
       # Functions live in migrations as a pile of CREATE OR REPLACE statements,
       # so functions_current/ is the only place their present-day definition is
@@ -70,13 +77,37 @@ jobs:
       - name: Redump function definitions
         run: npm run dump:functions
 
+      # Checks both before failing, so one push reports every stale file. The
+      # diff goes to the job summary, where it is readable without digging
+      # through the log.
       - name: Fail if either differs from what is committed
         run: |
-          if ! git diff --exit-code -- frontend/src/types/database.ts; then
-            echo "::error::frontend/src/types/database.ts is out of date. Run 'npm run gen:types --workspace=frontend' and commit the result."
-            exit 1
+          stale=0
+          if ! git diff --quiet -- frontend/src/types/database.ts; then
+            echo "::error::frontend/src/types/database.ts is out of date. Run 'npm run gen:types' and commit the result."
+            stale=1
           fi
-          if ! git diff --exit-code -- supabase/functions_current; then
+          if ! git diff --quiet -- supabase/functions_current; then
             echo "::error::supabase/functions_current is out of date. Run 'npm run dump:functions' and commit the result."
+            stale=1
+          fi
+          if [ "$stale" = 1 ]; then
+            {
+              echo '## Generated files differ from what is committed'
+              echo 'The regenerated files are attached to this run as the `regenerated-schema-files` artifact.'
+              echo '```diff'
+              git diff -- frontend/src/types/database.ts supabase/functions_current | head -n 400
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+
+      # What CI generated, ready to download and commit if the job fails.
+      - name: Upload regenerated files
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regenerated-schema-files
+          path: |
+            frontend/src/types/database.ts
+            supabase/functions_current/
